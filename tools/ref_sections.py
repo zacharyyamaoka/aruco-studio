@@ -196,7 +196,7 @@ def run_ref(rel: str, rows, entry):
                     "PYTHONIOENCODING": "utf-8"})
         env.pop("PYTHONPATH", None)
         child = Path(tmp) / "child.py"
-        child.write_text(CHILD, encoding="utf-8")
+        child.write_text(CHILD, encoding="utf-8", newline="\n")
         p = subprocess.run([sys.executable, "-I", "-X", "utf8", str(child), str(ref_path.REF / rel),
                             json.dumps(headers), json.dumps(entry or []),
                             str(ref_path.REF / "CADExporter")],
@@ -237,7 +237,7 @@ def main():
            "about": "A section = a print('<literal>') header of a REF suite. ref_counts = the "
                     "checks REF's own suite passed under each header, run read-only.",
            "suites": suites}
-    OUT.write_text(json.dumps(doc, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    OUT.write_text(json.dumps(doc, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     n = sum(len(s["sections"]) for s in suites)
     print(f"{len(suites)} suites, {n} sections -> {OUT.relative_to(ref_path.ROOT)}")
 

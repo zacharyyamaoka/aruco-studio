@@ -103,7 +103,7 @@ def child(ref, tools, out, names):
             doc.update(extra)
         path = Path(out) / f"{name}.json"
         path.write_text(json.dumps(doc, indent=None, separators=(",", ":"), allow_nan=False)
-                        + "\n", encoding="utf-8")
+                        + "\n", encoding="utf-8", newline="\n")
         print(f"{name}: {len(cases)} cases -> goldens/{name}.json "
               f"({path.stat().st_size // 1024} KB)", flush=True)
 
@@ -193,7 +193,7 @@ def copies(ref, out, ref_path, pinned):
                "sha256": ref_path.sha256_at(rel), "date": date.today().isoformat(),
                "golden": json.loads(raw.decode("utf-8"))}
         (dest / Path(rel).name).write_text(json.dumps(doc, indent=None, separators=(",", ":"),
-                                                      ensure_ascii=False) + "\n", encoding="utf-8")
+                                                      ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
         print(f"copied {rel} -> goldens/ref/{Path(rel).name}")
     # PrusaSlicer's profiles: text files, copied byte for byte, with a manifest
     pdest = Path(out) / "prusaslicer"
@@ -210,7 +210,7 @@ def copies(ref, out, ref_path, pinned):
         p.write_bytes(raw)
         manifest["sha256"][Path(rel).relative_to("tests/fixtures/prusaslicer").as_posix()] = \
             ref_path.sha256_at(rel)
-    (pdest / "provenance.json").write_text(json.dumps(manifest, indent=1) + "\n", encoding="utf-8")
+    (pdest / "provenance.json").write_text(json.dumps(manifest, indent=1) + "\n", encoding="utf-8", newline="\n")
     print(f"copied {len(files)} PrusaSlicer fixture files -> goldens/prusaslicer/")
 
 

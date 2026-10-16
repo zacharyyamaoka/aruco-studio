@@ -100,7 +100,7 @@ INFO_IN = (" fit, but ",)       # a board capped at its dictionary's ids
 TARGET_KEYS = ("source", "z_sign", "x_sketch", "has_body", "key", "host_xform",
                # a face tag's x, fixed at creation (native component frame):
                # x_base the face frame's, x_ref the fitted pattern's (before
-               # the Origin turn) -- an upstream edit cannot turn it 180°
+               # the Origin turn) -- an upstream edit cannot turn it 180Â°
                "x_base", "x_ref")
 
 
