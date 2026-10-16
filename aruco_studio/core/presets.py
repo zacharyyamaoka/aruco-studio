@@ -571,3 +571,297 @@ def layer_note(depth_mm, layer_mm, first_mm=0.0, what="black"):
         head = (f"{what} {d:.2f} mm face down = the {first:g} mm first layer + "
                 f"{j:.2f} × {lay:g} mm")
     return f"{head}: {alts} prints whole layers (face up it depends on the part)"
+
+
+# ============================================ the preset library's pure half
+# Verbatim from REF ArucoMarkers/aruco_preset_library.py at c8216ff (its SCHEMA is
+# LIBRARY_SCHEMA here: this module's SCHEMA is the presets file's). Not here: the recent
+# list's file (server/store.py, M2b), `Library` (the page model: M5's, over the server),
+# `LibraryWindow` (Fusion's palette), `document_nodes` (rolls Fusion's timeline).
+
+import sys as _sys  # noqa: E402
+
+aruco_presets = _sys.modules[__name__]   # REF's name for this module
+from ._ref_compat import aruco_core  # noqa: E402
+
+
+LIBRARY_SCHEMA = "bam_aruco_preset_library/1"
+
+
+MAX_RECENT = 8
+
+
+TITLE = "ArUco Print Presets"
+
+
+COLLECTIONS = [("recent", "Recent", "clock"), ("document", "This document", "doc"),
+               ("mine", "My presets", "star"), ("prusa", "PrusaSlicer profiles", "import"),
+               ("builtin", "Built-in", "cube")]
+
+
+def _g(v, unit=" mm"):
+    if v in (None, "", 0, 0.0):
+        return "–"
+    return f"{v:g}{unit}" if isinstance(v, (int, float)) else str(v)
+
+
+MODE_WORDS = {"auto": "Auto", "both": "White + black", "black": "Black only",
+              "white": "White only"}
+
+
+OP_WORDS = {"join": "Join", "new": "New body"}
+
+
+MARK_WORDS = {"none": "None", "cut": "Cut corner", "triangle": "Black triangle"}
+
+
+PIN_WORDS = {"none": "None", "triangle": "Triangle", "round": "Round"}
+
+
+def subtitle(p):
+    pr = p["profile"]
+    bits = [f"nozzle {pr['nozzle_mm']:g}"]
+    if pr.get("line_mm"):
+        bits.append(f"lines {pr['line_mm']:g}")
+    if pr.get("layer_mm"):
+        bits.append(f"layers {pr['layer_mm']:g}")
+    return " · ".join(bits)
+
+
+def lines_per_cell(p):
+    """The fewest print lines a cell has under this preset (its min cell in
+    lines), or None when cells are not counted in lines."""
+    c = aruco_presets.cell_setting(p)
+    line = aruco_presets.line_mm(p)
+    if c["of"] != "cell" or not line:
+        return None
+    if p["cells"]["step"] != "line" and abs(c["mm"] - line) > 1e-6:
+        return None
+    return max(1, int(math.ceil(c["min_mm"] / line - 1e-9)))
+
+
+def cells_words(p):
+    c = aruco_presets.cell_setting(p)
+    if c["of"] == "marker":
+        return f"marker in {c['mm']:g} mm steps"
+    k = lines_per_cell(p)
+    head = (f"every cell whole {c['mm']:g} mm lines" if k else
+            f"every cell a multiple of {c['mm']:g} mm")
+    return head + (f" (≥ {k} per cell)" if k else "") + f", min cell {c['min_mm']:g} mm"
+
+
+def info(p):
+    """Every value of a preset, in sections, as the Info panel shows them."""
+    pr, c, t, lb = p["profile"], p["cells"], p["tag"], p["label"]
+    return [
+        ["Printer", [["Profile", pr["name"] or "none"], ["Nozzle", _g(pr["nozzle_mm"])],
+                     ["Line width", _g(pr["line_mm"])], ["Layer", _g(pr["layer_mm"])],
+                     ["First layer", _g(pr["first_layer_mm"])]]],
+        ["Cells", [["Rounding", cells_words(p)],
+                   ["Min cell", aruco_presets.min_text(c)]]],
+        ["Tag", [["Dictionary", t["dictionary"]], ["Extrude", MODE_WORDS[t["mode"]]],
+                 ["Operation", OP_WORDS[t["op"]]], ["Quiet zone", f"{t['quiet_modules']:g} module"],
+                 ["Corner mark", MARK_WORDS[t["corner_mark"]]],
+                 ["Fuse corners", "on" if t["grow"] else "off"]]],
+        ["Heights", [["White offset", _g(t["white_offset_mm"]) if t["white_offset_mm"] else "0"],
+                     ["White height", _g(t["white_height_mm"])],
+                     ["Black height", _g(t["black_height_mm"])],
+                     ["Black step", _g(t["black_step_mm"]) if t["black_step_mm"] else "flush"]]],
+        ["Locating pin", [["Shape", PIN_WORDS[t["pin"]]], ["Size", _g(t["pin_size_mm"])],
+                          ["Length", _g(t["pin_length_mm"])],
+                          ["Tolerance", _g(t["pin_tol_mm"])]]],
+        ["Label", [["Label", "on" if lb["on"] else "off"], ["Text", lb["content"]],
+                   ["Position", lb["place"]],
+                   ["Cap height", "auto" if not lb["cap_mm"] else _g(lb["cap_mm"])],
+                   ["Nozzle", _g(lb["nozzle_mm"])]]],
+    ]
+
+
+# the Edit form: (path, label, kind, options) -- kind number / text / select / bool
+def edit_schema():
+    dicts = list(aruco_core.module("fiducials").ARUCO_DICTS)
+    ch = aruco_presets.LABEL_CHOICES
+    return [
+        ["profile.name", "Printer profile", "text", None],
+        ["profile.nozzle_mm", "Nozzle (mm)", "number", None],
+        ["profile.line_mm", "Line width (mm)", "number", None],
+        ["profile.layer_mm", "Layer (mm)", "number", None],
+        ["profile.first_layer_mm", "First layer (mm)", "number", None],
+        ["cells.of", "Round", "select", [["marker", "the marker size"], ["cell", "each cell"]]],
+        ["cells.step", "Multiple of", "select", [["line", "the line width"], ["mm", "a width"]]],
+        ["cells.mm", "Width (mm)", "number", None],
+        ["cells.min_mm", "Min cell (mm)", "number", None],
+        ["tag.dictionary", "Dictionary", "select", [[d, d] for d in dicts]],
+        ["tag.mode", "Extrude", "select", [[k, v] for k, v in MODE_WORDS.items()]],
+        ["tag.op", "Operation", "select", [[k, v] for k, v in OP_WORDS.items()]],
+        ["tag.quiet_modules", "Quiet zone (modules)", "number", None],
+        ["tag.grow", "Fuse corners", "bool", None],
+        ["tag.corner_mark", "Corner mark", "select", [[k, v] for k, v in MARK_WORDS.items()]],
+        ["tag.white_offset_mm", "White offset (mm)", "number", None],
+        ["tag.white_height_mm", "White height (mm)", "number", None],
+        ["tag.black_height_mm", "Black height (mm)", "number", None],
+        ["tag.black_step_mm", "Black step (mm)", "number", None],
+        ["tag.pin", "Locating pin", "select", [[k, v] for k, v in PIN_WORDS.items()]],
+        ["tag.pin_size_mm", "Pin size (mm)", "number", None],
+        ["tag.pin_length_mm", "Pin length (mm)", "number", None],
+        ["tag.pin_tol_mm", "Pin tolerance (mm)", "number", None],
+        ["label.on", "Label", "bool", None],
+        ["label.content", "Label text", "select", [[k, k] for k in ch["content"]]],
+        ["label.place", "Label position", "select", [[k, k] for k in ch["place"]]],
+        ["label.cap_mm", "Cap height (mm, 0 = auto)", "number", None],
+        ["label.nozzle_mm", "Label nozzle (mm)", "number", None],
+    ]
+
+
+def set_path(p, path, value):
+    sect, key = path.split(".", 1)
+    p.setdefault(sect, {})[key] = value
+    return p
+
+
+def thumb_svg(p, marker_id=0):
+    """A small SVG of the preset's dictionary marker (id 0) with its white
+    border. When cells are whole print lines, one cell is shown magnified
+    beside it, cut into its lines ("8 lines"): how many lines a cell has, at
+    the least (the top-left cell is outlined: the one magnified)."""
+    t = p["tag"]
+    try:
+        grid = aruco_core.module("aruco_dict").marker_grid(t["dictionary"], marker_id)
+    except Exception:                              # noqa: BLE001
+        grid = [[1] * 6] + [[1, 0, 1, 0, 1, 1]] * 4 + [[1] * 6]
+    n = len(grid)
+    q = min(1.5, max(0.0, float(t.get("quiet_modules", 1.0))))
+    side = n + 2 * q
+    k = lines_per_cell(p)
+    width = side * 1.62 if k else side
+    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:g} {side:g}">'
+             f'<rect width="{side:g}" height="{side:g}" fill="#fff"/><g shape-rendering="crispEdges">']
+    for y, row in enumerate(grid):
+        x = 0
+        while x < len(row):
+            if row[x]:
+                x0 = x
+                while x < len(row) and row[x]:
+                    x += 1
+                parts.append(f'<rect x="{x0 + q:g}" y="{y + q:g}" width="{x - x0}" height="1" '
+                             f'fill="#111"/>')
+            else:
+                x += 1
+    parts.append("</g>")
+    if k:
+        s = side * 0.5                             # the magnified cell
+        x0, y0 = side * 1.1, side - s - side * 0.06
+        parts.append(f'<rect x="{q:g}" y="{q:g}" width="1" height="1" fill="none" '
+                     f'stroke="#38a6e8" stroke-width="0.12"/>')
+        parts.append(f'<path d="M{q + 1:g} {q + 0.5:g}L{x0:g} {y0 + s / 2:g}" stroke="#38a6e8" '
+                     f'stroke-width="0.08" stroke-dasharray="0.25 0.2" fill="none"/>')
+        parts.append(f'<rect x="{x0:g}" y="{y0:g}" width="{s:g}" height="{s:g}" fill="#111" '
+                     f'stroke="#38a6e8" stroke-width="0.12"/>')
+        for i in range(1, k):
+            xx = x0 + s * i / k
+            parts.append(f'<line x1="{xx:g}" y1="{y0:g}" x2="{xx:g}" y2="{y0 + s:g}" '
+                         f'stroke="#38a6e8" stroke-width="{min(0.1, s / k * 0.35):g}"/>')
+        parts.append(f'<text x="{x0 + s / 2:g}" y="{y0 - side * 0.08:g}" font-size="{side * 0.13:g}" '
+                     f'text-anchor="middle" fill="#38a6e8" font-family="Segoe UI, sans-serif">'
+                     f'{k} line{"s" if k != 1 else ""}</text>')
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def _cells_from(cells_setting, line_mm):
+    """A tag's stored "cells" -> a preset's cells (None: made before them)."""
+    A = aruco_core.module("aruco_autosize")
+    c = A.cells_of(cells_setting) if cells_setting else None
+    if c is None:
+        return None
+    of, step_m, min_m = c
+    mm = round(step_m * 1000.0, 6)
+    step = "line" if (of == "cell" and line_mm and abs(mm - line_mm) < 1e-6) else "mm"
+    return {"of": of, "step": step, "mm": mm, "min_mm": round(min_m * 1000.0, 6),
+            "min_lines": 0}
+
+
+def preset_of_node(s, n, profile=None):
+    """An ArUco Extrude node's print settings (settings_of / numbers_of) as a
+    preset (aruco_presets' shape): what a tag was made with."""
+    p = aruco_presets.default_preset()
+    if profile:
+        p["profile"].update({k: profile.get(k, p["profile"][k]) for k in p["profile"]})
+    t = p["tag"]
+    for k in ("dictionary", "mode", "op"):
+        if s.get(k):
+            t[k] = s[k]
+    t["quiet_modules"] = float(s.get("quiet_modules", t["quiet_modules"]))
+    t["grow"] = bool(s.get("grow"))
+    try:
+        t["corner_mark"] = aruco_core.module("aruco_chamfer").choice_of(s)
+    except Exception:                              # noqa: BLE001
+        t["corner_mark"] = s.get("corner_mark") or "none"
+    for k, nk in (("white_offset_mm", "white_offset"), ("white_height_mm", "white_height"),
+                  ("black_height_mm", "black_height"), ("pin_size_mm", "pin_size"),
+                  ("pin_length_mm", "pin_length"), ("pin_tol_mm", "pin_tol")):
+        if isinstance(n.get(nk), (int, float)):
+            t[k] = float(n[nk])
+    try:
+        top = aruco_core.module("aruco_slabs").white_top(t["mode"], n)
+        t["black_step_mm"] = round(float(n.get("black_offset", top)) - top, 6)
+    except Exception:                              # noqa: BLE001
+        pass
+    t["pin"] = s.get("pin") or "none"
+    lb = s.get("label")
+    if isinstance(lb, dict):
+        for k in ("on", "content", "text", "place", "row", "side", "scope", "cap_mm", "nozzle_mm"):
+            if k in lb:
+                p["label"][k] = lb[k]
+    c = _cells_from(s.get("cells"), aruco_presets.line_mm(p))
+    if c is not None:
+        p["cells"] = c
+    return aruco_presets.normalise(p)
+
+
+def _resolved(p):
+    q = aruco_presets.normalise(copy.deepcopy(p))
+    c = aruco_presets.cell_setting(q)
+    q["cells"] = {"of": c["of"], "step": "mm", "mm": c["mm"], "min_mm": c["min_mm"],
+                  "min_lines": 0}
+    q["profile"]["name"] = ""
+    return q
+
+
+def same_print(a, b):
+    """Do two presets print the same tag (the printer profile's name aside,
+    cells compared as resolved widths)? A node stores its RESOLVED Extrude
+    (white + black / black only / white only); a preset's Auto matches any."""
+    ra, rb = _resolved(a), _resolved(b)
+    if "auto" in (ra["tag"]["mode"], rb["tag"]["mode"]):
+        ra["tag"]["mode"] = rb["tag"]["mode"] = "auto"
+    return aruco_presets.same(ra, rb)
+
+
+def group_nodes(nodes, catalog_items):
+    """[(key, preset)] of the design's tags -> [{"name", "preset", "keys",
+    "matches"}]: one per distinct print setting, named after the catalog
+    preset it equals, else the first tag."""
+    groups = []
+    for key, p in nodes:
+        for g in groups:
+            if same_print(g["preset"], p):
+                g["keys"].append(key)
+                break
+        else:
+            groups.append({"preset": p, "keys": [key], "matches": None})
+    for g in groups:
+        for name, cp, _kind in catalog_items:
+            if same_print(g["preset"], cp):
+                g["matches"] = name
+                break
+        n = len(g["keys"])
+        g["name"] = (g["matches"] if g["matches"] else f"Tag '{g['keys'][0]}' settings")
+        g["note"] = f"{n} tag{'s' if n != 1 else ''} in this design"
+    return groups
+
+
+def preset_of(settings, numbers, profile=None):
+    """A tag's print settings (its settings + numbers, mm) as a preset: REF
+    preset_of_node's mapping. The adapter reads the node; this maps."""
+    return preset_of_node(settings, numbers, profile)

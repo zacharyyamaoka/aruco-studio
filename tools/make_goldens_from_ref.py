@@ -42,7 +42,7 @@ ROOT = TOOLS.parent
 OUT = ROOT / "goldens"
 
 ALL = ["copies", "dictionary", "board", "origin", "slabs", "chamfer", "autosize", "label", "trim",
-       "numbering", "restructure", "jo_maths", "presets", "prusa"]
+       "numbering", "restructure", "jo_maths", "presets", "prusa", "preset_library"]
 
 
 # ======================================================== the parent process
@@ -172,6 +172,8 @@ def child(ref, tools, out, names):
             presets(ref, write, pinned, GC)
         elif name == "prusa":
             prusa(ref, write, pinned, GC)
+        elif name == "preset_library":
+            preset_library(ref, write, pinned, GC)
         else:
             raise SystemExit(f"unknown golden {name!r}; known: {', '.join(ALL)}")
 
@@ -363,6 +365,63 @@ def presets(ref, write, pinned, GC):
           ["ArucoMarkers/aruco_presets.py", "ArucoMarkers/aruco_prusa.py", "ArucoMarkers/aruco_core.py",
            "CADExporter/bam_cad_core/aruco_slabs.py", "CADExporter/bam_cad_core/aruco_label.py"],
           {"profiles": "REF tests/fixtures/prusaslicer (BAM_ARUCO_PRUSASLICER_DIR)"}, cases)
+
+
+NODE_SETTINGS = [
+    ({}, {}), ({"mode": "both", "op": "new"}, {"black_offset": 2.3}),
+    ({"mode": "black", "corner_mark": "triangle", "pin": "round"}, {"pin_size": 4.0, "pin_tol": 0.2}),
+    ({"mode": "both", "chamfer": True, "grow": True, "quiet_modules": 1.5}, {"white_height": 1.6}),
+    ({"mode": "white", "dictionary": "DICT_6X6_250",
+      "cells": {"rule": 1, "of": "cell", "mm": 0.68, "min_mm": 2.0}}, {}),
+    ({"mode": "both", "cells": {"rule": 1, "of": "marker", "mm": 0.5, "min_mm": 0.0},
+      "label": {"on": True, "content": "id_name", "place": "white", "cap_mm": 3.5, "rule": 2}},
+     {"black_height": 0.4}),
+    ({"cells": {"rule": 1, "of": "cell", "mm": 0.45, "min_mm": 1.35}}, {}),
+]
+
+
+def preset_library(ref, write, pinned, GC):
+    for m in ("ArucoMarkers/aruco_preset_library.py", "ArucoMarkers/aruco_presets.py",
+              "ArucoMarkers/aruco_prusa.py", "ArucoMarkers/aruco_core.py"):
+        pinned(m)
+    import aruco_preset_library as PL   # no adsk at the top (only inside its palette half)
+    import aruco_presets as P
+    import aruco_prusa as R
+    fix = os.environ["BAM_ARUCO_PRUSASLICER_DIR"]
+    profs = [R.profile(u["name"], fix) for u in R.user_prints(fix)]
+    presets = [P.default_preset()] + [P.from_profile(pr) for pr in profs] + \
+        [P.normalise(p) for p in PRESET_ODD]
+    cases = []
+    for i, p in enumerate(presets):
+        cases.append({"in": {"fn": "cards", "p": p},
+                      "out": GC.norm({"subtitle": PL.subtitle(p), "lines": PL.lines_per_cell(p),
+                                      "words": PL.cells_words(p), "info": PL.info(p),
+                                      "thumb": PL.thumb_svg(p), "thumb7": PL.thumb_svg(p, 7)})})
+    base = [(None, {}), (profs[-1], {})]
+    for s, n in NODE_SETTINGS:
+        from bam_cad_core import aruco_slabs as SL  # noqa: E402
+        nn = dict({"marker_id": 0, "size": 0.0, "square": 0.0}, **SL.default_numbers(
+            s.get("mode") if s.get("mode") in ("both", "black", "white") else "both"))
+        nn.update(SL.pin_defaults())
+        nn.update(n)
+        for prof, _x in base:
+            got = PL.preset_of_node(dict(s), dict(nn), prof)
+            cases.append({"in": {"fn": "preset_of_node", "s": s, "n": nn, "profile": prof},
+                          "out": GC.norm(got)})
+    for a in presets[:4]:
+        for b in presets[:4]:
+            cases.append({"in": {"fn": "same_print", "a": a, "b": b}, "out": PL.same_print(a, b)})
+    nodes = [(f"k{i}", PL.preset_of_node(dict(s), dict(n), None)) for i, (s, n) in
+             enumerate(NODE_SETTINGS)]
+    cat = [(p["name"], p, "builtin") for p in presets[:3]]
+    cases.append({"in": {"fn": "group_nodes", "nodes": nodes, "catalog": cat},
+                  "out": GC.norm(PL.group_nodes(nodes, cat))})
+    cases.append({"in": {"fn": "edit_schema"}, "out": GC.norm(PL.edit_schema())})
+    write("preset_library", "ArucoMarkers/aruco_preset_library.py",
+          ["ArucoMarkers/aruco_preset_library.py", "ArucoMarkers/aruco_presets.py",
+           "ArucoMarkers/aruco_prusa.py", "ArucoMarkers/aruco_core.py",
+           "CADExporter/bam_cad_core/aruco_slabs.py", "CADExporter/bam_cad_core/aruco_chamfer.py"],
+          {"profiles": "REF tests/fixtures/prusaslicer", "node_settings": "NODE_SETTINGS"}, cases)
 
 
 WIDTHS = [({"extrusion_width": "0"}, "extrusion_width", 0.6, 0.2, 0.2),
