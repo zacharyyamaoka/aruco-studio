@@ -42,7 +42,7 @@ ROOT = TOOLS.parent
 OUT = ROOT / "goldens"
 
 ALL = ["copies", "dictionary", "board", "origin", "slabs", "chamfer", "autosize", "label", "trim",
-       "numbering", "restructure", "jo_maths", "presets", "prusa", "preset_library"]
+       "numbering", "restructure", "jo_maths", "presets", "prusa", "preset_library", "settings", "form"]
 
 
 # ======================================================== the parent process
@@ -88,7 +88,17 @@ def child(ref, tools, out, names):
     import golden_cases as GC
     import ref_path
 
+    EXEC_ONLY = {"ArucoMarkers/aruco_feature.py", "ArucoMarkers/aruco_restructure.py",
+                 "ArucoMarkers/aruco_extrude_cmd.py", "ArucoMarkers/aruco_extrude_ui.py",
+                 "ArucoMarkers/bam_fusion_ui.py",
+                 "ArucoMarkers/aruco_tags.py", "tests/test_aruco_numbering.py"}
+
     def pinned(rel):
+        """The file's sha256 at the pinned commit. A file that is IMPORTED
+        must also equal the pinned commit in REF's working tree; a file whose
+        functions are exec'd from the pinned blob (EXEC_ONLY) need not."""
+        if rel in EXEC_ONLY:
+            return ref_path.sha256_at(rel)
         if not ref_path.same_as_pinned(rel):
             raise SystemExit(f"{rel}: REF's working tree differs from {ref_path.REF_COMMIT}")
         return ref_path.sha256_at(rel)
@@ -174,6 +184,10 @@ def child(ref, tools, out, names):
             prusa(ref, write, pinned, GC)
         elif name == "preset_library":
             preset_library(ref, write, pinned, GC)
+        elif name == "settings":
+            settings_golden(ref, write, pinned, GC)
+        elif name == "form":
+            form_golden(ref, write, pinned, GC)
         else:
             raise SystemExit(f"unknown golden {name!r}; known: {', '.join(ALL)}")
 
@@ -232,7 +246,8 @@ def extract(ref_path, rel, names):
             nm = [t.id for t in node.targets if isinstance(t, ast.Name)]
         if set(nm) & set(names):
             found |= set(nm) & set(names)
-            got.append("\n".join(lines[node.lineno - 1:node.end_lineno]))
+            start = min([node.lineno] + [d.lineno for d in getattr(node, "decorator_list", [])])
+            got.append("\n".join(lines[start - 1:node.end_lineno]))
     missing = set(names) - found
     if missing:
         raise SystemExit(f"{rel}: not found: {sorted(missing)}")
@@ -422,6 +437,405 @@ def preset_library(ref, write, pinned, GC):
            "ArucoMarkers/aruco_prusa.py", "ArucoMarkers/aruco_core.py",
            "CADExporter/bam_cad_core/aruco_slabs.py", "CADExporter/bam_cad_core/aruco_chamfer.py"],
           {"profiles": "REF tests/fixtures/prusaslicer", "node_settings": "NODE_SETTINGS"}, cases)
+
+
+def feature_namespace(ref_path, GC):
+    """REF aruco_feature's pure functions, exec'd from the pinned blob with
+    REF's own aruco_core (no adsk anywhere): the edit model on a fake node."""
+    import types
+    import aruco_core
+    rel = "ArucoMarkers/aruco_feature.py"
+    names = ["SPEC_VERSION", "MODES", "OPS", "HEIGHT_PARAMS", "PIN_PARAMS", "PARAMS",
+             "LEGACY_PARAMS", "INFO_NOTES", "INFO_IN", "TARGET_KEYS", "JO_AFTER",
+             "RESTRUCTURE_IN_PLACE", "M", "A", "SL", "CH", "OR", "AL", "TR", "is_info",
+             "default_settings", "size_is_auto", "has_frame_sketch", "trim_setting", "normalise",
+             "default_numbers", "effective_op", "resolve_follow", "plan_of", "structure",
+             "rebuild_reason", "node_structure", "cells_of", "_param", "is_legacy", "black_follows",
+             "follow_expression", "_norm_expr", "settings_of", "numbers_of", "settle",
+             "keep_black_step", "_merged", "structural_change", "edit_kind", "_settings_key",
+             "_edit_changes", "_trim_not_in_place", "params_for"]
+    ns = {"json": json, "math": __import__("math"), "aruco_core": aruco_core,
+          "aruco_tags": types.SimpleNamespace(frame_sketch_of=lambda cf: cf._frame_sketch)}
+    exec(compile(extract(ref_path, rel, names), rel, "exec"), ns)
+
+    class FeatureView:                      # REF's `aruco_feature` module, as F() sees it
+        def __getattr__(self, k):
+            return ns[k]
+
+    rrel = "ArucoMarkers/aruco_restructure.py"
+    rns = {"F": lambda: FeatureView()}
+    exec(compile(extract(ref_path, rrel, ["ROLE_ORDER", "has_combine", "restructure_plan",
+                                          "new_parts", "needed_params", "refusal", "what_goes"]),
+                 rrel, "exec"), rns)
+
+    def node_roles(cf, s):                  # the one Fusion read refusal() does
+        if cf._roles_error:
+            raise ValueError(cf._roles_error)
+        return {}
+    rns["node_roles"] = node_roles
+    stub = types.ModuleType("aruco_restructure")
+    stub.__dict__.update(rns)
+    sys.modules["aruco_restructure"] = stub   # edit_kind / _trim_not_in_place import it
+    return ns
+
+
+class _Param:
+    def __init__(self, name, value_cm, expression):
+        self.name, self.value, self.expression = name, value_cm, expression
+
+
+class FakeNode:
+    """A custom feature as aruco_feature reads it: the "spec" named value,
+    parameters by id (cm; itemById RAISES for an unknown id, as in 2705), a
+    frame sketch or not, its features matching its parts or not."""
+
+    def __init__(self, stored, params_cm, key="k", follow=False, frame_sketch=True,
+                 roles_error=None):
+        spec = json.dumps(stored)
+        self.customNamedValues = type("NV", (), {
+            "isExistingValue": staticmethod(lambda k: k == "spec"),
+            "value": staticmethod(lambda k: spec)})()
+        names = {pid: f"aruco_{key}_{pid}" for pid in params_cm}
+        ps = {}
+        for pid, v in params_cm.items():
+            expr = f"{round(v * 10.0, 6):g} mm"
+            ps[pid] = _Param(names[pid], v, expr)
+        if follow and "white_offset" in ps and "white_height" in ps and "black_offset" in ps:
+            wo, wh = names["white_offset"], names["white_height"]
+            ps["black_offset"].expression = f"max({wo}; {wo} + {wh})"
+
+        def item(pid):
+            if pid not in ps:
+                raise RuntimeError(f"no parameter {pid}")
+            return ps[pid]
+        self.parameters = type("P", (), {"itemById": staticmethod(item)})()
+        self._frame_sketch = object() if frame_sketch else None
+        self._roles_error = roles_error
+
+
+def settings_cases():
+    """Stored shapes (every generation) x edits x layouts x parameter sets."""
+    import itertools
+    base = {"v": 2, "key": "k", "mode": "both", "op": "join", "layout": "single",
+            "dictionary": "DICT_4X4_50", "quiet_modules": 1.0, "grow": False, "rotate_deg": 0,
+            "legacy": False, "size_auto": True, "force": None, "flip": False, "pin": "none",
+            "turn": 0, "corner_mark": "none", "black_follows": False, "source": "profile",
+            "z_sign": 1, "x_sketch": None, "has_body": True, "host_xform": None}
+    shapes = {
+        "legacy_0810": dict({k: v for k, v in base.items() if k not in ("v",)}),
+        "v2_jo1_no_origin_v": dict(base, parts=["tile", "pocket", "pattern"]),
+        "v2_chamfer_checkbox": dict(base, parts=["tile", "pocket", "pattern"], chamfer=True, jo_v=1),
+        "v2_old_frame": dict(base, parts=["tile", "pocket", "pattern"], frame="opencv", jo_v=2,
+                             origin_v=2),
+        "v2_now": dict(base, parts=["tile", "pocket", "pattern", "trim"], jo_v=2, origin_v=2,
+                       cells={"rule": 1, "of": "cell", "mm": 0.68, "min_mm": 2.0},
+                       trim={"rule": 1, "axes": "x", "margin_mm": 1.0, "force": False},
+                       label={"on": True, "content": "id", "place": "white", "rule": 2}),
+        "v2_label_rule1_square": dict(base, parts=["tile", "pocket", "pattern"], jo_v=2,
+                                      label={"on": True, "scope": "square", "place": "black"}),
+        "v2_black_new": dict(base, mode="black", op="join", has_body=False, parts=["pattern"],
+                             jo_v=2, origin_v=2),
+    }
+    edits = [({}, {}), ({"mode": "black"}, {}), ({"op": "new"}, {}), ({"turn": 90}, {}),
+             ({"layout": "grid", "cols": 3, "rows": 1}, {}), ({"pin": "round"}, {}),
+             ({}, {"white_height": 1.0}), ({}, {"black_offset": 1.0}), ({}, {"size": 25.0}),
+             ({"black_follows": True}, {}), ({"trim": {"rule": 1, "axes": "both"}}, {}),
+             ({"jo_v": 2}, {}), ({"label": {"on": True, "content": "id_name"}}, {}),
+             ({"mode": "white", "op": "new"}, {"white_height": -0.6}),
+             ({"corner_mark": "triangle"}, {}), ({"mode": "auto"}, {})]
+    full = {"marker_id": 3.0, "size": 0.0, "square": 0.0, "white_offset": 0.0, "white_height": 0.2,
+            "black_offset": 0.2, "black_height": -0.06, "pin_size": 0.3, "pin_length": 0.2,
+            "pin_tol": 0.015}
+    no_pins = {k: v for k, v in full.items() if not k.startswith("pin_")}
+    legacy = {"marker_id": 3.0, "size": 2.8, "height": 0.2, "thickness": 0.06, "above": 0.0}
+    out = []
+    for (shape, stored), (s_new, n_new), layout, (pname, params), (fs, roles) in itertools.product(
+            shapes.items(), edits, ("single", "charuco"), (("full", full), ("no_pins", no_pins)),
+            ((True, None), (False, "1 base features for parts ['tile']"))):
+        st = dict(stored, layout=layout)
+        if layout == "charuco":
+            st.update(cols=4, rows=3)
+        if shape == "legacy_0810":
+            pname, params = "legacy", legacy
+        out.append({"shape": shape, "stored": st, "params_cm": params, "pset": pname,
+                    "s_new": s_new, "n_new": n_new, "frame_sketch": fs, "roles_error": roles,
+                    "follow": shape in ("v2_now", "v2_jo1_no_origin_v")})
+    return out
+
+
+def settings_golden(ref, write, pinned, GC):
+    import ref_path
+    for m in ("ArucoMarkers/aruco_feature.py", "ArucoMarkers/aruco_restructure.py",
+              "ArucoMarkers/aruco_core.py"):
+        pinned(m)
+    F = feature_namespace(ref_path, GC)
+    from bam_cad_core import aruco_slabs as SL, markers as Mk
+    cases = []
+    for jo_after in (True, False):
+        F["JO_AFTER"] = jo_after
+        cases.append({"in": {"fn": "default_settings", "jo_after": jo_after},
+                      "out": GC.norm(F["default_settings"]())})
+    F["JO_AFTER"] = True
+    for shape in ({}, {"chamfer": True}, {"chamfer": False, "corner_mark": "triangle"},
+                  {"corner_mark": "bogus"}, {"frame": "opencv", "turn": 90},
+                  {"label": {"on": True, "scope": "square"}}, {"label": "junk"},
+                  {"label": {"on": True, "rule": 1, "offset_x_mm": 2.0}}):
+        for partial in (False, True):
+            cases.append({"in": {"fn": "normalise", "s": shape, "partial": partial},
+                          "out": GC.norm(F["normalise"](shape, partial=partial))})
+    for s in ({"layout": "single"}, {"layout": "charuco"}):
+        for n in ({}, {"size": 0}, {"size": 28.0}, {"size": 0, "square": 30.0}, {"size": "x"},
+                  None):
+            cases.append({"in": {"fn": "size_is_auto", "s": s, "n": n},
+                          "out": F["size_is_auto"](s, n)})
+    for mode in ("both", "black", "white", "auto"):
+        cases.append({"in": {"fn": "default_numbers", "mode": mode},
+                      "out": GC.norm(F["default_numbers"](mode))})
+        for op in ("join", "new"):
+            for has_body in (True, False):
+                for trim in (None, {"rule": 1, "axes": "x"}, "junk"):
+                    s = {"mode": mode if mode != "auto" else "both", "op": op, "has_body": has_body,
+                         "pin": "triangle", "layout": "single", "parts": ["tile", "pocket"]}
+                    if trim is not None:
+                        s["trim"] = trim
+                    n = F["default_numbers"](s["mode"])
+                    cases.append({"in": {"fn": "structure", "s": s, "n": n},
+                                  "out": GC.norm({"structure": F["structure"](s, n),
+                                                  "node_structure": F["node_structure"](s),
+                                                  "effective_op": F["effective_op"](s),
+                                                  "params_for": F["params_for"](s),
+                                                  "trim_setting": F["trim_setting"](s),
+                                                  "follow": F["resolve_follow"](dict(s, black_follows=True), n)})})
+    for mo in ("both", "black", "white", "x"):
+        for m in ("both", "black", "white"):
+            for followed in (False, True):
+                n_old = dict(F["default_numbers"]("both"), black_offset=2.4)
+                n = dict(F["default_numbers"](m), white_height=1.5)
+                cases.append({"in": {"fn": "keep_black_step", "args": [mo, n_old, m, n, followed]},
+                              "out": GC.norm(F["keep_black_step"](mo, n_old, m, n, followed))})
+    for layout in ("single", "charuco"):
+        for size in (0.0, 27.3):
+            for trim in (None, {"rule": 1, "axes": "y"}, {"rule": 5}):
+                s = dict(F["default_settings"](), layout=layout, mode="both", has_body=True, pin="round")
+                if trim is not None:
+                    s["trim"] = trim
+                n = dict(F["default_numbers"]("both"), size=size, square=size * 1.3)
+                spec = Mk.TagSpec(marker_length_m=0.0273, square_length_m=0.0355, layout=layout,
+                                  cols=4 if layout == "charuco" else 1,
+                                  rows=3 if layout == "charuco" else 1)
+                plan = SL.plan("both", "join", True, n, "round")
+                cases.append({"in": {"fn": "settle", "s": s, "n": n, "spec": spec.to_dict(),
+                                     "plan": ["both", "join", True, "round"]},
+                              "out": GC.norm(F["settle"](s, n, {"spec": spec, "plan": plan}))})
+    for c in settings_cases():
+        cf = FakeNode(c["stored"], c["params_cm"], follow=c["follow"], frame_sketch=c["frame_sketch"],
+                      roles_error=c["roles_error"])
+        out = {"black_follows": F["black_follows"](cf),
+               "settings_of": F["settings_of"](cf), "numbers_of": F["numbers_of"](cf),
+               "rebuild_reason": F["rebuild_reason"](cf)}
+        try:
+            out["merged"] = F["_merged"](cf, dict(c["s_new"]), dict(c["n_new"]))
+            s_old, _n_old, s, n = out["merged"]
+            out["structural"] = F["structural_change"](cf, s_old, s, n)
+            out["edit_kind"] = F["edit_kind"](cf, dict(c["s_new"]), dict(c["n_new"]))
+        except Exception as exc:                   # noqa: BLE001
+            out["raises"] = [type(exc).__name__, str(exc)]
+        cases.append({"in": dict(c, fn="node"), "out": GC.norm(out)})
+    write("settings", "ArucoMarkers/aruco_feature.py",
+          ["ArucoMarkers/aruco_feature.py", "ArucoMarkers/aruco_restructure.py",
+           "ArucoMarkers/aruco_core.py", "CADExporter/bam_cad_core/aruco_slabs.py",
+           "CADExporter/bam_cad_core/aruco_label.py", "CADExporter/bam_cad_core/aruco_chamfer.py"],
+          {"how": "aruco_feature's pure functions and aruco_restructure's refusal exec'd from the "
+                  "pinned blobs (both modules import adsk: never imported) on FakeNode, a custom "
+                  "feature as plain data (spec named value, parameters in cm, frame sketch, roles)",
+           "switches": {"JO_AFTER": True, "RESTRUCTURE_IN_PLACE": True}}, cases)
+
+
+FORM_SPECS = [
+    {"marker_id": 3, "marker_length_m": 0.028},
+    {"marker_id": 3, "marker_length_m": 0.02856, "quiet_modules": 2.0},
+    {"marker_id": 0, "marker_length_m": 0.03, "quiet_modules": 0.0},
+    {"marker_id": 5, "marker_length_m": 0.014, "layout": "grid", "cols": 3, "rows": 1,
+     "separation_m": 0.004},
+    {"marker_id": 10, "marker_length_m": 0.009, "layout": "charuco", "cols": 4, "rows": 2,
+     "square_length_m": 0.012, "dictionary": "DICT_5X5_100"},
+    {"marker_id": 1, "marker_length_m": 0.0272, "dictionary": "DICT_6X6_250", "quiet_modules": 1.5},
+]
+FORM_CELLS = [None, {"rule": 1, "of": "marker", "mm": 0.5, "min_mm": 2.0},
+              {"rule": 1, "of": "cell", "mm": 0.68, "min_mm": 2.0},
+              {"rule": 1, "of": "cell", "mm": 0.45, "min_mm": 0.0}]
+INFO_TEXTS = [
+    "no marker fits here: the face is 8.0 x 6.0 mm", "ids 48..53 exceed DICT_4X4_50 (50 ids)",
+    "cell minimum: a cell is 1.36 mm, under the preset's 2 mm", "module 1.00 mm < 1.2 mm",
+    "nothing printable fits", "default raised to 10 mm", "clamped: 30 -> 20 mm",
+    "only one grid marker fits: a single marker would", "ChArUco: 2 inner corners",
+    "6 x 2 fit, but DICT_4X4_50 has 50 ids", "White height 0.05 mm is under 0.1 mm",
+    "Black height snapped", "offset 60 mm is past the limit", "pin size 9 mm is too big",
+    "pin length 0.2 mm", "the pin stops 0.2 mm short", "the white starts below the face",
+    "the black floats 0.4 mm over the white", "the black goes through the tile",
+    "a pinned tag prints upside down", "white border 4.67 mm = 6.86 × 0.68 mm: not whole lines",
+    "Min cell 'x' is not a size", "the white tile is the area's box",
+    "Body1 belongs to the external reference", "Auto size would build 25.0 mm",
+    "saved as preset 'Mine'", "not saved: the name is taken", "Preset 'Default': a → b, c → d",
+    "Imported 'Aruco 0.6': x → y", "This tag's own settings back", "Label too big",
+    "Trim refused: the face is not a rectangle", "something else entirely"]
+INFO_COLOURS = ["#c00", "#c60", "#06c", "#888", "", "#d45500", "#0a66c2", "#cc0000"]
+
+
+def form_golden(ref, write, pinned, GC):
+    import types
+    import ref_path
+    import aruco_core
+    from bam_cad_core import aruco_label as L, aruco_trim as TRMm, markers as Mk
+    rel = "ArucoMarkers/aruco_extrude_cmd.py"
+    ui = "ArucoMarkers/aruco_extrude_ui.py"
+    kit = "ArucoMarkers/bam_fusion_ui.py"
+    F = feature_namespace(ref_path, GC)
+
+    class FeatureView:
+        def __getattr__(self, k):
+            return F[k]
+    import aruco_presets
+    X_state = types.SimpleNamespace(profile=None, mode="both")
+    ns = {"json": json, "aruco_core": aruco_core, "aruco_feature": FeatureView(),
+          "aruco_presets": aruco_presets, "_X": X_state}
+    exec(compile(extract(ref_path, rel, [
+        "LAYOUT_LABELS", "MODE_LABELS", "OP_LABELS", "PIN_LABELS", "LABEL_CONTENT", "LABEL_PLACE",
+        "LABEL_ROW", "LABEL_SIDE", "LABEL_SCOPE", "CELLS", "SL", "OR", "CH", "AL", "_num", "_dd",
+        "defaults", "_base_from", "_cell_line_mm", "_choice_of_cells", "_same_value", "cells_line",
+        "layer_lines", "_cell_warnings", "label_defaults", "_same_label_settings", "WARN_HTML",
+        "LEVEL_HTML", "INFO_ROWS", "INFO_CHARS", "_html", "label_entries", "label_lines",
+        "info_rows", "resolve_mode", "_origin_line", "same_build", "ROLE_WORDS", "_mark_line",
+        "_pin_line", "_mm_text", "size_line", "TRIM_LABELS", "TRIM_MISSING", "TRM", "trim_values",
+        "trim_issues", "trim_lines"]), rel, "exec"), ns)
+    kns = {"re": __import__("re")}
+    from dataclasses import dataclass as _dc
+    kns["dataclass"] = _dc
+    exec(compile("from typing import Dict, List\n" + extract(ref_path, kit, [
+        "LEVELS", "RANK", "PALETTES", "COLOUR", "set_theme", "SIGN", "MSG_SUFFIX", "html", "Issue",
+        "worst", "head_of", "summary_text", "rows_for"]), kit, "exec"), kns)
+    K = types.SimpleNamespace(**{k: v for k, v in kns.items() if not k.startswith("__")})
+    uns = {"re": __import__("re"), "_h": __import__("html"), "K": K, "aruco_core": aruco_core,
+           "X": lambda: types.SimpleNamespace(_X=X_state)}
+    exec(compile(extract(ref_path, ui, ["round_line", "json_key", "FALLBACK", "ROUTES", "_plain",
+                                        "PRESET_EVENTS", "_short", "_level_of", "classify",
+                                        "_short_note", "label_issues"]), ui, "exec"), uns)
+
+    class Inp:                                    # a dialog row, as REF reads it
+        def __init__(self, value=None, name=None, visible=True, valid=True):
+            self.value = value
+            self.selectedItem = types.SimpleNamespace(name=name) if name else None
+            self.isVisible = visible
+            self.isValidExpression = valid
+
+    def inputs(**rows):
+        return types.SimpleNamespace(itemById=lambda cid: rows.get(cid))
+
+    cases = [{"in": {"fn": "defaults"}, "out": GC.norm({"defaults": ns["defaults"](),
+                                                        "label": ns["label_defaults"]()})}]
+    for vals in ({}, {"white_offset": 0.1, "white_height": 0.15, "black_height": 0.05},
+                 {"black_height": -0.04, "white_height": "x"}, {"white_height": True}):
+        cases.append({"in": {"fn": "_base_from", "vals": vals}, "out": GC.norm(ns["_base_from"](vals))})
+    for sd in FORM_SPECS:
+        spec = Mk.TagSpec.from_dict(dict(sd), lambda m: None, "form")
+        for ci, cells in enumerate(FORM_CELLS):
+            s = {"cells": cells} if cells else {}
+            for prof in (None, {"line_mm": 0.68, "layer_mm": 0.32, "first_layer_mm": 0.2},
+                         {"line_mm": 0.45}):
+                X_state.profile = prof
+                cases.append({"in": {"fn": "cells", "spec": sd, "s": s, "profile": prof},
+                              "out": GC.norm({"cells_line": ns["cells_line"](spec, s),
+                                              "warn": ns["_cell_warnings"](spec, s)})})
+        for turn in (0, 90, 180, 270):
+            cases.append({"in": {"fn": "_origin_line", "spec": sd, "turn": turn},
+                          "out": ns["_origin_line"](spec, turn)})
+        cases.append({"in": {"fn": "size_line", "spec": sd}, "out": ns["size_line"](spec)})
+        for choice in ("marker", "line", "custom"):
+            for line, step, typed in ((0.68, 0.5, None), (0.45, 0.5, 28.0), (None, 0.25, 27.3)):
+                cases.append({"in": {"fn": "round_line", "spec": sd, "args": [choice, line, step, typed]},
+                              "out": uns["round_line"](spec, choice, line, step, typed)})
+    for v in (28.0, 27.25, 37.333, 0.0, 5.0, 12.345):
+        cases.append({"in": {"fn": "_mm_text", "v": v}, "out": ns["_mm_text"](v)})
+    for mode in ("both", "black", "white"):
+        for bh in (-0.6, 0.6, -0.5):
+            for prof in (None, {"layer_mm": 0.32, "first_layer_mm": 0.2}, {"layer_mm": 0.2}):
+                X_state.profile = prof
+                n = {"black_height": bh}
+                cases.append({"in": {"fn": "layer_lines", "s": {"mode": mode}, "n": n, "profile": prof},
+                              "out": ns["layer_lines"]({"mode": mode}, n)})
+    for c in ({"of": "marker"}, {"of": "cell", "step": "line"}, {"of": "cell", "step": "mm"}):
+        cases.append({"in": {"fn": "_choice_of_cells", "c": c}, "out": ns["_choice_of_cells"](c)})
+    for a, b in ((True, 1), (1, 1.0), (0.1 + 0.2, 0.3), ("a", "a"), (None, 0)):
+        cases.append({"in": {"fn": "_same_value", "a": a, "b": b}, "out": ns["_same_value"](a, b)})
+    for a, b in (({"on": True, "rule": 1}, {"on": True, "rule": 2}),
+                 ({"cap_mm": 3.0}, {"cap_mm": 3.0000001}), ({"cap_mm": 3.0}, {"cap_mm": 3.1}),
+                 ({"x": "a"}, {"x": "b"}), ({"cap_mm": "x"}, {"cap_mm": 1.0})):
+        cases.append({"in": {"fn": "_same_label_settings", "a": a, "b": b},
+                      "out": ns["_same_label_settings"](a, b)})
+    lines = [[f"<span style='color:{c}'>{t}</span>" if c else t for t in INFO_TEXTS]
+             for c in INFO_COLOURS]
+    for ls in lines:
+        cases.append({"in": {"fn": "classify", "lines": ls},
+                      "out": GC.norm([[i.anchor, i.level, i.text, i.note, i.detail]
+                                      for i in uns["classify"](ls, "black_offset")])})
+        cases.append({"in": {"fn": "info_rows", "lines": ls}, "out": ns["info_rows"](ls)})
+    for t in INFO_TEXTS + ["Preset 'Default': a → b, +3 more"]:
+        cases.append({"in": {"fn": "_short_note", "t": t}, "out": uns["_short_note"](t)})
+        cases.append({"in": {"fn": "_short", "t": t * 6}, "out": uns["_short"](t * 6)})
+    issues = [kns["Issue"]("size", "block", "nothing fits here"), kns["Issue"]("quiet", "warn", "x y"),
+              kns["Issue"]("", "error", "a general thing: with words"), kns["Issue"]("pin", "info", "i"),
+              kns["Issue"]("label_place", "warn", "Label too big (by 2 mm)", note=True)]
+    for k in range(len(issues) + 1):
+        sub = issues[k:] + issues[:k][:1]
+        cases.append({"in": {"fn": "summary", "issues": [[i.anchor, i.level, i.text, i.note, i.detail]
+                                                          for i in sub]},
+                      "out": GC.norm({"summary": kns["summary_text"](sub, {"size": "Size", "quiet": "Quiet zone"},
+                                                                     {"size": "Marker"}, "✓ ok"),
+                                      "worst": kns["worst"](sub),
+                                      "heads": [kns["head_of"](i.text) for i in sub]})})
+    # labels: the info's words and the issue they make
+    for i, case in enumerate(GC.label_cases(L)[:60]):
+        lab = GC_label(case, L, Mk)
+        X_state.mode = case["mode"]
+        on = inputs(label_on=Inp(True))
+        cases.append({"in": {"fn": "label", "case": case},
+                      "out": GC.norm({"entries": ns["label_entries"](lab, case["mode"]),
+                                      "issues": [[x.anchor, x.level, x.text]
+                                                 for x in uns["label_issues"](on, {"label": lab})]})})
+    # Trim excess in the dialog
+    for axes_name in ("Off", "Width (the tag's X)", "Both"):
+        for margin, valid, force in ((0.15, True, False), (0.0, False, False), (0.2, True, True)):
+            inp = inputs(trim=Inp(name=axes_name), trim_margin=Inp(margin, valid=valid),
+                         trim_force=Inp(force))
+            body = (-25.0, -20.0, 25.0, 20.0)
+            for refuse in (False, True):
+                face = [[(-25, -20), (25, -20), (25, 20), (-25, 20)]] if not refuse else \
+                    [[(-25, -20), (25, -20), (25, 0), (0, 0), (0, 20), (-25, 20)]]
+                tp = TRMm.plan_trim("x", (-10.0, -10.0, 10.0, 10.0), body, face,
+                                    volumes=(50 * 40 * 5.0, 30 * 40 * 5.0), z=(-5.0, 0.0),
+                                    force=force)
+                ev = {"trim": tp}
+                s = {"trim": ns["trim_values"](inp), "has_body": True}
+                cases.append({"in": {"fn": "trim", "axes": axes_name, "margin_cm": margin,
+                                     "valid": valid, "force": force, "refuse": refuse},
+                              "out": GC.norm({"values": ns["trim_values"](inp),
+                                              "issues": ns["trim_issues"](inp, ev),
+                                              "lines": ns["trim_lines"](inp, s, ev, "Plate")})})
+    write("form", rel, [rel, ui, kit, "ArucoMarkers/aruco_feature.py", "ArucoMarkers/aruco_presets.py",
+                        "ArucoMarkers/aruco_core.py", "CADExporter/bam_cad_core/aruco_label.py"],
+          {"how": "the dialog's pure functions exec'd from the pinned blobs (the dialog modules import "
+                  "adsk: never imported); the dialog state they read (_X.profile, _X.mode) and the "
+                  "Trim / Label rows as plain stand-ins"}, cases)
+
+
+def GC_label(case, L, Mk):
+    """The Label a golden_cases.label_cases case plans (no corner mark)."""
+    spec = Mk.TagSpec.from_dict(dict(case["spec"]), lambda m: None, "golden")
+    import golden_cases as GC
+    region = GC.REGIONS.get(case["region"]) if case["region"] else None
+    return L.plan_label(spec, dict(case["settings"]), mode=case["mode"],
+                        op=case["op"] if case["mode"] == "both" else None, name=case["name"],
+                        key=case["key"], region=region, grow=case["grow"])
 
 
 WIDTHS = [({"extrusion_width": "0"}, "extrusion_width", 0.6, 0.2, 0.2),
