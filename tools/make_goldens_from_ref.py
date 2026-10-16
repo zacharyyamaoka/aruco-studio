@@ -51,16 +51,18 @@ def parent(names):
     sys.path.insert(0, str(TOOLS))
     import ref_path
     before = ref_path.status()
+    t0 = ref_path.now()
     with tempfile.TemporaryDirectory(prefix="aruco_goldens_") as tmp:
         env = {k: v for k, v in os.environ.items() if k not in ("PYTHONPATH", "PYTHONHOME")}
         env.update({"PYTHONDONTWRITEBYTECODE": "1", "USERPROFILE": tmp, "HOME": tmp,
                     "BAM_ARUCO_PRUSASLICER_DIR": str(ref_path.REF / "tests" / "fixtures" / "prusaslicer"),
                     "PYTHONIOENCODING": "utf-8"})
-        p = subprocess.run([sys.executable, "-I", "-X", "utf8", str(Path(__file__).resolve()),
+        p = subprocess.run([sys.executable, "-I", "-B", "-X", "utf8", str(Path(__file__).resolve()),
                             "--child", str(ref_path.REF), str(TOOLS), str(OUT), *names],
                            cwd=tmp, env=env)
     after = ref_path.status()
-    ours = ref_path.status_check(before, after, read=("CADExporter/", "tests/fixtures/", "tools/make_", "ArucoMarkers/aruco_core.py", "ArucoMarkers/aruco_presets.py", "ArucoMarkers/aruco_prusa.py", "ArucoMarkers/aruco_preset_library.py", "ArucoMarkers/aruco_autosize_gallery.py"))
+    read = ("CADExporter/", "tests/fixtures/", "tools/make_", "ArucoMarkers/aruco_core.py", "ArucoMarkers/aruco_presets.py", "ArucoMarkers/aruco_prusa.py", "ArucoMarkers/aruco_preset_library.py", "ArucoMarkers/aruco_autosize_gallery.py")
+    ours = ref_path.new_bytecode(t0, read) + ref_path.status_check(before, after, read=read)
     if ours:
         raise SystemExit("REF's git status changed in files this run read: " + "; ".join(ours))
     if p.returncode:
@@ -71,6 +73,7 @@ def parent(names):
 # ========================================================= the child process
 
 def child(ref, tools, out, names):
+    sys.dont_write_bytecode = True      # never a .pyc in REF (python -B as well)
     if "aruco_studio" in sys.modules:
         print("REFUSED: aruco_studio is already imported", file=sys.stderr)
         sys.exit(2)

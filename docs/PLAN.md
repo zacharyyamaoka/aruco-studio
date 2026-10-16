@@ -435,3 +435,88 @@ An adversarial review of `ARCHITECTURE.md`, `PLAN.md` and `spec.json` against `B
 | R29 | OpenCV also reads: 10 relabelled copies (each as its own id and only that), a top-down raster of the MESH, and a 12-tag scene PNG with every marker centre within 0.1 mm of its pose (M2b.3, M2b.4, M2b.7; D6; spec ST-T-VERIFY-4). ChArUco detection must interpolate every `charuco_corners` corner (M2b.1). | Variants, the 3D path and the multi-marker canvas had no oracle; a board "detected as a board" said nothing about its corners. |
 | R30 | `pymupdf` pinned for the PDF raster (M2b step 3). | M2.8 rasterised the PDF at 600 dpi with no rasteriser in the venv. |
 | R31 | A locked tag's rule is defined and tested (ARCHITECTURE 5.5; M2b.5; spec ST-T-SCENE-2). | `locked` was a field with a sentence and no check. |
+
+## 7. Builder notes (M1)
+
+Written by the M1 builder, 2026-10-16. Where PLAN and ARCHITECTURE were silent, or where they and the work order differed, this says what was done and why. The numbers are in `docs/status/M1.md`.
+
+### Names and places
+
+| Work order said | Built as (PLAN's names) | Why |
+|---|---|---|
+| `tools/make_goldens.py` | `tools/make_goldens_from_ref.py` | PLAN M1 step 3 names it; the work order says to follow PLAN |
+| `tests/goldens/*.json` | `goldens/*.json`; REF's own fixtures in `goldens/ref/`, PrusaSlicer's profiles in `goldens/prusaslicer/` | PLAN M1 owner paths, ARCHITECTURE 2 |
+| `tests/test_goldens.py` | `tests/core/test_golden_*.py`, one per table | PLAN M1 step 4 |
+| port the REF suites' assertions into pytest | `tests/core/ref_suites/ref_*.py` (REF's script, imports renamed) run by `tests/core/test_ref_*.py`: one pytest test per REF section | every REF check runs unchanged, and each section must pass exactly as many checks as REF's own run did (`tests/ref_sections.json` counted them). The copies are made by `tools/port_ref_suites.py`, never edited by hand |
+| `docs/spec.json` is the orchestrator's (PLAN 2) | M1 set the statuses of its own items, with a `result` field | the work order asks for it |
+
+### How goldens come from REF without importing adsk
+
+| Golden | REF code that made it | How |
+|---|---|---|
+| dictionary, board, origin, slabs, chamfer, autosize, label, trim, numbering | `bam_cad_core/*` | imported read-only: `python -I`, cwd a temp dir, REF's `CADExporter` as `sys.path[0]` |
+| presets, prusa, preset_library | `ArucoMarkers/aruco_presets.py`, `aruco_prusa.py`, `aruco_preset_library.py` | imported: none imports adsk at the top |
+| restructure, jo_maths, settings, form | `aruco_restructure.py`, `aruco_tags.py`, `aruco_feature.py`, `aruco_extrude_cmd.py`, `aruco_extrude_ui.py`, `bam_fusion_ui.py` | these import adsk, so they are NEVER imported. Their pure functions are taken from the pinned blob with `ast` and exec'd alone. The one Fusion read each does gets a plain stand-in: `_jo_probe` returns a frame; a custom feature is `FakeNode` (the spec named value, parameters in cm, frame sketch yes / no, roles match / not) |
+| `goldens/ref/*` | REF's own fixture files (196454c, 8473e14, 5cf71bd, the measured GIM43 disc) | copied verbatim inside a provenance wrapper: `golden` is the file's JSON, `sha256` the file's bytes at c8216ff |
+
+The maker refuses to run (exit 2) when `aruco_studio` is importable; `tests/core/test_golden_provenance.py` proves it. REF's `git status` is compared before and after every run. Other sessions commit in REF all day, so only a change in a file the run read (or bytecode) counts as ours.
+
+### Choices where the plan was silent
+
+| Choice | Why |
+|---|---|
+| A section is any `print("...")` header of a REF suite (plain or f-string), not only `print("== ...")` | 5 suites have no `==` headers (`autosize`, `numbering`, `ids_stability`, `settings`, `markers` print `§4 ...`, `G0.1 ...`). The tallies and indented info lines are left out |
+| `markers.py` kept whole except `instance_fiducials` | PLAN 1.1 dropped `fit_square`, `fit_board`, `largest_rect` and the sidecar helpers. They are pure, and keeping them lets REF's `tests/test_markers.py` run unchanged. `instance_fiducials` needs `fiducials.Fiducial` and a CAD Exporter link description, so it is the one left out |
+| `fiducials.ARUCO_DICTS`, `DICT_ALIASES`, `board_for_tube` live in `core/dictionary.py` | PLAN 1.1; the decal-era rest of `fiducials.py` is not ported |
+| `core/_ref_compat.py` maps REF's module names (`aruco_core.module("aruco_label")`, `aruco_feature.A()`, `aruco_presets.line_mm`) onto the core | copied bodies stay byte for byte REF's; `tests/core/test_port_fidelity.py` checks every shared top-level name against the pinned blob |
+| A node is a `core.edits.NodeState`: stored spec, parameters in mm, black linked, frame sketch, roles error | REF's edit model read a Fusion custom feature; these five facts are all it read |
+| `geometry._dot` is aruco_tags' (p0 + p1 + p2), `_dot_f` aruco_feature's (a sum from the int 0) | they differ in the sign of a zero, and `atan2` sees it; both are kept so the Joint Origin maths is bit for bit |
+| `jo_decompose` returns REF's numbers: the angle in RADIANS (Fusion's `createByReal`), offsets in the frames' unit | ARCHITECTURE 3.1 wrote `angle_deg`; REF hands radians to Fusion |
+| `core/presets.py` takes a store (`.text`, `.aside`); `MemoryStore` is the in-memory one | core never touches a file; REF's file rules (a broken file moved aside, missing = empty) run on the text. `tests/core/ref_suites/ref_store_shim.py` puts REF's path API back on top for the ported suite; `server/store.py` (M2b) is the real home |
+| `core/prusa.py` reads text (`parse_ini`, `parse_bundle`) into `PrusaSources` | the folder walk is the server's (M2b) |
+| `core/validate.py` keeps REF's `Issue(anchor, ...)`; `ANCHOR_FIELD` / `field_of` give each dialog row's TagSpec key path | `validate(spec, plan)` needs the TagPlan, so it is M2's; M1 has the model and the routes |
+| `core/form.py` has no `values(inputs)`, `snap_size`, `_size_limit`, `_check_auto` or the refresh state machine | they read and write Fusion command inputs; the Studio's inspector is built from `/api/form` (M2b) |
+| `core/ids_design.py`: `AssemblySnapshot` + `collection()` make the dict REF's `collect_design` returned, so `plan_design` runs unchanged | ARCHITECTURE 5.4. `staleness`, `_drift`, `export_overrides` measure Fusion bodies or read the node (adapter, M4); `part_plan`, `id_regions`, `label_slots` are `plan/variants.py` (M2) |
+| `core/beds.py` and `core/dictionary.py` still open files (the 3MF / STL writers; the dictionary table, package data) | copied verbatim (PLAN 1.1). M2b should call the writers only from `server/`. `test_purity.py` checks imports, not `open()` |
+| The M1.2 grep is measured with `ast`: no IMPORT of adsk, numpy or cv2 | REF's verbatim docstrings say "cv2 5.0.0" where they record what was measured; a literal grep hits them |
+| `.gitattributes`: LF everywhere | this machine has `core.autocrlf=true`; goldens and ported files must stay byte-identical |
+| `pytest==8.4.2`, `pytest-xdist==3.8.0`, `numpy==2.3.5`, `opencv-contrib-python-headless==5.0.0.93` | PyPI, pinned. cv2 5.0.0 is the version REF's tables were measured on. numpy and cv2 are for M2b's `verify/`; the core never imports them |
+| REF's mutation tables (`tools/mutate_aruco_ids.py`, `mutate_aruco_label.py`) run on the new core: `tests/core/test_ref_mutations.py` | ST-T-LEDGER-1 / ST-T-LABEL-4 ask for it; the 32 rows that break a core file are each killed by their aimed check. The 4 rows that break an add-in file are M4's |
+
+### Parked for M2 (the `evaluate()` cases)
+
+`tests/core/test_ref_cells_legacy.py` and `test_ref_trim_legacy.py` skip their `evaluate()` sections with "parked for M2" (12 + 26 cases, and the junk-trim and JO_AFTER re-runs). M2 replays them through `plan_tag` (M2.1) and removes the parked entries from `tests/ref_trace_notes.json`.
+
+### Not ported (Fusion-only)
+
+REF has 43 `tests/test_aruco_*.py` suites at c8216ff. Ported: the 17 Fusion-free suites (16 whole; `test_aruco_settings` is deferred, below), `test_aruco_frame`'s core half, REF's `test_markers`, `test_print_beds` and `test_print_beds_slicer`, and the pure sections of three add-in suites. Not ported:
+
+| Suite | Why | Owner |
+|---|---|---|
+| `test_aruco_arrow_typing` | typing at a canvas arrow (Fusion custom graphics, the v2 dialog) | M4 (adapter UI) |
+| `test_aruco_chamfer_bodies` | the mark on CSG stand-in bodies (`part_body`, TBM) | M4 (M4.3) |
+| `test_aruco_collect` | the CAD Exporter's `_collect_aruco` on fake Fusion objects | not planned (CAD Exporter) |
+| `test_aruco_disc_fit` | `evaluate()` on the GIM43 discs | M2 (`plan_tag`) |
+| `test_aruco_edit_roundtrip` | Edit -> OK on a stand-in node, the timeline marker, the frame sketch, orphan Joint Origins | M4 (the pure edit model is in goldens/settings.json) |
+| `test_aruco_export_dialog` | the Export dialog on stand-in inputs (its progress-bar section is ported) | M4 |
+| `test_aruco_extrude_dialog` | the Extrude dialog on stand-in inputs | M4 (its words are in goldens/form.json) |
+| `test_aruco_extrude_fixes` | `paint()`, a mode change on a stand-in node | M4 |
+| `test_aruco_extrude_sync` | after-compute hooks on fake Fusion (section 4, `restructure_plan`, is ported) | M4 |
+| `test_aruco_frame` (`evaluate()` and URDF halves) | `evaluate()` x Origin; the URDF needs yourdfpy | M2; skipped: venv |
+| `test_aruco_frame_pnp` | `evaluate()` + OpenCV PnP on a stand-in | skipped: venv; M2b `verify/` |
+| `test_aruco_ids_dialog` | the IDs dialog on the shared table | M4 |
+| `test_aruco_ids_label_warning` | `label_warning` on a stand-in part | M2 (`plan/variants.py`) |
+| `test_aruco_ids_ledger_fusion` | stamps and the ledger read / written on fake Fusion objects (`plan_design` itself is in core/ids_design.py) | M4 |
+| `test_aruco_ids_upstream` | the rebuild hooks' control flow on fake Fusion (the pure digests are core/numbering's) | M4 |
+| `test_aruco_jo_one_per_tag` | one Joint Origin per tag through 12 edits on a stand-in design | M4 (M4.5) |
+| `test_aruco_label_bodies` | the label as CSG bodies | M4 (M4.3) |
+| `test_aruco_label_print` | the slicing oracle | skipped: venv |
+| `test_aruco_marker_table` (clicks, pick, zoom, navigation) | the table's UI (its names and rows are ported) | M3 (studio/src/table) |
+| `test_aruco_preset_library` | the palette window and its messages | M5 |
+| `test_aruco_presets_dialog` | presets in the Fusion dialog | M4 |
+| `test_aruco_refresh_hook` | the v2 dialog's refresh hook | M4 |
+| `test_aruco_restructure_sim` | the in-place `restructure()` on a stand-in timeline | M4 (M4.6) |
+| `test_aruco_settings` | the remembered dialog options and their file; `snapshot` / `apply` read Fusion inputs | deferred: M2b (`server/store.py`) |
+| `test_aruco_trim_dialog` | Trim excess in the Fusion dialog | M4 (`trim_issues` / `trim_lines` are in goldens/form.json) |
+| `test_aruco_trim_feature` | Trim excess in `evaluate()` and compute on a stand-in | M2 / M4 |
+| `test_aruco_ui_v2` | the v2 dialog on stand-ins (classify and the Issue model are in goldens/form.json) | M4 |

@@ -142,6 +142,7 @@ def sections_of(src: str):
 # logic). Kept as source text so the child imports nothing of ours.
 CHILD = r'''
 import json, sys, runpy, builtins
+sys.dont_write_bytecode = True
 import re
 path, headers, entry, core_dir = sys.argv[1], json.loads(sys.argv[2]), json.loads(sys.argv[3]), sys.argv[4]
 # headers: [[key, regex], ...] in source order
@@ -208,7 +209,7 @@ def run_ref(rel: str, rows, entry):
         env.pop("PYTHONPATH", None)
         child = Path(tmp) / "child.py"
         child.write_text(CHILD, encoding="utf-8", newline="\n")
-        p = subprocess.run([sys.executable, "-I", "-X", "utf8", str(child), str(ref_path.REF / rel),
+        p = subprocess.run([sys.executable, "-I", "-B", "-X", "utf8", str(child), str(ref_path.REF / rel),
                             json.dumps(headers), json.dumps(entry or []),
                             str(ref_path.REF / "CADExporter")],
                            cwd=tmp, env=env, capture_output=True, timeout=900)
@@ -256,6 +257,7 @@ def attach_spec_ids(rel, rows, tests):
 
 def main():
     before = ref_path.status()
+    t0 = ref_path.now()
     tests = spec_tests()
     suites = []
     for rel, how in SUITES.items():
@@ -277,7 +279,8 @@ def main():
             print(f"   {res['PASS']} passed, {res['FAIL']} failed, exit {res['exit']}", flush=True)
         suites.append(entry)
     after = ref_path.status()
-    ours = ref_path.status_check(before, after, read=("CADExporter/", "tests/", "tools/make_"))
+    read = ("CADExporter/", "tests/", "tools/make_")
+    ours = ref_path.new_bytecode(t0, read) + ref_path.status_check(before, after, read=read)
     if ours:
         raise SystemExit("REF's git status changed in files this run read: " + "; ".join(ours))
     doc = {"schema": "arucostudio.ref_sections/1", "ref": str(ref_path.REF),

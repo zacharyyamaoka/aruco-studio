@@ -68,3 +68,30 @@ def status_check(before: str, after: str, read=()) -> list:
         print("note: REF changed during the run by another session (not read by this run): "
               + "; ".join(others))
     return ours
+
+
+def now() -> float:
+    import time
+    return time.time()
+
+
+def new_bytecode(since: float, read=()) -> list:
+    """Bytecode written under REF since `since` by this interpreter's version
+    for a source file the run read (`read`: path prefixes). git ignores
+    __pycache__, so `git status` cannot see it; another session's runs write
+    bytecode too, so only the files this run read count."""
+    import sys
+    tag = f"cpython-{sys.version_info[0]}{sys.version_info[1]}"
+    out = []
+    for p in REF.rglob(f"*.{tag}.pyc"):
+        if ".git" in p.parts:
+            continue
+        src = (p.parent.parent / (p.name.split(".")[0] + ".py")).relative_to(REF).as_posix()
+        if read and not any(src.startswith(r) for r in read):
+            continue
+        try:
+            if p.stat().st_mtime >= since:
+                out.append(f"?? {p.relative_to(REF).as_posix()} (bytecode written during the run)")
+        except OSError:
+            pass
+    return out
