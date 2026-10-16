@@ -37,7 +37,8 @@ SUITES = ["test_aruco_autosize", "test_aruco_board", "test_aruco_cells", "test_a
           "test_aruco_chamfer", "test_aruco_label", "test_aruco_label_position",
           "test_aruco_label_preview", "test_aruco_label_rule1", "test_aruco_numbering",
           "test_aruco_ids_stability", "test_aruco_output", "test_aruco_slabs", "test_aruco_trim",
-          "test_aruco_trim_legacy", "test_aruco_presets", "test_aruco_frame"]
+          "test_aruco_trim_legacy", "test_aruco_presets", "test_aruco_frame",
+          "test_print_beds", "test_print_beds_slicer", "test_markers"]
 
 GOLD = 'Path(__file__).resolve().parents[3] / "goldens" / "ref"'
 PRELUDE = ("# REF: tests/{name}.py at {commit} (cad-exporter), ported by tools/port_ref_suites.py:\n"

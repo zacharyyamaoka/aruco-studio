@@ -125,10 +125,8 @@ def test_shared_names_are_refs_text(module, ref, adapted):
 
 def test_whole_core_copies_keep_every_ref_name():
     """A copied bam_cad_core module keeps every one of REF's top-level names
-    (markers.py: but the ones PLAN 1.1 does not port)."""
-    not_ported = {"fit_square", "fit_board", "tile_aspect", "_row_intervals", "_covered",
-                  "largest_rect", "tags_from_payload", "attach_joint_origins",
-                  "resolve_for_description", "instance_fiducials"}
+    (markers.py: but instance_fiducials, the CAD Exporter's URDF bridge)."""
+    not_ported = {"instance_fiducials"}
     for module, refs in PORTS.items():
         ref = refs[0][0]
         if not ref.startswith(B) or ref.endswith("fiducials.py"):

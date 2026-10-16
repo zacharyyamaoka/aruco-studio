@@ -62,6 +62,11 @@ SUITES = {
                                   "why": "only test_origin_math is core; the rest loads a stand-in adsk or needs yourdfpy"},
     "tests/test_aruco_frame_pnp.py": {"run": False, "why": "stand-in adsk + cv2"},
     "tests/test_aruco_label_print.py": {"run": False, "why": "the slicing oracle's venv"},
+    # the tag model (core/markers.py) and the print beds (core/beds.py): Fusion-free,
+    # not ArUco-named
+    "tests/test_markers.py": {"run": True},
+    "tests/test_print_beds.py": {"run": True},
+    "tests/test_print_beds_slicer.py": {"run": True},
     # add-in suites (a stand-in adsk) with sections of pure logic, hand-ported
     "tests/test_aruco_extrude_sync.py": {"run": False, "why": "stand-in adsk; section 4 is pure"},
     "tests/test_aruco_marker_table.py": {"run": False, "why": "its module guards an adsk import; "

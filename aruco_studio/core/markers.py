@@ -939,8 +939,132 @@ def suggest(n_tags: int, *, marker_length_m: Optional[float] = None,
     return out
 
 
-# fit_square, fit_board, tile_aspect, _row_intervals, _covered and
-# largest_rect are NOT ported: aruco_autosize supersedes them (PLAN 1.1).
+def fit_square(face_w_m: float, face_h_m: float, dictionary: str,
+               quiet_modules: float = DEFAULT_QUIET_MODULES) -> float:
+    """The marker_length that fills a w x h face with its quiet zone."""
+    n = (dictionary_bits(dictionary) or 4) + 2
+    side = min(face_w_m, face_h_m)
+    return side * n / (n + 2.0 * quiet_modules)
+
+
+def fit_board(face_w_m: float, face_h_m: float, spec: "TagSpec") -> "TagSpec":
+    """Size `spec` (layout, rows, cols, dictionary, quiet) to fill a face.
+
+    Returns a copy with marker_length_m (and separation_m / square_length_m)
+    set from the default ratios: the largest target that fits with its
+    quiet zone.
+    """
+    n = spec.bits + 2
+    q = 2.0 * spec.quiet_modules / n           # quiet zone, in marker lengths
+    out = replace(spec)
+    if spec.layout == "grid":
+        r = DEFAULT_GRID_SEPARATION_RATIO
+        L = min(face_w_m / (spec.cols + (spec.cols - 1) * r + q),
+                face_h_m / (spec.rows + (spec.rows - 1) * r + q))
+        out.marker_length_m, out.separation_m = L, L * r
+    elif spec.layout == "charuco":
+        m = DEFAULT_CHARUCO_MARKER_RATIO
+        sq = min(face_w_m / (spec.cols + q * m), face_h_m / (spec.rows + q * m))
+        out.square_length_m, out.marker_length_m = sq, sq * m
+    else:
+        out.marker_length_m = fit_square(face_w_m, face_h_m, spec.dictionary,
+                                         spec.quiet_modules)
+    return out
+
+
+def tile_aspect(spec: "TagSpec") -> float:
+    """Width / height of the tile (pattern + quiet zone) for this layout."""
+    n = spec.bits + 2
+    q = 2.0 * spec.quiet_modules / n               # quiet zone in marker lengths
+    if spec.layout == "grid":
+        r = DEFAULT_GRID_SEPARATION_RATIO
+        return (spec.cols + (spec.cols - 1) * r + q) / (spec.rows + (spec.rows - 1) * r + q)
+    if spec.layout == "charuco":
+        m = DEFAULT_CHARUCO_MARKER_RATIO
+        return (spec.cols + q * m) / (spec.rows + q * m)
+    return 1.0
+
+
+def _row_intervals(loops, y):
+    """x-intervals inside the region (even-odd over all loops) on the line y."""
+    xs = []
+    for loop in loops:
+        n = len(loop)
+        for i in range(n):
+            (x0, y0), (x1, y1) = loop[i], loop[(i + 1) % n]
+            if (y0 <= y < y1) or (y1 <= y < y0):
+                xs.append(x0 + (y - y0) * (x1 - x0) / (y1 - y0))
+    xs.sort()
+    return [(xs[i], xs[i + 1]) for i in range(0, len(xs) - 1, 2)]
+
+
+def _covered(intervals, a, b):
+    return any(lo <= a and b <= hi for lo, hi in intervals)
+
+
+def largest_rect(loops: List[List[Tuple[float, float]]], aspect: float = 1.0,
+                 angles_deg: Sequence[float] = tuple(range(0, 90, 5)),
+                 cells: int = 120) -> Optional[dict]:
+    """The largest rectangle of width/height `aspect` inside a planar region.
+
+    Zach, 2026-10-07: click a face "and it does some heuristics to place the
+    mark as best it can. Perhaps it basically tries to find the largest
+    rectangle that will fit uninterrupted". `loops` are closed polygons in
+    the face's own 2D frame (outer boundary AND holes; even-odd decides
+    inside), any unit. For each trial angle the region is rotated, cut into
+    rows, and each row's inside-intervals are found by scanline at the row's
+    top, centre and bottom; a cell counts only if all three cover it -- so the
+    answer never crosses a hole or an edge by more than the sampling allows.
+    The largest square of cells (stretched by `aspect`) wins; ties keep the
+    first angle, i.e. the one aligned with the face's own x axis.
+
+    Returns {"cx", "cy", "w", "h", "angle_deg"} in the input frame, or None.
+    """
+    pts = [p for loop in loops for p in loop]
+    if len(pts) < 3:
+        return None
+    best = None
+    for a in angles_deg:
+        t = math.radians(a)
+        c, s = math.cos(t), math.sin(t)
+        rot = [[(x * c + y * s, -x * s + y * c) for x, y in loop] for loop in loops]
+        xs = [p[0] for loop in rot for p in loop]
+        ys = [p[1] for loop in rot for p in loop]
+        x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+        span = max((x1 - x0) / aspect, y1 - y0)
+        dy = span / cells
+        dx = dy * aspect
+        nx, ny = int((x1 - x0) / dx) + 1, int((y1 - y0) / dy) + 1
+        grid = []
+        for j in range(ny):
+            yb, yt = y0 + j * dy, y0 + (j + 1) * dy
+            lines = [_row_intervals(rot, yb + 1e-9 * dy), _row_intervals(rot, (yb + yt) / 2),
+                     _row_intervals(rot, yt - 1e-9 * dy)]
+            row = []
+            for i in range(nx):
+                xa, xb = x0 + i * dx, x0 + (i + 1) * dx
+                row.append(all(_covered(iv, xa, xb) for iv in lines))
+            grid.append(row)
+        # largest square of True cells (classic DP)
+        dp = [[0] * nx for _ in range(ny)]
+        k_best, at = 0, None
+        for j in range(ny):
+            for i in range(nx):
+                if grid[j][i]:
+                    dp[j][i] = 1 if i == 0 or j == 0 else 1 + min(
+                        dp[j - 1][i], dp[j][i - 1], dp[j - 1][i - 1])
+                    if dp[j][i] > k_best:
+                        k_best, at = dp[j][i], (i, j)
+        if not k_best:
+            continue
+        i, j = at
+        cxr = x0 + (i + 1 - k_best / 2.0) * dx
+        cyr = y0 + (j + 1 - k_best / 2.0) * dy
+        w, h = k_best * dx, k_best * dy
+        if best is None or w * h > best["w"] * best["h"] * (1 + 1e-9):
+            best = {"cx": cxr * c - cyr * s, "cy": cxr * s + cyr * c, "w": w, "h": h,
+                    "angle_deg": a}
+    return best
 
 
 def board_spec(spec: "TagSpec"):
@@ -1028,9 +1152,105 @@ def cell_boxes(spec: TagSpec, grid: Optional[List[List[int]]] = None,
 
 # ------------------------------------------------------- export / fiducials
 
-# tags_from_payload, attach_joint_origins, resolve_for_description and
-# instance_fiducials are NOT ported: they are CAD Exporter's payload and
-# URDF bridge (PLAN 1.1). The pure export helpers below are kept.
+def tags_from_payload(raw: Optional[dict], warn: Callable[[str], None]
+                      ) -> Tuple[List[TagDef], List[OverrideRecord]]:
+    """payload["aruco"] -> records. Absent or empty is not an error."""
+    if not raw:
+        return [], []
+    if not isinstance(raw, dict):
+        warn("payload 'aruco' is not an object — tags ignored")
+        return [], []
+    if raw.get("schema") not in (None, SCHEMA):
+        warn(f"payload 'aruco' schema {raw.get('schema')!r} is not {SCHEMA} "
+             "— read best-effort")
+    tags = [t for t in (TagDef.from_dict(d, warn) for d in raw.get("tags") or [])
+            if t is not None]
+    ovs = [o for o in (OverrideRecord.from_dict(d, warn)
+                       for d in raw.get("overrides") or []) if o is not None]
+    for w in raw.get("warnings") or []:
+        warn(f"[fusion] {w}")
+    return tags, ovs
+
+
+def attach_joint_origins(tags: List[TagDef], joint_origins, design_units: str,
+                         warn: Callable[[str], None],
+                         tol_m: float = 1e-5, tol_rad: float = 1e-4) -> int:
+    """Give each tag the optical frame of its Joint Origin "aruco <key>".
+
+    Zach, 2026-10-07: insert a Joint Origin at each tag "with the correct
+    orientation ... cadexporter can then automatically create the frame based
+    on that frame". The add-in puts one there (aruco_tags.ensure_joint_origin)
+    and the exporter harvests every Joint Origin anyway (bam_joint_origins),
+    so the frame a camera is told about is the one the designer can SEE in
+    Fusion. It is built on the tag's face, so it follows the face when the
+    design changes upstream -- and the black cells (a base feature) do not.
+    A disagreement between the two is therefore reported, not averaged: it
+    means the pattern is stale and the tag wants rebuilding.
+    """
+    if not joint_origins:
+        return 0
+    by_key = {}
+    for rec in joint_origins:
+        if isinstance(rec, dict) and rec.get("origin") and rec.get("x_axis"):
+            by_key[(rec.get("component") or "", rec.get("name") or "")] = rec
+    hit = 0
+    for tag in tags:
+        rec = by_key.get((tag.component, f"aruco {tag.key}"))
+        if rec is None:
+            continue
+        k = UNIT_TO_M.get(design_units, 0.01) / UNIT_TO_M.get(tag.units, 0.01)
+        origin = [v * k for v in rec["origin"]]
+        x, y, z = rec["x_axis"], rec.get("y_axis"), rec.get("z_axis")
+        if y is None or z is None:
+            continue
+        jo = mat_from_frame(origin, x, y, z)
+        if tag.old_frame_offset is not None:
+            # a record from 2026-10-08's Frame: its Joint Origin sits there;
+            # its frame_offset takes it to OpenCV's (TagDef.old_frame_offset)
+            jo = mat_mul(jo, mat_scale_translation(tag.old_frame_offset,
+                                                   1.0 / UNIT_TO_M.get(tag.units, 0.01)))
+        ref = tag.record_optical()
+        d_m = math.sqrt(sum((jo[i] - ref[i]) ** 2 for i in (3, 7, 11))) \
+            * UNIT_TO_M.get(tag.units, 0.01)
+        ang = max(math.acos(max(-1.0, min(1.0, sum(jo[r * 4 + c] * ref[r * 4 + c]
+                                                    for r in range(3)))))
+                  for c in range(3))
+        if d_m > tol_m or ang > tol_rad:
+            warn(f"tag {tag.component or '(root)'}|{tag.key}: its Joint Origin is "
+                 f"{d_m * 1000:.3f} mm / {math.degrees(ang):.3f} deg from where the "
+                 "pattern was built — the face moved after tagging; rebuild the tag "
+                 "(ArUco Edit -> OK) so the ink and the frame agree again")
+        tag.optical, tag.optical_source = jo, "joint_origin"
+        hit += 1
+    return hit
+
+
+def resolve_for_description(cd, raw: Optional[dict],
+                            warn: Callable[[str], None],
+                            joint_origins=None) -> Resolution:
+    """CadDescription + payload["aruco"] -> per-copy tags with world poses."""
+    tags, ovs = tags_from_payload(raw, warn)
+    attach_joint_origins(tags, joint_origins, getattr(cd, "units", "cm") or "cm", warn)
+    if not tags:
+        for o in ovs:
+            warn(f"override on '{o.owner or '(root)'}' / '{o.occurrence}' "
+                 "but the design has no ArUco tags — stale")
+        return Resolution()
+    occs = [OccurrenceRef(o.path, o.component, o.transform, o.is_visible)
+            for o in getattr(cd, "occurrences", [])]
+    ids_hidden = (raw or {}).get("ids_hidden") if isinstance(raw, dict) else None
+    res = resolve(tags, ovs, occs, getattr(cd, "root_name", ""),
+                  getattr(cd, "units", "cm") or "cm",
+                  ids_hidden=set(ids_hidden) if ids_hidden is not None else None)
+    for w in res.warnings:
+        warn(w)
+    for line in describe_duplicates(res):
+        warn(line)
+    return res
+
+
+# instance_fiducials is NOT ported: it builds fiducials.Fiducial on a CAD
+# Exporter link description (the URDF bridge, PLAN 1.1).
 
 
 def short_part_name(path: str) -> str:

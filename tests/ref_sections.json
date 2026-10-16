@@ -2894,6 +2894,428 @@
    ]
   },
   {
+   "suite": "tests/test_markers.py",
+   "sha256": "58e82b5b91e8885b08a6c55851731d2bbf002c5ffbd3976666bd33b07fcb0eb9",
+   "run": true,
+   "entry": null,
+   "why": "",
+   "spec_ids": [],
+   "sections": [
+    {
+     "text": "resolve: inheritance and outermost-wins",
+     "key": "resolve: inheritance and outermost-wins",
+     "regex": "resolve:\\ inheritance\\ and\\ outermost\\-wins",
+     "line": 57,
+     "func": null
+    },
+    {
+     "text": "world poses",
+     "key": "world poses",
+     "regex": "world\\ poses",
+     "line": 132,
+     "func": null
+    },
+    {
+     "text": "serials: deepest level that works",
+     "key": "serials: deepest level that works",
+     "regex": "serials:\\ deepest\\ level\\ that\\ works",
+     "line": 149,
+     "func": null
+    },
+    {
+     "text": "geometry",
+     "key": "geometry",
+     "regex": "geometry",
+     "line": 188,
+     "func": null
+    },
+    {
+     "text": "boards: an id block per copy",
+     "key": "boards: an id block per copy",
+     "regex": "boards:\\ an\\ id\\ block\\ per\\ copy",
+     "line": 212,
+     "func": null
+    },
+    {
+     "text": "black layer: depth into the face, raise above it",
+     "key": "black layer: depth into the face, raise above it",
+     "regex": "black\\ layer:\\ depth\\ into\\ the\\ face,\\ raise\\ above\\ it",
+     "line": 246,
+     "func": null
+    },
+    {
+     "text": "optical frames from Joint Origins",
+     "key": "optical frames from Joint Origins",
+     "regex": "optical\\ frames\\ from\\ Joint\\ Origins",
+     "line": 267,
+     "func": null
+    },
+    {
+     "text": "largest uninterrupted rectangle on a face",
+     "key": "largest uninterrupted rectangle on a face",
+     "regex": "largest\\ uninterrupted\\ rectangle\\ on\\ a\\ face",
+     "line": 298,
+     "func": null
+    },
+    {
+     "text": "two components share a name (the rack, 2026-10-09)",
+     "key": "two components share a name (the rack, 2026-10-09)",
+     "regex": "two\\ components\\ share\\ a\\ name\\ \\(the\\ rack,\\ 2026\\-10\\-09\\)",
+     "line": 356,
+     "func": null
+    },
+    {
+     "text": "suggestions",
+     "key": "suggestions",
+     "regex": "suggestions",
+     "line": 399,
+     "func": null
+    }
+   ],
+   "ref_exit": 0,
+   "ref_pass": 86,
+   "ref_fail": 0,
+   "ref_counts": {
+    "resolve: inheritance and outermost-wins": {
+     "ok": 20,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "world poses": {
+     "ok": 4,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "serials: deepest level that works": {
+     "ok": 11,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "geometry": {
+     "ok": 9,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "boards: an id block per copy": {
+     "ok": 10,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "black layer: depth into the face, raise above it": {
+     "ok": 9,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "optical frames from Joint Origins": {
+     "ok": 6,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "largest uninterrupted rectangle on a face": {
+     "ok": 9,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "two components share a name (the rack, 2026-10-09)": {
+     "ok": 5,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "suggestions": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    }
+   }
+  },
+  {
+   "suite": "tests/test_print_beds.py",
+   "sha256": "15cc3ab7e755ca8f125c29a32a57cf8e2914c627b1aab1e2fb41138733a470fc",
+   "run": true,
+   "entry": null,
+   "why": "",
+   "spec_ids": [],
+   "sections": [
+    {
+     "text": "STL round trip",
+     "key": "STL round trip",
+     "regex": "STL\\ round\\ trip",
+     "line": 175,
+     "func": null
+    },
+    {
+     "text": "orientation rule",
+     "key": "orientation rule",
+     "regex": "orientation\\ rule",
+     "line": 202,
+     "func": null
+    },
+    {
+     "text": "units are measured",
+     "key": "units are measured",
+     "regex": "units\\ are\\ measured",
+     "line": 276,
+     "func": null
+    },
+    {
+     "text": "packing",
+     "key": "packing",
+     "regex": "packing",
+     "line": 299,
+     "func": null
+    },
+    {
+     "text": "PrusaSlicer 2.9 multi-bed geometry",
+     "key": "PrusaSlicer 2.9 multi-bed geometry",
+     "regex": "PrusaSlicer\\ 2\\.9\\ multi\\-bed\\ geometry",
+     "line": 388,
+     "func": null
+    },
+    {
+     "text": "project config from a vendor bundle",
+     "key": "project config from a vendor bundle",
+     "regex": "project\\ config\\ from\\ a\\ vendor\\ bundle",
+     "line": 399,
+     "func": null
+    },
+    {
+     "text": "3MF and project files",
+     "key": "3MF and project files",
+     "regex": "3MF\\ and\\ project\\ files",
+     "line": 429,
+     "func": null
+    },
+    {
+     "text": "write_beds",
+     "key": "write_beds",
+     "regex": "write_beds",
+     "line": 507,
+     "func": null
+    },
+    {
+     "text": "every copy its own object",
+     "key": "every copy its own object",
+     "regex": "every\\ copy\\ its\\ own\\ object",
+     "line": 538,
+     "func": null
+    },
+    {
+     "text": "part selection",
+     "key": "part selection",
+     "regex": "part\\ selection",
+     "line": 558,
+     "func": null
+    },
+    {
+     "text": "orientation='cad' and the overhang guard",
+     "key": "orientation='cad' and the overhang guard",
+     "regex": "orientation='cad'\\ and\\ the\\ overhang\\ guard",
+     "line": 578,
+     "func": null
+    },
+    {
+     "text": "write_selection_project",
+     "key": "write_selection_project",
+     "regex": "write_selection_project",
+     "line": 608,
+     "func": null
+    },
+    {
+     "text": "write_part_stls (ArUco Export's STL files type)",
+     "key": "write_part_stls (ArUco Export's STL files type)",
+     "regex": "write_part_stls\\ \\(ArUco\\ Export's\\ STL\\ files\\ type\\)",
+     "line": 689,
+     "func": null
+    }
+   ],
+   "ref_exit": 0,
+   "ref_pass": 129,
+   "ref_fail": 0,
+   "ref_counts": {
+    "STL round trip": {
+     "ok": 7,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "orientation rule": {
+     "ok": 22,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "units are measured": {
+     "ok": 5,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "packing": {
+     "ok": 19,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "PrusaSlicer 2.9 multi-bed geometry": {
+     "ok": 4,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "project config from a vendor bundle": {
+     "ok": 10,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "3MF and project files": {
+     "ok": 18,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "write_beds": {
+     "ok": 5,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "every copy its own object": {
+     "ok": 4,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "part selection": {
+     "ok": 5,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "orientation='cad' and the overhang guard": {
+     "ok": 6,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "write_selection_project": {
+     "ok": 12,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "write_part_stls (ArUco Export's STL files type)": {
+     "ok": 12,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    }
+   }
+  },
+  {
+   "suite": "tests/test_print_beds_slicer.py",
+   "sha256": "9dc95398327d353b149e367b87b50f3eef841aea07ff10f35aa0a727c37a2d55",
+   "run": true,
+   "entry": null,
+   "why": "",
+   "spec_ids": [],
+   "sections": [
+    {
+     "text": "last_selected_presets",
+     "key": "last_selected_presets",
+     "regex": "last_selected_presets",
+     "line": 96,
+     "func": null
+    },
+    {
+     "text": "load_selected_profile (mirrored)",
+     "key": "load_selected_profile (mirrored)",
+     "regex": "load_selected_profile\\ \\(mirrored\\)",
+     "line": 104,
+     "func": null
+    },
+    {
+     "text": "project_config_text: nothing of ours",
+     "key": "project_config_text: nothing of ours",
+     "regex": "project_config_text:\\ nothing\\ of\\ ours",
+     "line": 117,
+     "func": null
+    },
+    {
+     "text": "the vendor path is unchanged (recolours, as before)",
+     "key": "the vendor path is unchanged (recolours, as before)",
+     "regex": "the\\ vendor\\ path\\ is\\ unchanged\\ \\(recolours,\\ as\\ before\\)",
+     "line": 136,
+     "func": null
+    },
+    {
+     "text": "slots",
+     "key": "slots",
+     "regex": "slots",
+     "line": 144,
+     "func": null
+    },
+    {
+     "text": "_project_setup(presets='slicer') falls back to NO config, never to ours",
+     "key": "_project_setup(presets='slicer') falls back to NO config, never to ours",
+     "regex": "_project_setup\\(presets='slicer'\\)\\ falls\\ back\\ to\\ NO\\ config,\\ never\\ to\\ ours",
+     "line": 156,
+     "func": null
+    }
+   ],
+   "ref_exit": 0,
+   "ref_pass": 19,
+   "ref_fail": 0,
+   "ref_counts": {
+    "last_selected_presets": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "load_selected_profile (mirrored)": {
+     "ok": 6,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "project_config_text: nothing of ours": {
+     "ok": 6,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "the vendor path is unchanged (recolours, as before)": {
+     "ok": 1,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "slots": {
+     "ok": 2,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "_project_setup(presets='slicer') falls back to NO config, never to ours": {
+     "ok": 1,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    }
+   }
+  },
+  {
    "suite": "tests/test_aruco_extrude_sync.py",
    "sha256": "05969b6eccc6f97969326dcd6c40d8a4118f37b0a51d8ce671d4634d3e65345a",
    "run": false,
