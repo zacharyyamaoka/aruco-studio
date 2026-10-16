@@ -1,0 +1,2533 @@
+{
+ "schema": "arucostudio.ref_sections/1",
+ "ref": "C:\\Users\\BAM\\Documents\\cad-exporter\\.claude\\worktrees\\aruco-fusion-plugin-0e9bcb",
+ "ref_commit": "c8216ff",
+ "made_by": "tools/ref_sections.py",
+ "date": "2026-10-16",
+ "about": "A section = a print('<literal>') header of a REF suite. ref_counts = the checks REF's own suite passed under each header, run read-only.",
+ "suites": [
+  {
+   "suite": "tests/test_aruco_autosize.py",
+   "sha256": "6c6a7b9b27d59f743b4fd98ceca5f2400bf52484c54a89e3967aa35ad94787ce",
+   "run": true,
+   "entry": null,
+   "why": "",
+   "sections": [
+    {
+     "text": "§4 P1 defaults on the five faces (doc table)",
+     "key": "§4 P1 defaults on the five faces (doc table)",
+     "regex": "§4\\ P1\\ defaults\\ on\\ the\\ five\\ faces\\ \\(doc\\ table\\)",
+     "line": 173,
+     "func": "main"
+    },
+    {
+     "text": "§6 P3 ranked lists (doc)",
+     "key": "§6 P3 ranked lists (doc)",
+     "regex": "§6\\ P3\\ ranked\\ lists\\ \\(doc\\)",
+     "line": 221,
+     "func": "main"
+    },
+    {
+     "text": "clamp_to_fit: typed sizes",
+     "key": "clamp_to_fit: typed sizes",
+     "regex": "clamp_to_fit:\\ typed\\ sizes",
+     "line": 272,
+     "func": "main"
+    },
+    {
+     "text": "layout_for_size",
+     "key": "layout_for_size",
+     "regex": "layout_for_size",
+     "line": 327,
+     "func": "main"
+    },
+    {
+     "text": "Layout.apply -> TagSpec",
+     "key": "Layout.apply -> TagSpec",
+     "regex": "Layout\\.apply\\ \\->\\ TagSpec",
+     "line": 355,
+     "func": "main"
+    },
+    {
+     "text": "auto_dictionary (§3)",
+     "key": "auto_dictionary (§3)",
+     "regex": "auto_dictionary\\ \\(§3\\)",
+     "line": 383,
+     "func": "main"
+    },
+    {
+     "text": "invariant sweep over random boxes",
+     "key": "invariant sweep over random boxes",
+     "regex": "invariant\\ sweep\\ over\\ random\\ boxes",
+     "line": 399,
+     "func": "main"
+    },
+    {
+     "text": "fit_on_loops: a clicked face's own outline",
+     "key": "fit_on_loops: a clicked face's own outline",
+     "regex": "fit_on_loops:\\ a\\ clicked\\ face's\\ own\\ outline",
+     "line": 486,
+     "func": "main"
+    },
+    {
+     "text": "gallery: ten faces that are not boxes, against a brute-force raster (0.1 mm)",
+     "key": "gallery: ten faces that are not boxes, against a brute-force raster (0.1 mm)",
+     "regex": "gallery:\\ ten\\ faces\\ that\\ are\\ not\\ boxes,\\ against\\ a\\ brute\\-force\\ raster\\ \\(0\\.1\\ mm\\)",
+     "line": 778,
+     "func": "gallery"
+    },
+    {
+     "text": "candidates_on_loops: the Layout list respects holes",
+     "key": "candidates_on_loops: the Layout list respects holes",
+     "regex": "candidates_on_loops:\\ the\\ Layout\\ list\\ respects\\ holes",
+     "line": 905,
+     "func": "gallery"
+    }
+   ],
+   "ref_exit": 0,
+   "ref_pass": 110,
+   "ref_fail": 0,
+   "ref_counts": {
+    "§4 P1 defaults on the five faces (doc table)": {
+     "ok": 21,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "§6 P3 ranked lists (doc)": {
+     "ok": 12,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "clamp_to_fit: typed sizes": {
+     "ok": 14,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "layout_for_size": {
+     "ok": 8,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "Layout.apply -> TagSpec": {
+     "ok": 9,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "auto_dictionary (§3)": {
+     "ok": 8,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "invariant sweep over random boxes": {
+     "ok": 2,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "fit_on_loops: a clicked face's own outline": {
+     "ok": 28,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "gallery: ten faces that are not boxes, against a brute-force raster (0.1 mm)": {
+     "ok": 4,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "candidates_on_loops: the Layout list respects holes": {
+     "ok": 4,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    }
+   }
+  },
+  {
+   "suite": "tests/test_aruco_board.py",
+   "sha256": "abf29eed97705525b552ae7483f123e78fc44ef3999913117a8c509f4940eefd",
+   "run": true,
+   "entry": null,
+   "why": "",
+   "sections": [
+    {
+     "text": "== counts, ids, extents ==",
+     "key": "== counts, ids, extents ==",
+     "regex": "==\\ counts,\\ ids,\\ extents\\ ==",
+     "line": 175,
+     "func": "main"
+    },
+    {
+     "text": "== validation ==",
+     "key": "== validation ==",
+     "regex": "==\\ validation\\ ==",
+     "line": 191,
+     "func": "main"
+    },
+    {
+     "text": "== ink == generateImage (pinned from cv2) ==",
+     "key": "== ink == generateImage (pinned from cv2) ==",
+     "regex": "==\\ ink\\ ==\\ generateImage\\ \\(pinned\\ from\\ cv2\\)\\ ==",
+     "line": 210,
+     "func": "main"
+    },
+    {
+     "text": "== OpenCV's frame (pinned from cv2 5.0 objPoints) ==",
+     "key": "== OpenCV's frame (pinned from cv2 5.0 objPoints) ==",
+     "regex": "==\\ OpenCV's\\ frame\\ \\(pinned\\ from\\ cv2\\ 5\\.0\\ objPoints\\)\\ ==",
+     "line": 239,
+     "func": "main"
+    },
+    {
+     "text": "== board_png / board_svg ==",
+     "key": "== board_png / board_svg ==",
+     "regex": "==\\ board_png\\ /\\ board_svg\\ ==",
+     "line": 279,
+     "func": "main"
+    },
+    {
+     "text": "== boards on a print sheet ==",
+     "key": "== boards on a print sheet ==",
+     "regex": "==\\ boards\\ on\\ a\\ print\\ sheet\\ ==",
+     "line": 296,
+     "func": "main"
+    }
+   ],
+   "ref_exit": 0,
+   "ref_pass": 51,
+   "ref_fail": 0,
+   "ref_counts": {
+    "== counts, ids, extents ==": {
+     "ok": 7,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== validation ==": {
+     "ok": 6,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== ink == generateImage (pinned from cv2) ==": {
+     "ok": 10,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== OpenCV's frame (pinned from cv2 5.0 objPoints) ==": {
+     "ok": 9,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== board_png / board_svg ==": {
+     "ok": 6,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== boards on a print sheet ==": {
+     "ok": 13,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    }
+   }
+  },
+  {
+   "suite": "tests/test_aruco_cells.py",
+   "sha256": "ccd1706bf954d3352a9410e7be0a30b189780e2b83b815e1197b621adbf159d8",
+   "run": true,
+   "entry": null,
+   "why": "",
+   "sections": [
+    {
+     "text": "== the spec's example: a typed 28.0 mm 6x6 marker at 0.68 mm lines",
+     "key": "== the spec's example: a typed 28.0 mm 6x6 marker at 0.68 mm lines",
+     "regex": "==\\ the\\ spec's\\ example:\\ a\\ typed\\ 28\\.0\\ mm\\ 6x6\\ marker\\ at\\ 0\\.68\\ mm\\ lines",
+     "line": 96,
+     "func": null
+    },
+    {
+     "text": "== Auto on a face: the largest k whose sticker still fits (brute force)",
+     "key": "== Auto on a face: the largest k whose sticker still fits (brute force)",
+     "regex": "==\\ Auto\\ on\\ a\\ face:\\ the\\ largest\\ k\\ whose\\ sticker\\ still\\ fits\\ \\(brute\\ force\\)",
+     "line": 119,
+     "func": null
+    },
+    {
+     "text": "== boards: every length whole, the board fits, nothing overlaps",
+     "key": "== boards: every length whole, the board fits, nothing overlaps",
+     "regex": "==\\ boards:\\ every\\ length\\ whole,\\ the\\ board\\ fits,\\ nothing\\ overlaps",
+     "line": 140,
+     "func": null
+    },
+    {
+     "text": "== ChArUco: whole white around the marker, odd module counts too",
+     "key": "== ChArUco: whole white around the marker, odd module counts too",
+     "regex": "==\\ ChArUco:\\ whole\\ white\\ around\\ the\\ marker,\\ odd\\ module\\ counts\\ too",
+     "line": 169,
+     "func": null
+    },
+    {
+     "text": "== grids: the gap rounds UP to whole lines",
+     "key": "== grids: the gap rounds UP to whole lines",
+     "regex": "==\\ grids:\\ the\\ gap\\ rounds\\ UP\\ to\\ whole\\ lines",
+     "line": 190,
+     "func": null
+    },
+    {
+     "text": "== 'marker' cells: the legacy rule on another step (0.675 = Zach's 0.6 nozzle)",
+     "key": "== 'marker' cells: the legacy rule on another step (0.675 = Zach's 0.6 nozzle)",
+     "regex": "==\\ 'marker'\\ cells:\\ the\\ legacy\\ rule\\ on\\ another\\ step\\ \\(0\\.675\\ =\\ Zach's\\ 0\\.6\\ nozzle\\)",
+     "line": 198,
+     "func": null
+    },
+    {
+     "text": "== the minimum cell: a note, never a refusal",
+     "key": "== the minimum cell: a note, never a refusal",
+     "regex": "==\\ the\\ minimum\\ cell:\\ a\\ note,\\ never\\ a\\ refusal",
+     "line": 210,
+     "func": null
+    },
+    {
+     "text": "== a face that is not a rectangle (holes, a disc, an L)",
+     "key": "== a face that is not a rectangle (holes, a disc, an L)",
+     "regex": "==\\ a\\ face\\ that\\ is\\ not\\ a\\ rectangle\\ \\(holes,\\ a\\ disc,\\ an\\ L\\)",
+     "line": 220,
+     "func": null
+    },
+    {
+     "text": "== the ranked lists: every entry on the grid",
+     "key": "== the ranked lists: every entry on the grid",
+     "regex": "==\\ the\\ ranked\\ lists:\\ every\\ entry\\ on\\ the\\ grid",
+     "line": 260,
+     "func": null
+    }
+   ],
+   "ref_exit": 0,
+   "ref_pass": 40,
+   "ref_fail": 0,
+   "ref_counts": {
+    "== the spec's example: a typed 28.0 mm 6x6 marker at 0.68 mm lines": {
+     "ok": 5,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== Auto on a face: the largest k whose sticker still fits (brute force)": {
+     "ok": 1,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== boards: every length whole, the board fits, nothing overlaps": {
+     "ok": 1,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== ChArUco: whole white around the marker, odd module counts too": {
+     "ok": 7,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== grids: the gap rounds UP to whole lines": {
+     "ok": 2,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== 'marker' cells: the legacy rule on another step (0.675 = Zach's 0.6 nozzle)": {
+     "ok": 4,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== the minimum cell: a note, never a refusal": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== a face that is not a rectangle (holes, a disc, an L)": {
+     "ok": 13,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== the ranked lists: every entry on the grid": {
+     "ok": 4,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    }
+   }
+  },
+  {
+   "suite": "tests/test_aruco_cells_legacy.py",
+   "sha256": "6f3351646a1112a293410da6d538ec1680cc1c969c5aea54c2d89367187978a5",
+   "run": false,
+   "entry": null,
+   "why": "its golden maker installs a stand-in adsk for the 12 evaluate() cases",
+   "sections": [
+    {
+     "text": "== the legacy rule: no 'cells' is None, so is anything unreadable",
+     "key": "== the legacy rule: no 'cells' is None, so is anything unreadable",
+     "regex": "==\\ the\\ legacy\\ rule:\\ no\\ 'cells'\\ is\\ None,\\ so\\ is\\ anything\\ unreadable",
+     "line": 84,
+     "func": null
+    },
+    {
+     "text": "== {len(data['cases'])} sizings recomputed with no 'cells': identical",
+     "key": "== {len(data['cases'])} sizings recomputed with no 'cells': identical",
+     "regex": "==\\ .*?\\ sizings\\ recomputed\\ with\\ no\\ 'cells':\\ identical",
+     "line": 92,
+     "func": null
+    },
+    {
+     "text": "== 'marker' cells with the 0.5 mm step (and no minimum) ARE the legacy rule",
+     "key": "== 'marker' cells with the 0.5 mm step (and no minimum) ARE the legacy rule",
+     "regex": "==\\ 'marker'\\ cells\\ with\\ the\\ 0\\.5\\ mm\\ step\\ \\(and\\ no\\ minimum\\)\\ ARE\\ the\\ legacy\\ rule",
+     "line": 107,
+     "func": null
+    },
+    {
+     "text": "== {len(data['evaluate'])} evaluate() results (aruco_feature, no 'cells' in the settings): identical",
+     "key": "== {len(data['evaluate'])} evaluate() results (aruco_feature, no 'cells' in the settings): identical",
+     "regex": "==\\ .*?\\ evaluate\\(\\)\\ results\\ \\(aruco_feature,\\ no\\ 'cells'\\ in\\ the\\ settings\\):\\ identical",
+     "line": 134,
+     "func": null
+    }
+   ]
+  },
+  {
+   "suite": "tests/test_aruco_chamfer.py",
+   "sha256": "61be76660aca95f213ff2da5ded232d7ff630aa0a9d128490240b1deebb6f130",
+   "run": true,
+   "entry": null,
+   "why": "",
+   "sections": [
+    {
+     "text": "== which mark each layout x mode gets",
+     "key": "== which mark each layout x mode gets",
+     "regex": "==\\ which\\ mark\\ each\\ layout\\ x\\ mode\\ gets",
+     "line": 178,
+     "func": null
+    },
+    {
+     "text": "== at OpenCV's corner 0 / the board origin, for every Origin turn",
+     "key": "== at OpenCV's corner 0 / the board origin, for every Origin turn",
+     "regex": "==\\ at\\ OpenCV's\\ corner\\ 0\\ /\\ the\\ board\\ origin,\\ for\\ every\\ Origin\\ turn",
+     "line": 190,
+     "func": null
+    },
+    {
+     "text": "== legs, in module units",
+     "key": "== legs, in module units",
+     "regex": "==\\ legs,\\ in\\ module\\ units",
+     "line": 213,
+     "func": null
+    },
+    {
+     "text": "== single and grid: never touches a black cell",
+     "key": "== single and grid: never touches a black cell",
+     "regex": "==\\ single\\ and\\ grid:\\ never\\ touches\\ a\\ black\\ cell",
+     "line": 240,
+     "func": null
+    },
+    {
+     "text": "== ChArUco: only the outer corner of the top-left black square",
+     "key": "== ChArUco: only the outer corner of the top-left black square",
+     "regex": "==\\ ChArUco:\\ only\\ the\\ outer\\ corner\\ of\\ the\\ top\\-left\\ black\\ square",
+     "line": 269,
+     "func": null
+    },
+    {
+     "text": "== the cut tool",
+     "key": "== the cut tool",
+     "regex": "==\\ the\\ cut\\ tool",
+     "line": 304,
+     "func": null
+    },
+    {
+     "text": "== tiles bigger than the sticker, rectangles, turns",
+     "key": "== tiles bigger than the sticker, rectangles, turns",
+     "regex": "==\\ tiles\\ bigger\\ than\\ the\\ sticker,\\ rectangles,\\ turns",
+     "line": 322,
+     "func": null
+    },
+    {
+     "text": "== too narrow a white border",
+     "key": "== too narrow a white border",
+     "regex": "==\\ too\\ narrow\\ a\\ white\\ border",
+     "line": 350,
+     "func": null
+    },
+    {
+     "text": "== a copy (another id) carries the same mark",
+     "key": "== a copy (another id) carries the same mark",
+     "regex": "==\\ a\\ copy\\ \\(another\\ id\\)\\ carries\\ the\\ same\\ mark",
+     "line": 372,
+     "func": null
+    },
+    {
+     "text": "== locating pins keep clear of a cut corner",
+     "key": "== locating pins keep clear of a cut corner",
+     "regex": "==\\ locating\\ pins\\ keep\\ clear\\ of\\ a\\ cut\\ corner",
+     "line": 390,
+     "func": null
+    },
+    {
+     "text": "== Corner mark: None / Cut white corner / Black triangle (2026-10-09)",
+     "key": "== Corner mark: None / Cut white corner / Black triangle (2026-10-09)",
+     "regex": "==\\ Corner\\ mark:\\ None\\ /\\ Cut\\ white\\ corner\\ /\\ Black\\ triangle\\ \\(2026\\-10\\-09\\)",
+     "line": 424,
+     "func": null
+    },
+    {
+     "text": "== stdlib only",
+     "key": "== stdlib only",
+     "regex": "==\\ stdlib\\ only",
+     "line": 480,
+     "func": null
+    }
+   ],
+   "ref_exit": 0,
+   "ref_pass": 579,
+   "ref_fail": 0,
+   "ref_counts": {
+    "== which mark each layout x mode gets": {
+     "ok": 30,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== at OpenCV's corner 0 / the board origin, for every Origin turn": {
+     "ok": 192,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== legs, in module units": {
+     "ok": 87,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== single and grid: never touches a black cell": {
+     "ok": 58,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== ChArUco: only the outer corner of the top-left black square": {
+     "ok": 50,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== the cut tool": {
+     "ok": 27,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== tiles bigger than the sticker, rectangles, turns": {
+     "ok": 9,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== too narrow a white border": {
+     "ok": 14,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== a copy (another id) carries the same mark": {
+     "ok": 33,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== locating pins keep clear of a cut corner": {
+     "ok": 16,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== Corner mark: None / Cut white corner / Black triangle (2026-10-09)": {
+     "ok": 62,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== stdlib only": {
+     "ok": 1,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    }
+   }
+  },
+  {
+   "suite": "tests/test_aruco_label.py",
+   "sha256": "729dd2ad2e3cc76f0667d6eb1831c0bc80cd4c9153cd3da38d81e304b2741ea3",
+   "run": true,
+   "entry": null,
+   "why": "",
+   "sections": [
+    {
+     "text": "== the font (a pixel font: Zach, 2026-10-10, \"very blocky letters\")",
+     "key": "== the font (a pixel font: Zach, 2026-10-10, \"very blocky letters\")",
+     "regex": "==\\ the\\ font\\ \\(a\\ pixel\\ font:\\ Zach,\\ 2026\\-10\\-10,\\ \"very\\ blocky\\ letters\"\\)",
+     "line": 107,
+     "func": null
+    },
+    {
+     "text": "== content",
+     "key": "== content",
+     "regex": "==\\ content",
+     "line": 211,
+     "func": null
+    },
+    {
+     "text": "== per-copy ids and names (markers.resolve / plan_serials)",
+     "key": "== per-copy ids and names (markers.resolve / plan_serials)",
+     "regex": "==\\ per\\-copy\\ ids\\ and\\ names\\ \\(markers\\.resolve\\ /\\ plan_serials\\)",
+     "line": 253,
+     "func": null
+    },
+    {
+     "text": "== on the black",
+     "key": "== on the black",
+     "regex": "==\\ on\\ the\\ black",
+     "line": 305,
+     "func": null
+    },
+    {
+     "text": "== on the white",
+     "key": "== on the white",
+     "regex": "==\\ on\\ the\\ white",
+     "line": 416,
+     "func": null
+    },
+    {
+     "text": "== a face with holes (Black only)",
+     "key": "== a face with holes (Black only)",
+     "regex": "==\\ a\\ face\\ with\\ holes\\ \\(Black\\ only\\)",
+     "line": 497,
+     "func": null
+    },
+    {
+     "text": "== corner marks and pins",
+     "key": "== corner marks and pins",
+     "regex": "==\\ corner\\ marks\\ and\\ pins",
+     "line": 536,
+     "func": null
+    },
+    {
+     "text": "== one label, its position apart (any content in any position)",
+     "key": "== one label, its position apart (any content in any position)",
+     "regex": "==\\ one\\ label,\\ its\\ position\\ apart\\ \\(any\\ content\\ in\\ any\\ position\\)",
+     "line": 665,
+     "func": null
+    },
+    {
+     "text": "== the name on the black: both rows",
+     "key": "== the name on the black: both rows",
+     "regex": "==\\ the\\ name\\ on\\ the\\ black:\\ both\\ rows",
+     "line": 698,
+     "func": null
+    },
+    {
+     "text": "== a text too long for its place: shrink, then cut short",
+     "key": "== a text too long for its place: shrink, then cut short",
+     "regex": "==\\ a\\ text\\ too\\ long\\ for\\ its\\ place:\\ shrink,\\ then\\ cut\\ short",
+     "line": 751,
+     "func": null
+    },
+    {
+     "text": "== batch ids, two rows",
+     "key": "== batch ids, two rows",
+     "regex": "==\\ batch\\ ids,\\ two\\ rows",
+     "line": 821,
+     "func": null
+    },
+    {
+     "text": "== the label is as tall as the black (its slab)",
+     "key": "== the label is as tall as the black (its slab)",
+     "regex": "==\\ the\\ label\\ is\\ as\\ tall\\ as\\ the\\ black\\ \\(its\\ slab\\)",
+     "line": 865,
+     "func": null
+    },
+    {
+     "text": "== offsets: a nudge after the automatic placement, re-checked",
+     "key": "== offsets: a nudge after the automatic placement, re-checked",
+     "regex": "==\\ offsets:\\ a\\ nudge\\ after\\ the\\ automatic\\ placement,\\ re\\-checked",
+     "line": 903,
+     "func": null
+    },
+    {
+     "text": "== the safety check catches a broken rule",
+     "key": "== the safety check catches a broken rule",
+     "regex": "==\\ the\\ safety\\ check\\ catches\\ a\\ broken\\ rule",
+     "line": 1026,
+     "func": null
+    },
+    {
+     "text": "== records and determinism",
+     "key": "== records and determinism",
+     "regex": "==\\ records\\ and\\ determinism",
+     "line": 1078,
+     "func": null
+    },
+    {
+     "text": "== a 0.6 mm nozzle (Zach's MK4 MMU3, the default since 2026-10-10)",
+     "key": "== a 0.6 mm nozzle (Zach's MK4 MMU3, the default since 2026-10-10)",
+     "regex": "==\\ a\\ 0\\.6\\ mm\\ nozzle\\ \\(Zach's\\ MK4\\ MMU3,\\ the\\ default\\ since\\ 2026\\-10\\-10\\)",
+     "line": 1116,
+     "func": null
+    },
+    {
+     "text": "== frames",
+     "key": "== frames",
+     "regex": "==\\ frames",
+     "line": 1159,
+     "func": null
+    },
+    {
+     "text": "== stdlib only",
+     "key": "== stdlib only",
+     "regex": "==\\ stdlib\\ only",
+     "line": 1169,
+     "func": null
+    }
+   ],
+   "ref_exit": 0,
+   "ref_pass": 295,
+   "ref_fail": 0,
+   "ref_counts": {
+    "== the font (a pixel font: Zach, 2026-10-10, \"very blocky letters\")": {
+     "ok": 20,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== content": {
+     "ok": 17,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== per-copy ids and names (markers.resolve / plan_serials)": {
+     "ok": 13,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== on the black": {
+     "ok": 43,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== on the white": {
+     "ok": 32,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== a face with holes (Black only)": {
+     "ok": 10,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== corner marks and pins": {
+     "ok": 24,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== one label, its position apart (any content in any position)": {
+     "ok": 35,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== the name on the black: both rows": {
+     "ok": 9,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== a text too long for its place: shrink, then cut short": {
+     "ok": 13,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== batch ids, two rows": {
+     "ok": 8,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== the label is as tall as the black (its slab)": {
+     "ok": 8,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== offsets: a nudge after the automatic placement, re-checked": {
+     "ok": 22,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== the safety check catches a broken rule": {
+     "ok": 9,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== records and determinism": {
+     "ok": 16,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== a 0.6 mm nozzle (Zach's MK4 MMU3, the default since 2026-10-10)": {
+     "ok": 13,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== frames": {
+     "ok": 2,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== stdlib only": {
+     "ok": 1,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    }
+   }
+  },
+  {
+   "suite": "tests/test_aruco_label_position.py",
+   "sha256": "9c6b526a279bd6a4691ab37940e7a89e6a01078091888bddc7cb33fe528c3f79",
+   "run": true,
+   "entry": null,
+   "why": "",
+   "sections": [
+    {
+     "text": "== the clearance rule: a hard line and a preferred margin",
+     "key": "== the clearance rule: a hard line and a preferred margin",
+     "regex": "==\\ the\\ clearance\\ rule:\\ a\\ hard\\ line\\ and\\ a\\ preferred\\ margin",
+     "line": 99,
+     "func": null
+    },
+    {
+     "text": "== Zach's GIM43 disc ({'measured' if G['source'].startswith('MEASURED') else 'GUESS'}): {GS.marker_length_m * 1000} mm marker, '#0', nozzle {GL['nozzle_mm']}",
+     "key": "== Zach's GIM43 disc ({'measured' if G['source'].startswith('MEASURED') else 'GUESS'}): {GS.marker_length_m * 1000} mm marker, '#0', nozzle {GL['nozzle_mm']}",
+     "regex": "==\\ Zach's\\ GIM43\\ disc\\ \\(.*?\\):\\ .*?\\ mm\\ marker,\\ '\\#0',\\ nozzle\\ .*?",
+     "line": 134,
+     "func": null
+    },
+    {
+     "text": "== Auto position: Offset X / Y show auto's spot; typing one takes over",
+     "key": "== Auto position: Offset X / Y show auto's spot; typing one takes over",
+     "regex": "==\\ Auto\\ position:\\ Offset\\ X\\ /\\ Y\\ show\\ auto's\\ spot;\\ typing\\ one\\ takes\\ over",
+     "line": 183,
+     "func": null
+    },
+    {
+     "text": "== settings: position auto | manual (x, y); old records keep their offsets",
+     "key": "== settings: position auto | manual (x, y); old records keep their offsets",
+     "regex": "==\\ settings:\\ position\\ auto\\ \\|\\ manual\\ \\(x,\\ y\\);\\ old\\ records\\ keep\\ their\\ offsets",
+     "line": 231,
+     "func": null
+    },
+    {
+     "text": "== no room anywhere: refused, saying why, in three lines",
+     "key": "== no room anywhere: refused, saying why, in three lines",
+     "regex": "==\\ no\\ room\\ anywhere:\\ refused,\\ saying\\ why,\\ in\\ three\\ lines",
+     "line": 257,
+     "func": null
+    },
+    {
+     "text": "== ArUco IDs: copies print their own id at a manual spot",
+     "key": "== ArUco IDs: copies print their own id at a manual spot",
+     "regex": "==\\ ArUco\\ IDs:\\ copies\\ print\\ their\\ own\\ id\\ at\\ a\\ manual\\ spot",
+     "line": 274,
+     "func": null
+    },
+    {
+     "text": "== the far search",
+     "key": "== the far search",
+     "regex": "==\\ the\\ far\\ search",
+     "line": 312,
+     "func": null
+    }
+   ],
+   "ref_exit": 0,
+   "ref_pass": 39,
+   "ref_fail": 0,
+   "ref_counts": {
+    "== the clearance rule: a hard line and a preferred margin": {
+     "ok": 6,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== Zach's GIM43 disc ({'measured' if G['source'].startswith('MEASURED') else 'GUESS'}): {GS.marker_length_m * 1000} mm marker, '#0', nozzle {GL['nozzle_mm']}": {
+     "ok": 8,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== Auto position: Offset X / Y show auto's spot; typing one takes over": {
+     "ok": 8,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== settings: position auto | manual (x, y); old records keep their offsets": {
+     "ok": 5,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== no room anywhere: refused, saying why, in three lines": {
+     "ok": 4,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== ArUco IDs: copies print their own id at a manual spot": {
+     "ok": 6,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== the far search": {
+     "ok": 2,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    }
+   }
+  },
+  {
+   "suite": "tests/test_aruco_label_preview.py",
+   "sha256": "fbc16d36fab168dabb411a3f9b86ec44deb5d361a16f6b9fc66a502dffdec0fb",
+   "run": true,
+   "entry": null,
+   "why": "",
+   "sections": [
+    {
+     "text": "== Zach's GIM43 disc tag: #id On the white, Above, nozzle 0.4",
+     "key": "== Zach's GIM43 disc tag: #id On the white, Above, nozzle 0.4",
+     "regex": "==\\ Zach's\\ GIM43\\ disc\\ tag:\\ \\#id\\ On\\ the\\ white,\\ Above,\\ nozzle\\ 0\\.4",
+     "line": 86,
+     "func": null
+    },
+    {
+     "text": "== ... a 40 mm disc: no room above",
+     "key": "== ... a 40 mm disc: no room above",
+     "regex": "==\\ \\.\\.\\.\\ a\\ 40\\ mm\\ disc:\\ no\\ room\\ above",
+     "line": 94,
+     "func": null
+    },
+    {
+     "text": "== nothing fits inside the rules: shown anyway",
+     "key": "== nothing fits inside the rules: shown anyway",
+     "regex": "==\\ nothing\\ fits\\ inside\\ the\\ rules:\\ shown\\ anyway",
+     "line": 121,
+     "func": null
+    },
+    {
+     "text": "== a nudge that breaks a rule: shown where it was nudged",
+     "key": "== a nudge that breaks a rule: shown where it was nudged",
+     "regex": "==\\ a\\ nudge\\ that\\ breaks\\ a\\ rule:\\ shown\\ where\\ it\\ was\\ nudged",
+     "line": 154,
+     "func": null
+    },
+    {
+     "text": "== every preview says what it breaks; a good label breaks nothing",
+     "key": "== every preview says what it breaks; a good label breaks nothing",
+     "regex": "==\\ every\\ preview\\ says\\ what\\ it\\ breaks;\\ a\\ good\\ label\\ breaks\\ nothing",
+     "line": 212,
+     "func": null
+    },
+    {
+     "text": "== records, copies, determinism",
+     "key": "== records, copies, determinism",
+     "regex": "==\\ records,\\ copies,\\ determinism",
+     "line": 229,
+     "func": null
+    }
+   ],
+   "ref_exit": 0,
+   "ref_pass": 29,
+   "ref_fail": 0,
+   "ref_counts": {
+    "== Zach's GIM43 disc tag: #id On the white, Above, nozzle 0.4": {
+     "ok": 1,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== ... a 40 mm disc: no room above": {
+     "ok": 7,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== nothing fits inside the rules: shown anyway": {
+     "ok": 5,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== a nudge that breaks a rule: shown where it was nudged": {
+     "ok": 8,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== every preview says what it breaks; a good label breaks nothing": {
+     "ok": 2,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== records, copies, determinism": {
+     "ok": 6,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    }
+   }
+  },
+  {
+   "suite": "tests/test_aruco_label_rule1.py",
+   "sha256": "080b8280d1d26e863bd5b6224ce0239f279d9a253f27e61cb1f0ad1d68a20a81",
+   "run": true,
+   "entry": null,
+   "why": "",
+   "sections": [
+    {
+     "text": "== settings: no 'rule' is rule 1; a new label is rule 2",
+     "key": "== settings: no 'rule' is rule 1; a new label is rule 2",
+     "regex": "==\\ settings:\\ no\\ 'rule'\\ is\\ rule\\ 1;\\ a\\ new\\ label\\ is\\ rule\\ 2",
+     "line": 77,
+     "func": null
+    },
+    {
+     "text": "== {len(data['cases'])} labels laid out by {data['core']}: identical today",
+     "key": "== {len(data['cases'])} labels laid out by {data['core']}: identical today",
+     "regex": "==\\ .*?\\ labels\\ laid\\ out\\ by\\ .*?:\\ identical\\ today",
+     "line": 86,
+     "func": null
+    },
+    {
+     "text": "== Zach's GIM43 disc, his old Offset (6, 4) record",
+     "key": "== Zach's GIM43 disc, his old Offset (6, 4) record",
+     "regex": "==\\ Zach's\\ GIM43\\ disc,\\ his\\ old\\ Offset\\ \\(6,\\ 4\\)\\ record",
+     "line": 99,
+     "func": null
+    },
+    {
+     "text": "== a rule-1 label keeps rule 1 through a record and a copy",
+     "key": "== a rule-1 label keeps rule 1 through a record and a copy",
+     "regex": "==\\ a\\ rule\\-1\\ label\\ keeps\\ rule\\ 1\\ through\\ a\\ record\\ and\\ a\\ copy",
+     "line": 114,
+     "func": null
+    }
+   ],
+   "ref_exit": 0,
+   "ref_pass": 45,
+   "ref_fail": 0,
+   "ref_counts": {
+    "== settings: no 'rule' is rule 1; a new label is rule 2": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== {len(data['cases'])} labels laid out by {data['core']}: identical today": {
+     "ok": 37,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== Zach's GIM43 disc, his old Offset (6, 4) record": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== a rule-1 label keeps rule 1 through a record and a copy": {
+     "ok": 2,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    }
+   }
+  },
+  {
+   "suite": "tests/test_aruco_numbering.py",
+   "sha256": "3a5e5f14c5edc9503a0827b04297a5667f4b78171b343262e55edf73277f18a1",
+   "run": true,
+   "entry": null,
+   "why": "",
+   "sections": [
+    {
+     "text": "helpers",
+     "key": "helpers",
+     "regex": "helpers",
+     "line": 141,
+     "func": null
+    },
+    {
+     "text": "G0.1 every visible instance its own marker, every fixture",
+     "key": "G0.1 every visible instance its own marker, every fixture",
+     "regex": "G0\\.1\\ every\\ visible\\ instance\\ its\\ own\\ marker,\\ every\\ fixture",
+     "line": 159,
+     "func": null
+    },
+    {
+     "text": "G0.2 board blocks contiguous, never overlapping",
+     "key": "G0.2 board blocks contiguous, never overlapping",
+     "regex": "G0\\.2\\ board\\ blocks\\ contiguous,\\ never\\ overlapping",
+     "line": 178,
+     "func": null
+    },
+    {
+     "text": "G0.3 ids stay inside the dictionary; refusals name the tag",
+     "key": "G0.3 ids stay inside the dictionary; refusals name the tag",
+     "regex": "G0\\.3\\ ids\\ stay\\ inside\\ the\\ dictionary;\\ refusals\\ name\\ the\\ tag",
+     "line": 200,
+     "func": null
+    },
+    {
+     "text": "G0.4 stable: an already-unique design changes nothing; one new copy, one new id",
+     "key": "G0.4 stable: an already-unique design changes nothing; one new copy, one new id",
+     "regex": "G0\\.4\\ stable:\\ an\\ already\\-unique\\ design\\ changes\\ nothing;\\ one\\ new\\ copy,\\ one\\ new\\ id",
+     "line": 221,
+     "func": null
+    },
+    {
+     "text": "G0.5 overrides: set, clear to auto, conflicts flagged",
+     "key": "G0.5 overrides: set, clear to auto, conflicts flagged",
+     "regex": "G0\\.5\\ overrides:\\ set,\\ clear\\ to\\ auto,\\ conflicts\\ flagged",
+     "line": 258,
+     "func": null
+    },
+    {
+     "text": "G0.6 owners: never inside a linked design",
+     "key": "G0.6 owners: never inside a linked design",
+     "regex": "G0\\.6\\ owners:\\ never\\ inside\\ a\\ linked\\ design",
+     "line": 297,
+     "func": null
+    },
+    {
+     "text": "export: resolve() of the records = the plan",
+     "key": "export: resolve() of the records = the plan",
+     "regex": "export:\\ resolve\\(\\)\\ of\\ the\\ records\\ =\\ the\\ plan",
+     "line": 314,
+     "func": null
+    },
+    {
+     "text": "G1.2 (offline): hidden copies are listed, not numbered",
+     "key": "G1.2 (offline): hidden copies are listed, not numbered",
+     "regex": "G1\\.2\\ \\(offline\\):\\ hidden\\ copies\\ are\\ listed,\\ not\\ numbered",
+     "line": 331,
+     "func": null
+    },
+    {
+     "text": "inherited per-copy ids (old records inside a linked design)",
+     "key": "inherited per-copy ids (old records inside a linked design)",
+     "regex": "inherited\\ per\\-copy\\ ids\\ \\(old\\ records\\ inside\\ a\\ linked\\ design\\)",
+     "line": 339,
+     "func": null
+    },
+    {
+     "text": "tags in the root component",
+     "key": "tags in the root component",
+     "regex": "tags\\ in\\ the\\ root\\ component",
+     "line": 348,
+     "func": null
+    },
+    {
+     "text": "fixed copies (a linked design's stale record): they keep what they print",
+     "key": "fixed copies (a linked design's stale record): they keep what they print",
+     "regex": "fixed\\ copies\\ \\(a\\ linked\\ design's\\ stale\\ record\\):\\ they\\ keep\\ what\\ they\\ print",
+     "line": 356,
+     "func": null
+    },
+    {
+     "text": "the node's dependencies: one kept copy per component (G8.3)",
+     "key": "the node's dependencies: one kept copy per component (G8.3)",
+     "regex": "the\\ node's\\ dependencies:\\ one\\ kept\\ copy\\ per\\ component\\ \\(G8\\.3\\)",
+     "line": 367,
+     "func": null
+    },
+    {
+     "text": "decoding built patterns (the geometry checks' reader)",
+     "key": "decoding built patterns (the geometry checks' reader)",
+     "regex": "decoding\\ built\\ patterns\\ \\(the\\ geometry\\ checks'\\ reader\\)",
+     "line": 386,
+     "func": null
+    }
+   ],
+   "ref_exit": 0,
+   "ref_pass": 153,
+   "ref_fail": 0,
+   "ref_counts": {
+    "helpers": {
+     "ok": 6,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "G0.1 every visible instance its own marker, every fixture": {
+     "ok": 35,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "G0.2 board blocks contiguous, never overlapping": {
+     "ok": 26,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "G0.3 ids stay inside the dictionary; refusals name the tag": {
+     "ok": 6,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "G0.4 stable: an already-unique design changes nothing; one new copy, one new id": {
+     "ok": 17,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "G0.5 overrides: set, clear to auto, conflicts flagged": {
+     "ok": 11,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "G0.6 owners: never inside a linked design": {
+     "ok": 8,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "export: resolve() of the records = the plan": {
+     "ok": 22,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "G1.2 (offline): hidden copies are listed, not numbered": {
+     "ok": 2,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "inherited per-copy ids (old records inside a linked design)": {
+     "ok": 2,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "tags in the root component": {
+     "ok": 2,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "fixed copies (a linked design's stale record): they keep what they print": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "the node's dependencies: one kept copy per component (G8.3)": {
+     "ok": 4,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "decoding built patterns (the geometry checks' reader)": {
+     "ok": 9,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    }
+   }
+  },
+  {
+   "suite": "tests/test_aruco_ids_stability.py",
+   "sha256": "9bf82d39df1a51295922f8bb8efe6cbed376a65f58571f298ac191b40bb416f4",
+   "run": true,
+   "entry": null,
+   "why": "",
+   "sections": [
+    {
+     "text": "0. backward compatible: no ledger = the 2026-10-09 numbering",
+     "key": "0. backward compatible: no ledger = the 2026-10-09 numbering",
+     "regex": "0\\.\\ backward\\ compatible:\\ no\\ ledger\\ =\\ the\\ 2026\\-10\\-09\\ numbering",
+     "line": 284,
+     "func": null
+    },
+    {
+     "text": "1. delete the ArUco IDs node and run it again",
+     "key": "1. delete the ArUco IDs node and run it again",
+     "regex": "1\\.\\ delete\\ the\\ ArUco\\ IDs\\ node\\ and\\ run\\ it\\ again",
+     "line": 291,
+     "func": null
+    },
+    {
+     "text": "2. a deleted copy's id is never handed to a new copy",
+     "key": "2. a deleted copy's id is never handed to a new copy",
+     "regex": "2\\.\\ a\\ deleted\\ copy's\\ id\\ is\\ never\\ handed\\ to\\ a\\ new\\ copy",
+     "line": 310,
+     "func": null
+    },
+    {
+     "text": "3. copies added in the middle (natural order and creation order)",
+     "key": "3. copies added in the middle (natural order and creation order)",
+     "regex": "3\\.\\ copies\\ added\\ in\\ the\\ middle\\ \\(natural\\ order\\ and\\ creation\\ order\\)",
+     "line": 344,
+     "func": null
+    },
+    {
+     "text": "4. a component renamed (every path changes, the stamps stay)",
+     "key": "4. a component renamed (every path changes, the stamps stay)",
+     "regex": "4\\.\\ a\\ component\\ renamed\\ \\(every\\ path\\ changes,\\ the\\ stamps\\ stay\\)",
+     "line": 362,
+     "func": null
+    },
+    {
+     "text": "5. renamed with NO stamps (a ledger seeded from an old node): found by place",
+     "key": "5. renamed with NO stamps (a ledger seeded from an old node): found by place",
+     "regex": "5\\.\\ renamed\\ with\\ NO\\ stamps\\ \\(a\\ ledger\\ seeded\\ from\\ an\\ old\\ node\\):\\ found\\ by\\ place",
+     "line": 374,
+     "func": null
+    },
+    {
+     "text": "6. a copy re-parented (moved into a sub-assembly, same place)",
+     "key": "6. a copy re-parented (moved into a sub-assembly, same place)",
+     "regex": "6\\.\\ a\\ copy\\ re\\-parented\\ \\(moved\\ into\\ a\\ sub\\-assembly,\\ same\\ place\\)",
+     "line": 387,
+     "func": null
+    },
+    {
+     "text": "7. ':3' becomes ':2' after a delete",
+     "key": "7. ':3' becomes ':2' after a delete",
+     "regex": "7\\.\\ ':3'\\ becomes\\ ':2'\\ after\\ a\\ delete",
+     "line": 410,
+     "func": null
+    },
+    {
+     "text": "8. a deleted copy's NAME given to a new copy (Fusion reusing ':2')",
+     "key": "8. a deleted copy's NAME given to a new copy (Fusion reusing ':2')",
+     "regex": "8\\.\\ a\\ deleted\\ copy's\\ NAME\\ given\\ to\\ a\\ new\\ copy\\ \\(Fusion\\ reusing\\ ':2'\\)",
+     "line": 440,
+     "func": null
+    },
+    {
+     "text": "9. hide a copy, OK, show it again",
+     "key": "9. hide a copy, OK, show it again",
+     "regex": "9\\.\\ hide\\ a\\ copy,\\ OK,\\ show\\ it\\ again",
+     "line": 451,
+     "func": null
+    },
+    {
+     "text": "10. a tag deleted and made again",
+     "key": "10. a tag deleted and made again",
+     "regex": "10\\.\\ a\\ tag\\ deleted\\ and\\ made\\ again",
+     "line": 469,
+     "func": null
+    },
+    {
+     "text": "11. a linked design refreshed / replaced (its part named differently)",
+     "key": "11. a linked design refreshed / replaced (its part named differently)",
+     "regex": "11\\.\\ a\\ linked\\ design\\ refreshed\\ /\\ replaced\\ \\(its\\ part\\ named\\ differently\\)",
+     "line": 488,
+     "func": null
+    },
+    {
+     "text": "12. both the node's state and the ledger lost: best effort",
+     "key": "12. both the node's state and the ledger lost: best effort",
+     "regex": "12\\.\\ both\\ the\\ node's\\ state\\ and\\ the\\ ledger\\ lost:\\ best\\ effort",
+     "line": 500,
+     "func": null
+    },
+    {
+     "text": "13. overrides: never moved; clearing one gives the copy back its auto id",
+     "key": "13. overrides: never moved; clearing one gives the copy back its auto id",
+     "regex": "13\\.\\ overrides:\\ never\\ moved;\\ clearing\\ one\\ gives\\ the\\ copy\\ back\\ its\\ auto\\ id",
+     "line": 527,
+     "func": null
+    },
+    {
+     "text": "14. a full dictionary: the oldest retired id first, a hidden copy's last",
+     "key": "14. a full dictionary: the oldest retired id first, a hidden copy's last",
+     "regex": "14\\.\\ a\\ full\\ dictionary:\\ the\\ oldest\\ retired\\ id\\ first,\\ a\\ hidden\\ copy's\\ last",
+     "line": 552,
+     "func": null
+    },
+    {
+     "text": "15. a pasted copy carrying its original's stamp",
+     "key": "15. a pasted copy carrying its original's stamp",
+     "regex": "15\\.\\ a\\ pasted\\ copy\\ carrying\\ its\\ original's\\ stamp",
+     "line": 584,
+     "func": null
+    },
+    {
+     "text": "23. a copy MOVED and its component renamed: only the stamp knows it",
+     "key": "23. a copy MOVED and its component renamed: only the stamp knows it",
+     "regex": "23\\.\\ a\\ copy\\ MOVED\\ and\\ its\\ component\\ renamed:\\ only\\ the\\ stamp\\ knows\\ it",
+     "line": 612,
+     "func": null
+    },
+    {
+     "text": "24. the tag's own id edited in ArUco Extrude (5 -> 9)",
+     "key": "24. the tag's own id edited in ArUco Extrude (5 -> 9)",
+     "regex": "24\\.\\ the\\ tag's\\ own\\ id\\ edited\\ in\\ ArUco\\ Extrude\\ \\(5\\ \\->\\ 9\\)",
+     "line": 623,
+     "func": null
+    },
+    {
+     "text": "16. boards: a block that grows keeps its start when the extra id was never printed",
+     "key": "16. boards: a block that grows keeps its start when the extra id was never printed",
+     "regex": "16\\.\\ boards:\\ a\\ block\\ that\\ grows\\ keeps\\ its\\ start\\ when\\ the\\ extra\\ id\\ was\\ never\\ printed",
+     "line": 634,
+     "func": null
+    },
+    {
+     "text": "17. G0.4 with the ledger: re-planning its own result changes nothing (every edit above)",
+     "key": "17. G0.4 with the ledger: re-planning its own result changes nothing (every edit above)",
+     "regex": "17\\.\\ G0\\.4\\ with\\ the\\ ledger:\\ re\\-planning\\ its\\ own\\ result\\ changes\\ nothing\\ \\(every\\ edit\\ above\\)",
+     "line": 657,
+     "func": null
+    },
+    {
+     "text": "18. the ledger is data: unreadable parts are dropped, never fatal",
+     "key": "18. the ledger is data: unreadable parts are dropped, never fatal",
+     "regex": "18\\.\\ the\\ ledger\\ is\\ data:\\ unreadable\\ parts\\ are\\ dropped,\\ never\\ fatal",
+     "line": 665,
+     "func": null
+    },
+    {
+     "text": "19. migration: a node from before the ledger keeps every id it printed",
+     "key": "19. migration: a node from before the ledger keeps every id it printed",
+     "regex": "19\\.\\ migration:\\ a\\ node\\ from\\ before\\ the\\ ledger\\ keeps\\ every\\ id\\ it\\ printed",
+     "line": 679,
+     "func": null
+    },
+    {
+     "text": "20. the rack (One Dof Test Rack, 2026-10-09 22:52 -> 2026-10-10 12:36)",
+     "key": "20. the rack (One Dof Test Rack, 2026-10-09 22:52 -> 2026-10-10 12:36)",
+     "regex": "20\\.\\ the\\ rack\\ \\(One\\ Dof\\ Test\\ Rack,\\ 2026\\-10\\-09\\ 22:52\\ \\->\\ 2026\\-10\\-10\\ 12:36\\)",
+     "line": 701,
+     "func": null
+    },
+    {
+     "text": "21. a copy deleted and put back (Undo, or the same occurrence restored)",
+     "key": "21. a copy deleted and put back (Undo, or the same occurrence restored)",
+     "regex": "21\\.\\ a\\ copy\\ deleted\\ and\\ put\\ back\\ \\(Undo,\\ or\\ the\\ same\\ occurrence\\ restored\\)",
+     "line": 739,
+     "func": null
+    },
+    {
+     "text": "22. one family's ids never leak into another's",
+     "key": "22. one family's ids never leak into another's",
+     "regex": "22\\.\\ one\\ family's\\ ids\\ never\\ leak\\ into\\ another's",
+     "line": 752,
+     "func": null
+    }
+   ],
+   "ref_exit": 0,
+   "ref_pass": 64,
+   "ref_fail": 0,
+   "ref_counts": {
+    "0. backward compatible: no ledger = the 2026-10-09 numbering": {
+     "ok": 1,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "1. delete the ArUco IDs node and run it again": {
+     "ok": 2,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "2. a deleted copy's id is never handed to a new copy": {
+     "ok": 6,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "3. copies added in the middle (natural order and creation order)": {
+     "ok": 2,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "4. a component renamed (every path changes, the stamps stay)": {
+     "ok": 2,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "5. renamed with NO stamps (a ledger seeded from an old node): found by place": {
+     "ok": 1,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "6. a copy re-parented (moved into a sub-assembly, same place)": {
+     "ok": 2,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "7. ':3' becomes ':2' after a delete": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "8. a deleted copy's NAME given to a new copy (Fusion reusing ':2')": {
+     "ok": 2,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "9. hide a copy, OK, show it again": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "10. a tag deleted and made again": {
+     "ok": 2,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "11. a linked design refreshed / replaced (its part named differently)": {
+     "ok": 1,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "12. both the node's state and the ledger lost: best effort": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "13. overrides: never moved; clearing one gives the copy back its auto id": {
+     "ok": 5,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "14. a full dictionary: the oldest retired id first, a hidden copy's last": {
+     "ok": 5,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "15. a pasted copy carrying its original's stamp": {
+     "ok": 5,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "23. a copy MOVED and its component renamed: only the stamp knows it": {
+     "ok": 1,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "24. the tag's own id edited in ArUco Extrude (5 -> 9)": {
+     "ok": 1,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "16. boards: a block that grows keeps its start when the extra id was never printed": {
+     "ok": 2,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "17. G0.4 with the ledger: re-planning its own result changes nothing (every edit above)": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "18. the ledger is data: unreadable parts are dropped, never fatal": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "19. migration: a node from before the ledger keeps every id it printed": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "20. the rack (One Dof Test Rack, 2026-10-09 22:52 -> 2026-10-10 12:36)": {
+     "ok": 4,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "21. a copy deleted and put back (Undo, or the same occurrence restored)": {
+     "ok": 1,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "22. one family's ids never leak into another's": {
+     "ok": 1,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    }
+   }
+  },
+  {
+   "suite": "tests/test_aruco_output.py",
+   "sha256": "52617cbc28a667a618123754fcb4e29a195de7e2536066eb370921f6e080ac99",
+   "run": true,
+   "entry": null,
+   "why": "",
+   "sections": [
+    {
+     "text": "== the table ==",
+     "key": "== the table ==",
+     "regex": "==\\ the\\ table\\ ==",
+     "line": 163,
+     "func": "main"
+    },
+    {
+     "text": "== marker_grid ==",
+     "key": "== marker_grid ==",
+     "regex": "==\\ marker_grid\\ ==",
+     "line": 198,
+     "func": "main"
+    },
+    {
+     "text": "== black_rects ==",
+     "key": "== black_rects ==",
+     "regex": "==\\ black_rects\\ ==",
+     "line": 233,
+     "func": "main"
+    },
+    {
+     "text": "== marker_png ==",
+     "key": "== marker_png ==",
+     "regex": "==\\ marker_png\\ ==",
+     "line": 251,
+     "func": "main"
+    },
+    {
+     "text": "== marker_svg ==",
+     "key": "== marker_svg ==",
+     "regex": "==\\ marker_svg\\ ==",
+     "line": 267,
+     "func": "main"
+    },
+    {
+     "text": "== layout ==",
+     "key": "== layout ==",
+     "regex": "==\\ layout\\ ==",
+     "line": 280,
+     "func": "main"
+    },
+    {
+     "text": "== PDF ==",
+     "key": "== PDF ==",
+     "regex": "==\\ PDF\\ ==",
+     "line": 366,
+     "func": "main"
+    },
+    {
+     "text": "== page margin (printer-safe border) ==",
+     "key": "== page margin (printer-safe border) ==",
+     "regex": "==\\ page\\ margin\\ \\(printer\\-safe\\ border\\)\\ ==",
+     "line": 402,
+     "func": "main"
+    }
+   ],
+   "ref_exit": 0,
+   "ref_pass": 109,
+   "ref_fail": 0,
+   "ref_counts": {
+    "== the table ==": {
+     "ok": 9,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== marker_grid ==": {
+     "ok": 17,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== black_rects ==": {
+     "ok": 2,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== marker_png ==": {
+     "ok": 6,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== marker_svg ==": {
+     "ok": 4,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== layout ==": {
+     "ok": 33,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== PDF ==": {
+     "ok": 35,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== page margin (printer-safe border) ==": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    }
+   }
+  },
+  {
+   "suite": "tests/test_aruco_slabs.py",
+   "sha256": "c1e94bcb946660bc38297b03d7dd6aeb292ab6ae2c32d7309afd2a841b885bca",
+   "run": true,
+   "entry": null,
+   "why": "",
+   "sections": [
+    {
+     "text": "== slabs: an extrude from Offset, Height further (either sign)",
+     "key": "== slabs: an extrude from Offset, Height further (either sign)",
+     "regex": "==\\ slabs:\\ an\\ extrude\\ from\\ Offset,\\ Height\\ further\\ \\(either\\ sign\\)",
+     "line": 56,
+     "func": null
+    },
+    {
+     "text": "== defaults",
+     "key": "== defaults",
+     "regex": "==\\ defaults",
+     "line": 66,
+     "func": null
+    },
+    {
+     "text": "== layers: the record's surface, depth / raise / recess, detector plane",
+     "key": "== layers: the record's surface, depth / raise / recess, detector plane",
+     "regex": "==\\ layers:\\ the\\ record's\\ surface,\\ depth\\ /\\ raise\\ /\\ recess,\\ detector\\ plane",
+     "line": 78,
+     "func": null
+    },
+    {
+     "text": "== the record (TagSpec) agrees with the slabs",
+     "key": "== the record (TagSpec) agrees with the slabs",
+     "regex": "==\\ the\\ record\\ \\(TagSpec\\)\\ agrees\\ with\\ the\\ slabs",
+     "line": 109,
+     "func": null
+    },
+    {
+     "text": "== migration: height / thickness / above -> Offset / Height (same geometry)",
+     "key": "== migration: height / thickness / above -> Offset / Height (same geometry)",
+     "regex": "==\\ migration:\\ height\\ /\\ thickness\\ /\\ above\\ \\->\\ Offset\\ /\\ Height\\ \\(same\\ geometry\\)",
+     "line": 131,
+     "func": null
+    },
+    {
+     "text": "== plan: the parts follow from where the slabs are",
+     "key": "== plan: the parts follow from where the slabs are",
+     "regex": "==\\ plan:\\ the\\ parts\\ follow\\ from\\ where\\ the\\ slabs\\ are",
+     "line": 160,
+     "func": null
+    },
+    {
+     "text": "== plan: locating pins",
+     "key": "== plan: locating pins",
+     "regex": "==\\ plan:\\ locating\\ pins",
+     "line": 203,
+     "func": null
+    },
+    {
+     "text": "== pin outlines",
+     "key": "== pin outlines",
+     "regex": "==\\ pin\\ outlines",
+     "line": 225,
+     "func": null
+    },
+    {
+     "text": "== stdlib only",
+     "key": "== stdlib only",
+     "regex": "==\\ stdlib\\ only",
+     "line": 252,
+     "func": null
+    }
+   ],
+   "ref_exit": 0,
+   "ref_pass": 106,
+   "ref_fail": 0,
+   "ref_counts": {
+    "== slabs: an extrude from Offset, Height further (either sign)": {
+     "ok": 8,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== defaults": {
+     "ok": 4,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== layers: the record's surface, depth / raise / recess, detector plane": {
+     "ok": 13,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== the record (TagSpec) agrees with the slabs": {
+     "ok": 23,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== migration: height / thickness / above -> Offset / Height (same geometry)": {
+     "ok": 14,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== plan: the parts follow from where the slabs are": {
+     "ok": 18,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== plan: locating pins": {
+     "ok": 8,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== pin outlines": {
+     "ok": 17,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== stdlib only": {
+     "ok": 1,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    }
+   }
+  },
+  {
+   "suite": "tests/test_aruco_trim.py",
+   "sha256": "a255b86362b12afbd7759702f44b9f54dbb2a74f3daf07b65b85189f34072534",
+   "run": true,
+   "entry": null,
+   "why": "",
+   "sections": [
+    {
+     "text": "== the setting: versioned, junk reads as off",
+     "key": "== the setting: versioned, junk reads as off",
+     "regex": "==\\ the\\ setting:\\ versioned,\\ junk\\ reads\\ as\\ off",
+     "line": 75,
+     "func": null
+    },
+    {
+     "text": "== the outline: the base, what sticks out, the margin",
+     "key": "== the outline: the base, what sticks out, the margin",
+     "regex": "==\\ the\\ outline:\\ the\\ base,\\ what\\ sticks\\ out,\\ the\\ margin",
+     "line": 96,
+     "func": null
+    },
+    {
+     "text": "== polygons: area, clip, the outer loop",
+     "key": "== polygons: area, clip, the outer loop",
+     "regex": "==\\ polygons:\\ area,\\ clip,\\ the\\ outer\\ loop",
+     "line": 105,
+     "func": null
+    },
+    {
+     "text": "== keep and cut: the outline on the sides cut, past the body elsewhere",
+     "key": "== keep and cut: the outline on the sides cut, past the body elsewhere",
+     "regex": "==\\ keep\\ and\\ cut:\\ the\\ outline\\ on\\ the\\ sides\\ cut,\\ past\\ the\\ body\\ elsewhere",
+     "line": 121,
+     "func": null
+    },
+    {
+     "text": "== a plate under its face: trims, no refusal",
+     "key": "== a plate under its face: trims, no refusal",
+     "regex": "==\\ a\\ plate\\ under\\ its\\ face:\\ trims,\\ no\\ refusal",
+     "line": 139,
+     "func": null
+    },
+    {
+     "text": "== nothing to trim",
+     "key": "== nothing to trim",
+     "regex": "==\\ nothing\\ to\\ trim",
+     "line": 163,
+     "func": null
+    },
+    {
+     "text": "== refusals: not a rectangle",
+     "key": "== refusals: not a rectangle",
+     "regex": "==\\ refusals:\\ not\\ a\\ rectangle",
+     "line": 173,
+     "func": null
+    },
+    {
+     "text": "== refusals: holes",
+     "key": "== refusals: holes",
+     "regex": "==\\ refusals:\\ holes",
+     "line": 205,
+     "func": null
+    },
+    {
+     "text": "== refusals: the part is bigger than its face (a boss on a plate)",
+     "key": "== refusals: the part is bigger than its face (a boss on a plate)",
+     "regex": "==\\ refusals:\\ the\\ part\\ is\\ bigger\\ than\\ its\\ face\\ \\(a\\ boss\\ on\\ a\\ plate\\)",
+     "line": 222,
+     "func": null
+    },
+    {
+     "text": "== refusals: nothing measured",
+     "key": "== refusals: nothing measured",
+     "regex": "==\\ refusals:\\ nothing\\ measured",
+     "line": 243,
+     "func": null
+    },
+    {
+     "text": "== the ghost's regions: the removed strips, never overlapping",
+     "key": "== the ghost's regions: the removed strips, never overlapping",
+     "regex": "==\\ the\\ ghost's\\ regions:\\ the\\ removed\\ strips,\\ never\\ overlapping",
+     "line": 258,
+     "func": null
+    },
+    {
+     "text": "== random plates: the column keeps the outline, cuts only past it",
+     "key": "== random plates: the column keeps the outline, cuts only past it",
+     "regex": "==\\ random\\ plates:\\ the\\ column\\ keeps\\ the\\ outline,\\ cuts\\ only\\ past\\ it",
+     "line": 268,
+     "func": null
+    }
+   ],
+   "ref_exit": 0,
+   "ref_pass": 52,
+   "ref_fail": 0,
+   "ref_counts": {
+    "== the setting: versioned, junk reads as off": {
+     "ok": 7,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== the outline: the base, what sticks out, the margin": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== polygons: area, clip, the outer loop": {
+     "ok": 6,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== keep and cut: the outline on the sides cut, past the body elsewhere": {
+     "ok": 6,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== a plate under its face: trims, no refusal": {
+     "ok": 6,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== nothing to trim": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== refusals: not a rectangle": {
+     "ok": 6,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== refusals: holes": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== refusals: the part is bigger than its face (a boss on a plate)": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== refusals: nothing measured": {
+     "ok": 5,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== the ghost's regions: the removed strips, never overlapping": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== random plates: the column keeps the outline, cuts only past it": {
+     "ok": 1,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    }
+   }
+  },
+  {
+   "suite": "tests/test_aruco_trim_legacy.py",
+   "sha256": "cd24dabba71c5595ea7601e4fd5ae7795070ef97bf68dea42282eb1b592e6afc",
+   "run": false,
+   "entry": null,
+   "why": "its golden maker installs a stand-in adsk for the 26 evaluate() cases",
+   "sections": [
+    {
+     "text": "tree: {ROOT}",
+     "key": "tree: {ROOT}",
+     "regex": "tree:\\ .*?",
+     "line": 82,
+     "func": null
+    },
+    {
+     "text": "== default_settings(): no 'trim', the rest as before",
+     "key": "== default_settings(): no 'trim', the rest as before",
+     "regex": "==\\ default_settings\\(\\):\\ no\\ 'trim',\\ the\\ rest\\ as\\ before",
+     "line": 84,
+     "func": null
+    },
+    {
+     "text": "== {len(gold['evaluate'])} tags evaluated with no 'trim': identical",
+     "key": "== {len(gold['evaluate'])} tags evaluated with no 'trim': identical",
+     "regex": "==\\ .*?\\ tags\\ evaluated\\ with\\ no\\ 'trim':\\ identical",
+     "line": 91,
+     "func": null
+    },
+    {
+     "text": "== the same tags with a 'trim' that reads as off: identical",
+     "key": "== the same tags with a 'trim' that reads as off: identical",
+     "regex": "==\\ the\\ same\\ tags\\ with\\ a\\ 'trim'\\ that\\ reads\\ as\\ off:\\ identical",
+     "line": 98,
+     "func": null
+    },
+    {
+     "text": "== the shipped defaults (4babc4b: the Joint Origin after the node): no 'trim' = junk 'trim'",
+     "key": "== the shipped defaults (4babc4b: the Joint Origin after the node): no 'trim' = junk 'trim'",
+     "regex": "==\\ the\\ shipped\\ defaults\\ \\(4babc4b:\\ the\\ Joint\\ Origin\\ after\\ the\\ node\\):\\ no\\ 'trim'\\ =\\ junk\\ 'trim'",
+     "line": 114,
+     "func": null
+    },
+    {
+     "text": "== {len(gold['plans'])} aruco_slabs plans: identical, and trim=False is the same",
+     "key": "== {len(gold['plans'])} aruco_slabs plans: identical, and trim=False is the same",
+     "regex": "==\\ .*?\\ aruco_slabs\\ plans:\\ identical,\\ and\\ trim=False\\ is\\ the\\ same",
+     "line": 134,
+     "func": null
+    },
+    {
+     "text": "== a node with no 'trim' keeps its structure; the edit guard leaves it alone",
+     "key": "== a node with no 'trim' keeps its structure; the edit guard leaves it alone",
+     "regex": "==\\ a\\ node\\ with\\ no\\ 'trim'\\ keeps\\ its\\ structure;\\ the\\ edit\\ guard\\ leaves\\ it\\ alone",
+     "line": 152,
+     "func": null
+    }
+   ]
+  },
+  {
+   "suite": "tests/test_aruco_settings.py",
+   "sha256": "aeddc99892d5792d95baa9296cde659d2976cb085b54de7262e115a2f0b313b2",
+   "run": true,
+   "entry": null,
+   "why": "",
+   "sections": [
+    {
+     "text": "file location",
+     "key": "file location",
+     "regex": "file\\ location",
+     "line": 118,
+     "func": "main"
+    },
+    {
+     "text": "missing file",
+     "key": "missing file",
+     "regex": "missing\\ file",
+     "line": 124,
+     "func": "main"
+    },
+    {
+     "text": "remember / recall (global)",
+     "key": "remember / recall (global)",
+     "regex": "remember\\ /\\ recall\\ \\(global\\)",
+     "line": 130,
+     "func": "main"
+    },
+    {
+     "text": "merge",
+     "key": "merge",
+     "regex": "merge",
+     "line": 142,
+     "func": "main"
+    },
+    {
+     "text": "per design",
+     "key": "per design",
+     "regex": "per\\ design",
+     "line": 153,
+     "func": "main"
+    },
+    {
+     "text": "design keys",
+     "key": "design keys",
+     "regex": "design\\ keys",
+     "line": 185,
+     "func": "main"
+    },
+    {
+     "text": "pruning",
+     "key": "pruning",
+     "regex": "pruning",
+     "line": 194,
+     "func": "main"
+    },
+    {
+     "text": "corrupt / odd files",
+     "key": "corrupt / odd files",
+     "regex": "corrupt\\ /\\ odd\\ files",
+     "line": 208,
+     "func": "main"
+    },
+    {
+     "text": "snapshot",
+     "key": "snapshot",
+     "regex": "snapshot",
+     "line": 232,
+     "func": "main"
+    },
+    {
+     "text": "apply",
+     "key": "apply",
+     "regex": "apply",
+     "line": 249,
+     "func": "main"
+    },
+    {
+     "text": "round trip through the file",
+     "key": "round trip through the file",
+     "regex": "round\\ trip\\ through\\ the\\ file",
+     "line": 282,
+     "func": "main"
+    },
+    {
+     "text": "PrusaSlicer",
+     "key": "PrusaSlicer",
+     "regex": "PrusaSlicer",
+     "line": 296,
+     "func": "main"
+    }
+   ],
+   "ref_exit": 0,
+   "ref_pass": 61,
+   "ref_fail": 0,
+   "ref_counts": {
+    "file location": {
+     "ok": 1,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "missing file": {
+     "ok": 2,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "remember / recall (global)": {
+     "ok": 5,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "merge": {
+     "ok": 4,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "per design": {
+     "ok": 11,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "design keys": {
+     "ok": 5,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "pruning": {
+     "ok": 1,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "corrupt / odd files": {
+     "ok": 13,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "snapshot": {
+     "ok": 5,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "apply": {
+     "ok": 9,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "round trip through the file": {
+     "ok": 1,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "PrusaSlicer": {
+     "ok": 4,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    }
+   }
+  },
+  {
+   "suite": "tests/test_aruco_presets.py",
+   "sha256": "20102006de56ed5dcf1a5fcda116ca48b0a08085958018b59e067cfa7511bcbc",
+   "run": true,
+   "entry": null,
+   "why": "",
+   "sections": [
+    {
+     "text": "== PrusaSlicer (the fixture): his profiles as the coordinator measured them",
+     "key": "== PrusaSlicer (the fixture): his profiles as the coordinator measured them",
+     "regex": "==\\ PrusaSlicer\\ \\(the\\ fixture\\):\\ his\\ profiles\\ as\\ the\\ coordinator\\ measured\\ them",
+     "line": 53,
+     "func": null
+    },
+    {
+     "text": "== built-ins: Default (the dialog as it was) and PrusaSlicer's Aruco profiles",
+     "key": "== built-ins: Default (the dialog as it was) and PrusaSlicer's Aruco profiles",
+     "regex": "==\\ built\\-ins:\\ Default\\ \\(the\\ dialog\\ as\\ it\\ was\\)\\ and\\ PrusaSlicer's\\ Aruco\\ profiles",
+     "line": 99,
+     "func": null
+    },
+    {
+     "text": "== save as / update / delete / last; built-ins are read only",
+     "key": "== save as / update / delete / last; built-ins are read only",
+     "regex": "==\\ save\\ as\\ /\\ update\\ /\\ delete\\ /\\ last;\\ built\\-ins\\ are\\ read\\ only",
+     "line": 129,
+     "func": null
+    },
+    {
+     "text": "== a broken file: the built-ins + a note; the next save moves it aside",
+     "key": "== a broken file: the built-ins + a note; the next save moves it aside",
+     "regex": "==\\ a\\ broken\\ file:\\ the\\ built\\-ins\\ \\+\\ a\\ note;\\ the\\ next\\ save\\ moves\\ it\\ aside",
+     "line": 176,
+     "func": null
+    },
+    {
+     "text": "== Import from PrusaSlicer…: a preset of any print profile",
+     "key": "== Import from PrusaSlicer…: a preset of any print profile",
+     "regex": "==\\ Import\\ from\\ PrusaSlicer…:\\ a\\ preset\\ of\\ any\\ print\\ profile",
+     "line": 214,
+     "func": null
+    },
+    {
+     "text": "== the Min cell field and the words for a change",
+     "key": "== the Min cell field and the words for a change",
+     "regex": "==\\ the\\ Min\\ cell\\ field\\ and\\ the\\ words\\ for\\ a\\ change",
+     "line": 229,
+     "func": null
+    },
+    {
+     "text": "== heights in layers: a note, never a snap (C)",
+     "key": "== heights in layers: a note, never a snap (C)",
+     "regex": "==\\ heights\\ in\\ layers:\\ a\\ note,\\ never\\ a\\ snap\\ \\(C\\)",
+     "line": 244,
+     "func": null
+    }
+   ],
+   "ref_exit": 0,
+   "ref_pass": 62,
+   "ref_fail": 0,
+   "ref_counts": {
+    "== PrusaSlicer (the fixture): his profiles as the coordinator measured them": {
+     "ok": 13,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== built-ins: Default (the dialog as it was) and PrusaSlicer's Aruco profiles": {
+     "ok": 7,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== save as / update / delete / last; built-ins are read only": {
+     "ok": 24,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== a broken file: the built-ins + a note; the next save moves it aside": {
+     "ok": 7,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== Import from PrusaSlicer…: a preset of any print profile": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== the Min cell field and the words for a change": {
+     "ok": 5,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== heights in layers: a note, never a snap (C)": {
+     "ok": 3,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    }
+   }
+  },
+  {
+   "suite": "tests/test_aruco_frame.py",
+   "sha256": "959defbe44f989c4652d3772807e358140bb96aa50cd15722739ce05ff225e9e",
+   "run": true,
+   "entry": [
+    "test_origin_math"
+   ],
+   "why": "only test_origin_math is core; the rest loads a stand-in adsk or needs yourdfpy",
+   "sections": [
+    {
+     "text": "== aruco_origin: the words, Rotate, which boards swap, the old rule",
+     "key": "== aruco_origin: the words, Rotate, which boards swap, the old rule",
+     "regex": "==\\ aruco_origin:\\ the\\ words,\\ Rotate,\\ which\\ boards\\ swap,\\ the\\ old\\ rule",
+     "line": 312,
+     "func": "test_origin_math"
+    },
+    {
+     "text": "== aruco_origin.opencv_in_layout = markers.detector_frame of the board as built",
+     "key": "== aruco_origin.opencv_in_layout = markers.detector_frame of the board as built",
+     "regex": "==\\ aruco_origin\\.opencv_in_layout\\ =\\ markers\\.detector_frame\\ of\\ the\\ board\\ as\\ built",
+     "line": 343,
+     "func": "test_origin_math"
+    },
+    {
+     "text": "== the add-in: evaluate() x every Origin -> the Joint Origin IS OpenCV's frame",
+     "key": "== the add-in: evaluate() x every Origin -> the Joint Origin IS OpenCV's frame",
+     "regex": "==\\ the\\ add\\-in:\\ evaluate\\(\\)\\ x\\ every\\ Origin\\ \\->\\ the\\ Joint\\ Origin\\ IS\\ OpenCV's\\ frame",
+     "line": 417,
+     "func": "test_addin"
+    },
+    {
+     "text": "== a node made before 2026-10-09 keeps its orientation (no origin_v)",
+     "key": "== a node made before 2026-10-09 keeps its orientation (no origin_v)",
+     "regex": "==\\ a\\ node\\ made\\ before\\ 2026\\-10\\-09\\ keeps\\ its\\ orientation\\ \\(no\\ origin_v\\)",
+     "line": 481,
+     "func": "test_addin"
+    },
+    {
+     "text": "== the removed Frame: settings and records that still carry one",
+     "key": "== the removed Frame: settings and records that still carry one",
+     "regex": "==\\ the\\ removed\\ Frame:\\ settings\\ and\\ records\\ that\\ still\\ carry\\ one",
+     "line": 494,
+     "func": "test_addin"
+    },
+    {
+     "text": "== the dialog: Origin words, Rotate, the info line",
+     "key": "== the dialog: Origin words, Rotate, the info line",
+     "regex": "==\\ the\\ dialog:\\ Origin\\ words,\\ Rotate,\\ the\\ info\\ line",
+     "line": 525,
+     "func": "test_addin"
+    },
+    {
+     "text": "== the dialog: Corner mark -- only what the tag can have, the old checkbox",
+     "key": "== the dialog: Corner mark -- only what the tag can have, the old checkbox",
+     "regex": "==\\ the\\ dialog:\\ Corner\\ mark\\ \\-\\-\\ only\\ what\\ the\\ tag\\ can\\ have,\\ the\\ old\\ checkbox",
+     "line": 617,
+     "func": "test_addin"
+    },
+    {
+     "text": "== the URDF: today's output is the goldens', byte for byte",
+     "key": "== the URDF: today's output is the goldens', byte for byte",
+     "regex": "==\\ the\\ URDF:\\ today's\\ output\\ is\\ the\\ goldens',\\ byte\\ for\\ byte",
+     "line": 653,
+     "func": "test_urdf"
+    },
+    {
+     "text": "== 2026-10-08's records (a chosen Frame, the Joint Origin there): OpenCV's frame",
+     "key": "== 2026-10-08's records (a chosen Frame, the Joint Origin there): OpenCV's frame",
+     "regex": "==\\ 2026\\-10\\-08's\\ records\\ \\(a\\ chosen\\ Frame,\\ the\\ Joint\\ Origin\\ there\\):\\ OpenCV's\\ frame",
+     "line": 663,
+     "func": "test_urdf"
+    },
+    {
+     "text": "== every target is OpenCV's frame, worked out by hand (yourdfpy FK)",
+     "key": "== every target is OpenCV's frame, worked out by hand (yourdfpy FK)",
+     "regex": "==\\ every\\ target\\ is\\ OpenCV's\\ frame,\\ worked\\ out\\ by\\ hand\\ \\(yourdfpy\\ FK\\)",
+     "line": 685,
+     "func": "test_urdf"
+    }
+   ],
+   "ref_exit": 0,
+   "ref_pass": 61,
+   "ref_fail": 0,
+   "ref_counts": {
+    "== aruco_origin: the words, Rotate, which boards swap, the old rule": {
+     "ok": 9,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    },
+    "== aruco_origin.opencv_in_layout = markers.detector_frame of the board as built": {
+     "ok": 52,
+     "fail": 0,
+     "skip": 0,
+     "fails": []
+    }
+   }
+  },
+  {
+   "suite": "tests/test_aruco_frame_pnp.py",
+   "sha256": "b429bb3a8d85936d729b34efec785b5352753cfd716cedd73fa60bff8172bb43",
+   "run": false,
+   "entry": null,
+   "why": "stand-in adsk + cv2",
+   "sections": [
+    {
+     "text": "== every layout x every Origin: the add-in's body, OpenCV's own board",
+     "key": "== every layout x every Origin: the add-in's body, OpenCV's own board",
+     "regex": "==\\ every\\ layout\\ x\\ every\\ Origin:\\ the\\ add\\-in's\\ body,\\ OpenCV's\\ own\\ board",
+     "line": 436,
+     "func": "main"
+    },
+    {
+     "text": "== the same with Corner mark 'cut' (black square cut / triangle)",
+     "key": "== the same with Corner mark 'cut' (black square cut / triangle)",
+     "regex": "==\\ the\\ same\\ with\\ Corner\\ mark\\ 'cut'\\ \\(black\\ square\\ cut\\ /\\ triangle\\)",
+     "line": 438,
+     "func": "main"
+    },
+    {
+     "text": "== the Origin's words and order (aruco_origin)",
+     "key": "== the Origin's words and order (aruco_origin)",
+     "regex": "==\\ the\\ Origin's\\ words\\ and\\ order\\ \\(aruco_origin\\)",
+     "line": 440,
+     "func": "main"
+    },
+    {
+     "text": "PnP vs the record / the Joint Origin's target (mm / deg), per Origin:",
+     "key": "PnP vs the record / the Joint Origin's target (mm / deg), per Origin:",
+     "regex": "PnP\\ vs\\ the\\ record\\ /\\ the\\ Joint\\ Origin's\\ target\\ \\(mm\\ /\\ deg\\),\\ per\\ Origin:",
+     "line": 448,
+     "func": "main"
+    }
+   ]
+  },
+  {
+   "suite": "tests/test_aruco_label_print.py",
+   "sha256": "a440d2a6469f3f83d016263d30e8a25c3fa9b12155eeac34b41dd8db01e18ec6",
+   "run": false,
+   "entry": null,
+   "why": "the slicing oracle's venv",
+   "sections": [
+    {
+     "text": "== the geometry the tool slices",
+     "key": "== the geometry the tool slices",
+     "regex": "==\\ the\\ geometry\\ the\\ tool\\ slices",
+     "line": 113,
+     "func": null
+    }
+   ]
+  }
+ ]
+}

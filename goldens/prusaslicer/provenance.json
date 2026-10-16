@@ -1,0 +1,15 @@
+{
+ "schema": "arucostudio.golden/1",
+ "name": "prusaslicer",
+ "ref": "C:\\Users\\BAM\\Documents\\cad-exporter\\.claude\\worktrees\\aruco-fusion-plugin-0e9bcb",
+ "ref_commit": "c8216ff",
+ "maker": "C:\\Users\\BAM\\Documents\\cad-exporter\\.claude\\worktrees\\aruco-fusion-plugin-0e9bcb\\tests\\fixtures\\prusaslicer",
+ "made_by": "tools/make_goldens_from_ref.py (copied verbatim)",
+ "date": "2026-10-16",
+ "sha256": {
+  "print/0.15mm SPEED @MK4IS 0.25 - Aruco Black.ini": "88dfbcff8bd98aff9e2547614bc2a071aceb61f84c5f6195997fc4b2b93b6015",
+  "print/0.20mm Sparse test @0.4 nozzle.ini": "82eaeb5438ef922874e7ca59c5071dc83de3ae125330dac1ec2bb4da6b2cb71c",
+  "print/0.32mm SPEED @MK4IS 0.6 - Aruco.ini": "a26437e7908ed60adf8019d8fac968431538b0124fae4c86253f077fceb39c8a",
+  "vendor/PrusaResearch.ini": "26ae47b8076ed6f16ec640d0c3fd93c898f982ca5897dbea364502e3cdec297b"
+ }
+}
