@@ -41,7 +41,8 @@ aruco-studio/
   studio/                    the web app: Vite + React + TypeScript (dev server 5361)
   goldens/                   JSON made by running REF's code read-only (never by the new code)
   tests/                     pytest (core, plan, scene, verify, server, adapters) + Playwright e2e
-  tools/                     check.py (ONE command), make_goldens_from_ref.py, ref_path.py
+  tools/                     check.py (ONE command, groups discovered), make_goldens_from_ref.py,
+                             make_evaluate_goldens.py, ref_sections.py, ref_path.py, spec_status.py
   docs/                      BRIEF, ARCHITECTURE, PLAN, spec.json, inventory/, status/
   .venv/                     Python (C:\Users\BAM\miniconda3\python.exe -m venv .venv)
   .data/                     the Studio's own store (presets, remembered options); git-ignored
@@ -53,6 +54,8 @@ Rules that hold everywhere:
 |---|---|
 | `core/` and `plan/` import only the standard library and each other. | Fusion's Python has no numpy or cv2. The same files must run inside Fusion later. |
 | `core/` and `plan/` never read or write a file. | So every function is a pure function of its arguments and can be tested with plain values. |
+| `plan/` and `scene/` never import `adapters/`, `server/` or `verify/`. | build123d and viser reuse `plan/` and `scene/` alone (section 6). A test greps for it. |
+| The plan reads `x_ref`, `z_sign`, `has_body` and the loops from `Target` only, never from `settings`. | Stripping every adapter-only key from `settings` (5.2) gives the same `TagPlan`. A test does exactly that. |
 | Lengths in the plan are millimetres in the tag's own frame. | One unit for every shell. The core modules keep their own units inside (see 4.1); the plan converts at its boundary. |
 | Every versioned rule keeps its number and its stored key, bit for bit. | Existing tags never change on their own. A Fusion adapter rebuilds today's tags identically. |
 | The Studio never writes under `%USERPROFILE%\CADExporter`. Its own store is `ROOT/.data/` (env `ARUCO_STUDIO_HOME` overrides). | Zach's remembered options, presets and ledgers belong to the live add-in. |
@@ -81,10 +84,12 @@ One module per REF core module, same public names, so the port is a copy and the
 | `core/edits.py` | NEW, from `aruco_feature.py` | the edit model: `settle`, `keep_black_step`, `merged`, `structural_change`, `edit_kind`, `edit_changes`, `rebuild_reason` | mm |
 | `core/form.py` | NEW, from `aruco_extrude_cmd.py` and `aruco_extrude_ui.py` | the tag form's pure model: defaults and limits, `values` (fields -> settings + numbers), `label_values`, `trim_values`, `preset_values`, `snap_size`, `round_line`, `size_line`, `cells_line`, `layer_lines`, `info_rows`, `same_build`, `check_auto` | mm |
 | `core/validate.py` | NEW, from `bam_fusion_ui.py` (Issue, Validator) and `aruco_extrude_ui.py` (`classify`, `label_issues`, `trim_issues`) | per-field messages: `Issue(field, level, text)`, `worst`, `summary_text`, `validate(spec, plan) -> [Issue]` | |
-| `core/presets.py` | `ArucoMarkers/aruco_presets.py` (minus load / save), `aruco_preset_library.py` (words, cards, `Library`) | `default_preset`, `from_profile`, `normalise`, `line_mm`, `cell_setting`, `builtins`, `catalog`, `find`, `unique_name`, `changes`, `describe_changes`, `layer_note`; the cards' words and `thumb_svg` | mm |
+| `core/presets.py` | `ArucoMarkers/aruco_presets.py` (minus load / save), `aruco_preset_library.py` (words, cards, `Library`, the pure half of `preset_of_node`) | `default_preset`, `from_profile`, `preset_of(settings, numbers)` (a tag's print settings as a preset; the adapter reads the node, the core maps), `normalise`, `line_mm`, `cell_setting`, `builtins`, `catalog`, `find`, `unique_name`, `changes`, `describe_changes`, `layer_note`; the cards' words and `thumb_svg` | mm |
 | `core/prusa.py` | `ArucoMarkers/aruco_prusa.py` (minus the directory walk) | `read_ini(text)`, `read_bundle(text)`, `resolve`, `nozzle_of`, `width_of`, `profile`, `describe` | mm |
-| `core/geometry.py` | NEW, from `aruco_feature.py` (`_v`..`_rotz`, `_xf_frame`), `aruco_tags.py` (Rodrigues, `_frame_error`, `_solve3`), `aruco_preview.py` (boxes, prisms) | vectors, 4x4 frames, box / prism polygons, polygon area and clipping helpers shared by plan/ | mm |
-| `core/export_rows.py` | NEW, from `aruco_commands.py`, `aruco_export.py`, `aruco_export_preview.py` | the Export table's rows and words: `slug`, `labels` (" <1>", " <2>"), `body_role`, `print_rows`, `tag_parts`, `KINDS`, which files each type writes, `eta_text`, `progress_message` | |
+| `core/geometry.py` | NEW, from `aruco_feature.py` (`_v`..`_rotz`, `_xf_frame`), `aruco_tags.py` (Rodrigues, `_frame_error`, `_solve3`, the composition maths of `_place_joint_origin`), `aruco_preview.py` (boxes, prisms) | vectors, 4x4 frames, box / prism polygons, polygon area and clipping helpers shared by plan/; `jo_decompose(frame) -> (angle_deg, offsets, flip)` and `jo_compose(...) -> frame` (how Fusion composes a Joint Origin: x turned by `angle` about the UNFLIPPED z, the flip half a turn about x', offsets along the FINAL axes). Pure maths; the adapter only passes the three numbers to Fusion | mm |
+| `core/restructure.py` | `ArucoMarkers/aruco_restructure.py` (pure half) | `has_combine`, `restructure_plan(parts_old, op_old, parts_new, op_new)`, `new_parts`, `needed_params`, `refusal` (the words), `lost_after`, `what_goes`; with `core.edits.structural_change` this is the whole "what a structural edit does" model. The in-place `restructure()` itself stays in the adapter | |
+| `core/faces.py` | `ArucoMarkers/aruco_autosize_gallery.py` (`FACES`, `TYPED`, `shape_pts`, `loops_mm`, `bbox_mm`, `summary`) | the ten non-box faces plus a box and a disc as loops in mm (chord tolerance 0.05 mm, the way Fusion strokes an edge). Product data: the Studio's target palette serves them (`GET /api/targets`); the tests use the same list | mm |
+| `core/export_rows.py` | NEW, from `aruco_commands.py`, `aruco_export.py`, `aruco_export_preview.py` | the Export table's rows and words: `slug`, `labels` (" <1>", " <2>"), `print_rows`, `tag_parts`, `KINDS`, which files each type writes, `eta_text`, `progress_message`. NOT `body_role`: it parses Fusion's body names ("tag tile <key>"), so it is the adapter's | |
 | `core/marker_table.py` | NEW, from `aruco_marker_table.py` (pure half), `aruco_ids_cmd.py` | one row per tag copy: `MarkerRow`, `name_of`, `natural_key`, `family`, `order`, `duplicates`, `spec_info`, the Status words (`how`, `tone`) | |
 | `core/ids_design.py` | NEW, from `aruco_ids_feature.py` (pure part) | `plan_design(snapshot, ledger)`, `Labels`, `stamp_chains`, `resolve_hidden`, `staleness`, `drift`, `auto_verdict`, `warning_text`, `export_overrides` over an **assembly snapshot** (section 5.4) | |
 
@@ -94,10 +99,10 @@ Not ported, on purpose: `markers.fit_square`, `fit_board`, `largest_rect` (super
 
 | Module | Holds |
 |---|---|
-| `plan/target.py` | `Target`: the face or profile as plain numbers (section 5.1) |
-| `plan/spec.py` | `TagSpec`: the request (section 5.2); `from_record()` reads a REF node's settings + numbers |
+| `plan/target.py` | `Target`: the face or profile as plain numbers (section 5.1); `box(w, h)`, `disc(r, holes)`, `from_face(name)` (the `core.faces` list); `prism_volumes(target)`: the trim's `volumes_mm3` for a Studio target, which is always a prism (the outline extruded from `body_mm.z0` to `z1`), so `body = box area x depth` and `under_face = face area x depth` are exact, not estimates. Fusion measures real bodies instead. |
+| `plan/spec.py` | `TagSpec`: the request (section 5.2); `from_record()` reads a REF node's settings + numbers; `check(spec) -> [Issue]`: the per-field checks of section 5.6, run first by `plan_tag` and by `/api/validate` |
 | `plan/plan.py` | `plan_tag(spec) -> TagPlan`: the port of `aruco_feature.evaluate()` as a pure function. Order kept: fit on loops, the Origin turn, the mark, the label (a strip grows the tile; the cut and the pins follow), the pins, the trim, the slabs. Never raises: a refusal is `errors`. |
-| `plan/layers.py` | `TagPlan`, `Layer`, `Polygon` (section 5.3); the polygons from `cell_boxes`, `Mark`, `Label.boxes()`, `pin_outlines`, `TrimPlan.column()` |
+| `plan/layers.py` | `TagPlan`, `Layer`, `Polygon` (section 5.3); the polygons from `cell_boxes`, `Mark`, `Label.boxes()`, `pin_outlines`, `TrimPlan.column()`; the `guides` (quiet ring, clear zones, keep-outs, a refused label's preview) from `label.quiet_ring`, `clear_zones`, `mark_keepouts`, `pin_keepouts`, `Label.preview` |
 | `plan/record.py` | the record a tag stores: `spec.to_dict()`, `mark`, `label`, `trim`, the rule versions; `record_digest`, `record_same`, `frame_digest`; the node's warning words |
 | `plan/variants.py` | a copy's plan from the template's: `relabel` by id and name, `id_regions`, `label_slots` (which cells flip colour) |
 | `plan/mesh.py` | a layer as triangles (boxes and extruded polygons with holes, ear clipping) for the 3D view and STL |
@@ -130,7 +135,9 @@ FastAPI + uvicorn on `127.0.0.1:5360`. Serves `studio/dist/` at `/` when it exis
 |---|---|
 | `GET /api/health` | `{ok, version, ref_commit}` |
 | `GET /api/dictionaries` | names, bits, capacity |
-| `POST /api/plan` | `TagSpec` -> `TagPlan` (JSON, section 5.3) |
+| `GET /api/form` | the inspector's field list from `core.form` + section 5.6: for every field its key path, type, default, limits, choices and which `settings` / `numbers` key it writes. The web app builds the inspector from this, never from a hand-written copy |
+| `GET /api/targets` | the target palette: box, disc, the ten `core.faces` as `Target`s |
+| `POST /api/plan` | `TagSpec` -> `TagPlan` (JSON, section 5.3); `?mesh=1` fills `mesh`. A wrong TYPE (a string for a number, a missing required key) is 422 with the field's key path; a wrong VALUE goes through `plan_tag` and comes back as an `Issue` (5.6) |
 | `POST /api/validate` | `TagSpec` -> `[Issue]` |
 | `POST /api/candidates` | the ranked Layout list for a target |
 | `GET/PUT /api/scene` | the open scene; `POST /api/scene/renumber` |
@@ -141,6 +148,8 @@ FastAPI + uvicorn on `127.0.0.1:5360`. Serves `studio/dist/` at `/` when it exis
 
 `server/store.py` owns every file: presets (`bam_aruco_presets/1`, same shape as REF so a preset file can be copied over), remembered options, the recent list, PrusaSlicer's config directory (read only; `BAM_ARUCO_PRUSASLICER_DIR` points at a fixture).
 
+`server/app.py` serves `studio/dist/` at `/` when it exists and allows CORS from `http://127.0.0.1:5361` and `http://localhost:5361` from the start, so the web app's builder never edits the server.
+
 ### 3.6 `adapters/fusion/`: thin
 
 | Module | Holds |
@@ -148,10 +157,11 @@ FastAPI + uvicorn on `127.0.0.1:5360`. Serves `studio/dist/` at `/` when it exis
 | `adapters/fusion/target.py` | a Fusion face or profile -> `Target` (from REF `profile_rect`, `face_frame`, `keep_x`, `_face_loops_m`, `_trim_inputs`) |
 | `adapters/fusion/build.py` | `TagPlan` -> temporary bodies per layer (`TemporaryBRepManager` boxes and polygon prisms), the combines, the base features |
 | `adapters/fusion/feature.py` | the custom feature: create, compute, edit; parameters and expressions (`follow_expression`, `params_for`) |
-| `adapters/fusion/joint_origin.py` | OpenCV's frame -> a Joint Origin (angle, offsets, flip); one per tag |
+| `adapters/fusion/joint_origin.py` | one Joint Origin per tag: `core.geometry.jo_decompose` gives (angle, offsets, flip); this module only places it, reads it back and keeps the one-per-tag rule |
 | `adapters/fusion/paint.py` | appearances and the repaint hooks |
-| `adapters/fusion/records.py` | the record on the component: `plan/record.py`'s dict plus the adapter's handles (tokens, body names, group) |
-| `adapters/fusion/restructure.py` | `restructure_plan` (pure) and the in-place rebuild |
+| `adapters/fusion/records.py` | the record on the component: `plan/record.py`'s dict plus the adapter's handles (tokens, body names, group); `body_role` (cells or tile from a body's NAME); `preset_of_node` = read the node, then `core.presets.preset_of` |
+| `adapters/fusion/restructure.py` | the in-place rebuild only (release, delete, create, regroup, atomic). What to delete and create comes from `core.restructure.restructure_plan` |
+| `adapters/fusion/sync.py` | the after-compute hooks (idle detection, the hidden refresh command, the retry); the policy is `core.numbering.auto_decision` and `core.edits.verdict` |
 | `adapters/fusion/fake_adsk.py` | the stand-in used by the tests (from REF `tests/aruco_trim_fixtures.py`, `aruco_ui_stubs.py`) |
 
 In this run the adapter is a skeleton tested against the fake. It is not installed into Fusion.
@@ -162,14 +172,15 @@ Stack: Vite + React + TypeScript. State in one store (zustand). No deviation pla
 
 | Part | What it does |
 |---|---|
-| 2D canvas | an SVG canvas like Figma: pan, zoom, select, drag, snap; many tags on one canvas. Each tag draws its `TagPlan` layers as `<path>` elements (polygons with holes, `fill-rule="evenodd"`); white, black, cut, keep-column colours from a theme table. |
-| 3D view | three.js; the same layers extruded between `z[0]` and `z[1]` (via `/api/plan`'s `mesh` or client-side extrusion of the same polygons); a Google-Maps-style 2D / 3D toggle that keeps the camera's centre and zoom |
-| Inspector | the tag form from `core.form`'s field list: layout, dictionary, id, size (Auto), cells, mode, op, Offset / Height per colour, Origin, corner mark, label, pins, trim; per-field messages from `/api/validate` |
-| Library | print presets (a React port of REF `resources/preset_library`'s cards) |
-| IDs table | one row per scene tag (`core.marker_table` rows), renumber, overrides |
-| Export | SVG / PNG / PDF sheet / STL / 3MF / verify |
+| 2D canvas | an SVG canvas like Figma: pan, zoom, select, drag, snap, rulers in mm; many tags on one canvas, each on its own target. Each tag draws its target's outline and holes, then its `TagPlan` layers as `<path>` elements (polygons with holes, `fill-rule="evenodd"`), then its `guides` (the quiet ring, the clear zones, a refused label's preview in orange); white, black, cut, keep-column colours from a theme table. Every `<path>` carries `data-layer="<name>"` and a refused label's preview `data-state="refused"`, so a test can count and find them. |
+| Target editor | part of the inspector: pick a target from `/api/targets` (box, disc, the ten faces) or type `w_mm` / `h_mm`, a thickness (`body_mm.z0..z1`, 0 = no body) and holes (circles); the canvas draws it. This is the Studio's stand-in for the clicked face. |
+| 3D view | three.js; the same layers extruded between `z[0]` and `z[1]`, from `/api/plan?mesh=1` only (the app never triangulates); a Google-Maps-style 2D / 3D toggle that keeps the camera's centre and zoom; the OpenCV frame as a triad. The store exposes the scene's z extent (`zRange`) and the camera centre for the tests. |
+| Inspector | the tag form from `/api/form`'s field list: layout, dictionary, id, size (Auto), cells, mode, op, Offset / Height per colour, Origin, corner mark, label, pins, trim, the Layout candidates; per-field messages from `/api/validate` under the field each `Issue.field` names |
+| IDs table | one row per scene tag (`core.marker_table` rows), renumber, overrides; click a row to select |
+| Export | SVG / PNG / PDF sheet / STL / 3MF / verify, with the verify report shown |
+| Library (M5) | print presets (a React port of REF `resources/preset_library`'s cards), click-again-to-zoom in the IDs table |
 
-The app computes nothing geometric. Every number on screen comes from a `TagPlan` or an `Issue`.
+The app computes nothing geometric. Every number on screen comes from a `TagPlan`, a `Target` or an `Issue`.
 
 ## 5. The contracts
 
@@ -186,9 +197,9 @@ Types are written like JSON schema. `mm` means millimetres. Polygons are `[[u, v
 | `z_sign` | `1 \| -1` | which way the target's normal points relative to the host |
 | `x_ref` | `[u, v] \| null` | a face tag's x as it was made (REF `keep_x`); null for a profile |
 | `body_mm` | `{u0, v0, u1, v1, z0, z1} \| null` | the body under, boxed in the target frame (trim) |
-| `volumes_mm3` | `{body, under_face} \| null` | measured volumes for the trim rules; null = "nothing measured" (a refusal unless `trim.force`) |
+| `volumes_mm3` | `{body, under_face} \| null` | measured volumes for the trim rules; null = "nothing measured" (a refusal unless `trim.force`). The Studio fills it with `plan/target.prism_volumes` (exact for its prism targets); Fusion measures the real body |
 
-The adapter fills this. The core never sees an entity.
+The adapter fills this. The core never sees an entity. In the Studio the target editor (section 4) fills it, so a Studio tag with a thickness behaves like a tag on a plate: pocket, recess, pins and trim all plan.
 
 ### 5.2 `TagSpec` (the request)
 
@@ -217,8 +228,13 @@ Settings keys and the versioned rules they carry:
 | `pin` | `none\|triangle\|round` | |
 | `trim` | `{rule: 1, axes, margin_mm, force}` or absent | `trim.RULE`: anything else reads as off |
 | `rotate_deg` | legacy | turned the frame BEFORE the fit; kept on nodes that have it |
-| `x_base`, `x_ref`, `z_sign`, `has_body`, `source` | from the target at creation | the adapter's; mirrored in `Target` |
+| `frame` | legacy (settings or record) | the removed "Frame" choice; read as OpenCV's frame and dropped on the next write (REF `aruco_tags.has_old_frame`, `test_aruco_frame` EX-MIGRATE-2) |
+| `label.scope` = `"square"` | legacy (phase 1) | read as `row = "square"` by `LabelSettings.from_dict` |
+| `numbers.height`, `thickness`, `above` | legacy (before 2026-10-08) | `core.slabs.from_legacy` maps them to Offset / Height pairs; a plan from the legacy numbers equals the plan from the mapped pairs, and `TagPlan.rules.legacy_numbers` says it happened |
+| `x_base`, `x_ref`, `z_sign`, `has_body`, `source` | from the target at creation | the adapter's; mirrored in `Target`. The plan reads them from `Target`, never from here |
 | `jo_v`, `host_xform`, `key`, `black_follows` | adapter only | carried through untouched, never read by the plan |
+
+The last two rows are the adapter's keys and they stay in `settings` only because the settings dict's shape (`v: 2`) is what a REF record stores and what `record_same` compares. `plan_tag` must give the same `TagPlan` with every one of them deleted; `tests/plan/test_adapter_keys.py` checks that on every golden case.
 
 ### 5.3 `TagPlan` (the result)
 
@@ -239,8 +255,9 @@ All lengths in mm in the PATTERN frame: origin at the pattern's centre, u = imag
 | `ids` | `[int]` | the ids this tag prints (`marker.ids`) |
 | `labels` | `[{slot, text, cap_mm, stroke_mm}]` | the label's resolved texts per slot |
 | `mark`, `label`, `trim`, `pins` | objects | `Mark.to_dict()`, `Label.to_dict()`, `TrimPlan` as dict, the pin outlines: the record pieces, unchanged from REF so a Fusion record compares |
-| `warnings` | `[Issue]` | `{field, level: "info"\|"warn"\|"error", text}`; `field` names a form field or `"tag"` |
-| `rules` | object | `{spec: 2, origin: 2\|null, cells: {...}\|null, label: 1\|2, trim: 1\|null}`: the versions this plan was made under |
+| `guides` | object | the lines the 2D view draws and nothing prints, all in the pattern frame: `sticker` (rect), `quiet_ring` (rect), `clear_hard` and `clear_preferred` (`label.clear_zones` under the label's rule), `keepouts` (`[polygon]`: the mark's and the pins'), `label_preview` (`[Box]`, only when the label was refused: where it was asked for, drawn in orange), `target` (the target's loops turned into the pattern frame by `label.loops_to_pattern`) |
+| `warnings` | `[Issue]` | `{field, level: "info"\|"warn"\|"error", text}`; `field` is a key path of section 5.6 (`numbers.size`, `settings.label.cap_mm`, ...) or `"tag"` |
+| `rules` | object | `{spec: 2, origin: 2\|null, cells: {...}\|null, label: 1\|2, trim: 1\|null, legacy_numbers: bool, font: 1}`: the versions this plan was made under. `font: 1` is the pixel font of 2026-10-10 (REF never versioned the font change; the Studio records it here, in the plan only, so a stored label record keeps REF's exact shape) |
 | `mesh` | optional | per layer, triangles for the 3D view (filled by `/api/plan?mesh=1`) |
 
 `Layer`:
@@ -295,6 +312,45 @@ The Studio scene builds one from itself (each tag = a component with one occurre
 | `locked` | boolean | a printed tag: the Studio refuses edits that would change its ink |
 
 The file is the scene as JSON with `plan` dropped. `scene/file.py` keeps a migration per schema number.
+
+A `locked` tag: `scene.model.edit(scene, name, change)` refuses any change whose plan has a different `record_digest` (ink, size, ids, label text) and returns an `Issue(field, "error", "locked: printed tag")`; a move or a rename is allowed.
+
+### 5.6 Validation, per field
+
+Two layers, never mixed:
+
+| Layer | Catches | Answer |
+|---|---|---|
+| the schema (pydantic in `server/`, the `TagSpec` dataclass in `plan/spec.py`) | a wrong TYPE: a string where a number goes, a missing required key, an unknown `schema` string | HTTP 422 / `TypeError` naming the key path. Never reaches `plan_tag` |
+| `plan/spec.check(spec)` then `plan_tag` | a wrong VALUE: out of range, not a choice, does not fit | an `Issue(field, level, text)` in `TagPlan.warnings`; `ok` is false only for `error`. `plan_tag` never raises |
+
+`Issue.field` is the key path into `TagSpec`. The table is the contract for `/api/form`, the inspector and the tests; limits are REF's constants, named so a builder copies the number from the core, not from here.
+
+| Field | Type | Valid | Out of range says (level) |
+|---|---|---|---|
+| `settings.layout` | choice | `single` / `grid` / `charuco` (`board.LAYOUTS`) | error: unknown layout |
+| `settings.dictionary` | choice | one of `dictionary.DICTIONARY_NAMES` (case-folded accepted) | error: unknown dictionary |
+| `numbers.marker_id` | int | `0 <= id`, `id + count <= capacity` | error: outside the dictionary (names the capacity) |
+| `numbers.size` | mm | `0` = Auto; else `> 0`; snapped / clamped by the fit | info: snapped or clamped, with the number (`autosize` notes) |
+| `numbers.square` | mm | ChArUco only; `0` = Auto; else `> marker` (`board.check_spec`) | error: square must be larger than the marker |
+| `settings.cols`, `rows` | int | `>= 1`; ChArUco `>= 2 x 2` (`board.check_spec`) | error: cv2 refuses it |
+| `settings.quiet_modules` | modules | `>= 0.5`, `<= 3` | warn: below 1 reads worse; error above 3 |
+| `settings.cells` | object or absent | `rule == 1`, `of` in `autosize.CELL_OF`, `MIN_STEP_M <= mm/1000 <= MAX_STEP_M`, `min_mm >= 0` | error: unknown cells rule (absent = legacy, no message) |
+| `settings.mode`, `op` | choice | `slabs.MODES`, `slabs.OPS` | error |
+| `numbers.white_offset`, `white_height`, `black_offset`, `black_height` | mm | `abs(v) <= slabs.LIMIT_MM`; a colour that is built has `abs(height) >= WHITE_MIN_MM` / `BLACK_MIN_MM` | error: a colour with no height; info: snapped (`slabs.snap_height`) |
+| `settings.turn` | choice | `0 / 90 / 180 / 270` | error |
+| `settings.origin_v` | `2` or absent | | info: a node made before 2026-10-09 keeps its orientation (`origin.effective` note) |
+| `settings.corner_mark` | choice | `chamfer.CHOICES`; valid for the tag per `chamfer.valid_marks` | info: the other form instead (`Mark.instead`); warn: no mark, the border is too narrow |
+| `settings.pin` | choice | `slabs.PIN_SHAPES`; only with a body under a New tile | info: pins need a body / a new tile (`slabs.pin_applies`) |
+| `numbers.pin_size`, `pin_length`, `pin_tol` | mm | inside `slabs.PIN_LIMITS` | error: outside the limits; error: the pins do not fit (`pin_outlines` raises -> an Issue) |
+| `settings.label.on` ... (every `LabelSettings` field) | per `LabelSettings` | `content` in `label.CONTENTS`, `place` / `row` / `side` / `scope` / `position` in their tuples, `cap_mm` `0` or `>= min_cap(nozzle)`, `nozzle_mm > 0`, `rule` in `label.RULES` | error / warn: each `label_violations` line with how much, on `settings.label`; info: the label was laid out as a preview (`build_anyway` builds it) |
+| `settings.trim` | object or absent | `rule == 1`, `axes` in `trim.AXES`, `0 <= margin_mm <= MARGIN_MAX_MM` | error: each `TrimPlan.refusals` line (`force` overrides) |
+| `target.w_mm`, `h_mm` | mm | `> 0` | error |
+| `target.loops_mm` | polygons | each loop `>= 3` points, the first loop the outer, holes inside it; empty = the box | error: a loop with under 3 points; error: nothing fits (`autosize` refusal) |
+| `target.body_mm` | box or null | `z1 > z0` when present | error |
+| `name`, `key` | string | any; `key` unique in a scene | error (scene level): duplicate key |
+
+Everything in `TagPlan.warnings` that REF's dialog said as an info line (`round_line`, `size_line`, `cells_line`, `layer_lines`, the Origin line) is an `Issue` of level `info` on its field. `core.validate.validate(spec, plan)` is the one function that turns the plan's notes into these Issues; the Fusion dialog and the Studio's inspector both call it.
 
 ## 6. Why this split
 
