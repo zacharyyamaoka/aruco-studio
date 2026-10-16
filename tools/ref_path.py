@@ -51,3 +51,20 @@ def same_as_pinned(rel: str) -> bool:
 def status() -> str:
     """`git status --porcelain` of REF: compared before and after every run."""
     return git("status", "--porcelain")
+
+
+def status_check(before: str, after: str, read=()) -> list:
+    """What changed in REF's `git status` while a run read it. Other
+    sessions commit in REF all day, so a change there is not ours by
+    itself; it is OURS only when it is bytecode or a file the run read
+    (`read`: path prefixes). -> the lines that are ours (empty = clean);
+    raises nothing, prints the others as a note."""
+    b, a = set(before.splitlines()), set(after.splitlines())
+    changed = sorted(a ^ b)
+    ours = [l for l in changed if "__pycache__" in l or l.endswith(".pyc")
+            or any(l[3:].startswith(p) for p in read)]
+    others = [l for l in changed if l not in ours]
+    if others:
+        print("note: REF changed during the run by another session (not read by this run): "
+              + "; ".join(others))
+    return ours

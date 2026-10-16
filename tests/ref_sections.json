@@ -2528,6 +2528,166 @@
      "func": null
     }
    ]
+  },
+  {
+   "suite": "tests/test_aruco_extrude_sync.py",
+   "sha256": "05969b6eccc6f97969326dcd6c40d8a4118f37b0a51d8ce671d4634d3e65345a",
+   "run": false,
+   "entry": null,
+   "why": "stand-in adsk; section 4 is pure",
+   "sections": [
+    {
+     "text": "== 1. compute's outcome does not depend on the record check",
+     "key": "== 1. compute's outcome does not depend on the record check",
+     "regex": "==\\ 1\\.\\ compute's\\ outcome\\ does\\ not\\ depend\\ on\\ the\\ record\\ check",
+     "line": 172,
+     "func": null
+    },
+    {
+     "text": "== 2. after_compute: digest only, read only, a budget, never raises",
+     "key": "== 2. after_compute: digest only, read only, a budget, never raises",
+     "regex": "==\\ 2\\.\\ after_compute:\\ digest\\ only,\\ read\\ only,\\ a\\ budget,\\ never\\ raises",
+     "line": 214,
+     "func": null
+    },
+    {
+     "text": "== 3. maybe_refresh: undo, busy, already refreshed",
+     "key": "== 3. maybe_refresh: undo, busy, already refreshed",
+     "regex": "==\\ 3\\.\\ maybe_refresh:\\ undo,\\ busy,\\ already\\ refreshed",
+     "line": 263,
+     "func": null
+    },
+    {
+     "text": "== 4. restructure_plan: every pair of node structures",
+     "key": "== 4. restructure_plan: every pair of node structures",
+     "regex": "==\\ 4\\.\\ restructure_plan:\\ every\\ pair\\ of\\ node\\ structures",
+     "line": 288,
+     "func": null
+    }
+   ]
+  },
+  {
+   "suite": "tests/test_aruco_marker_table.py",
+   "sha256": "70aaf3212a90daf60b2762095617a0740d91fd00ded830e2c56962237f9bb131",
+   "run": false,
+   "entry": null,
+   "why": "its module guards an adsk import; the names and rows are pure",
+   "sections": [
+    {
+     "text": "names: the same string as the IDs node",
+     "key": "names: the same string as the IDs node",
+     "regex": "names:\\ the\\ same\\ string\\ as\\ the\\ IDs\\ node",
+     "line": 46,
+     "func": null
+    },
+    {
+     "text": "rows from a tag spec (TagSpec or its dict)",
+     "key": "rows from a tag spec (TagSpec or its dict)",
+     "regex": "rows\\ from\\ a\\ tag\\ spec\\ \\(TagSpec\\ or\\ its\\ dict\\)",
+     "line": 78,
+     "func": null
+    },
+    {
+     "text": "double-click timing",
+     "key": "double-click timing",
+     "regex": "double\\-click\\ timing",
+     "line": 120,
+     "func": null
+    },
+    {
+     "text": "the viewport pick",
+     "key": "the viewport pick",
+     "regex": "the\\ viewport\\ pick",
+     "line": 178,
+     "func": null
+    },
+    {
+     "text": "the zoom's camera",
+     "key": "the zoom's camera",
+     "regex": "the\\ zoom's\\ camera",
+     "line": 212,
+     "func": null
+    },
+    {
+     "text": "navigation (both dialogs): rows, buttons, the pick, the zoom box",
+     "key": "navigation (both dialogs): rows, buttons, the pick, the zoom box",
+     "regex": "navigation\\ \\(both\\ dialogs\\):\\ rows,\\ buttons,\\ the\\ pick,\\ the\\ zoom\\ box",
+     "line": 232,
+     "func": null
+    },
+    {
+     "text": "the events Fusion really sends (measured 2026-10-13, real mouse)",
+     "key": "the events Fusion really sends (measured 2026-10-13, real mouse)",
+     "regex": "the\\ events\\ Fusion\\ really\\ sends\\ \\(measured\\ 2026\\-10\\-13,\\ real\\ mouse\\)",
+     "line": 353,
+     "func": null
+    }
+   ]
+  },
+  {
+   "suite": "tests/test_aruco_export_dialog.py",
+   "sha256": "546b2d7a7fe44762c7ca8e4781f4e7eadcdc0ecc473828030aeeaa8efdcb9ffd",
+   "run": false,
+   "entry": null,
+   "why": "stand-in adsk; the progress bar words are pure",
+   "sections": [
+    {
+     "text": "first run (nothing remembered)",
+     "key": "first run (nothing remembered)",
+     "regex": "first\\ run\\ \\(nothing\\ remembered\\)",
+     "line": 423,
+     "func": null
+    },
+    {
+     "text": "filament slots (Zach 2026-10-10: black #1, white #2) and the viewport highlight",
+     "key": "filament slots (Zach 2026-10-10: black #1, white #2) and the viewport highlight",
+     "regex": "filament\\ slots\\ \\(Zach\\ 2026\\-10\\-10:\\ black\\ \\#1,\\ white\\ \\#2\\)\\ and\\ the\\ viewport\\ highlight",
+     "line": 505,
+     "func": null
+    },
+    {
+     "text": "the progress bar (Zach 2026-10-10: estimated time, what it is working on)",
+     "key": "the progress bar (Zach 2026-10-10: estimated time, what it is working on)",
+     "regex": "the\\ progress\\ bar\\ \\(Zach\\ 2026\\-10\\-10:\\ estimated\\ time,\\ what\\ it\\ is\\ working\\ on\\)",
+     "line": 602,
+     "func": null
+    },
+    {
+     "text": "OK's validity and Reset",
+     "key": "OK's validity and Reset",
+     "regex": "OK's\\ validity\\ and\\ Reset",
+     "line": 634,
+     "func": null
+    },
+    {
+     "text": "OK",
+     "key": "OK",
+     "regex": "OK",
+     "line": 664,
+     "func": null
+    },
+    {
+     "text": "reopen",
+     "key": "reopen",
+     "regex": "reopen",
+     "line": 700,
+     "func": null
+    },
+    {
+     "text": "settings saved by the dialog of before the types",
+     "key": "settings saved by the dialog of before the types",
+     "regex": "settings\\ saved\\ by\\ the\\ dialog\\ of\\ before\\ the\\ types",
+     "line": 712,
+     "func": null
+    },
+    {
+     "text": "the dialog of before the types (a running Fusion's old handler)",
+     "key": "the dialog of before the types (a running Fusion's old handler)",
+     "regex": "the\\ dialog\\ of\\ before\\ the\\ types\\ \\(a\\ running\\ Fusion's\\ old\\ handler\\)",
+     "line": 740,
+     "func": null
+    }
+   ]
   }
  ]
 }

@@ -59,7 +59,7 @@ import json
 import math
 from typing import List, Optional
 
-from . import dictionary as _dictionary
+from ._ref_compat import aruco_core
 from . import label as _label_module
 from . import markers as _markers_module
 from . import prusa as aruco_prusa
@@ -208,7 +208,7 @@ def normalise(p, name=None):
     _pick(src, c, "min_lines", lambda v: int(v) if _num(v, 0, 100) is not None
           and float(v).is_integer() else None)
     t, src = out["tag"], p.get("tag")
-    dicts = _dictionary.ARUCO_DICTS
+    dicts = aruco_core.module("fiducials").ARUCO_DICTS
     _pick(src, t, "dictionary", _choice(tuple(dicts)))
     _pick(src, t, "mode", _choice(MODES))
     _pick(src, t, "op", _choice(OPS))
@@ -582,7 +582,6 @@ def layer_note(depth_mm, layer_mm, first_mm=0.0, what="black"):
 import sys as _sys  # noqa: E402
 
 aruco_presets = _sys.modules[__name__]   # REF's name for this module
-from ._ref_compat import aruco_core  # noqa: E402
 
 
 LIBRARY_SCHEMA = "bam_aruco_preset_library/1"

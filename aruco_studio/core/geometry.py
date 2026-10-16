@@ -1,6 +1,6 @@
 """Vectors, rigid frames, loops and the Joint Origin maths, as plain numbers.
 
-Ported from REF (cad-exporter c8216ff), adsk-free bodies only:
+Ported from REF (cad-exporter c8216ff), the Fusion-free bodies only:
 
 | From | What |
 |---|---|
@@ -86,7 +86,7 @@ def _area2(pts):
 
 
 def _frame_error(a, b):
-    """(position error, worst axis angle rad) between two frames."""
+    """(position error cm, worst axis angle rad) between two frames."""
     d = _sub(a[0], b[0])
     pos = math.sqrt(_dot(d, d))
     ang = 0.0
@@ -145,7 +145,7 @@ def _chain(segs, tol=1e-4):
     """Stroked curves of one loop (any order, any direction) -> one polygon."""
     if not segs:
         return []
-    d = lambda a, b: sum((p - q) ** 2 for p, q in zip(a, b))  # noqa: E731
+    d = lambda a, b: sum((p - q) ** 2 for p, q in zip(a, b))
     out, rest = list(segs[0]), [list(s_) for s_ in segs[1:]]
     while rest:
         end = out[-1]

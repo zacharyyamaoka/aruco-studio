@@ -60,8 +60,9 @@ def parent(names):
                             "--child", str(ref_path.REF), str(TOOLS), str(OUT), *names],
                            cwd=tmp, env=env)
     after = ref_path.status()
-    if before != after:
-        raise SystemExit(f"REF's git status changed: before {before!r}, after {after!r}")
+    ours = ref_path.status_check(before, after, read=("CADExporter/", "tests/fixtures/", "tools/make_", "ArucoMarkers/aruco_core.py", "ArucoMarkers/aruco_presets.py", "ArucoMarkers/aruco_prusa.py", "ArucoMarkers/aruco_preset_library.py", "ArucoMarkers/aruco_autosize_gallery.py"))
+    if ours:
+        raise SystemExit("REF's git status changed in files this run read: " + "; ".join(ours))
     if p.returncode:
         raise SystemExit(p.returncode)
     print("REF's git status: unchanged")

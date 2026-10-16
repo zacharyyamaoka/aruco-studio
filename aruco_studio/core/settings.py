@@ -1,7 +1,7 @@
 """A tag's settings and numbers: the five generations and their rules.
 
 Ported from REF `ArucoMarkers/aruco_feature.py` (cad-exporter c8216ff): the
-adsk-free bodies only, copied verbatim. `settings_of` / `numbers_of` read a
+Fusion-free bodies only, copied verbatim. `settings_of` / `numbers_of` read a
 node's stored values here as plain data (a `NodeState`, see core/edits.py)
 instead of a Fusion custom feature.
 
