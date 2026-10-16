@@ -1,0 +1,7 @@
+# LF everywhere, so goldens, fixtures and ported files stay byte-identical to REF.
+* text=auto eol=lf
+*.ini -text
+*.png binary
+*.pdf binary
+*.3mf binary
+*.stl binary
