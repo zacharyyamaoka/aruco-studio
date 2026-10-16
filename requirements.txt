@@ -1,0 +1,6 @@
+# ArUco Studio, Python 3.11. PyPI only, every version pinned.
+# core/ and plan/ need none of these (stdlib only); the tests and verify/ do.
+pytest==8.4.2
+pytest-xdist==3.8.0
+numpy==2.3.5
+opencv-contrib-python-headless==5.0.0.93

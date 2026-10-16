@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aruco_studio"
+version = "0.1.0"
+description = "ArUco Studio: fiducial markers planned by a pure core, drawn by thin shells"
+requires-python = ">=3.11,<3.12"
+dependencies = []          # core/ and plan/ are stdlib only; see requirements.txt for the tests
+
+[tool.setuptools.packages.find]
+include = ["aruco_studio*"]
+
+[tool.setuptools.package-data]
+"aruco_studio.core" = ["*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "ref(suite, section): the REF suite and section a test was ported from",
+]
