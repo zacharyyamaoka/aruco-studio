@@ -25,3 +25,15 @@ os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "ref(suite, section): the REF suite and section ported")
+
+
+def pytest_collection_modifyitems(session, config, items):
+    """tools/check.py --trace: every test's ref(suite, section) markers -> a JSON file."""
+    out = os.environ.get("ARUCO_TRACE_OUT")
+    if not out:
+        return
+    import json
+    rows = [{"nodeid": it.nodeid, "suite": m.args[0], "section": m.args[1]}
+            for it in items for m in it.iter_markers("ref")]
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump(rows, f)

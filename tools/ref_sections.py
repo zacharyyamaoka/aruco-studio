@@ -214,16 +214,54 @@ def run_ref(rel: str, rows, entry):
         return json.loads(out[-1])
 
 
+def spec_tests():
+    """REF docs/aruco_spec.json's offline tests: {suite: [(test id, [section words])]}."""
+    spec = json.loads(ref_path.show("docs/aruco_spec.json").decode("utf-8"))
+    out = {}
+    for area in spec["areas"]:
+        for feat in area["features"]:
+            for t in feat.get("tests") or []:
+                how = t.get("how") or {}
+                if isinstance(how, dict) and how.get("file", "").startswith("tests/test_aruco_"):
+                    out.setdefault(how["file"], []).append((t["id"], list(how.get("sections") or [])))
+    return out
+
+
+def attach_spec_ids(rel, rows, tests):
+    """Each REF spec test id onto the sections its `how.sections` names (a
+    header that starts with, or holds, those words); a test naming no
+    section is the whole suite's."""
+    whole = []
+    for tid, secs in tests.get(rel, []):
+        if not secs:
+            whole.append(tid)
+            continue
+        for words in secs:
+            w = words.strip().lower()
+            hit = [r for r in rows if r["text"].lstrip("= ").lower().startswith(w)] or \
+                  [r for r in rows if w in r["text"].lower()]
+            for r in hit[:1]:
+                r.setdefault("spec_ids", [])
+                if tid not in r["spec_ids"]:
+                    r["spec_ids"].append(tid)
+            if not hit:
+                whole.append(tid)
+    return sorted(set(whole))
+
+
 def main():
     before = ref_path.status()
+    tests = spec_tests()
     suites = []
     for rel, how in SUITES.items():
         src = ref_path.show(rel).decode("utf-8")
         if not ref_path.same_as_pinned(rel):
             raise SystemExit(f"{rel}: REF's working tree differs from {ref_path.REF_COMMIT}")
         rows = sections_of(src)
+        whole = attach_spec_ids(rel, rows, tests)
         entry = {"suite": rel, "sha256": ref_path.sha256_at(rel), "run": bool(how.get("run")),
-                 "entry": how.get("entry"), "why": how.get("why", ""), "sections": rows}
+                 "entry": how.get("entry"), "why": how.get("why", ""), "spec_ids": whole,
+                 "sections": rows}
         if how.get("run"):
             print(f"running {rel} ...", flush=True)
             res = run_ref(rel, rows, how.get("entry"))

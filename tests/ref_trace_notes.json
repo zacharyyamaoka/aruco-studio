@@ -1,0 +1,39 @@
+{
+ "about": "Why a REF section has no ported pytest test (or only a parked one). tools/check.py --trace reads it. A key is a section's exact header text, or '*' for every section of the suite without a test. Statuses: 'parked: <milestone>' (a test exists and skips until that milestone), 'skipped: venv' (needs another venv), 'not ported: ...' (Fusion or UI, owned elsewhere), 'deferred: <milestone>' (pure, but its home is a later milestone).",
+ "tests/test_aruco_cells_legacy.py": {
+  "== {len(data['evaluate'])} evaluate() results (aruco_feature, no 'cells' in the settings): identical": "parked: M2 (the 12 evaluate() cases replay through plan_tag: tests/plan/test_golden_evaluate.py)"
+ },
+ "tests/test_aruco_trim_legacy.py": {
+  "== {len(gold['evaluate'])} tags evaluated with no 'trim': identical": "parked: M2 (the 26 evaluate() cases replay through plan_tag)",
+  "== the same tags with a 'trim' that reads as off: identical": "parked: M2 (evaluate() with a junk 'trim')",
+  "== the shipped defaults (4babc4b: the Joint Origin after the node): no 'trim' = junk 'trim'": "parked: M2 (evaluate() with JO_AFTER on)"
+ },
+ "tests/test_aruco_settings.py": {
+  "*": "deferred: M2b (aruco_settings is the remembered dialog options and their file: server/store.py; snapshot / apply read Fusion command inputs; find_prusaslicer is server/prusa_launch.py)"
+ },
+ "tests/test_aruco_frame.py": {
+  "== the add-in: evaluate() x every Origin -> the Joint Origin IS OpenCV's frame": "parked: M2 (evaluate() is plan_tag; the frame is TagPlan.frames.opencv)",
+  "== a node made before 2026-10-09 keeps its orientation (no origin_v)": "parked: M2 (evaluate() under the old Origin rule; core.origin's rule itself is covered by the golden origin.json and test_ref_frame s01)",
+  "== the removed Frame: settings and records that still carry one": "parked: M2 (the record: plan/record.py; normalise dropping 'frame' is in goldens/settings.json)",
+  "== the dialog: Origin words, Rotate, the info line": "not ported: the Fusion dialog (adapters/fusion, M4); the words are core.origin's (test_ref_frame s01) and core.form._origin_line (goldens/form.json)",
+  "== the dialog: Corner mark -- only what the tag can have, the old checkbox": "not ported: the Fusion dialog (adapters/fusion, M4); chamfer.valid_marks / choice_of are in goldens/chamfer.json",
+  "== the URDF: today's output is the goldens', byte for byte": "skipped: venv (numpy + yourdfpy and the CAD Exporter's URDF writer: the clank venv)",
+  "== 2026-10-08's records (a chosen Frame, the Joint Origin there): OpenCV's frame": "skipped: venv (the CAD Exporter's URDF writer)",
+  "== every target is OpenCV's frame, worked out by hand (yourdfpy FK)": "skipped: venv (yourdfpy)"
+ },
+ "tests/test_aruco_frame_pnp.py": {
+  "*": "skipped: venv (cv2 + a stand-in adsk for evaluate(); M2b's verify/ redoes it on plan_tag: PLAN M2b.1)"
+ },
+ "tests/test_aruco_label_print.py": {
+  "*": "skipped: venv (the slicing oracle's tools and PrusaSlicer)"
+ },
+ "tests/test_aruco_extrude_sync.py": {
+  "*": "not ported: Fusion (the after-compute hooks on fake Fusion objects: adapters/fusion/sync.py, M4); the policy is core.edits.verdict"
+ },
+ "tests/test_aruco_marker_table.py": {
+  "*": "not ported: UI (the table's clicks, viewport pick, zoom camera and navigation: studio/src/table, M3; the Python stays with the Fusion adapter's UI)"
+ },
+ "tests/test_aruco_export_dialog.py": {
+  "*": "not ported: the Fusion Export dialog (adapters/fusion, M4); its rows' words are core.export_rows"
+ }
+}

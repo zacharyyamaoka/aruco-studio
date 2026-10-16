@@ -42,13 +42,14 @@ def slug(text, n=60):
     return (s[:n].rstrip("_")) or "section"
 
 
-def run_copy(copy, rows, entry):
+def run_copy(copy, rows, entry, extra_env=None):
     headers = [[r["key"], r["regex"]] for r in rows]
     with tempfile.TemporaryDirectory(prefix="aruco_ref_copy_") as tmp:
         env = dict(os.environ)
         env.update({"PYTHONDONTWRITEBYTECODE": "1", "USERPROFILE": tmp, "HOME": tmp,
                     "ARUCO_STUDIO_HOME": os.path.join(tmp, "studio"), "PYTHONIOENCODING": "utf-8"})
         env.pop("PYTHONPATH", None)
+        env.update(extra_env or {})
         p = subprocess.run([sys.executable, "-X", "utf8", str(HERE / "_ref_child.py"), str(copy),
                             json.dumps(headers), json.dumps(entry or [])],
                            cwd=tmp, env=env, capture_output=True, timeout=900)

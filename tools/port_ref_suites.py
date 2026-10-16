@@ -222,11 +222,44 @@ def port_helpers():
         (OUT / f"ref_{tool}.py").write_text(head + fix_imports(body), encoding="utf-8", newline="\n")
 
 
+def port_mutations():
+    """REF's mutation tables (tools/mutate_aruco_ids.py, mutate_aruco_label.py),
+    the rows that break a CORE file and are caught by a core suite, as data."""
+    import ast
+    rows = []
+    for tool, default_file in (("tools/mutate_aruco_ids.py", "CADExporter/bam_cad_core/aruco_numbering.py"),
+                               ("tools/mutate_aruco_label.py", None)):
+        tree = ast.parse(ref_path.show(tool).decode("utf-8"))
+        env = {"ROOT": "", "CORE": "CADExporter/bam_cad_core/aruco_label.py"}
+        for node in tree.body:
+            if (isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+                    and node.targets[0].id in ("PREVIEW", "BODIES", "DIALOG", "RULE1", "MUTATIONS")):
+                env[node.targets[0].id] = eval(compile(ast.Expression(node.value), tool, "eval"), {}, env)
+        for m in env["MUTATIONS"]:
+            if default_file:
+                mid, rule, old, new, must = m
+                path, suites = default_file, ["tests/test_aruco_ids_stability.py"]
+            else:
+                mid, rule, path, old, new, suites, must = m
+            if not path.startswith("CADExporter/bam_cad_core/"):
+                continue                         # an add-in file: the Fusion adapter's (M4)
+            rows.append({"id": mid, "tool": tool, "rule": rule, "file": path, "old": old, "new": new,
+                         "suites": suites, "must": must})
+    import json
+    text = ("# REF: the mutation tables of tools/mutate_aruco_ids.py and mutate_aruco_label.py at "
+            f"{ref_path.REF_COMMIT}\n# (rows on a core file only). Data; tests/core/test_ref_mutations.py "
+            "runs them. Do not edit by hand.\nMUTATIONS = " + json.dumps(rows, indent=1, ensure_ascii=False)
+            + "\n")
+    (OUT / "ref_mutations.py").write_text(text, encoding="utf-8", newline="\n")
+    return len(rows)
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for name in SUITES:
         port_suite(name)
     port_helpers()
+    print(f"{port_mutations()} mutations -> tests/core/ref_suites/ref_mutations.py")
     print(f"{len(SUITES)} suites -> {OUT.relative_to(ref_path.ROOT)}")
 
 

@@ -10,6 +10,7 @@ counted REF's own run.
 """
 import builtins
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -17,6 +18,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path[:0] = [str(HERE / "ref_suites"), str(ROOT), str(ROOT / "tools")]
+if os.environ.get("ARUCO_STUDIO_CORE_ROOT"):     # a mutated copy of the package (mutation tests)
+    sys.path.insert(0, os.environ["ARUCO_STUDIO_CORE_ROOT"])
 
 path, headers, entry = sys.argv[1], json.loads(sys.argv[2]), json.loads(sys.argv[3])
 counts, seen = {}, {}

@@ -46,3 +46,45 @@ def test_jo_compose_round_trip(case):
     a, off, flip = GEO.jo_decompose(base, target)
     pos, ang = GEO._frame_error(GEO.jo_compose(base, a, off, flip), target)
     assert pos < 1e-9 and ang < 1e-6, (pos, ang)
+
+
+def _random_frames(n, seed):
+    """n random (base, target) pairs a Joint Origin can reach: the target on
+    the base's plane (z parallel or flipped), any angle, any in-plane offset,
+    plus a lift along z."""
+    import math
+    import random
+    rnd = random.Random(seed)
+
+    def unit(v):
+        s = math.sqrt(sum(c * c for c in v))
+        return [c / s for c in v]
+    out = []
+    for _ in range(n):
+        z = unit([rnd.gauss(0, 1) for _ in range(3)])
+        a = unit([rnd.gauss(0, 1) for _ in range(3)])
+        x = unit([a[i] - sum(a[j] * z[j] for j in range(3)) * z[i] for i in range(3)])
+        y = [z[1] * x[2] - z[2] * x[1], z[2] * x[0] - z[0] * x[2], z[0] * x[1] - z[1] * x[0]]
+        o = [rnd.uniform(-50, 50) for _ in range(3)]
+        t = rnd.uniform(-math.pi, math.pi)
+        s = rnd.choice((1.0, -1.0))
+        tx = [math.cos(t) * x[k] + math.sin(t) * y[k] for k in range(3)]
+        ty = [s * (-math.sin(t) * x[k] + math.cos(t) * y[k]) for k in range(3)]
+        tz = [s * c for c in z]
+        u, v, w = rnd.uniform(-30, 30), rnd.uniform(-30, 30), rnd.uniform(-5, 5)
+        to = [o[k] + u * x[k] + v * y[k] + w * z[k] for k in range(3)]
+        out.append(([o, x, y, z], [to, tx, ty, tz]))
+    return out
+
+
+def test_jo_compose_inverts_jo_decompose_on_2000_random_frames():
+    """ST-T-JO-1: jo_compose(jo_decompose(f)) == f within 1e-9, flipped frames included."""
+    worst = (0.0, 0.0)
+    flips = 0
+    for base, target in _random_frames(2000, 20261016):
+        a, off, flip = GEO.jo_decompose(base, target)
+        flips += flip
+        pos, ang = GEO._frame_error(GEO.jo_compose(base, a, off, flip), target)
+        worst = (max(worst[0], pos), max(worst[1], ang))
+    assert worst[0] < 1e-9 and worst[1] < 1e-7, worst
+    assert 800 < flips < 1200

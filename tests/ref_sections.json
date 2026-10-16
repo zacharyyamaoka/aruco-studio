@@ -12,76 +12,107 @@
    "run": true,
    "entry": null,
    "why": "",
+   "spec_ids": [],
    "sections": [
     {
      "text": "§4 P1 defaults on the five faces (doc table)",
      "key": "§4 P1 defaults on the five faces (doc table)",
      "regex": "§4\\ P1\\ defaults\\ on\\ the\\ five\\ faces\\ \\(doc\\ table\\)",
      "line": 173,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-SIZE-1"
+     ]
     },
     {
      "text": "§6 P3 ranked lists (doc)",
      "key": "§6 P3 ranked lists (doc)",
      "regex": "§6\\ P3\\ ranked\\ lists\\ \\(doc\\)",
      "line": 221,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-SIZE-2"
+     ]
     },
     {
      "text": "clamp_to_fit: typed sizes",
      "key": "clamp_to_fit: typed sizes",
      "regex": "clamp_to_fit:\\ typed\\ sizes",
      "line": 272,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-SIZE-3"
+     ]
     },
     {
      "text": "layout_for_size",
      "key": "layout_for_size",
      "regex": "layout_for_size",
      "line": 327,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-SIZE-3"
+     ]
     },
     {
      "text": "Layout.apply -> TagSpec",
      "key": "Layout.apply -> TagSpec",
      "regex": "Layout\\.apply\\ \\->\\ TagSpec",
      "line": 355,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-SIZE-3"
+     ]
     },
     {
      "text": "auto_dictionary (§3)",
      "key": "auto_dictionary (§3)",
      "regex": "auto_dictionary\\ \\(§3\\)",
      "line": 383,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-SIZE-4"
+     ]
     },
     {
      "text": "invariant sweep over random boxes",
      "key": "invariant sweep over random boxes",
      "regex": "invariant\\ sweep\\ over\\ random\\ boxes",
      "line": 399,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-SIZE-5"
+     ]
     },
     {
      "text": "fit_on_loops: a clicked face's own outline",
      "key": "fit_on_loops: a clicked face's own outline",
      "regex": "fit_on_loops:\\ a\\ clicked\\ face's\\ own\\ outline",
      "line": 486,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-SIZE-6"
+     ]
     },
     {
      "text": "gallery: ten faces that are not boxes, against a brute-force raster (0.1 mm)",
      "key": "gallery: ten faces that are not boxes, against a brute-force raster (0.1 mm)",
      "regex": "gallery:\\ ten\\ faces\\ that\\ are\\ not\\ boxes,\\ against\\ a\\ brute\\-force\\ raster\\ \\(0\\.1\\ mm\\)",
      "line": 778,
-     "func": "gallery"
+     "func": "gallery",
+     "spec_ids": [
+      "EX-SIZE-7"
+     ]
     },
     {
      "text": "candidates_on_loops: the Layout list respects holes",
      "key": "candidates_on_loops: the Layout list respects holes",
      "regex": "candidates_on_loops:\\ the\\ Layout\\ list\\ respects\\ holes",
      "line": 905,
-     "func": "gallery"
+     "func": "gallery",
+     "spec_ids": [
+      "EX-SIZE-6"
+     ]
     }
    ],
    "ref_exit": 0,
@@ -156,48 +187,67 @@
    "run": true,
    "entry": null,
    "why": "",
+   "spec_ids": [],
    "sections": [
     {
      "text": "== counts, ids, extents ==",
      "key": "== counts, ids, extents ==",
      "regex": "==\\ counts,\\ ids,\\ extents\\ ==",
      "line": 175,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-LAYOUT-1"
+     ]
     },
     {
      "text": "== validation ==",
      "key": "== validation ==",
      "regex": "==\\ validation\\ ==",
      "line": 191,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-LAYOUT-2"
+     ]
     },
     {
      "text": "== ink == generateImage (pinned from cv2) ==",
      "key": "== ink == generateImage (pinned from cv2) ==",
      "regex": "==\\ ink\\ ==\\ generateImage\\ \\(pinned\\ from\\ cv2\\)\\ ==",
      "line": 210,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-LAYOUT-3"
+     ]
     },
     {
      "text": "== OpenCV's frame (pinned from cv2 5.0 objPoints) ==",
      "key": "== OpenCV's frame (pinned from cv2 5.0 objPoints) ==",
      "regex": "==\\ OpenCV's\\ frame\\ \\(pinned\\ from\\ cv2\\ 5\\.0\\ objPoints\\)\\ ==",
      "line": 239,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-LAYOUT-3"
+     ]
     },
     {
      "text": "== board_png / board_svg ==",
      "key": "== board_png / board_svg ==",
      "regex": "==\\ board_png\\ /\\ board_svg\\ ==",
      "line": 279,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EXP-PDF-4"
+     ]
     },
     {
      "text": "== boards on a print sheet ==",
      "key": "== boards on a print sheet ==",
      "regex": "==\\ boards\\ on\\ a\\ print\\ sheet\\ ==",
      "line": 296,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EXP-PDF-4"
+     ]
     }
    ],
    "ref_exit": 0,
@@ -248,6 +298,9 @@
    "run": true,
    "entry": null,
    "why": "",
+   "spec_ids": [
+    "EX-CELLS-1"
+   ],
    "sections": [
     {
      "text": "== the spec's example: a typed 28.0 mm 6x6 marker at 0.68 mm lines",
@@ -379,6 +432,9 @@
    "run": false,
    "entry": null,
    "why": "its golden maker installs a stand-in adsk for the 12 evaluate() cases",
+   "spec_ids": [
+    "EX-CELLS-2"
+   ],
    "sections": [
     {
      "text": "== the legacy rule: no 'cells' is None, so is anything unreadable",
@@ -416,90 +472,127 @@
    "run": true,
    "entry": null,
    "why": "",
+   "spec_ids": [],
    "sections": [
     {
      "text": "== which mark each layout x mode gets",
      "key": "== which mark each layout x mode gets",
      "regex": "==\\ which\\ mark\\ each\\ layout\\ x\\ mode\\ gets",
      "line": 178,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-MARK-1"
+     ]
     },
     {
      "text": "== at OpenCV's corner 0 / the board origin, for every Origin turn",
      "key": "== at OpenCV's corner 0 / the board origin, for every Origin turn",
      "regex": "==\\ at\\ OpenCV's\\ corner\\ 0\\ /\\ the\\ board\\ origin,\\ for\\ every\\ Origin\\ turn",
      "line": 190,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-MARK-2"
+     ]
     },
     {
      "text": "== legs, in module units",
      "key": "== legs, in module units",
      "regex": "==\\ legs,\\ in\\ module\\ units",
      "line": 213,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-MARK-3"
+     ]
     },
     {
      "text": "== single and grid: never touches a black cell",
      "key": "== single and grid: never touches a black cell",
      "regex": "==\\ single\\ and\\ grid:\\ never\\ touches\\ a\\ black\\ cell",
      "line": 240,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-MARK-4"
+     ]
     },
     {
      "text": "== ChArUco: only the outer corner of the top-left black square",
      "key": "== ChArUco: only the outer corner of the top-left black square",
      "regex": "==\\ ChArUco:\\ only\\ the\\ outer\\ corner\\ of\\ the\\ top\\-left\\ black\\ square",
      "line": 269,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-MARK-4"
+     ]
     },
     {
      "text": "== the cut tool",
      "key": "== the cut tool",
      "regex": "==\\ the\\ cut\\ tool",
      "line": 304,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-MARK-3"
+     ]
     },
     {
      "text": "== tiles bigger than the sticker, rectangles, turns",
      "key": "== tiles bigger than the sticker, rectangles, turns",
      "regex": "==\\ tiles\\ bigger\\ than\\ the\\ sticker,\\ rectangles,\\ turns",
      "line": 322,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-MARK-5"
+     ]
     },
     {
      "text": "== too narrow a white border",
      "key": "== too narrow a white border",
      "regex": "==\\ too\\ narrow\\ a\\ white\\ border",
      "line": 350,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-MARK-5"
+     ]
     },
     {
      "text": "== a copy (another id) carries the same mark",
      "key": "== a copy (another id) carries the same mark",
      "regex": "==\\ a\\ copy\\ \\(another\\ id\\)\\ carries\\ the\\ same\\ mark",
      "line": 372,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-MARK-5"
+     ]
     },
     {
      "text": "== locating pins keep clear of a cut corner",
      "key": "== locating pins keep clear of a cut corner",
      "regex": "==\\ locating\\ pins\\ keep\\ clear\\ of\\ a\\ cut\\ corner",
      "line": 390,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-PINS-3"
+     ]
     },
     {
      "text": "== Corner mark: None / Cut white corner / Black triangle (2026-10-09)",
      "key": "== Corner mark: None / Cut white corner / Black triangle (2026-10-09)",
      "regex": "==\\ Corner\\ mark:\\ None\\ /\\ Cut\\ white\\ corner\\ /\\ Black\\ triangle\\ \\(2026\\-10\\-09\\)",
      "line": 424,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-MARK-1"
+     ]
     },
     {
      "text": "== stdlib only",
      "key": "== stdlib only",
      "regex": "==\\ stdlib\\ only",
      "line": 480,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-MARK-3"
+     ]
     }
    ],
    "ref_exit": 0,
@@ -586,132 +679,188 @@
    "run": true,
    "entry": null,
    "why": "",
+   "spec_ids": [],
    "sections": [
     {
      "text": "== the font (a pixel font: Zach, 2026-10-10, \"very blocky letters\")",
      "key": "== the font (a pixel font: Zach, 2026-10-10, \"very blocky letters\")",
      "regex": "==\\ the\\ font\\ \\(a\\ pixel\\ font:\\ Zach,\\ 2026\\-10\\-10,\\ \"very\\ blocky\\ letters\"\\)",
      "line": 107,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-1",
+      "EX-LABEL-FONT-1"
+     ]
     },
     {
      "text": "== content",
      "key": "== content",
      "regex": "==\\ content",
      "line": 211,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-2"
+     ]
     },
     {
      "text": "== per-copy ids and names (markers.resolve / plan_serials)",
      "key": "== per-copy ids and names (markers.resolve / plan_serials)",
      "regex": "==\\ per\\-copy\\ ids\\ and\\ names\\ \\(markers\\.resolve\\ /\\ plan_serials\\)",
      "line": 253,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-2"
+     ]
     },
     {
      "text": "== on the black",
      "key": "== on the black",
      "regex": "==\\ on\\ the\\ black",
      "line": 305,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-3"
+     ]
     },
     {
      "text": "== on the white",
      "key": "== on the white",
      "regex": "==\\ on\\ the\\ white",
      "line": 416,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-4"
+     ]
     },
     {
      "text": "== a face with holes (Black only)",
      "key": "== a face with holes (Black only)",
      "regex": "==\\ a\\ face\\ with\\ holes\\ \\(Black\\ only\\)",
      "line": 497,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-4"
+     ]
     },
     {
      "text": "== corner marks and pins",
      "key": "== corner marks and pins",
      "regex": "==\\ corner\\ marks\\ and\\ pins",
      "line": 536,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-5"
+     ]
     },
     {
      "text": "== one label, its position apart (any content in any position)",
      "key": "== one label, its position apart (any content in any position)",
      "regex": "==\\ one\\ label,\\ its\\ position\\ apart\\ \\(any\\ content\\ in\\ any\\ position\\)",
      "line": 665,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-6"
+     ]
     },
     {
      "text": "== the name on the black: both rows",
      "key": "== the name on the black: both rows",
      "regex": "==\\ the\\ name\\ on\\ the\\ black:\\ both\\ rows",
      "line": 698,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-3"
+     ]
     },
     {
      "text": "== a text too long for its place: shrink, then cut short",
      "key": "== a text too long for its place: shrink, then cut short",
      "regex": "==\\ a\\ text\\ too\\ long\\ for\\ its\\ place:\\ shrink,\\ then\\ cut\\ short",
      "line": 751,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-7"
+     ]
     },
     {
      "text": "== batch ids, two rows",
      "key": "== batch ids, two rows",
      "regex": "==\\ batch\\ ids,\\ two\\ rows",
      "line": 821,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-8"
+     ]
     },
     {
      "text": "== the label is as tall as the black (its slab)",
      "key": "== the label is as tall as the black (its slab)",
      "regex": "==\\ the\\ label\\ is\\ as\\ tall\\ as\\ the\\ black\\ \\(its\\ slab\\)",
      "line": 865,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-9"
+     ]
     },
     {
      "text": "== offsets: a nudge after the automatic placement, re-checked",
      "key": "== offsets: a nudge after the automatic placement, re-checked",
      "regex": "==\\ offsets:\\ a\\ nudge\\ after\\ the\\ automatic\\ placement,\\ re\\-checked",
      "line": 903,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-9"
+     ]
     },
     {
      "text": "== the safety check catches a broken rule",
      "key": "== the safety check catches a broken rule",
      "regex": "==\\ the\\ safety\\ check\\ catches\\ a\\ broken\\ rule",
      "line": 1026,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-10"
+     ]
     },
     {
      "text": "== records and determinism",
      "key": "== records and determinism",
      "regex": "==\\ records\\ and\\ determinism",
      "line": 1078,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-11"
+     ]
     },
     {
      "text": "== a 0.6 mm nozzle (Zach's MK4 MMU3, the default since 2026-10-10)",
      "key": "== a 0.6 mm nozzle (Zach's MK4 MMU3, the default since 2026-10-10)",
      "regex": "==\\ a\\ 0\\.6\\ mm\\ nozzle\\ \\(Zach's\\ MK4\\ MMU3,\\ the\\ default\\ since\\ 2026\\-10\\-10\\)",
      "line": 1116,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-FONT-1"
+     ]
     },
     {
      "text": "== frames",
      "key": "== frames",
      "regex": "==\\ frames",
      "line": 1159,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-11"
+     ]
     },
     {
      "text": "== stdlib only",
      "key": "== stdlib only",
      "regex": "==\\ stdlib\\ only",
      "line": 1169,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-11"
+     ]
     }
    ],
    "ref_exit": 0,
@@ -834,55 +983,77 @@
    "run": true,
    "entry": null,
    "why": "",
+   "spec_ids": [],
    "sections": [
     {
      "text": "== the clearance rule: a hard line and a preferred margin",
      "key": "== the clearance rule: a hard line and a preferred margin",
      "regex": "==\\ the\\ clearance\\ rule:\\ a\\ hard\\ line\\ and\\ a\\ preferred\\ margin",
      "line": 99,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-RULE-2"
+     ]
     },
     {
      "text": "== Zach's GIM43 disc ({'measured' if G['source'].startswith('MEASURED') else 'GUESS'}): {GS.marker_length_m * 1000} mm marker, '#0', nozzle {GL['nozzle_mm']}",
      "key": "== Zach's GIM43 disc ({'measured' if G['source'].startswith('MEASURED') else 'GUESS'}): {GS.marker_length_m * 1000} mm marker, '#0', nozzle {GL['nozzle_mm']}",
      "regex": "==\\ Zach's\\ GIM43\\ disc\\ \\(.*?\\):\\ .*?\\ mm\\ marker,\\ '\\#0',\\ nozzle\\ .*?",
      "line": 134,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-POS-1"
+     ]
     },
     {
      "text": "== Auto position: Offset X / Y show auto's spot; typing one takes over",
      "key": "== Auto position: Offset X / Y show auto's spot; typing one takes over",
      "regex": "==\\ Auto\\ position:\\ Offset\\ X\\ /\\ Y\\ show\\ auto's\\ spot;\\ typing\\ one\\ takes\\ over",
      "line": 183,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-POS-1"
+     ]
     },
     {
      "text": "== settings: position auto | manual (x, y); old records keep their offsets",
      "key": "== settings: position auto | manual (x, y); old records keep their offsets",
      "regex": "==\\ settings:\\ position\\ auto\\ \\|\\ manual\\ \\(x,\\ y\\);\\ old\\ records\\ keep\\ their\\ offsets",
      "line": 231,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-POS-1"
+     ]
     },
     {
      "text": "== no room anywhere: refused, saying why, in three lines",
      "key": "== no room anywhere: refused, saying why, in three lines",
      "regex": "==\\ no\\ room\\ anywhere:\\ refused,\\ saying\\ why,\\ in\\ three\\ lines",
      "line": 257,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-POS-1"
+     ]
     },
     {
      "text": "== ArUco IDs: copies print their own id at a manual spot",
      "key": "== ArUco IDs: copies print their own id at a manual spot",
      "regex": "==\\ ArUco\\ IDs:\\ copies\\ print\\ their\\ own\\ id\\ at\\ a\\ manual\\ spot",
      "line": 274,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-POS-1"
+     ]
     },
     {
      "text": "== the far search",
      "key": "== the far search",
      "regex": "==\\ the\\ far\\ search",
      "line": 312,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-LABEL-POS-1"
+     ]
     }
    ],
    "ref_exit": 0,
@@ -939,6 +1110,9 @@
    "run": true,
    "entry": null,
    "why": "",
+   "spec_ids": [
+    "EX-LABEL-SHOWN-1"
+   ],
    "sections": [
     {
      "text": "== Zach's GIM43 disc tag: #id On the white, Above, nozzle 0.4",
@@ -1031,6 +1205,9 @@
    "run": true,
    "entry": null,
    "why": "",
+   "spec_ids": [
+    "EX-LABEL-RULE-3"
+   ],
    "sections": [
     {
      "text": "== settings: no 'rule' is rule 1; a new label is rule 2",
@@ -1097,104 +1274,147 @@
    "run": true,
    "entry": null,
    "why": "",
+   "spec_ids": [],
    "sections": [
     {
      "text": "helpers",
      "key": "helpers",
      "regex": "helpers",
      "line": 141,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "IDS-PLAN-8"
+     ]
     },
     {
      "text": "G0.1 every visible instance its own marker, every fixture",
      "key": "G0.1 every visible instance its own marker, every fixture",
      "regex": "G0\\.1\\ every\\ visible\\ instance\\ its\\ own\\ marker,\\ every\\ fixture",
      "line": 159,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "G0.1"
+     ]
     },
     {
      "text": "G0.2 board blocks contiguous, never overlapping",
      "key": "G0.2 board blocks contiguous, never overlapping",
      "regex": "G0\\.2\\ board\\ blocks\\ contiguous,\\ never\\ overlapping",
      "line": 178,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "G0.2"
+     ]
     },
     {
      "text": "G0.3 ids stay inside the dictionary; refusals name the tag",
      "key": "G0.3 ids stay inside the dictionary; refusals name the tag",
      "regex": "G0\\.3\\ ids\\ stay\\ inside\\ the\\ dictionary;\\ refusals\\ name\\ the\\ tag",
      "line": 200,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "G0.3"
+     ]
     },
     {
      "text": "G0.4 stable: an already-unique design changes nothing; one new copy, one new id",
      "key": "G0.4 stable: an already-unique design changes nothing; one new copy, one new id",
      "regex": "G0\\.4\\ stable:\\ an\\ already\\-unique\\ design\\ changes\\ nothing;\\ one\\ new\\ copy,\\ one\\ new\\ id",
      "line": 221,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "G0.4"
+     ]
     },
     {
      "text": "G0.5 overrides: set, clear to auto, conflicts flagged",
      "key": "G0.5 overrides: set, clear to auto, conflicts flagged",
      "regex": "G0\\.5\\ overrides:\\ set,\\ clear\\ to\\ auto,\\ conflicts\\ flagged",
      "line": 258,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "G0.5"
+     ]
     },
     {
      "text": "G0.6 owners: never inside a linked design",
      "key": "G0.6 owners: never inside a linked design",
      "regex": "G0\\.6\\ owners:\\ never\\ inside\\ a\\ linked\\ design",
      "line": 297,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "G0.6"
+     ]
     },
     {
      "text": "export: resolve() of the records = the plan",
      "key": "export: resolve() of the records = the plan",
      "regex": "export:\\ resolve\\(\\)\\ of\\ the\\ records\\ =\\ the\\ plan",
      "line": 314,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "IDS-PLAN-7"
+     ]
     },
     {
      "text": "G1.2 (offline): hidden copies are listed, not numbered",
      "key": "G1.2 (offline): hidden copies are listed, not numbered",
      "regex": "G1\\.2\\ \\(offline\\):\\ hidden\\ copies\\ are\\ listed,\\ not\\ numbered",
      "line": 331,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "G1.2-offline"
+     ]
     },
     {
      "text": "inherited per-copy ids (old records inside a linked design)",
      "key": "inherited per-copy ids (old records inside a linked design)",
      "regex": "inherited\\ per\\-copy\\ ids\\ \\(old\\ records\\ inside\\ a\\ linked\\ design\\)",
      "line": 339,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "IDS-PLAN-8"
+     ]
     },
     {
      "text": "tags in the root component",
      "key": "tags in the root component",
      "regex": "tags\\ in\\ the\\ root\\ component",
      "line": 348,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "IDS-PLAN-8"
+     ]
     },
     {
      "text": "fixed copies (a linked design's stale record): they keep what they print",
      "key": "fixed copies (a linked design's stale record): they keep what they print",
      "regex": "fixed\\ copies\\ \\(a\\ linked\\ design's\\ stale\\ record\\):\\ they\\ keep\\ what\\ they\\ print",
      "line": 356,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "IDS-PLAN-8"
+     ]
     },
     {
      "text": "the node's dependencies: one kept copy per component (G8.3)",
      "key": "the node's dependencies: one kept copy per component (G8.3)",
      "regex": "the\\ node's\\ dependencies:\\ one\\ kept\\ copy\\ per\\ component\\ \\(G8\\.3\\)",
      "line": 367,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "IDS-PLAN-9"
+     ]
     },
     {
      "text": "decoding built patterns (the geometry checks' reader)",
      "key": "decoding built patterns (the geometry checks' reader)",
      "regex": "decoding\\ built\\ patterns\\ \\(the\\ geometry\\ checks'\\ reader\\)",
      "line": 386,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "IDS-PLAN-8"
+     ]
     }
    ],
    "ref_exit": 0,
@@ -1293,6 +1513,9 @@
    "run": true,
    "entry": null,
    "why": "",
+   "spec_ids": [
+    "G0.7"
+   ],
    "sections": [
     {
      "text": "0. backward compatible: no ledger = the 2026-10-09 numbering",
@@ -1632,62 +1855,87 @@
    "run": true,
    "entry": null,
    "why": "",
+   "spec_ids": [],
    "sections": [
     {
      "text": "== the table ==",
      "key": "== the table ==",
      "regex": "==\\ the\\ table\\ ==",
      "line": 163,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-LAYOUT-4"
+     ]
     },
     {
      "text": "== marker_grid ==",
      "key": "== marker_grid ==",
      "regex": "==\\ marker_grid\\ ==",
      "line": 198,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-LAYOUT-4"
+     ]
     },
     {
      "text": "== black_rects ==",
      "key": "== black_rects ==",
      "regex": "==\\ black_rects\\ ==",
      "line": 233,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-LAYOUT-4"
+     ]
     },
     {
      "text": "== marker_png ==",
      "key": "== marker_png ==",
      "regex": "==\\ marker_png\\ ==",
      "line": 251,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EXP-PDF-1"
+     ]
     },
     {
      "text": "== marker_svg ==",
      "key": "== marker_svg ==",
      "regex": "==\\ marker_svg\\ ==",
      "line": 267,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EXP-PDF-1"
+     ]
     },
     {
      "text": "== layout ==",
      "key": "== layout ==",
      "regex": "==\\ layout\\ ==",
      "line": 280,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EXP-PDF-2"
+     ]
     },
     {
      "text": "== PDF ==",
      "key": "== PDF ==",
      "regex": "==\\ PDF\\ ==",
      "line": 366,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EXP-PDF-3"
+     ]
     },
     {
      "text": "== page margin (printer-safe border) ==",
      "key": "== page margin (printer-safe border) ==",
      "regex": "==\\ page\\ margin\\ \\(printer\\-safe\\ border\\)\\ ==",
      "line": 402,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EXP-PDF-3"
+     ]
     }
    ],
    "ref_exit": 0,
@@ -1750,69 +1998,97 @@
    "run": true,
    "entry": null,
    "why": "",
+   "spec_ids": [],
    "sections": [
     {
      "text": "== slabs: an extrude from Offset, Height further (either sign)",
      "key": "== slabs: an extrude from Offset, Height further (either sign)",
      "regex": "==\\ slabs:\\ an\\ extrude\\ from\\ Offset,\\ Height\\ further\\ \\(either\\ sign\\)",
      "line": 56,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-HGT-1"
+     ]
     },
     {
      "text": "== defaults",
      "key": "== defaults",
      "regex": "==\\ defaults",
      "line": 66,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-HGT-2"
+     ]
     },
     {
      "text": "== layers: the record's surface, depth / raise / recess, detector plane",
      "key": "== layers: the record's surface, depth / raise / recess, detector plane",
      "regex": "==\\ layers:\\ the\\ record's\\ surface,\\ depth\\ /\\ raise\\ /\\ recess,\\ detector\\ plane",
      "line": 78,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-HGT-3"
+     ]
     },
     {
      "text": "== the record (TagSpec) agrees with the slabs",
      "key": "== the record (TagSpec) agrees with the slabs",
      "regex": "==\\ the\\ record\\ \\(TagSpec\\)\\ agrees\\ with\\ the\\ slabs",
      "line": 109,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-HGT-3"
+     ]
     },
     {
      "text": "== migration: height / thickness / above -> Offset / Height (same geometry)",
      "key": "== migration: height / thickness / above -> Offset / Height (same geometry)",
      "regex": "==\\ migration:\\ height\\ /\\ thickness\\ /\\ above\\ \\->\\ Offset\\ /\\ Height\\ \\(same\\ geometry\\)",
      "line": 131,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-MIGRATE-1"
+     ]
     },
     {
      "text": "== plan: the parts follow from where the slabs are",
      "key": "== plan: the parts follow from where the slabs are",
      "regex": "==\\ plan:\\ the\\ parts\\ follow\\ from\\ where\\ the\\ slabs\\ are",
      "line": 160,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-MODE-1"
+     ]
     },
     {
      "text": "== plan: locating pins",
      "key": "== plan: locating pins",
      "regex": "==\\ plan:\\ locating\\ pins",
      "line": 203,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-PINS-1"
+     ]
     },
     {
      "text": "== pin outlines",
      "key": "== pin outlines",
      "regex": "==\\ pin\\ outlines",
      "line": 225,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-PINS-2"
+     ]
     },
     {
      "text": "== stdlib only",
      "key": "== stdlib only",
      "regex": "==\\ stdlib\\ only",
      "line": 252,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-HGT-3"
+     ]
     }
    ],
    "ref_exit": 0,
@@ -1881,6 +2157,7 @@
    "run": true,
    "entry": null,
    "why": "",
+   "spec_ids": [],
    "sections": [
     {
      "text": "== the setting: versioned, junk reads as off",
@@ -2051,6 +2328,7 @@
    "run": false,
    "entry": null,
    "why": "its golden maker installs a stand-in adsk for the 26 evaluate() cases",
+   "spec_ids": [],
    "sections": [
     {
      "text": "tree: {ROOT}",
@@ -2109,90 +2387,127 @@
    "run": true,
    "entry": null,
    "why": "",
+   "spec_ids": [],
    "sections": [
     {
      "text": "file location",
      "key": "file location",
      "regex": "file\\ location",
      "line": 118,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-DIALOG-2"
+     ]
     },
     {
      "text": "missing file",
      "key": "missing file",
      "regex": "missing\\ file",
      "line": 124,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-DIALOG-2"
+     ]
     },
     {
      "text": "remember / recall (global)",
      "key": "remember / recall (global)",
      "regex": "remember\\ /\\ recall\\ \\(global\\)",
      "line": 130,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-DIALOG-2"
+     ]
     },
     {
      "text": "merge",
      "key": "merge",
      "regex": "merge",
      "line": 142,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-DIALOG-2"
+     ]
     },
     {
      "text": "per design",
      "key": "per design",
      "regex": "per\\ design",
      "line": 153,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-DIALOG-3"
+     ]
     },
     {
      "text": "design keys",
      "key": "design keys",
      "regex": "design\\ keys",
      "line": 185,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-DIALOG-3"
+     ]
     },
     {
      "text": "pruning",
      "key": "pruning",
      "regex": "pruning",
      "line": 194,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-DIALOG-2"
+     ]
     },
     {
      "text": "corrupt / odd files",
      "key": "corrupt / odd files",
      "regex": "corrupt\\ /\\ odd\\ files",
      "line": 208,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-DIALOG-2"
+     ]
     },
     {
      "text": "snapshot",
      "key": "snapshot",
      "regex": "snapshot",
      "line": 232,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-DIALOG-4"
+     ]
     },
     {
      "text": "apply",
      "key": "apply",
      "regex": "apply",
      "line": 249,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-DIALOG-4"
+     ]
     },
     {
      "text": "round trip through the file",
      "key": "round trip through the file",
      "regex": "round\\ trip\\ through\\ the\\ file",
      "line": 282,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-DIALOG-4"
+     ]
     },
     {
      "text": "PrusaSlicer",
      "key": "PrusaSlicer",
      "regex": "PrusaSlicer",
      "line": 296,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EXP-PRUSA-4"
+     ]
     }
    ],
    "ref_exit": 0,
@@ -2279,6 +2594,9 @@
    "run": true,
    "entry": null,
    "why": "",
+   "spec_ids": [
+    "EX-PRESETS-1"
+   ],
    "sections": [
     {
      "text": "== PrusaSlicer (the fixture): his profiles as the coordinator measured them",
@@ -2386,76 +2704,107 @@
     "test_origin_math"
    ],
    "why": "only test_origin_math is core; the rest loads a stand-in adsk or needs yourdfpy",
+   "spec_ids": [],
    "sections": [
     {
      "text": "== aruco_origin: the words, Rotate, which boards swap, the old rule",
      "key": "== aruco_origin: the words, Rotate, which boards swap, the old rule",
      "regex": "==\\ aruco_origin:\\ the\\ words,\\ Rotate,\\ which\\ boards\\ swap,\\ the\\ old\\ rule",
      "line": 312,
-     "func": "test_origin_math"
+     "func": "test_origin_math",
+     "spec_ids": [
+      "EX-ORIGIN-1"
+     ]
     },
     {
      "text": "== aruco_origin.opencv_in_layout = markers.detector_frame of the board as built",
      "key": "== aruco_origin.opencv_in_layout = markers.detector_frame of the board as built",
      "regex": "==\\ aruco_origin\\.opencv_in_layout\\ =\\ markers\\.detector_frame\\ of\\ the\\ board\\ as\\ built",
      "line": 343,
-     "func": "test_origin_math"
+     "func": "test_origin_math",
+     "spec_ids": [
+      "EX-ORIGIN-2"
+     ]
     },
     {
      "text": "== the add-in: evaluate() x every Origin -> the Joint Origin IS OpenCV's frame",
      "key": "== the add-in: evaluate() x every Origin -> the Joint Origin IS OpenCV's frame",
      "regex": "==\\ the\\ add\\-in:\\ evaluate\\(\\)\\ x\\ every\\ Origin\\ \\->\\ the\\ Joint\\ Origin\\ IS\\ OpenCV's\\ frame",
      "line": 417,
-     "func": "test_addin"
+     "func": "test_addin",
+     "spec_ids": [
+      "EX-ORIGIN-3"
+     ]
     },
     {
      "text": "== a node made before 2026-10-09 keeps its orientation (no origin_v)",
      "key": "== a node made before 2026-10-09 keeps its orientation (no origin_v)",
      "regex": "==\\ a\\ node\\ made\\ before\\ 2026\\-10\\-09\\ keeps\\ its\\ orientation\\ \\(no\\ origin_v\\)",
      "line": 481,
-     "func": "test_addin"
+     "func": "test_addin",
+     "spec_ids": [
+      "EX-MIGRATE-2"
+     ]
     },
     {
      "text": "== the removed Frame: settings and records that still carry one",
      "key": "== the removed Frame: settings and records that still carry one",
      "regex": "==\\ the\\ removed\\ Frame:\\ settings\\ and\\ records\\ that\\ still\\ carry\\ one",
      "line": 494,
-     "func": "test_addin"
+     "func": "test_addin",
+     "spec_ids": [
+      "EX-MIGRATE-2"
+     ]
     },
     {
      "text": "== the dialog: Origin words, Rotate, the info line",
      "key": "== the dialog: Origin words, Rotate, the info line",
      "regex": "==\\ the\\ dialog:\\ Origin\\ words,\\ Rotate,\\ the\\ info\\ line",
      "line": 525,
-     "func": "test_addin"
+     "func": "test_addin",
+     "spec_ids": [
+      "EX-ORIGIN-6"
+     ]
     },
     {
      "text": "== the dialog: Corner mark -- only what the tag can have, the old checkbox",
      "key": "== the dialog: Corner mark -- only what the tag can have, the old checkbox",
      "regex": "==\\ the\\ dialog:\\ Corner\\ mark\\ \\-\\-\\ only\\ what\\ the\\ tag\\ can\\ have,\\ the\\ old\\ checkbox",
      "line": 617,
-     "func": "test_addin"
+     "func": "test_addin",
+     "spec_ids": [
+      "EX-MARK-18"
+     ]
     },
     {
      "text": "== the URDF: today's output is the goldens', byte for byte",
      "key": "== the URDF: today's output is the goldens', byte for byte",
      "regex": "==\\ the\\ URDF:\\ today's\\ output\\ is\\ the\\ goldens',\\ byte\\ for\\ byte",
      "line": 653,
-     "func": "test_urdf"
+     "func": "test_urdf",
+     "spec_ids": [
+      "CADX-URDF-1"
+     ]
     },
     {
      "text": "== 2026-10-08's records (a chosen Frame, the Joint Origin there): OpenCV's frame",
      "key": "== 2026-10-08's records (a chosen Frame, the Joint Origin there): OpenCV's frame",
      "regex": "==\\ 2026\\-10\\-08's\\ records\\ \\(a\\ chosen\\ Frame,\\ the\\ Joint\\ Origin\\ there\\):\\ OpenCV's\\ frame",
      "line": 663,
-     "func": "test_urdf"
+     "func": "test_urdf",
+     "spec_ids": [
+      "CADX-URDF-1"
+     ]
     },
     {
      "text": "== every target is OpenCV's frame, worked out by hand (yourdfpy FK)",
      "key": "== every target is OpenCV's frame, worked out by hand (yourdfpy FK)",
      "regex": "==\\ every\\ target\\ is\\ OpenCV's\\ frame,\\ worked\\ out\\ by\\ hand\\ \\(yourdfpy\\ FK\\)",
      "line": 685,
-     "func": "test_urdf"
+     "func": "test_urdf",
+     "spec_ids": [
+      "CADX-URDF-2"
+     ]
     }
    ],
    "ref_exit": 0,
@@ -2482,27 +2831,39 @@
    "run": false,
    "entry": null,
    "why": "stand-in adsk + cv2",
+   "spec_ids": [
+    "EX-PREVIEW-1"
+   ],
    "sections": [
     {
      "text": "== every layout x every Origin: the add-in's body, OpenCV's own board",
      "key": "== every layout x every Origin: the add-in's body, OpenCV's own board",
      "regex": "==\\ every\\ layout\\ x\\ every\\ Origin:\\ the\\ add\\-in's\\ body,\\ OpenCV's\\ own\\ board",
      "line": 436,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-ORIGIN-4"
+     ]
     },
     {
      "text": "== the same with Corner mark 'cut' (black square cut / triangle)",
      "key": "== the same with Corner mark 'cut' (black square cut / triangle)",
      "regex": "==\\ the\\ same\\ with\\ Corner\\ mark\\ 'cut'\\ \\(black\\ square\\ cut\\ /\\ triangle\\)",
      "line": 438,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-MARK-9"
+     ]
     },
     {
      "text": "== the Origin's words and order (aruco_origin)",
      "key": "== the Origin's words and order (aruco_origin)",
      "regex": "==\\ the\\ Origin's\\ words\\ and\\ order\\ \\(aruco_origin\\)",
      "line": 440,
-     "func": "main"
+     "func": "main",
+     "spec_ids": [
+      "EX-ORIGIN-4"
+     ]
     },
     {
      "text": "PnP vs the record / the Joint Origin's target (mm / deg), per Origin:",
@@ -2519,6 +2880,9 @@
    "run": false,
    "entry": null,
    "why": "the slicing oracle's venv",
+   "spec_ids": [
+    "EX-LABEL-FONT-2"
+   ],
    "sections": [
     {
      "text": "== the geometry the tool slices",
@@ -2535,34 +2899,47 @@
    "run": false,
    "entry": null,
    "why": "stand-in adsk; section 4 is pure",
+   "spec_ids": [],
    "sections": [
     {
      "text": "== 1. compute's outcome does not depend on the record check",
      "key": "== 1. compute's outcome does not depend on the record check",
      "regex": "==\\ 1\\.\\ compute's\\ outcome\\ does\\ not\\ depend\\ on\\ the\\ record\\ check",
      "line": 172,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-SYNC-1"
+     ]
     },
     {
      "text": "== 2. after_compute: digest only, read only, a budget, never raises",
      "key": "== 2. after_compute: digest only, read only, a budget, never raises",
      "regex": "==\\ 2\\.\\ after_compute:\\ digest\\ only,\\ read\\ only,\\ a\\ budget,\\ never\\ raises",
      "line": 214,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "SAFE-LIVE-4"
+     ]
     },
     {
      "text": "== 3. maybe_refresh: undo, busy, already refreshed",
      "key": "== 3. maybe_refresh: undo, busy, already refreshed",
      "regex": "==\\ 3\\.\\ maybe_refresh:\\ undo,\\ busy,\\ already\\ refreshed",
      "line": 263,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-SYNC-1"
+     ]
     },
     {
      "text": "== 4. restructure_plan: every pair of node structures",
      "key": "== 4. restructure_plan: every pair of node structures",
      "regex": "==\\ 4\\.\\ restructure_plan:\\ every\\ pair\\ of\\ node\\ structures",
      "line": 288,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EX-RESTRUCTURE-2"
+     ]
     }
    ]
   },
@@ -2572,55 +2949,77 @@
    "run": false,
    "entry": null,
    "why": "its module guards an adsk import; the names and rows are pure",
+   "spec_ids": [],
    "sections": [
     {
      "text": "names: the same string as the IDs node",
      "key": "names: the same string as the IDs node",
      "regex": "names:\\ the\\ same\\ string\\ as\\ the\\ IDs\\ node",
      "line": 46,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "MT-ROWS-1"
+     ]
     },
     {
      "text": "rows from a tag spec (TagSpec or its dict)",
      "key": "rows from a tag spec (TagSpec or its dict)",
      "regex": "rows\\ from\\ a\\ tag\\ spec\\ \\(TagSpec\\ or\\ its\\ dict\\)",
      "line": 78,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "MT-ROWS-1"
+     ]
     },
     {
      "text": "double-click timing",
      "key": "double-click timing",
      "regex": "double\\-click\\ timing",
      "line": 120,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "MT-ZOOM-1"
+     ]
     },
     {
      "text": "the viewport pick",
      "key": "the viewport pick",
      "regex": "the\\ viewport\\ pick",
      "line": 178,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "MT-ROWS-1"
+     ]
     },
     {
      "text": "the zoom's camera",
      "key": "the zoom's camera",
      "regex": "the\\ zoom's\\ camera",
      "line": 212,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "MT-ZOOM-1"
+     ]
     },
     {
      "text": "navigation (both dialogs): rows, buttons, the pick, the zoom box",
      "key": "navigation (both dialogs): rows, buttons, the pick, the zoom box",
      "regex": "navigation\\ \\(both\\ dialogs\\):\\ rows,\\ buttons,\\ the\\ pick,\\ the\\ zoom\\ box",
      "line": 232,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "MT-ZOOM-1"
+     ]
     },
     {
      "text": "the events Fusion really sends (measured 2026-10-13, real mouse)",
      "key": "the events Fusion really sends (measured 2026-10-13, real mouse)",
      "regex": "the\\ events\\ Fusion\\ really\\ sends\\ \\(measured\\ 2026\\-10\\-13,\\ real\\ mouse\\)",
      "line": 353,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "MT-ZOOM-1"
+     ]
     }
    ]
   },
@@ -2630,34 +3029,49 @@
    "run": false,
    "entry": null,
    "why": "stand-in adsk; the progress bar words are pure",
+   "spec_ids": [
+    "EXP-TYPES-1"
+   ],
    "sections": [
     {
      "text": "first run (nothing remembered)",
      "key": "first run (nothing remembered)",
      "regex": "first\\ run\\ \\(nothing\\ remembered\\)",
      "line": 423,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EXP-TYPES-1"
+     ]
     },
     {
      "text": "filament slots (Zach 2026-10-10: black #1, white #2) and the viewport highlight",
      "key": "filament slots (Zach 2026-10-10: black #1, white #2) and the viewport highlight",
      "regex": "filament\\ slots\\ \\(Zach\\ 2026\\-10\\-10:\\ black\\ \\#1,\\ white\\ \\#2\\)\\ and\\ the\\ viewport\\ highlight",
      "line": 505,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EXP-HIGHLIGHT-1"
+     ]
     },
     {
      "text": "the progress bar (Zach 2026-10-10: estimated time, what it is working on)",
      "key": "the progress bar (Zach 2026-10-10: estimated time, what it is working on)",
      "regex": "the\\ progress\\ bar\\ \\(Zach\\ 2026\\-10\\-10:\\ estimated\\ time,\\ what\\ it\\ is\\ working\\ on\\)",
      "line": 602,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EXP-PROGRESS-1"
+     ]
     },
     {
      "text": "OK's validity and Reset",
      "key": "OK's validity and Reset",
      "regex": "OK's\\ validity\\ and\\ Reset",
      "line": 634,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EXP-TYPES-2"
+     ]
     },
     {
      "text": "OK",
@@ -2671,21 +3085,30 @@
      "key": "reopen",
      "regex": "reopen",
      "line": 700,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EXP-TYPES-2"
+     ]
     },
     {
      "text": "settings saved by the dialog of before the types",
      "key": "settings saved by the dialog of before the types",
      "regex": "settings\\ saved\\ by\\ the\\ dialog\\ of\\ before\\ the\\ types",
      "line": 712,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EXP-TYPES-3"
+     ]
     },
     {
      "text": "the dialog of before the types (a running Fusion's old handler)",
      "key": "the dialog of before the types (a running Fusion's old handler)",
      "regex": "the\\ dialog\\ of\\ before\\ the\\ types\\ \\(a\\ running\\ Fusion's\\ old\\ handler\\)",
      "line": 740,
-     "func": null
+     "func": null,
+     "spec_ids": [
+      "EXP-TYPES-3"
+     ]
     }
    ]
   }
