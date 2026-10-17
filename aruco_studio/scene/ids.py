@@ -12,9 +12,11 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Tuple
 
+from ..core import dictionary as _D
 from ..core import markers as _M
 from ..core import numbering as _N
 from ..plan import plan_tag
+from ..plan.spec import Issue
 from .model import Scene, mat_mul
 
 KEY = "tag"
@@ -84,6 +86,73 @@ def renumber(scene: Scene, when: str = "") -> dict:
     return {"rows": rows, "changed": changed, "duplicates": plan.duplicates(),
             "warnings": list(plan.warnings), "errors": list(plan.errors) + [
                 f"{n}: {e}" for n, e in errors.items()], "ok": plan.ok}
+
+
+def number_one(scene: Scene, name: str, plans: Optional[dict] = None) -> Optional[int]:
+    """Number ONE tag (a new one, or a fresh duplicate) the way Renumber all
+    would, every other tag kept as it is (audit F5): the stable numbering
+    with all the others fixed, so the tag takes the next free ids of its
+    dictionary family (never an id the ledger says was printed). Writes its
+    marker_id; -> its first id, or None when it is not planned."""
+    plans = plans if plans is not None else scene.plans()
+    tags, occs, overrides, fixed, chains, _errors = snapshot(scene, plans)
+    me = instance(name)
+    for t in scene.tags:
+        if t.name != name:
+            fixed.setdefault(instance(t.name), "kept: numbering one new tag")
+    overrides = {k: v for k, v in overrides.items() if k == me}
+    led = _N.Ledger.from_any(scene.ledger) if scene.ledger else None
+    plan = _N.plan_stable(tags, occs, ledger=led, overrides=overrides, fixed=fixed,
+                          chains=chains, design_units="mm", root_component="")
+    row = next((r for r in plan.rows if r.name == me), None)
+    if row is None or row.error or row.final is None:
+        return None
+    t = scene.get(name)
+    t.spec.numbers = dict(t.spec.numbers or {}, marker_id=int(row.final))
+    return int(row.final)
+
+
+def check_first_id(scene: Scene, name: str, first, plans: Optional[dict] = None) -> List[Issue]:
+    """A typed first id for `name` (the IDs table's First field), checked
+    before it is used (audit F1): a whole number, 0 or more; every id the
+    tag prints (first .. first + count - 1) inside its dictionary; not on a
+    locked (printed) tag. -> [Issue] on field "override" ([] = fine)."""
+    t = scene.get(name)
+    if isinstance(first, bool) or not isinstance(first, int) or first < 0:
+        return [Issue("override", "error", f"first id {first!r}: a whole number, 0 or more")]
+    if t.locked:
+        return [Issue("override", "error",
+                      "locked: a printed tag keeps its ids (unlock it to type one)")]
+    p = (plans or {}).get(name) or plan_tag(t.spec)
+    if not p.ok:
+        return []                                  # not built: Renumber says why
+    dic = p.data["marker"]["dictionary"]
+    cap = _D.dictionary_info(dic)["capacity"]
+    count = len(p.data["ids"]) or 1
+    last = first + count - 1
+    if last >= cap:
+        span = f"ids {first}..{last}" if count > 1 else f"id {first}"
+        return [Issue("override", "error",
+                      f"{span} not in {dic} (0..{cap - 1})"
+                      + (f": this board needs {count} ids, so {cap - count} is the last first id"
+                         if count > 1 and cap >= count else ""))]
+    return []
+
+
+def set_first_id(scene: Scene, name: str, first: Optional[int]) -> List[Issue]:
+    """The IDs table's First field: a typed id is checked, kept as the
+    tag's override (Renumber all keeps it) and used at once (its marker_id).
+    None: back to auto (the tag keeps its ids until the next Renumber)."""
+    if first is None:
+        scene.overrides.pop(name, None)
+        return []
+    issues = check_first_id(scene, name, first)
+    if issues:
+        return issues
+    t = scene.get(name)
+    scene.overrides[name] = int(first)
+    t.spec.numbers = dict(t.spec.numbers or {}, marker_id=int(first))
+    return []
 
 
 def duplicates(scene: Scene) -> Dict[str, List[str]]:

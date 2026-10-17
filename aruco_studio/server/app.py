@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import copy
 import json
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -38,7 +39,8 @@ from ..plan import target as _T
 from ..plan.fields import form as _form
 from ..plan.spec import TagSpec
 from ..plan.target import SpecTypeError
-from ..scene import Scene, SceneFileError, dumps, loads, renumber
+from ..scene import Scene, SceneFileError, dumps, loads, number_one, renumber, set_first_id
+from ..scene import checks as _checks
 from ..scene import sheet as _sheet
 from . import library as _LIB
 from . import models as M
@@ -95,6 +97,60 @@ def _plan_dict(p, mesh: bool = False, top: bool = False) -> dict:
     if top and p.ok:
         d["top"] = _ME.top(p)          # {colour: polygons}: what is seen from above
     return d
+
+
+# ------------------------------------------------------------- the plan cache
+#
+# plan_tag is a pure function of the TagSpec, so the scene's plans (and their
+# top views and meshes) are kept by the spec's canonical JSON: a change
+# re-plans only the tags it changed (audit F14). Never stored in a file.
+
+CACHE_MAX = 1024
+_CACHE: "OrderedDict[str, dict]" = OrderedDict()
+
+
+def _key(spec: TagSpec) -> str:
+    return json.dumps(spec.to_dict(), sort_keys=True, separators=(",", ":"), default=str)
+
+
+def _entry(spec: TagSpec) -> dict:
+    k = _key(spec)
+    e = _CACHE.get(k)
+    if e is None:
+        e = {"plan": plan_tag(spec)}
+        _CACHE[k] = e
+        while len(_CACHE) > CACHE_MAX:
+            _CACHE.popitem(last=False)
+    else:
+        _CACHE.move_to_end(k)
+    return e
+
+
+def cached_plan(spec: TagSpec):
+    """plan_tag(spec), kept by the spec's canonical JSON."""
+    return _entry(spec)["plan"]
+
+
+def cached_plan_dict(spec: TagSpec, mesh: bool = False, top: bool = False) -> dict:
+    """_plan_dict of the cached plan; its JSON, top view and mesh are kept too."""
+    e = _entry(spec)
+    p = e["plan"]
+    if "dict" not in e:
+        e["dict"] = p.to_dict()
+    d = dict(e["dict"])
+    if mesh and p.ok:
+        if "mesh" not in e:
+            e["mesh"] = _ME.mesh(p)
+        d["mesh"] = e["mesh"]
+    if top and p.ok:
+        if "top" not in e:
+            e["top"] = _ME.top(p)
+        d["top"] = e["top"]
+    return d
+
+
+def _scene_plans(sc: Scene) -> dict:
+    return {t.name: cached_plan(t.spec) for t in sc.tags}
 
 
 # ------------------------------------------------------------- reference
@@ -336,9 +392,10 @@ def _scene_out(plans: bool = False, mesh: bool = False, top: bool = False) -> di
     sc = _scene()
     d = sc.to_dict()
     if plans:
-        ps = sc.plans()
+        by = {t.name: t for t in sc.tags}
         for t in d["tags"]:
-            t["plan"] = _plan_dict(ps[t["name"]], mesh=mesh, top=top)
+            t["plan"] = cached_plan_dict(by[t["name"]].spec, mesh=mesh, top=top)
+        d["issues"] = _checks.scene_issues(sc)          # overlaps (scene/checks.py)
     return d
 
 
@@ -366,10 +423,13 @@ def scene_new(req: M.SceneNewIn) -> dict:
 
 @app.post("/api/scene/tags")
 def scene_add(req: M.SceneTagIn) -> dict:
-    t = _scene().add(_spec(req.spec), float(req.x_mm), float(req.y_mm), float(req.rotation_deg),
-                     name=req.name, locked=req.locked)
+    sc = _scene()
+    t = sc.add(_spec(req.spec), float(req.x_mm), float(req.y_mm), float(req.rotation_deg),
+               name=req.name, locked=req.locked)
+    if req.number:
+        number_one(sc, t.name, _scene_plans(sc))
     out = t.to_dict()
-    out["plan"] = _plan_dict(plan_tag(t.spec))
+    out["plan"] = cached_plan_dict(t.spec)
     return out
 
 
@@ -403,7 +463,7 @@ def scene_patch(name: str, req: M.SceneTagPatch) -> dict:
         name = req.new_name
     t = sc.get(name)
     out = t.to_dict()
-    out["plan"] = _plan_dict(plan_tag(t.spec))
+    out["plan"] = cached_plan_dict(t.spec)
     return out
 
 
@@ -417,24 +477,35 @@ def scene_delete(name: str) -> dict:
 
 
 @app.post("/api/scene/tags/{name}/duplicate")
-def scene_duplicate(name: str, dx_mm: float = 10.0, dy_mm: float = 0.0) -> dict:
+def scene_duplicate(name: str, dx_mm: float = 10.0, dy_mm: float = 0.0,
+                    number: int = Query(1)) -> dict:
+    """A copy, `number`=1 (default): numbered at once with the next free ids
+    of its family (a copy of a printed tag is a new tag to print)."""
+    sc = _scene()
     try:
-        t = _scene().duplicate(name, dx_mm, dy_mm)
+        t = sc.duplicate(name, dx_mm, dy_mm)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"no tag {name!r}") from None
+    if number:
+        number_one(sc, t.name, _scene_plans(sc))
     return t.to_dict()
 
 
 @app.put("/api/scene/overrides/{name}")
-def scene_override(name: str, req: M.OverrideIn) -> dict:
+def scene_override(name: str, req: M.OverrideIn):
+    """The IDs table's First field: checked against the tag's dictionary and
+    its marker count, kept as the override and used at once (the tag's
+    marker_id); a bad one is a 409 with an Issue on "override". id null:
+    back to auto."""
     sc = _scene()
     if name not in sc.names():
         raise HTTPException(status_code=404, detail=f"no tag {name!r}")
-    if req.id is None:
-        sc.overrides.pop(name, None)
-    else:
-        sc.overrides[name] = int(req.id)
-    return {"overrides": sc.overrides}
+    issues = set_first_id(sc, name, req.id)
+    if issues:
+        return JSONResponse(status_code=409, content={"issues": [i.to_dict() for i in issues]})
+    t = sc.get(name)
+    return {"overrides": sc.overrides, "tag": name,
+            "ids": cached_plan(t.spec).data["ids"]}
 
 
 @app.post("/api/scene/renumber")
@@ -639,6 +710,10 @@ def library_save(req: M.LibrarySaveIn) -> dict:
         got = _LIB.save_edit(req.id, req.name, req.values, _nodes())
     except KeyError:
         raise HTTPException(status_code=404, detail=f"no preset card {req.id!r}") from None
+    except _LIB.EditError as exc:
+        raise HTTPException(status_code=422, detail=[
+            {"loc": ["body", "values", e["path"]], "msg": e["msg"], "type": "value_error",
+             "path": e["path"]} for e in exc.errors]) from None
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
     return {"name": got}

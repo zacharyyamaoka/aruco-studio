@@ -37,7 +37,7 @@ def verify_plan(plan, target: Optional[dict] = None, px_per_mm: float = 20.0, po
 
 def verify_scene(scene, px_per_mm: float = 10.0, png: Optional[str] = None) -> dict:
     """A scene's sheet read back: every tag's markers found, each centre
-    against where the scene puts it (mm)."""
+    against where the scene puts it (mm), and no two tags overlapping."""
     from .scene_check import check_scene, scene_raster
     plans = scene.plans()
     r = scene_raster(scene, plans, px_per_mm=px_per_mm)
@@ -45,6 +45,12 @@ def verify_scene(scene, px_per_mm: float = 10.0, png: Optional[str] = None) -> d
     rep["px_per_mm"] = px_per_mm
     rep["tags"] = {t.name: {"ok": plans[t.name].ok, "ids": plans[t.name].data["ids"]}
                    for t in scene.tags}
+    # tags whose targets overlap on the canvas (scene/checks.py): the sheet
+    # is not as planned even when every marker is still found (audit F13)
+    from ..scene.checks import overlaps
+    rep["overlaps"] = overlaps(scene)
+    rep["markers_ok"] = rep["ok"]
+    rep["ok"] = bool(rep["ok"]) and not rep["overlaps"]
     if png:
         Path(png).parent.mkdir(parents=True, exist_ok=True)
         cv2.imwrite(str(png), r.img)

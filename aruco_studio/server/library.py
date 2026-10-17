@@ -15,7 +15,7 @@ The words, thumbs, Info sections and the Edit form are core.presets'
 from __future__ import annotations
 
 import json
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from ..core import presets as _P
 from ..core import prusa as _PR
@@ -165,7 +165,8 @@ def state(nodes, dialog=None, selected=None) -> dict:
             "collections": [{"id": c, "name": n, "icon": i, "count": counts[c]}
                             for c, n, i in COLLECTIONS],
             "cards": order, "selected": selected if selected in cards else None,
-            "schema": _P.edit_schema(), "notes": notes, "dialog": dialog is not None}
+            "schema": _P.edit_schema(), "limits": {k: list(v) for k, v in LIMITS.items()},
+            "notes": notes, "dialog": dialog is not None}
 
 
 def select(card_id: str, nodes) -> Tuple[str, dict]:
@@ -190,15 +191,73 @@ def select(card_id: str, nodes) -> Tuple[str, dict]:
     return c["name"], c["preset"]
 
 
+def _limits() -> Dict[str, Tuple[float, float]]:
+    """The range core.presets.normalise keeps each number of the Edit form
+    in (outside it, a preset silently gets Default's value): the form checks
+    against these first (audit F16; tests/server/test_audit_fixes.py checks
+    them against normalise at both ends)."""
+    from ..core import slabs as _SL
+    lim = float(_SL.LIMIT_MM)
+    out = {"profile.nozzle_mm": (0.05, 5.0), "profile.line_mm": (0.05, 5.0),
+           "profile.layer_mm": (0.0, 5.0), "profile.first_layer_mm": (0.0, 5.0),
+           "cells.mm": (0.01, 20.0), "cells.min_mm": (0.0, 50.0),
+           "tag.quiet_modules": (0.0, 4.0),
+           "label.cap_mm": (0.0, 50.0), "label.nozzle_mm": (0.05, 5.0)}
+    for k in ("white_offset_mm", "white_height_mm", "black_height_mm", "black_step_mm"):
+        out[f"tag.{k}"] = (-lim, lim)
+    for k, key in (("pin_size_mm", "pin_size"), ("pin_length_mm", "pin_length"),
+                   ("pin_tol_mm", "pin_tol")):
+        out[f"tag.{k}"] = tuple(float(x) for x in _SL.PIN_LIMITS[key])
+    return out
+
+
+LIMITS = _limits()
+
+
+class EditError(ValueError):
+    """Edit -> Save refused: [{path, msg}], one per field."""
+
+    def __init__(self, errors):
+        super().__init__("; ".join(f"{e['path']}: {e['msg']}" for e in errors))
+        self.errors = errors
+
+
+def check_values(values: dict) -> list:
+    """The Edit form's values against the schema's kinds and LIMITS:
+    [{path, msg}] (empty = fine)."""
+    import math as _m
+    kinds = {path: (kind, label) for path, label, kind, _o in _P.edit_schema()}
+    errs = []
+    for path, v in (values or {}).items():
+        if path not in kinds or kinds[path][0] != "number":
+            continue
+        label = kinds[path][1]
+        try:
+            x = float(v)
+        except (TypeError, ValueError):
+            errs.append({"path": path, "msg": f"{label}: '{v}' is not a number"})
+            continue
+        lo, hi = LIMITS.get(path, (-_m.inf, _m.inf))
+        if not _m.isfinite(x) or not lo <= x <= hi:
+            errs.append({"path": path, "msg": f"{label}: {v} is outside {lo:g} to {hi:g}"})
+    return errs
+
+
 def save_edit(card_id: str, name: str, values: dict, nodes) -> str:
     """Edit -> Save of one of mine (REF Library.save): its fields by path,
-    maybe a new name. -> the preset's name."""
+    maybe a new name. A value outside what a preset keeps is refused
+    (EditError), never silently replaced by Default's. -> the preset's name."""
     cards, _notes, prusa = build(nodes)
     c = cards.get(card_id)
     if c is None:
         raise KeyError(card_id)
     if c["kind"] != "user":
         raise ValueError("only your own presets can be edited (Duplicate a built-in one)")
+    if name is not None and name != "" and not name.strip():
+        raise EditError([{"path": "name", "msg": "a preset needs a name"}])
+    errs = check_values(values)
+    if errs:
+        raise EditError(errs)
     import copy
     p = copy.deepcopy(c["preset"])
     kinds = {path: kind for path, _l, kind, _o in _P.edit_schema()}
@@ -206,10 +265,7 @@ def save_edit(card_id: str, name: str, values: dict, nodes) -> str:
         if path not in kinds:
             continue
         if kinds[path] == "number":
-            try:
-                v = float(v)
-            except (TypeError, ValueError):
-                raise ValueError(f"{path}: not a number: {v!r}") from None
+            v = float(v)
         elif kinds[path] == "bool":
             v = bool(v)
         _P.set_path(p, path, v)

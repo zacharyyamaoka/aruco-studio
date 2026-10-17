@@ -177,6 +177,9 @@ class SceneTagIn(BaseModel):
     rotation_deg: Num = 0.0
     name: Optional[StrictStr] = None
     locked: StrictBool = False
+    # number the new tag at once: the next free ids of its dictionary family
+    # (scene.number_one, the Studio's Add); False keeps the spec's marker_id
+    number: StrictBool = False
 
 
 class SceneTagPatch(BaseModel):

@@ -5,4 +5,4 @@ verify/ (build123d and viser adapters can use it as it is).
 """
 from .model import Scene, SceneTag, pose_of  # noqa: F401
 from .file import dumps, loads, SceneFileError  # noqa: F401
-from .ids import renumber  # noqa: F401
+from .ids import check_first_id, number_one, renumber, set_first_id  # noqa: F401
