@@ -1687,3 +1687,15 @@ Sources read: `docs/feedback/2026-10-17-markers-core-first.md`, `docs/feedback/2
 2. **After N-1's core lands, in the Studio core with new rule numbers.** Shift, the page / bed frame with the red size lint, print orientation, paper t/2, and Flip.
 
 Zach's open questions 1-7 above are still open. The build takes the recommended defaults and records them.
+
+### Zach's answers to the open questions (2026-10-17)
+
+| # | Question | Answer | Where it lands |
+|---|---|---|---|
+| 1 | Can a tag override its preset's make values? | "Overrides should only apply locally" | Step 1: a tag may override; it never writes back into the preset; the Preset row reads *(modified)* |
+| 2 | Auto size off on a new tag? | "Auto size can be on by default" | Step 1: Auto ON for a new tag; a drag, a typed size or a picked suggestion turns it off |
+| 3 | May a tag turn 90° before it is flagged too big? | "yes you should intelligently position it (if auto is on)" | Step 1: Auto tries 0° and 90° (as today) and shows the turn; step 2's size lint applies after both |
+| 4 | Print orientation per tag or only by the preset? | "print orientation set per tag" | Step 2: a per-tag field, the preset gives the default |
+| 5 | Corner mark on Label or Marker? | "Corner mark can go in Label" | Step 1: Label tab |
+| 6 | `#` = OK, then open ArUco IDs? | "not sure what you mean by #" | Left out. The ID row is a spinner plus a "next free ID" suggestion |
+| 7 | Inkjet margin and cut line on the tag or the export sheet? | "Only in export sheet" | Step 1: removed from the tag (new tags: margin 0, cut line on; existing tags unchanged). Step 2: ArUco Export's PDF sheet gets them |
