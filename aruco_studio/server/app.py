@@ -479,8 +479,9 @@ def scene_verify(px_per_mm: float = 10.0) -> dict:
 
 @app.post("/api/scene/export/{fmt}")
 def scene_export(fmt: str, save: int = Query(1), inline: int = Query(0)) -> dict:
-    """The scene as a 1:1 sheet (svg), its file (json), or every tag's
-    plan / STL; written under <home>/exports/<scene>/ (save=1)."""
+    """The scene as a 1:1 sheet (svg, png), a PDF sticker sheet (pdf: REF's
+    print sheet), its file (json), or every tag's plan / STL; written under
+    <home>/exports/<scene>/ (save=1)."""
     sc = _scene()
     out_dir = S.exports_dir(sc.name)
     files = []
@@ -497,13 +498,16 @@ def scene_export(fmt: str, save: int = Query(1), inline: int = Query(0)) -> dict
                 files.append((f"{S.safe_name(t.name)}.stl", _X.to_stl(p)))
             else:
                 files.append((f"{S.safe_name(t.name)}.json", _X.to_json(p).encode("utf-8")))
+    elif fmt == "pdf":
+        files.append(("sheet.pdf", _sheet.to_pdf(sc)))
     elif fmt == "png":
         import cv2
         from ..verify.scene_check import scene_raster
         r = scene_raster(sc, px_per_mm=10.0)
         files.append(("sheet.png", png_true_size(cv2.imencode(".png", r.img)[1].tobytes(), 10.0)))
     else:
-        raise HTTPException(status_code=404, detail=f"no export {fmt!r}: svg, png, json, stl, plan")
+        raise HTTPException(status_code=404,
+                            detail=f"no export {fmt!r}: svg, png, pdf, json, stl, plan")
     written = []
     if save:
         for fn, data in files:

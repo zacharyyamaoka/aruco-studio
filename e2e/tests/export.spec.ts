@@ -1,10 +1,11 @@
 // M3.9 / ST-T-UI-7: Verify (OpenCV reads every tag; its pose 25 deg off
-// within 0.1 mm) and the sheet; Export the 1:1 SVG sheet, STL, plan JSON and
-// the scene file: the files exist where the server says, and download.
+// within 0.1 mm) and the sheet; Export the 1:1 SVG sheet, the PDF sticker
+// sheet (OpenCV reads every id off it), STL, plan JSON and the scene file:
+// the files exist where the server says, and download.
 import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
-import { add, fresh, idle, probe, shot } from "./helpers";
+import { add, detect, fresh, idle, probe, shot } from "./helpers";
 
 async function exportVia(page: any, item: string) {
   const dl = page.waitForEvent("download");
@@ -61,6 +62,14 @@ test("verify every tag and the sheet; export SVG, STL, plan JSON, the scene", as
   expect(sheet.startsWith("<svg")).toBeTruthy();
   expect(sheet).toMatch(/width="[\d.]+mm"/);
   for (const t of tags) expect(sheet).toContain(`data-tag="${t.name}"`);
+
+  const pdf = await exportVia(page, "export-pdf");
+  expect(pdf.download.suggestedFilename()).toBe("sheet.pdf");
+  const pdfFile = path.join(pdf.dir, "sheet.pdf");
+  expect(fs.readFileSync(pdfFile).subarray(0, 5).toString("latin1")).toBe("%PDF-");
+  const dict = String((await (await page.request.get("http://127.0.0.1:5360/api/scene?plans=1")).json()).tags[0].plan.marker.dictionary);
+  const allIds = tags.flatMap((t: any) => t.ids).sort((a: number, b: number) => a - b);
+  expect(detect(pdfFile, dict)).toEqual(allIds);
 
   const stl = await exportVia(page, "export-stl");
   expect(stl.n).toBe(tags.length);

@@ -103,6 +103,7 @@ export function Toolbar() {
             <>
               <Item icon="sheet" label="Print sheet (SVG, 1:1)" onClick={() => { close(); st.exportScene("svg"); }} testid="export-svg" />
               <Item icon="sheet" label="Print sheet (PNG, 10 px/mm)" onClick={() => { close(); st.exportScene("png"); }} testid="export-png" />
+              <Item icon="sheet" label="Sticker sheet (PDF, A4, cut marks)" onClick={() => { close(); st.exportScene("pdf"); }} testid="export-pdf" />
               <Item icon="cube" label="STL, every tag" onClick={() => { close(); st.exportScene("stl"); }} testid="export-stl" />
               <Item icon="file" label="Plan JSON, every tag" onClick={() => { close(); st.exportScene("plan"); }} testid="export-plan" />
               <Item icon="file" label="Scene file (.arucostudio.json)" onClick={() => { close(); st.exportScene("json"); }} testid="export-json" />

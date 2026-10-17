@@ -12,6 +12,8 @@ colorama==0.4.6
 # verify/: OpenCV's own detector, PnP and raster
 numpy==2.3.5
 opencv-contrib-python-headless==5.0.0.93
+# tests/verify: the PDF sheet rasterised (REF verify_aruco_output's pdfium)
+pypdfium2==4.30.0
 # server/: FastAPI + uvicorn on 127.0.0.1:5360; httpx for its TestClient
 fastapi==0.115.12
 starlette==0.46.2

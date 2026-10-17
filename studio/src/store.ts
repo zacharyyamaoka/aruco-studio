@@ -470,7 +470,7 @@ export const useStudio = create<StudioState>((set, get) => {
       await run("", async () => {
         const r = await api.sceneExport(fmt);
         files = r.files;
-        const types: Record<string, string> = { svg: "image/svg+xml", png: "image/png", json: "application/json", stl: "model/stl" };
+        const types: Record<string, string> = { svg: "image/svg+xml", png: "image/png", pdf: "application/pdf", json: "application/json", stl: "model/stl" };
         for (const [fn, b64] of Object.entries(r.inline || {})) {
           const ext = fn.split(".").pop() || "";
           download(fn, b64Blob(b64, types[ext] || "application/octet-stream"));

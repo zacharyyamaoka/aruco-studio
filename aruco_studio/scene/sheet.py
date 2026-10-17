@@ -1,5 +1,11 @@
-"""A scene as one 1:1 print sheet (SVG, mm) and as polygons in scene mm.
-Standard library only.
+"""A scene as one 1:1 print sheet (SVG, mm), as polygons in scene mm, and
+as a PDF print sheet of stickers. Standard library only.
+
+The PDF (`to_pdf`, Definition of Done D6) is REF's print sheet
+(core.sheet, REF print_sheet): every visible, planned tag as one sticker,
+its board as built (TagPlan.marker), laid out on pages with cut marks, the
+id in the border row and the ruler. It is a sheet of printed stickers, not
+the canvas: the tags are packed, not placed where the scene puts them.
 
 Each tag's top view (plan/mesh.top: what is seen from above) is moved to
 its place: scene <- the tag's target frame (its pose) <- the pattern frame
@@ -10,6 +16,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
+from ..core import sheet as _SH
 from ..plan import exports as _X
 from ..plan import mesh as _ME
 from .model import Scene, mat_mul
@@ -69,3 +76,39 @@ def to_svg(scene: Scene, plans: Optional[dict] = None, margin_mm: float = 5.0,
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{f(w)}mm" height="{f(h)}mm" '
             f'viewBox="{f(x0)} {f(-y1)} {f(w)} {f(h)}"><title>{scene.name}</title>'
             + "".join(body) + "</svg>")
+
+
+def print_items(scene: Scene, plans: Optional[dict] = None) -> List["_SH.PrintItem"]:
+    """One sticker per visible, planned tag (REF markers.print_items' fields):
+    its board as built, the identity line and where it goes."""
+    plans = plans if plans is not None else scene.plans()
+    out = []
+    for t in scene.tags:
+        p = plans[t.name]
+        if t.hidden or not p.ok:
+            continue
+        sp = p.ev["spec"]
+        kw = {}
+        if sp.layout != "single":
+            kw = dict(layout=sp.layout, rows=sp.rows, cols=sp.cols, separation_m=sp.separation_m,
+                      square_length_m=sp.square_length_m, legacy=sp.legacy)
+        out.append(_SH.PrintItem(key=t.name, dictionary=sp.dictionary, marker_id=sp.marker_id,
+                                 marker_length_m=sp.marker_length_m,
+                                 quiet_modules=sp.quiet_modules,
+                                 label_lines=[sp.label(), f"{scene.name} · {t.name}"],
+                                 top_label=t.name, **kw))
+    return out
+
+
+def pdf_layout(scene: Scene, plans: Optional[dict] = None, page: str = "a4",
+               landscape: bool = False) -> "_SH.SheetLayout":
+    """The sticker sheet's layout (core.sheet.layout_sheet): pages, places,
+    the rejected tags with why."""
+    st = _SH.SheetSettings(page=page, landscape=landscape, title=scene.name)
+    return _SH.layout_sheet(print_items(scene, plans), st)
+
+
+def to_pdf(scene: Scene, plans: Optional[dict] = None, page: str = "a4",
+           landscape: bool = False, date: Optional[str] = None) -> bytes:
+    """The scene's stickers as a PDF at true size (core.sheet.render_layout_pdf)."""
+    return _SH.render_layout_pdf(pdf_layout(scene, plans, page, landscape), date=date)
