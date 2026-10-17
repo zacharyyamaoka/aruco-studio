@@ -27,6 +27,7 @@ from ..core import dictionary as _D
 from ..core import form as _F
 from ..core import label as _L
 from ..core import numbering as _N
+from ..core import origin as _O
 from ..core import presets as _P
 from ..core import prusa as _PR
 from ..core import slabs as _SL
@@ -124,6 +125,9 @@ def options() -> dict:
             "ops": pairs(_F.OP_LABELS), "pins": pairs(_F.PIN_LABELS),
             "corner_marks": [{"value": v, "label": _CH.CHOICE_LABELS[v]} for v in _CH.CHOICES],
             "turns": [0, 90, 180, 270],
+            # the Origin row: REF's words per layout, in the dialog's clockwise order
+            "origin": {lay: [{"value": t, "label": _O.label(lay, t)} for t in _O.TURNS_CW]
+                       for lay in ("single", "grid", "charuco")},
             "label": {"content": pairs(_F.LABEL_CONTENT), "place": pairs(_F.LABEL_PLACE),
                       "row": pairs(_F.LABEL_ROW), "side": pairs(_F.LABEL_SIDE),
                       "scope": pairs(_F.LABEL_SCOPE), "rule": _L.RULE,
@@ -515,6 +519,42 @@ def new_tag(req: M.NewTagIn) -> dict:
             raise HTTPException(status_code=404, detail=f"no preset {req.preset!r}")
     return _NEW.new_spec(req.layout, tgt, preset, marker_id=req.marker_id, name=req.name,
                          key=req.key)
+
+
+@app.post("/api/target")
+def target_make(req: M.TargetMakeIn) -> dict:
+    """The target editor: a box (w x h), a disc (r) or a palette face
+    (`key`), round holes (x, y, diameter), a thickness (0 = no body), as a
+    Target (plan/target.py; the web app never makes outlines itself)."""
+    th = float(req.thickness_mm)
+    holes = [(float(x), float(y), float(d) / 2.0) for x, y, d in req.holes]
+    if any(r <= 0 for _x, _y, r in holes):
+        raise _422("holes", "a hole's diameter must be > 0")
+    if req.shape == "face":
+        try:
+            t = _T.from_face(req.key or "", th)
+        except KeyError:
+            raise HTTPException(status_code=404, detail=f"no target {req.key!r}") from None
+        if holes:
+            loops = t.outline_mm() + [_T.circle_pts(x, y, r, 48, cw=True) for x, y, r in holes]
+            t = _T.from_loops(loops, th, centre=False, name=t.name)
+    elif req.shape == "disc":
+        if req.r_mm <= 0:
+            raise _422("r_mm", "the disc's radius must be > 0")
+        t = _T.disc(float(req.r_mm), holes, th)
+        t.name = f"Disc ⌀{2 * req.r_mm:g}"
+    else:
+        if req.w_mm <= 0 or req.h_mm <= 0:
+            raise _422("w_mm" if req.w_mm <= 0 else "h_mm", "the box's sides must be > 0")
+        if holes:
+            w, h = float(req.w_mm) / 2.0, float(req.h_mm) / 2.0
+            loops = [[(-w, -h), (w, -h), (w, h), (-w, h)]] + [
+                _T.circle_pts(x, y, r, 48, cw=True) for x, y, r in holes]
+            t = _T.from_loops(loops, th, centre=False)
+        else:
+            t = _T.box(float(req.w_mm), float(req.h_mm), th)
+        t.name = f"Box {req.w_mm:g} x {req.h_mm:g}"
+    return t.to_dict()
 
 
 @app.post("/api/preset/apply")

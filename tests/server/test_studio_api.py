@@ -125,3 +125,30 @@ def test_top_view_verify_image_inline_export(client):
     e = client.post("/api/scene/export/svg?save=1&inline=1").json()
     assert e["files"] and Path(e["files"][0]).exists()
     assert base64.b64decode(e["inline"]["sheet.svg"]).startswith(b"<svg")
+
+
+def test_target_editor(client):
+    b = client.post("/api/target", json={"shape": "box", "w_mm": 60.0, "h_mm": 30.0,
+                                          "thickness_mm": 2.0}).json()
+    assert b["w_mm"] == 60.0 and b["h_mm"] == 30.0 and b["has_body"]
+    assert b["body_mm"]["z0"] == -2.0
+    h = client.post("/api/target", json={"shape": "box", "w_mm": 60.0, "h_mm": 40.0,
+                                          "holes": [[20.0, 0.0, 6.0]], "thickness_mm": 0.0}).json()
+    assert len(h["loops_mm"]) == 2 and not h["has_body"]
+    d = client.post("/api/target", json={"shape": "disc", "r_mm": 25.0}).json()
+    assert abs(d["w_mm"] - 50.0) < 0.1
+    f = client.post("/api/target", json={"shape": "face", "key": "ring"}).json()
+    assert len(f["loops_mm"]) == 2
+    assert client.post("/api/target", json={"shape": "face", "key": "nope"}).status_code == 404
+    r = client.post("/api/target", json={"shape": "box", "w_mm": -1.0})
+    assert r.status_code == 422 and r.json()["detail"][0]["path"] == "w_mm"
+    for t in (b, h, d, f):
+        sp = client.post("/api/new", json={"layout": "single", "target": t}).json()
+        assert client.post("/api/plan", json=sp).json()["ok"]
+
+
+def test_options_carry_the_origin_words(client):
+    from aruco_studio.core import origin
+    o = client.get("/api/options").json()["origin"]
+    assert [x["value"] for x in o["single"]] == list(origin.TURNS_CW)
+    assert o["grid"][0]["label"] == origin.label("grid", 0)

@@ -1,0 +1,2984 @@
+{
+ "components": {
+  "schemas": {
+   "BodyIn": {
+    "additionalProperties": false,
+    "properties": {
+     "depth": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Depth"
+     },
+     "measured": {
+      "default": true,
+      "title": "Measured",
+      "type": "boolean"
+     },
+     "u0": {
+      "title": "U0",
+      "type": "number"
+     },
+     "u1": {
+      "title": "U1",
+      "type": "number"
+     },
+     "v0": {
+      "title": "V0",
+      "type": "number"
+     },
+     "v1": {
+      "title": "V1",
+      "type": "number"
+     },
+     "z0": {
+      "title": "Z0",
+      "type": "number"
+     },
+     "z1": {
+      "title": "Z1",
+      "type": "number"
+     }
+    },
+    "required": [
+     "u0",
+     "v0",
+     "u1",
+     "v1",
+     "z0",
+     "z1"
+    ],
+    "title": "BodyIn",
+    "type": "object"
+   },
+   "CandidatesIn": {
+    "properties": {
+     "cells": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cells"
+     },
+     "dictionary": {
+      "default": "DICT_4X4_50",
+      "title": "Dictionary",
+      "type": "string"
+     },
+     "layout": {
+      "default": "single",
+      "enum": [
+       "single",
+       "grid",
+       "charuco"
+      ],
+      "title": "Layout",
+      "type": "string"
+     },
+     "limit": {
+      "default": 8,
+      "title": "Limit",
+      "type": "integer"
+     },
+     "quiet_modules": {
+      "default": 1.0,
+      "title": "Quiet Modules",
+      "type": "number"
+     },
+     "target": {
+      "$ref": "#/components/schemas/TargetIn"
+     }
+    },
+    "required": [
+     "target"
+    ],
+    "title": "CandidatesIn",
+    "type": "object"
+   },
+   "FramesOut": {
+    "properties": {
+     "detector_z_mm": {
+      "title": "Detector Z Mm",
+      "type": "number"
+     },
+     "opencv": {
+      "items": {
+       "type": "number"
+      },
+      "title": "Opencv",
+      "type": "array"
+     },
+     "opencv_target": {
+      "items": {
+       "type": "number"
+      },
+      "title": "Opencv Target",
+      "type": "array"
+     },
+     "pattern_in_target": {
+      "items": {
+       "type": "number"
+      },
+      "title": "Pattern In Target",
+      "type": "array"
+     },
+     "surface_mm": {
+      "title": "Surface Mm",
+      "type": "number"
+     }
+    },
+    "required": [
+     "opencv",
+     "opencv_target",
+     "pattern_in_target",
+     "detector_z_mm",
+     "surface_mm"
+    ],
+    "title": "FramesOut",
+    "type": "object"
+   },
+   "GuidesOut": {
+    "additionalProperties": true,
+    "properties": {
+     "clear_hard": {
+      "items": {
+       "type": "number"
+      },
+      "title": "Clear Hard",
+      "type": "array"
+     },
+     "clear_preferred": {
+      "items": {
+       "type": "number"
+      },
+      "title": "Clear Preferred",
+      "type": "array"
+     },
+     "keepouts": {
+      "items": {
+       "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+         {
+          "type": "number"
+         },
+         {
+          "type": "number"
+         }
+        ],
+        "type": "array"
+       },
+       "type": "array"
+      },
+      "title": "Keepouts",
+      "type": "array"
+     },
+     "label_preview": {
+      "items": {
+       "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+         {
+          "type": "number"
+         },
+         {
+          "type": "number"
+         }
+        ],
+        "type": "array"
+       },
+       "type": "array"
+      },
+      "title": "Label Preview",
+      "type": "array"
+     },
+     "quiet_ring": {
+      "items": {
+       "type": "number"
+      },
+      "title": "Quiet Ring",
+      "type": "array"
+     },
+     "sticker": {
+      "items": {
+       "type": "number"
+      },
+      "title": "Sticker",
+      "type": "array"
+     },
+     "target": {
+      "items": {
+       "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+         {
+          "type": "number"
+         },
+         {
+          "type": "number"
+         }
+        ],
+        "type": "array"
+       },
+       "type": "array"
+      },
+      "title": "Target",
+      "type": "array"
+     },
+     "tile": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "number"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tile"
+     },
+     "trim": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Trim"
+     }
+    },
+    "required": [
+     "sticker",
+     "quiet_ring",
+     "clear_hard",
+     "clear_preferred",
+     "keepouts",
+     "label_preview",
+     "target"
+    ],
+    "title": "GuidesOut",
+    "type": "object"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "title": "Detail",
+      "type": "array"
+     }
+    },
+    "title": "HTTPValidationError",
+    "type": "object"
+   },
+   "IssueOut": {
+    "properties": {
+     "field": {
+      "title": "Field",
+      "type": "string"
+     },
+     "level": {
+      "enum": [
+       "error",
+       "warn",
+       "info"
+      ],
+      "title": "Level",
+      "type": "string"
+     },
+     "text": {
+      "title": "Text",
+      "type": "string"
+     }
+    },
+    "required": [
+     "field",
+     "level",
+     "text"
+    ],
+    "title": "IssueOut",
+    "type": "object"
+   },
+   "LayerOut": {
+    "additionalProperties": true,
+    "properties": {
+     "circles": {
+      "anyOf": [
+       {
+        "items": {
+         "additionalProperties": true,
+         "type": "object"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Circles"
+     },
+     "colour": {
+      "enum": [
+       "white",
+       "black",
+       "none"
+      ],
+      "title": "Colour",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "op": {
+      "enum": [
+       "add",
+       "cut",
+       "keep"
+      ],
+      "title": "Op",
+      "type": "string"
+     },
+     "part": {
+      "title": "Part",
+      "type": "string"
+     },
+     "polygons": {
+      "items": {
+       "$ref": "#/components/schemas/PolygonOut"
+      },
+      "title": "Polygons",
+      "type": "array"
+     },
+     "solid": {
+      "title": "Solid",
+      "type": "integer"
+     },
+     "step": {
+      "enum": [
+       "add",
+       "sub"
+      ],
+      "title": "Step",
+      "type": "string"
+     },
+     "z": {
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "number"
+       }
+      ],
+      "title": "Z",
+      "type": "array"
+     }
+    },
+    "required": [
+     "name",
+     "part",
+     "solid",
+     "step",
+     "op",
+     "colour",
+     "z",
+     "polygons"
+    ],
+    "title": "LayerOut",
+    "type": "object"
+   },
+   "LibraryCardIn": {
+    "properties": {
+     "id": {
+      "title": "Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id"
+    ],
+    "title": "LibraryCardIn",
+    "type": "object"
+   },
+   "LibrarySaveIn": {
+    "properties": {
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "name": {
+      "default": "",
+      "title": "Name",
+      "type": "string"
+     },
+     "values": {
+      "additionalProperties": true,
+      "title": "Values",
+      "type": "object"
+     }
+    },
+    "required": [
+     "id"
+    ],
+    "title": "LibrarySaveIn",
+    "type": "object"
+   },
+   "MeshOut": {
+    "properties": {
+     "colour": {
+      "title": "Colour",
+      "type": "string"
+     },
+     "indices": {
+      "items": {
+       "type": "integer"
+      },
+      "title": "Indices",
+      "type": "array"
+     },
+     "positions": {
+      "items": {
+       "type": "number"
+      },
+      "title": "Positions",
+      "type": "array"
+     },
+     "what": {
+      "title": "What",
+      "type": "string"
+     },
+     "z": {
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "number"
+       }
+      ],
+      "title": "Z",
+      "type": "array"
+     }
+    },
+    "required": [
+     "what",
+     "colour",
+     "z",
+     "positions",
+     "indices"
+    ],
+    "title": "MeshOut",
+    "type": "object"
+   },
+   "NewTagIn": {
+    "additionalProperties": false,
+    "description": "A fresh tag's spec (server/newtag.py): a layout on a target from the\npalette (`target_key`, `thickness_mm`) or a typed `target`, under a\npreset (its name; Default when empty).",
+    "properties": {
+     "key": {
+      "default": "",
+      "title": "Key",
+      "type": "string"
+     },
+     "layout": {
+      "default": "single",
+      "enum": [
+       "single",
+       "grid",
+       "charuco"
+      ],
+      "title": "Layout",
+      "type": "string"
+     },
+     "marker_id": {
+      "default": 0,
+      "title": "Marker Id",
+      "type": "integer"
+     },
+     "name": {
+      "default": "",
+      "title": "Name",
+      "type": "string"
+     },
+     "preset": {
+      "default": "",
+      "title": "Preset",
+      "type": "string"
+     },
+     "target": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/TargetIn"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "target_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Target Key"
+     },
+     "thickness_mm": {
+      "default": 3.0,
+      "title": "Thickness Mm",
+      "type": "number"
+     }
+    },
+    "title": "NewTagIn",
+    "type": "object"
+   },
+   "OverrideIn": {
+    "properties": {
+     "id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Id"
+     }
+    },
+    "title": "OverrideIn",
+    "type": "object"
+   },
+   "PolygonOut": {
+    "properties": {
+     "holes": {
+      "items": {
+       "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+         {
+          "type": "number"
+         },
+         {
+          "type": "number"
+         }
+        ],
+        "type": "array"
+       },
+       "type": "array"
+      },
+      "title": "Holes",
+      "type": "array"
+     },
+     "outer": {
+      "items": {
+       "maxItems": 2,
+       "minItems": 2,
+       "prefixItems": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "number"
+        }
+       ],
+       "type": "array"
+      },
+      "title": "Outer",
+      "type": "array"
+     }
+    },
+    "required": [
+     "outer"
+    ],
+    "title": "PolygonOut",
+    "type": "object"
+   },
+   "PresetApplyIn": {
+    "properties": {
+     "name": {
+      "default": "",
+      "title": "Name",
+      "type": "string"
+     },
+     "preset": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Preset"
+     },
+     "spec": {
+      "$ref": "#/components/schemas/TagSpecIn"
+     }
+    },
+    "required": [
+     "spec"
+    ],
+    "title": "PresetApplyIn",
+    "type": "object"
+   },
+   "PresetIn": {
+    "properties": {
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "preset": {
+      "additionalProperties": true,
+      "title": "Preset",
+      "type": "object"
+     }
+    },
+    "required": [
+     "name",
+     "preset"
+    ],
+    "title": "PresetIn",
+    "type": "object"
+   },
+   "PresetOfIn": {
+    "properties": {
+     "name": {
+      "default": "",
+      "title": "Name",
+      "type": "string"
+     },
+     "spec": {
+      "$ref": "#/components/schemas/TagSpecIn"
+     }
+    },
+    "required": [
+     "spec"
+    ],
+    "title": "PresetOfIn",
+    "type": "object"
+   },
+   "RecentIn": {
+    "properties": {
+     "name": {
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "title": "RecentIn",
+    "type": "object"
+   },
+   "SceneFileIn": {
+    "properties": {
+     "name": {
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "title": "SceneFileIn",
+    "type": "object"
+   },
+   "SceneNewIn": {
+    "properties": {
+     "name": {
+      "default": "scene",
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "title": "SceneNewIn",
+    "type": "object"
+   },
+   "SceneTagIn": {
+    "properties": {
+     "locked": {
+      "default": false,
+      "title": "Locked",
+      "type": "boolean"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "rotation_deg": {
+      "default": 0.0,
+      "title": "Rotation Deg",
+      "type": "number"
+     },
+     "spec": {
+      "$ref": "#/components/schemas/TagSpecIn"
+     },
+     "x_mm": {
+      "default": 0.0,
+      "title": "X Mm",
+      "type": "number"
+     },
+     "y_mm": {
+      "default": 0.0,
+      "title": "Y Mm",
+      "type": "number"
+     }
+    },
+    "required": [
+     "spec"
+    ],
+    "title": "SceneTagIn",
+    "type": "object"
+   },
+   "SceneTagPatch": {
+    "additionalProperties": false,
+    "properties": {
+     "hidden": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hidden"
+     },
+     "key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Key"
+     },
+     "locked": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Locked"
+     },
+     "new_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "New Name"
+     },
+     "numbers": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "type": "number"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Numbers"
+     },
+     "rotation_deg": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rotation Deg"
+     },
+     "settings": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Settings"
+     },
+     "target": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/TargetIn"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "x_mm": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "X Mm"
+     },
+     "y_mm": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Y Mm"
+     }
+    },
+    "title": "SceneTagPatch",
+    "type": "object"
+   },
+   "TagPlanOut": {
+    "additionalProperties": true,
+    "description": "The result (ARCHITECTURE 5.3).",
+    "properties": {
+     "body": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Body"
+     },
+     "combines": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Combines",
+      "type": "array"
+     },
+     "digest": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Digest"
+     },
+     "errors": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Errors",
+      "type": "array"
+     },
+     "frames": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/FramesOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "guides": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/GuidesOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "ids": {
+      "items": {
+       "type": "integer"
+      },
+      "title": "Ids",
+      "type": "array"
+     },
+     "key": {
+      "default": "",
+      "title": "Key",
+      "type": "string"
+     },
+     "label": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Label"
+     },
+     "labels": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Labels",
+      "type": "array"
+     },
+     "layers": {
+      "items": {
+       "$ref": "#/components/schemas/LayerOut"
+      },
+      "title": "Layers",
+      "type": "array"
+     },
+     "layout": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Layout"
+     },
+     "mark": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mark"
+     },
+     "marker": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Marker"
+     },
+     "mesh": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/MeshOut"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mesh"
+     },
+     "name": {
+      "default": "",
+      "title": "Name",
+      "type": "string"
+     },
+     "node_warning": {
+      "title": "Node Warning",
+      "type": "string"
+     },
+     "notes": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Notes",
+      "type": "array"
+     },
+     "ok": {
+      "title": "Ok",
+      "type": "boolean"
+     },
+     "parts": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Parts",
+      "type": "array"
+     },
+     "pins": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Pins",
+      "type": "array"
+     },
+     "placement": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Placement"
+     },
+     "record": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Record"
+     },
+     "rules": {
+      "additionalProperties": true,
+      "title": "Rules",
+      "type": "object"
+     },
+     "schema": {
+      "title": "Schema",
+      "type": "string"
+     },
+     "slabs": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Slabs"
+     },
+     "trim": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Trim"
+     },
+     "warnings": {
+      "items": {
+       "$ref": "#/components/schemas/IssueOut"
+      },
+      "title": "Warnings",
+      "type": "array"
+     },
+     "writes": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Writes"
+     }
+    },
+    "required": [
+     "schema",
+     "ok",
+     "errors",
+     "parts",
+     "layers",
+     "combines",
+     "ids",
+     "labels",
+     "pins",
+     "warnings",
+     "rules",
+     "notes",
+     "node_warning"
+    ],
+    "title": "TagPlanOut",
+    "type": "object"
+   },
+   "TagSpecIn": {
+    "additionalProperties": false,
+    "description": "The request (ARCHITECTURE 5.2).",
+    "properties": {
+     "key": {
+      "default": "",
+      "title": "Key",
+      "type": "string"
+     },
+     "name": {
+      "default": "",
+      "title": "Name",
+      "type": "string"
+     },
+     "numbers": {
+      "additionalProperties": {
+       "type": "number"
+      },
+      "title": "Numbers",
+      "type": "object"
+     },
+     "schema": {
+      "const": "arucostudio.tagspec/1",
+      "default": "arucostudio.tagspec/1",
+      "title": "Schema",
+      "type": "string"
+     },
+     "settings": {
+      "additionalProperties": true,
+      "title": "Settings",
+      "type": "object"
+     },
+     "target": {
+      "$ref": "#/components/schemas/TargetIn"
+     }
+    },
+    "required": [
+     "target"
+    ],
+    "title": "TagSpecIn",
+    "type": "object"
+   },
+   "TargetIn": {
+    "additionalProperties": true,
+    "description": "The face or sketch area, as numbers (ARCHITECTURE 5.1).",
+    "properties": {
+     "body_loops_mm": {
+      "anyOf": [
+       {
+        "items": {
+         "items": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+           {
+            "type": "number"
+           },
+           {
+            "type": "number"
+           }
+          ],
+          "type": "array"
+         },
+         "type": "array"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Body Loops Mm"
+     },
+     "body_mm": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/BodyIn"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "face_loops_mm": {
+      "anyOf": [
+       {
+        "items": {
+         "items": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+           {
+            "type": "number"
+           },
+           {
+            "type": "number"
+           }
+          ],
+          "type": "array"
+         },
+         "type": "array"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Face Loops Mm"
+     },
+     "h_mm": {
+      "title": "H Mm",
+      "type": "number"
+     },
+     "has_body": {
+      "default": true,
+      "title": "Has Body",
+      "type": "boolean"
+     },
+     "kind": {
+      "default": "face",
+      "title": "Kind",
+      "type": "string"
+     },
+     "loops_mm": {
+      "items": {
+       "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+         {
+          "type": "number"
+         },
+         {
+          "type": "number"
+         }
+        ],
+        "type": "array"
+       },
+       "type": "array"
+      },
+      "title": "Loops Mm",
+      "type": "array"
+     },
+     "name": {
+      "default": "",
+      "title": "Name",
+      "type": "string"
+     },
+     "w_mm": {
+      "title": "W Mm",
+      "type": "number"
+     },
+     "x_ref": {
+      "anyOf": [
+       {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+         {
+          "type": "number"
+         },
+         {
+          "type": "number"
+         }
+        ],
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "X Ref"
+     },
+     "z_sign": {
+      "default": 1,
+      "title": "Z Sign",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "w_mm",
+     "h_mm"
+    ],
+    "title": "TargetIn",
+    "type": "object"
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "title": "Location",
+      "type": "array"
+     },
+     "msg": {
+      "title": "Message",
+      "type": "string"
+     },
+     "type": {
+      "title": "Error Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError",
+    "type": "object"
+   },
+   "VerifyIn": {
+    "properties": {
+     "image": {
+      "default": false,
+      "title": "Image",
+      "type": "boolean"
+     },
+     "pose": {
+      "default": true,
+      "title": "Pose",
+      "type": "boolean"
+     },
+     "px_per_mm": {
+      "default": 20.0,
+      "title": "Px Per Mm",
+      "type": "number"
+     },
+     "spec": {
+      "$ref": "#/components/schemas/TagSpecIn"
+     }
+    },
+    "required": [
+     "spec"
+    ],
+    "title": "VerifyIn",
+    "type": "object"
+   }
+  }
+ },
+ "info": {
+  "description": "Fiducial markers planned outside any CAD program: the TagPlan contract, scenes, exports and OpenCV's own check.",
+  "title": "ArUco Studio",
+  "version": "0.2.0"
+ },
+ "openapi": "3.1.0",
+ "paths": {
+  "/api/candidates": {
+   "post": {
+    "description": "The ranked Layout list for a target (core.autosize).",
+    "operationId": "candidates_api_candidates_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CandidatesIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "title": "Response Candidates Api Candidates Post",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Candidates"
+   }
+  },
+  "/api/dictionaries": {
+   "get": {
+    "operationId": "dictionaries_api_dictionaries_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "title": "Response Dictionaries Api Dictionaries Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Dictionaries"
+   }
+  },
+  "/api/export/{fmt}": {
+   "post": {
+    "description": "One tag as SVG (1:1 mm), PNG (20 px / mm), STL or plan JSON.",
+    "operationId": "export_tag_api_export__fmt__post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "fmt",
+      "required": true,
+      "schema": {
+       "title": "Fmt",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TagSpecIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Export Tag"
+   }
+  },
+  "/api/form": {
+   "get": {
+    "operationId": "form_api_form_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Form Api Form Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Form"
+   }
+  },
+  "/api/health": {
+   "get": {
+    "operationId": "health_api_health_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Health Api Health Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Health"
+   }
+  },
+  "/api/library": {
+   "get": {
+    "description": "The preset Library's state (REF aruco_preset_library.Library.state):\ncollections, cards with thumbs, the Edit form. `tag`: the scene tag the\nLibrary opened for (its print settings are the dialog's).",
+    "operationId": "library_api_library_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "tag",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Tag"
+      }
+     },
+     {
+      "in": "query",
+      "name": "selected",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Selected"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Library Api Library Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Library"
+   }
+  },
+  "/api/library/recent": {
+   "get": {
+    "operationId": "library_recent_api_library_recent_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Library Recent Api Library Recent Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Library Recent"
+   },
+   "post": {
+    "operationId": "library_recent_add_api_library_recent_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RecentIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Library Recent Add Api Library Recent Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Library Recent Add"
+   }
+  },
+  "/api/library/save": {
+   "post": {
+    "description": "Edit -> Save of one of your presets (its fields by path; a new name renames).",
+    "operationId": "library_save_api_library_save_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LibrarySaveIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Library Save Api Library Save Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Library Save"
+   }
+  },
+  "/api/library/select": {
+   "post": {
+    "description": "Select a card: {name, preset} to apply (a PrusaSlicer profile is\nimported as one of yours first).",
+    "operationId": "library_select_api_library_select_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LibraryCardIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Library Select Api Library Select Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Library Select"
+   }
+  },
+  "/api/new": {
+   "post": {
+    "description": "A fresh tag's TagSpec: `layout` on a palette target (`target_key`,\n`thickness_mm`) or a typed `target`, under a preset (by name).",
+    "operationId": "new_tag_api_new_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/NewTagIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response New Tag Api New Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "New Tag"
+   }
+  },
+  "/api/options": {
+   "get": {
+    "description": "Every choice the inspector offers, with the dialog's words.",
+    "operationId": "options_api_options_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Options Api Options Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Options"
+   }
+  },
+  "/api/plan": {
+   "post": {
+    "description": "TagSpec -> TagPlan. ?mesh=1 fills `mesh` (per body, for the 3D view);\n?top=1 adds `top` ({colour: polygons}, the top view the 2D view fills).",
+    "operationId": "plan_api_plan_post",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "mesh",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "title": "Mesh",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "top",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "title": "Top",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TagSpecIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TagPlanOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Plan"
+   }
+  },
+  "/api/preset/apply": {
+   "post": {
+    "description": "`spec` with a preset's print settings (by `name`, or a `preset`).",
+    "operationId": "preset_apply_api_preset_apply_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PresetApplyIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Preset Apply Api Preset Apply Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Preset Apply"
+   }
+  },
+  "/api/preset/of": {
+   "post": {
+    "description": "A tag's print settings as a preset, and the catalog preset it equals.",
+    "operationId": "preset_of_api_preset_of_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PresetOfIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Preset Of Api Preset Of Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Preset Of"
+   }
+  },
+  "/api/presets": {
+   "get": {
+    "description": "Built-in presets (read only: Default and PrusaSlicer's \"Aruco\"\nprofiles) and the user's (their file under the Studio's home).",
+    "operationId": "presets_api_presets_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Presets Api Presets Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Presets"
+   },
+   "post": {
+    "operationId": "preset_save_as_api_presets_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PresetIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Preset Save As Api Presets Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Preset Save As"
+   }
+  },
+  "/api/presets/{name}": {
+   "delete": {
+    "operationId": "preset_delete_api_presets__name__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "name",
+      "required": true,
+      "schema": {
+       "title": "Name",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Preset Delete Api Presets  Name  Delete",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Preset Delete"
+   },
+   "put": {
+    "operationId": "preset_update_api_presets__name__put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "name",
+      "required": true,
+      "schema": {
+       "title": "Name",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "additionalProperties": true,
+        "title": "Preset",
+        "type": "object"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Preset Update Api Presets  Name  Put",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Preset Update"
+   }
+  },
+  "/api/prusa/profiles": {
+   "get": {
+    "operationId": "prusa_profiles_api_prusa_profiles_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Prusa Profiles Api Prusa Profiles Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Prusa Profiles"
+   }
+  },
+  "/api/remembered": {
+   "get": {
+    "operationId": "remembered_get_api_remembered_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Remembered Get Api Remembered Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Remembered Get"
+   }
+  },
+  "/api/remembered/{command}": {
+   "put": {
+    "operationId": "remembered_put_api_remembered__command__put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "command",
+      "required": true,
+      "schema": {
+       "title": "Command",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "additionalProperties": true,
+        "title": "Values",
+        "type": "object"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Remembered Put Api Remembered  Command  Put",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Remembered Put"
+   }
+  },
+  "/api/scene": {
+   "get": {
+    "description": "The open scene; ?plans=1 adds each tag's TagPlan (?mesh=1 its mesh,\n?top=1 its top view).",
+    "operationId": "scene_get_api_scene_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "plans",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "title": "Plans",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "mesh",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "title": "Mesh",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "top",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "title": "Top",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Scene Get Api Scene Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Scene Get"
+   },
+   "put": {
+    "operationId": "scene_put_api_scene_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "additionalProperties": true,
+        "title": "Doc",
+        "type": "object"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Scene Put Api Scene Put",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Scene Put"
+   }
+  },
+  "/api/scene/export/{fmt}": {
+   "post": {
+    "description": "The scene as a 1:1 sheet (svg), its file (json), or every tag's\nplan / STL; written under <home>/exports/<scene>/ (save=1).",
+    "operationId": "scene_export_api_scene_export__fmt__post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "fmt",
+      "required": true,
+      "schema": {
+       "title": "Fmt",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "save",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "title": "Save",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "inline",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "title": "Inline",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Scene Export Api Scene Export  Fmt  Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Scene Export"
+   }
+  },
+  "/api/scene/new": {
+   "post": {
+    "operationId": "scene_new_api_scene_new_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SceneNewIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Scene New Api Scene New Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Scene New"
+   }
+  },
+  "/api/scene/open": {
+   "post": {
+    "operationId": "scene_open_api_scene_open_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SceneFileIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Scene Open Api Scene Open Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Scene Open"
+   }
+  },
+  "/api/scene/overrides/{name}": {
+   "put": {
+    "operationId": "scene_override_api_scene_overrides__name__put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "name",
+      "required": true,
+      "schema": {
+       "title": "Name",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/OverrideIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Scene Override Api Scene Overrides  Name  Put",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Scene Override"
+   }
+  },
+  "/api/scene/renumber": {
+   "post": {
+    "description": "Unique ids across the scene (core.numbering through the scene's ledger).",
+    "operationId": "scene_renumber_api_scene_renumber_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Scene Renumber Api Scene Renumber Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Scene Renumber"
+   }
+  },
+  "/api/scene/save": {
+   "post": {
+    "operationId": "scene_save_api_scene_save_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "anyOf": [
+         {
+          "$ref": "#/components/schemas/SceneFileIn"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "title": "Req"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Scene Save Api Scene Save Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Scene Save"
+   }
+  },
+  "/api/scene/tags": {
+   "post": {
+    "operationId": "scene_add_api_scene_tags_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SceneTagIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Scene Add Api Scene Tags Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Scene Add"
+   }
+  },
+  "/api/scene/tags/{name}": {
+   "delete": {
+    "operationId": "scene_delete_api_scene_tags__name__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "name",
+      "required": true,
+      "schema": {
+       "title": "Name",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Scene Delete Api Scene Tags  Name  Delete",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Scene Delete"
+   },
+   "patch": {
+    "operationId": "scene_patch_api_scene_tags__name__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "name",
+      "required": true,
+      "schema": {
+       "title": "Name",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SceneTagPatch"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Scene Patch Api Scene Tags  Name  Patch",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Scene Patch"
+   }
+  },
+  "/api/scene/tags/{name}/duplicate": {
+   "post": {
+    "operationId": "scene_duplicate_api_scene_tags__name__duplicate_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "name",
+      "required": true,
+      "schema": {
+       "title": "Name",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "dx_mm",
+      "required": false,
+      "schema": {
+       "default": 10.0,
+       "title": "Dx Mm",
+       "type": "number"
+      }
+     },
+     {
+      "in": "query",
+      "name": "dy_mm",
+      "required": false,
+      "schema": {
+       "default": 0.0,
+       "title": "Dy Mm",
+       "type": "number"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Scene Duplicate Api Scene Tags  Name  Duplicate Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Scene Duplicate"
+   }
+  },
+  "/api/scene/verify": {
+   "post": {
+    "operationId": "scene_verify_api_scene_verify_post",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "px_per_mm",
+      "required": false,
+      "schema": {
+       "default": 10.0,
+       "title": "Px Per Mm",
+       "type": "number"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Scene Verify Api Scene Verify Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Scene Verify"
+   }
+  },
+  "/api/scenes": {
+   "get": {
+    "operationId": "scenes_api_scenes_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "title": "Response Scenes Api Scenes Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Scenes"
+   }
+  },
+  "/api/targets": {
+   "get": {
+    "operationId": "targets_api_targets_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "thickness_mm",
+      "required": false,
+      "schema": {
+       "default": 3.0,
+       "title": "Thickness Mm",
+       "type": "number"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "title": "Response Targets Api Targets Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Targets"
+   }
+  },
+  "/api/validate": {
+   "post": {
+    "operationId": "validate_api_validate_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TagSpecIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/IssueOut"
+         },
+         "title": "Response Validate Api Validate Post",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Validate"
+   }
+  },
+  "/api/verify": {
+   "post": {
+    "description": "The tag rendered and read by OpenCV (frontal), and its pose 25 deg off.",
+    "operationId": "verify_api_verify_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/VerifyIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Verify Api Verify Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Verify"
+   }
+  }
+ }
+}

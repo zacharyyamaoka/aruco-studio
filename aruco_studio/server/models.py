@@ -250,3 +250,15 @@ class LibrarySaveIn(BaseModel):
 
 class RecentIn(BaseModel):
     name: StrictStr
+
+
+class TargetMakeIn(BaseModel):
+    """The target editor's numbers (POST /api/target)."""
+    model_config = ConfigDict(extra="forbid")
+    shape: Literal["box", "disc", "face"] = "box"
+    key: Optional[StrictStr] = None
+    w_mm: Num = 40.0
+    h_mm: Num = 40.0
+    r_mm: Num = 20.0
+    holes: List[Tuple[Num, Num, Num]] = Field(default_factory=list)
+    thickness_mm: Num = 3.0
