@@ -5,20 +5,30 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "../api/client";
 import type { FormField, Issue, SceneTag } from "../api/types";
-import { getPath, idsText, routeIssues, summaryLine, worst } from "../model/scene";
+import { getPath, idsText, routeIssues, shortText, summaryLine, worst } from "../model/scene";
 import { useStudio } from "../store";
 import { ButtonRow, Dropdown, Icon, IconButton, NumberInput, TextInput, Toggle, type Opt } from "../ui/controls";
 import { ICONS_OF, shown, TABS, TARGET_EDITOR, tabOf, turnIcons, type Tab } from "./layout";
 import { PresetRow } from "./PresetRow";
 import { TargetEditor } from "./TargetEditor";
 
+/** A row's messages: one short line each (the whole text in its tooltip and
+ *  data-text), the same line never twice (audit F7). */
 function Msgs({ path, issues, local }: { path: string; issues: Issue[]; local?: string | null }) {
   if (!issues.length && !local) return null;
+  const seen = new Set<string>();
+  const shown = issues.filter((i) => {
+    const k = `${i.level}|${shortText(i.text)}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
   return (
     <div className="msgs" data-issues-for={path}>
-      {local && <div className="issue lv-error" data-level="error" data-local="1">{local}</div>}
-      {issues.map((i, k) => (
-        <div key={k} className={`issue lv-${i.level}`} data-level={i.level} data-field={i.field}>{i.text}</div>
+      {local && <div className="issue lv-error" data-level="error" data-local="1" data-text={local}>{local}</div>}
+      {shown.map((i, k) => (
+        <div key={k} className={`issue lv-${i.level}`} data-level={i.level} data-field={i.field} data-text={i.text}
+          title={shortText(i.text) !== i.text ? i.text : undefined}>{shortText(i.text)}</div>
       ))}
     </div>
   );
@@ -64,7 +74,20 @@ function TagInspector({ tag, count, form, options, tab, setTab }: {
   const s = tag.spec.settings as Record<string, any>;
   const n = tag.spec.numbers as Record<string, any>;
   const plan = tag.plan;
-  const issues: Issue[] = (plan?.warnings as Issue[]) ?? [];
+  const [autoNote, setAutoNote] = useState("");
+  // Auto size at creation (plan.auto, REF _check_auto): a tag stored with
+  // Auto AND a number (made before 2026-10-13) says when Auto would build
+  // another tag here now (audit C5)
+  const autoKey = s.size_auto && Number(n.size) > 0 ? JSON.stringify(tag.spec) : "";
+  useEffect(() => {
+    let live = true;
+    if (!autoKey) { setAutoNote(""); return; }
+    api.autoCheck(tag.spec as any).then((r) => live && setAutoNote(r.auto ? "" : r.note)).catch(() => live && setAutoNote(""));
+    return () => { live = false; };
+  }, [autoKey]);
+  const planIssues: Issue[] = (plan?.warnings as Issue[]) ?? [];
+  const issues: Issue[] = useMemo(() => autoNote ? [...planIssues, { field: "numbers.size", level: "info", text: autoNote } as Issue] : planIssues,
+    [planIssues, autoNote]);
   const [bad, setBad] = useState<Record<string, string | null>>({});
   const fields = useMemo(() => form.filter((f) => !TARGET_EDITOR.has(f.path)), [form]);
   const visible = fields.filter((f) => shown(f, s, n));
@@ -81,6 +104,9 @@ function TagInspector({ tag, count, form, options, tab, setTab }: {
   const edit = (path: string, v: unknown, extra?: Record<string, unknown>) => st.edit(path, v, extra);
   const setLocal = (path: string) => (m: string | null) => setBad((b) => ({ ...b, [path]: m }));
 
+  // a locked (printed) tag: its ink cannot change, so no ink field takes
+  // input (audit F6); its name, place, lock and visibility stay editable
+  const dis = Boolean(tag.locked);
   const control = (f: FormField): ReactNode => {
     const v = getPath(tag.spec, f.path);
     const p = f.path;
@@ -99,14 +125,14 @@ function TagInspector({ tag, count, form, options, tab, setTab }: {
       return (
         <span className="pair">
           {p === "numbers.size" && (
-            <Toggle value={auto} label="Auto" path={`${p}:auto`}
+            <Toggle disabled={dis} value={auto} label="Auto" path={`${p}:auto`}
               onChange={(a) => edit(p, a ? 0 : +(builtSize || 20).toFixed(3), {
                 "settings.size_auto": a,
                 ...(layout === "charuco" ? { "numbers.square": a ? 0 : +(builtSquare || 0).toFixed(3) } : {}),
                 ...(a ? { "settings.force": null } : {}),
               })} />
           )}
-          <NumberInput value={shownV} path={p} unit="mm" disabled={auto} onBad={setLocal(p)}
+          <NumberInput value={shownV} path={p} unit="mm" disabled={auto || dis} onBad={setLocal(p)}
             onCommit={(x) => edit(p, x, p === "numbers.size" ? { "settings.size_auto": x === 0 } : undefined)} />
         </span>
       );
@@ -122,9 +148,9 @@ function TagInspector({ tag, count, form, options, tab, setTab }: {
       }
       return (
         <span className="pair">
-          <NumberInput int value={cols} path={`${p}[0]`} onBad={setLocal(p)} onCommit={(x) => edit(p, [x, rows])} />
+          <NumberInput disabled={dis} int value={cols} path={`${p}[0]`} onBad={setLocal(p)} onCommit={(x) => edit(p, [x, rows])} />
           <span className="x">×</span>
-          <NumberInput int value={rows} path={`${p}[1]`} onBad={setLocal(p)} onCommit={(x) => edit(p, [cols, x])} />
+          <NumberInput disabled={dis} int value={rows} path={`${p}[1]`} onBad={setLocal(p)} onCommit={(x) => edit(p, [cols, x])} />
           {cur && <IconButton icon="close" title="Back to the fit's count" onClick={() => edit(p, null)} />}
         </span>
       );
@@ -132,40 +158,40 @@ function TagInspector({ tag, count, form, options, tab, setTab }: {
     if (p === "settings.turn") {
       const icons = turnIcons(layout);
       const opts: Opt[] = (options?.origin?.[layout] ?? f.choices ?? []).map((c: any) => ({ value: c.value, label: c.label, hint: c.label, icon: icons[String(c.value)] }));
-      return <ButtonRow path={p} value={Number(v ?? 0)} options={opts} onChange={(x) => edit(p, Number(x))} />;
+      return <ButtonRow disabled={dis} path={p} value={Number(v ?? 0)} options={opts} onChange={(x) => edit(p, Number(x))} />;
     }
-    if (p === "settings.cells") return <CellsEditor value={v as any} f={f} onChange={(x) => edit(p, x)} onBad={setLocal(p)} />;
+    if (p === "settings.cells") return <CellsEditor disabled={dis} value={v as any} f={f} onChange={(x) => edit(p, x)} onBad={setLocal(p)} />;
     if (p === "settings.trim") {
       const cur = v as any;
       const opts: Opt[] = (options?.trim ?? [{ value: "off", label: "Off" }]).map((c: any) => ({ value: c.value, label: c.label }));
       return (
         <span className="pair">
-          <Dropdown path={p} value={cur && cur.rule === 1 ? cur.axes : "off"} options={opts}
+          <Dropdown disabled={dis} path={p} value={cur && cur.rule === 1 ? cur.axes : "off"} options={opts}
             onChange={(x) => edit(p, x === "off" ? null : { rule: 1, axes: x, margin_mm: cur?.margin_mm ?? 0, force: Boolean(cur?.force) })} />
-          {cur && cur.rule === 1 && <Toggle value={Boolean(cur.force)} label="Cut anyway" path={`${p}.force`} onChange={(x) => edit(p, { ...cur, force: x })} />}
+          {cur && cur.rule === 1 && <Toggle disabled={dis} value={Boolean(cur.force)} label="Cut anyway" path={`${p}.force`} onChange={(x) => edit(p, { ...cur, force: x })} />}
         </span>
       );
     }
     if (p === "settings.mode") {
       const opts: Opt[] = (f.choices ?? []).map((c) => ({ value: c.value, label: c.label, icon: ICONS_OF[p][String(c.value)] }));
-      return <Dropdown path={p} value={v as any} options={opts} onChange={(x) => st.setMode(String(x))} />;
+      return <Dropdown disabled={dis} path={p} value={v as any} options={opts} onChange={(x) => st.setMode(String(x))} />;
     }
     switch (f.type) {
       case "choice": {
         const icons = ICONS_OF[p] ?? {};
         const opts: Opt[] = (f.choices ?? []).map((c) => ({ value: c.value, label: c.label, icon: icons[String(c.value)] }));
-        return <Dropdown path={p} value={v as any} options={opts} onChange={(x) => edit(p, typeof f.default === "number" ? Number(x) : x)} />;
+        return <Dropdown disabled={dis} path={p} value={v as any} options={opts} onChange={(x) => edit(p, typeof f.default === "number" ? Number(x) : x)} />;
       }
       case "bool":
-        return <Toggle path={p} value={Boolean(v)} onChange={(x) => edit(p, x)} />;
+        return <Toggle disabled={dis} path={p} value={Boolean(v)} onChange={(x) => edit(p, x)} />;
       case "int":
-        return <NumberInput int path={p} value={v as number} onBad={setLocal(p)} onCommit={(x) => edit(p, x)} />;
+        return <NumberInput disabled={dis} int path={p} value={v as number} onBad={setLocal(p)} onCommit={(x) => edit(p, x)} />;
       case "number":
-        return <NumberInput path={p} value={v as number} onBad={setLocal(p)} onCommit={(x) => edit(p, x)} />;
+        return <NumberInput disabled={dis} path={p} value={v as number} onBad={setLocal(p)} onCommit={(x) => edit(p, x)} />;
       case "mm":
-        return <NumberInput path={p} value={v as number} unit="mm" onBad={setLocal(p)} onCommit={(x) => edit(p, x)} />;
+        return <NumberInput disabled={dis} path={p} value={v as number} unit="mm" onBad={setLocal(p)} onCommit={(x) => edit(p, x)} />;
       case "text":
-        return <TextInput path={p} value={String(v ?? "")} onCommit={(x) => edit(p, x)} />;
+        return <TextInput disabled={dis} path={p} value={String(v ?? "")} onCommit={(x) => edit(p, x)} />;
       default:
         return <span className="ro" data-path={p}>{JSON.stringify(v)}</span>;
     }
@@ -191,9 +217,12 @@ function TagInspector({ tag, count, form, options, tab, setTab }: {
       <div className="insp-sub muted">
         {m ? `${m.dictionary} · ${m.layout === "single" ? `${(m.marker_length_m * 1000).toFixed(2)} mm` : `${m.cols} × ${m.rows}, marker ${(m.marker_length_m * 1000).toFixed(2)} mm`}` : "not built"}
       </div>
-      <PresetRow tag={tag} />
-      <TargetEditor tag={tag} issues={routed["target"] ?? []} />
-      {rows("root")}
+      {tag.locked && <div className="locked-note" data-testid="locked-note"><Icon name="lock" />Locked: a printed tag. Unlock it to change its ink; its name and place can still change.</div>}
+      <fieldset className="ink" disabled={dis} data-ink-locked={dis ? "1" : "0"}>
+        <PresetRow tag={tag} />
+        <TargetEditor tag={tag} issues={routed["target"] ?? []} />
+        {rows("root")}
+      </fieldset>
       <div className="tabs" role="tablist">
         {TABS.map((t) => {
           const w = tabWorst(t.id);
@@ -205,11 +234,11 @@ function TagInspector({ tag, count, form, options, tab, setTab }: {
           );
         })}
       </div>
-      <div className="tab-body" data-tab-body={tab}>
+      <fieldset className="ink tab-body" data-tab-body={tab} disabled={dis}>
         {tab === "marker" && <Candidates tag={tag} />}
         {rows(tab)}
         {tab === "print" && <PrintInfo tag={tag} />}
-      </div>
+      </fieldset>
       {general.length > 0 && <Msgs path="tag" issues={general} />}
       {plan && !plan.ok && plan.errors.some((e) => !issues.some((i) => i.text === e)) && (
         <div className="msgs" data-issues-for="errors">
@@ -223,7 +252,7 @@ function TagInspector({ tag, count, form, options, tab, setTab }: {
 
 /** Cells (CELL_RULE): absent = the legacy 0.5 mm marker steps; "marker":
  *  the marker size in mm steps; "cell": every cell a multiple of mm. */
-function CellsEditor({ value, f, onChange, onBad }: { value: any; f: FormField; onChange: (v: any) => void; onBad: (m: string | null) => void }) {
+function CellsEditor({ value, f, onChange, onBad, disabled }: { value: any; f: FormField; onChange: (v: any) => void; onBad: (m: string | null) => void; disabled?: boolean }) {
   const of = value?.of ?? "legacy";
   const opts: Opt[] = [
     { value: "legacy", label: "Legacy (0.5 mm steps)", icon: "r-mm", hint: "a tag made before cell multiples: absent" },
@@ -232,13 +261,24 @@ function CellsEditor({ value, f, onChange, onBad }: { value: any; f: FormField; 
   ];
   return (
     <span className="col">
-      <Dropdown path={f.path} value={of} options={opts}
+      <Dropdown disabled={disabled} path={f.path} value={of} options={opts}
         onChange={(x) => onChange(x === "legacy" ? null : { rule: f.rule ?? 1, of: x, mm: value?.mm ?? (x === "cell" ? 0.45 : 0.5), min_mm: value?.min_mm ?? 2.0 })} />
       {value && (
         <span className="pair">
-          <NumberInput path={`${f.path}.mm`} value={value.mm} unit="mm" onBad={onBad} onCommit={(x) => onChange({ ...value, mm: x })} />
+          <NumberInput disabled={disabled} path={`${f.path}.mm`} value={value.mm} unit="mm" onBad={onBad}
+            onCommit={(x) => {
+              // the form's limits (/api/form: 0.01 to 20 mm): outside them a cell is
+              // refused here, never sent to be read as the legacy steps (audit F8)
+              const lo = Number((f as any).min_mm ?? 0.01), hi = Number((f as any).max_mm ?? 20);
+              if (!(x >= lo && x <= hi)) { onBad(`cell ${x} mm: ${lo} to ${hi} mm`); return; }
+              onChange({ ...value, mm: x });
+            }} />
           <span className="x" title="the smallest cell">min</span>
-          <NumberInput path={`${f.path}.min_mm`} value={value.min_mm} unit="mm" onBad={onBad} onCommit={(x) => onChange({ ...value, min_mm: x })} />
+          <NumberInput disabled={disabled} path={`${f.path}.min_mm`} value={value.min_mm} unit="mm" onBad={onBad}
+            onCommit={(x) => {
+              if (!(x >= 0)) { onBad(`smallest cell ${x} mm: 0 or more`); return; }
+              onChange({ ...value, min_mm: x });
+            }} />
         </span>
       )}
     </span>
@@ -270,7 +310,7 @@ function Candidates({ tag }: { tag: SceneTag }) {
       <div className="row-main">
         <label className="row-label">Fit</label>
         <div className="row-ctl">
-          <Dropdown path="fit" value={null} placeholder={`${list.length} layouts fit`} options={opts}
+          <Dropdown disabled={tag.locked} path="fit" value={null} placeholder={`${list.length} layouts fit`} options={opts}
             onChange={(i) => {
               const c = list[Number(i)];
               const extra: Record<string, unknown> = { "settings.size_auto": false };

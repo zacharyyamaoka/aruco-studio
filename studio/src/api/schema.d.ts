@@ -4,6 +4,28 @@
  */
 
 export interface paths {
+    "/api/auto_check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Auto Check
+         * @description Auto size at creation (plan.auto.auto_still_fits, REF _check_auto):
+         *     a tag stored with Auto and a number (made before 2026-10-13) shows Auto
+         *     ON only if Auto builds that same tag; else `note` says what it would build.
+         */
+        post: operations["auto_check_api_auto_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/candidates": {
         parameters: {
             query?: never;
@@ -379,7 +401,9 @@ export interface paths {
         /**
          * Scene Get
          * @description The open scene; ?plans=1 adds each tag's TagPlan (?mesh=1 its mesh,
-         *     ?top=1 its top view).
+         *     ?top=1 its top view). Plain JSON already: written straight out, not
+         *     walked again by FastAPI's encoder (audit F14: a 25-tag scene with its
+         *     meshes is about 1 MB).
          */
         get: operations["scene_get_api_scene_get"];
         /** Scene Put */
@@ -402,8 +426,9 @@ export interface paths {
         put?: never;
         /**
          * Scene Export
-         * @description The scene as a 1:1 sheet (svg), its file (json), or every tag's
-         *     plan / STL; written under <home>/exports/<scene>/ (save=1).
+         * @description The scene as a 1:1 sheet (svg, png), a PDF sticker sheet (pdf: REF's
+         *     print sheet), its file (json), or every tag's plan / STL; written under
+         *     <home>/exports/<scene>/ (save=1).
          */
         post: operations["scene_export_api_scene_export__fmt__post"];
         delete?: never;
@@ -454,7 +479,13 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Scene Override */
+        /**
+         * Scene Override
+         * @description The IDs table's First field: checked against the tag's dictionary and
+         *     its marker count, kept as the override and used at once (the tag's
+         *     marker_id); a bad one is a 409 with an Issue on "override". id null:
+         *     back to auto.
+         */
         put: operations["scene_override_api_scene_overrides__name__put"];
         post?: never;
         delete?: never;
@@ -544,7 +575,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Scene Duplicate */
+        /**
+         * Scene Duplicate
+         * @description A copy, `number`=1 (default): numbered at once with the next free ids
+         *     of its family (a copy of a printed tag is a new tag to print).
+         */
         post: operations["scene_duplicate_api_scene_tags__name__duplicate_post"];
         delete?: never;
         options?: never;
@@ -972,6 +1007,11 @@ export interface components {
             /** Name */
             name?: string | null;
             /**
+             * Number
+             * @default false
+             */
+            number: boolean;
+            /**
              * Rotation Deg
              * @default 0
              */
@@ -1273,6 +1313,41 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    auto_check_api_auto_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TagSpecIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     candidates_api_candidates_post: {
         parameters: {
             query?: never;
@@ -1964,9 +2039,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -2144,9 +2217,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -2327,6 +2398,7 @@ export interface operations {
             query?: {
                 dx_mm?: number;
                 dy_mm?: number;
+                number?: number;
             };
             header?: never;
             path: {

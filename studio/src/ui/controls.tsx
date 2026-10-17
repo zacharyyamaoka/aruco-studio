@@ -29,10 +29,18 @@ export function Dropdown({ value, options, onChange, path, disabled, title, plac
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
-    const key = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    // Escape closes the open list and goes no further: the app's own Escape
+    // (select none) must not run as well (audit F3). Capture phase, so it is
+    // seen before the app's window listener; preventDefault marks it taken.
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(false);
+    };
     window.addEventListener("mousedown", close);
-    window.addEventListener("keydown", key);
-    return () => { window.removeEventListener("mousedown", close); window.removeEventListener("keydown", key); };
+    window.addEventListener("keydown", key, true);
+    return () => { window.removeEventListener("mousedown", close); window.removeEventListener("keydown", key, true); };
   }, [open]);
   const cur = options.find((o) => String(o.value) === String(value));
   return (
@@ -126,14 +134,14 @@ export function Toggle({ value, onChange, path, label, disabled }: {
 }
 
 /** A row of icon buttons for one choice (the dialog's Origin row). */
-export function ButtonRow({ value, options, onChange, path }: {
-  value: string | number; options: Opt[]; onChange: (v: string | number) => void; path?: string;
+export function ButtonRow({ value, options, onChange, path, disabled }: {
+  value: string | number; options: Opt[]; onChange: (v: string | number) => void; path?: string; disabled?: boolean;
 }) {
   return (
     <div className="brow" data-path={path} data-value={String(value)}>
       {options.map((o) => (
         <button type="button" key={String(o.value)} className={`ib${String(o.value) === String(value) ? " on" : ""}`}
-          title={o.hint ?? o.label} aria-label={o.hint ?? o.label} data-value={String(o.value)}
+          title={o.hint ?? o.label} aria-label={o.hint ?? o.label} data-value={String(o.value)} disabled={disabled}
           onClick={() => String(o.value) !== String(value) && onChange(o.value)}>
           {o.icon ? <Icon name={o.icon} /> : o.label}
         </button>

@@ -90,6 +90,16 @@ export interface SceneDoc {
   ledger: unknown;
   overrides: Record<string, number>;
   presets_used: string[];
+  /** scene/checks.py (GET /api/scene?plans=1): overlapping tags, ... */
+  issues?: SceneIssue[];
+}
+
+/** A message about the scene as a whole (scene/checks.scene_issues). */
+export interface SceneIssue {
+  tags: string[];
+  level: "error" | "warn" | "info";
+  kind: string;
+  text: string;
 }
 
 /** plan/fields.py: one row of the inspector's contract (GET /api/form). */
@@ -183,6 +193,8 @@ export interface LibraryState {
   cards: LibraryCard[];
   selected: string | null;
   schema: [string, string, string, [string, string][] | null][];
+  /** the range a preset keeps each number in (server/library.LIMITS) */
+  limits?: Record<string, [number, number]>;
   notes: string[];
   dialog: boolean;
 }

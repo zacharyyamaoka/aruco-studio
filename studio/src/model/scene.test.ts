@@ -5,7 +5,8 @@ import type { SceneDoc, SceneTag } from "../api/types";
 import { layerD, loopD, loopsD, poseOf, sceneZ, snap, svgMatrix, tagBox, topD } from "./geom";
 import {
   docOf, duplicates, idsText, issuesFor, marqueeSelect, moveLocal, patchFor, placeNew, pushHistory,
-  redoStep, rotateLocal, routeIssues, selectClick, setLocked, summaryLine, toggleView, undoStep,
+  redoStep, rotateLocal, routeIssues, rowMessages, selectClick, setLocked, shortText, summaryLine, toggleView,
+  undoStep, fileKey,
 } from "./scene";
 
 function tag(name: string, x = 0, y = 0, w = 40, h = 40, ids = [0], extra: Partial<SceneTag> = {}): SceneTag {
@@ -152,5 +153,28 @@ describe("boxes, z, ids, messages", () => {
     expect(patchFor("settings.trim.margin_mm", 2, spec)).toEqual({ settings: { trim: { rule: 1, axes: "x", margin_mm: 2, force: false } } });
     expect(patchFor("target.w_mm", 50, spec)).toEqual({ target: { w_mm: 50 } });
     expect(patchFor("key", "k", spec)).toEqual({ key: "k" });
+  });
+
+  it("gives each message one short line, the plan's whole text kept (audit F7)", () => {
+    const room = "Label not built: no room for '#0' on the black or on the white, even at 3.0 mm letters (the smallest a 0.6 mm nozzle prints). Try another Side, On the black or a finer nozzle -- or untick Auto positi…";
+    expect(shortText(room)).toBe("No room for '#0', even at 3.0 mm letters: a finer label nozzle or a smaller marker makes room");
+    const black = "not on the black -- '#0' does not print in a 3.83 mm module's bottom row -- its cap can be 1.92 mm at most, a 0.6 mm nozzle needs 3.00 mm (and the row is 13.4 mm long); put it on the white";
+    expect(shortText(black)).toBe("not on the black -- '#0' does not print in a 3.83 mm module's bottom row -- its cap can be 1.92 mm at most, a 0.6 mm nozzle needs 3.00 mm");
+    expect(shortText("label: cap 20 mm is over the 2.46 mm a border row allows -- clamped")).toBe("cap 20 mm is over the 2.46 mm a border row allows -- clamped");
+    expect(shortText("quiet zone 0.2 modules: at least 0.5")).toBe("quiet zone 0.2 modules: at least 0.5");
+    const one = summaryLine([{ field: "settings.label.cap_mm", level: "error", text: room }], () => "Letter height (Label)");
+    expect(one.text).toBe("⚠ Letter height (Label): " + shortText(room));
+  });
+  it("puts Renumber's messages on their rows without the |field marker (audit F15)", () => {
+    const r = rowMessages(["board1|tag: ids 500..503 not in DICT_4X4_50 (0..49)", "tag2: not built", "ledger: 3 retired"], ["board1", "tag2"]);
+    expect(r.byTag).toEqual({ board1: ["ids 500..503 not in DICT_4X4_50 (0..49)"], tag2: ["not built"] });
+    expect(r.rest).toEqual(["ledger: 3 retired"]);
+    expect(rowMessages(["other|tag: x"], ["board1"]).rest).toEqual(["other: x"]);
+  });
+  it("keys a scene by what its file holds: plans and poses do not count (audit F12)", () => {
+    const a: SceneDoc = { schema: "arucostudio.scene/1", units: "mm", name: "s", tags: [tag("t1")], ledger: null, overrides: {}, presets_used: [] };
+    const b: SceneDoc = { ...a, tags: [{ ...tag("t1"), plan: null }], issues: [] };
+    expect(fileKey(a)).toBe(fileKey(b));
+    expect(fileKey(moveLocal(a, ["t1"], 1, 0))).not.toBe(fileKey(a));
   });
 });

@@ -5,7 +5,7 @@ import { Canvas2D } from "../canvas/Canvas2D";
 import { IdsTable } from "../ids/IdsTable";
 import { Inspector } from "../inspector/Inspector";
 import { Library } from "../library/Library";
-import { useStudio } from "../store";
+import { isDirty, useStudio } from "../store";
 import { Icon } from "../ui/controls";
 import { View3D } from "../view3d/View3D";
 import { Dialogs } from "./Dialogs";
@@ -17,11 +17,21 @@ function typing(e: KeyboardEvent) {
   return !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
 }
 
+/** Is focus on the page itself or the canvas (not on a button, a field or
+ *  a menu)? Tab toggles 2D / 3D only there; elsewhere it moves focus (audit F18). */
+function onCanvas(e: KeyboardEvent) {
+  const t = e.target as HTMLElement | null;
+  return !t || t === document.body || t === document.documentElement || !!t.closest?.(".canvas2d, .canvas3d, .stage-wrap");
+}
+
 function useKeys() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const st = useStudio.getState();
       if (st.libraryOpen || st.dialog || typing(e)) return;
+      // a key an open dropdown or menu already took (its Escape) is not the app's (audit F3)
+      if (e.defaultPrevented) return;
+      if (e.key === "Escape" && document.querySelector(".dd.open, .menu.open")) return;
       const k = e.key.toLowerCase();
       const ctrl = e.ctrlKey || e.metaKey;
       const step = e.shiftKey ? 5 : 0.5;
@@ -35,7 +45,10 @@ function useKeys() {
       if (ctrl) return;
       if (k === "delete" || k === "backspace") return go(() => st.deleteSel());
       if (k === "escape") return go(() => st.setSel([]));
-      if (k === "tab") return go(() => st.toggleView());
+      if (k === "tab") {
+        if (e.shiftKey || !onCanvas(e)) return;              // focus moves on (audit F18)
+        return go(() => st.toggleView());
+      }
       if (k === "arrowleft") return go(() => st.nudge(-step, 0));
       if (k === "arrowright") return go(() => st.nudge(step, 0));
       if (k === "arrowup") return go(() => st.nudge(0, step));
@@ -64,6 +77,16 @@ export function App() {
   const view = useStudio((s) => s.view);
   const status = useStudio((s) => s.status);
   useKeys();
+  useEffect(() => {
+    // closing the tab over unsaved changes asks first (audit F12)
+    const leave = (e: BeforeUnloadEvent) => {
+      if (!isDirty(useStudio.getState())) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", leave);
+    return () => window.removeEventListener("beforeunload", leave);
+  }, []);
   useEffect(() => {
     if (started) return;
     started = true;

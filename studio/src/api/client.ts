@@ -24,6 +24,7 @@ export function errorText(detail: unknown): string {
   if (detail && typeof detail === "object") {
     const d = detail as any;
     if (Array.isArray(d.issues)) return d.issues.map((i: any) => i.text).join("; ");
+    if (d.detail === undefined && typeof d.message === "string") return d.message;
     if (Array.isArray(d.errors)) return d.errors.join("; ");
     if (d.detail !== undefined) return errorText(d.detail);
   }
@@ -96,13 +97,15 @@ export const api = {
   sceneDoc: () => get<SceneDoc>("/api/scene"),
   scenePut: (doc: SceneDoc) => put<SceneDoc>("/api/scene", doc),
   sceneNew: (name: string) => post<SceneDoc>("/api/scene/new", { name }),
-  addTag: (spec: TagSpec, x_mm: number, y_mm: number, rotation_deg = 0, name?: string) =>
-    post<SceneTag>("/api/scene/tags", { spec, x_mm, y_mm, rotation_deg, ...(name ? { name } : {}) }),
+  addTag: (spec: TagSpec, x_mm: number, y_mm: number, rotation_deg = 0, name?: string, number = false) =>
+    post<SceneTag>("/api/scene/tags", { spec, x_mm, y_mm, rotation_deg, number, ...(name ? { name } : {}) }),
   patchTag: (name: string, b: Record<string, unknown>) => patch<SceneTag>(`/api/scene/tags/${q(name)}`, b),
   deleteTag: (name: string) => del<{ deleted: string }>(`/api/scene/tags/${q(name)}`),
   duplicateTag: (name: string, dx: number, dy: number) =>
     post<SceneTag>(`/api/scene/tags/${q(name)}/duplicate?dx_mm=${dx}&dy_mm=${dy}`),
-  override: (name: string, id: number | null) => put<{ overrides: Record<string, number> }>(`/api/scene/overrides/${q(name)}`, { id }),
+  override: (name: string, id: number | null) =>
+    put<{ overrides: Record<string, number>; tag: string; ids: number[] }>(`/api/scene/overrides/${q(name)}`, { id }),
+  autoCheck: (spec: TagSpec) => post<{ auto: boolean; note: string }>("/api/auto_check", spec),
   renumber: () => post<RenumberReport>("/api/scene/renumber"),
   scenes: () => get<{ name: string; file: string; bytes: number; modified: string }[]>("/api/scenes"),
   save: (name: string) => post<{ saved: string; name: string }>("/api/scene/save", { name }),

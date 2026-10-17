@@ -35,7 +35,13 @@ test("the Library: browse, filter, select a preset, make and edit your own", asy
   await expect(lib.getByTestId("lib-info")).toContainText(want.name);
   await expect(lib.getByTestId("lib-info")).toContainText("Changes the tag:");
   await shot(page, "library_info");
+  // a print preset that changes the dictionary asks first (audit F10)
+  const inkWarn = await lib.getByTestId("lib-ink-warn").count();
   await lib.getByTestId("lib-select").click();
+  if (inkWarn) {
+    await expect(lib.locator(".prompt")).toContainText("also changes this tag's dictionary");
+    await lib.getByTestId("prompt-ok").click();
+  }
   await idle(page);
   await expect(lib).toHaveCount(0);
   const spec = (await probe(page)).doc.tags[0].spec;
@@ -45,9 +51,12 @@ test("the Library: browse, filter, select a preset, make and edit your own", asy
   expect(spec.settings.cells.of).toBe(want.preset.cells.of);
   await expect(page.locator('.dd[data-path="preset"]')).toHaveAttribute("data-value", want.name);
 
-  // New: the tag's print settings as a preset of mine
+  // New: the tag's print settings as a preset of mine (an empty name is refused there)
   await page.getByTestId("library-btn").first().click();
   await lib.getByTestId("lib-new").click();
+  await lib.getByTestId("prompt-input").fill("  ");
+  await lib.getByTestId("prompt-ok").click();
+  await expect(lib.getByTestId("prompt-error")).toHaveText("a preset needs a name");
   await lib.getByTestId("prompt-input").fill("E2E preset");
   await lib.getByTestId("prompt-ok").click();
   await expect(lib.locator('.card[data-card="user:E2E preset"]')).toBeVisible();
@@ -57,6 +66,12 @@ test("the Library: browse, filter, select a preset, make and edit your own", asy
   // Edit: the quiet zone 1.5
   await lib.locator('.card[data-card="user:E2E preset"]').click();
   await lib.getByTestId("lib-edit").click();
+  // a value a preset would drop is refused under its field, nothing saved (audit F16)
+  await lib.locator('[data-testid="lib-form"] input[data-path="tag.quiet_modules"]').fill("-3");
+  await lib.getByTestId("lib-save").click();
+  await expect(lib.locator('[data-error-for="tag.quiet_modules"]')).toContainText("outside 0 to 4");
+  const kept = (await (await request.get(`${API}/api/presets`)).json()).items.find((p: any) => p.name === "E2E preset");
+  expect(kept.preset.tag.quiet_modules).not.toBe(-3);                // nothing saved
   await lib.locator('[data-testid="lib-form"] input[data-path="tag.quiet_modules"]').fill("1.5");
   await lib.getByTestId("lib-save").click();
   await expect(lib.getByTestId("lib-status")).toContainText("saved");

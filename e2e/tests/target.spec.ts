@@ -3,7 +3,7 @@
 // give pin and hole layers; Trim excess gives a trim_keep layer; a typed
 // box with a hole draws the hole.
 import { expect, test } from "@playwright/test";
-import { API, add, choose, fresh, idle, probe, shot, tab, type } from "./helpers";
+import { API, add, choose, expectIssues, fresh, idle, probe, shot, tab, type } from "./helpers";
 
 test("target editor: a palette face, a thickness, pins, trim, a typed hole", async ({ page, request }) => {
   await fresh(page, "e2e-target");
@@ -13,7 +13,7 @@ test("target editor: a palette face, a thickness, pins, trim, a typed hole", asy
   expect(spec.target.loops_mm.length).toBe(5);
   const issues = await (await request.post(`${API}/api/validate`, { data: spec })).json();
   const size = issues.filter((i: any) => i.field === "numbers.size").map((i: any) => i.text);
-  await expect(page.locator('[data-issues-for="numbers.size"] .issue')).toHaveText(size);
+  await expectIssues(page, "numbers.size", size);
   const tag = page.locator('g[data-tag="tag1"]');
   expect(((await tag.locator('[data-layer="target"]').getAttribute("d")) || "").match(/M/g)!.length).toBe(5);
 

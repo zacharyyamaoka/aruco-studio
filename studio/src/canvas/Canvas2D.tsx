@@ -52,6 +52,9 @@ export function Canvas2D() {
   const viewport = useStudio((s) => s.viewport);
   const show = useStudio((s) => s.show);
   const [drag, setDrag] = useState<Drag | null>(null);
+  // the scene's own messages (scene/checks.py): overlapping tags (audit F13)
+  const sceneIssues = scene.issues ?? [];
+  const overlapping = new Set(sceneIssues.filter((i) => i.kind === "overlap").flatMap((i) => i.tags));
   const [space, setSpace] = useState(false);
 
   useEffect(() => {
@@ -258,6 +261,7 @@ export function Canvas2D() {
             labelShift={drag?.kind === "label" && drag.tag === t.name ? [drag.dx, drag.dy] : undefined} />)}
         </g>
         <g className="overlay">
+          {visible.map((t) => overlapping.has(t.name) ? selBox(boxes[t.name], `o${t.uid}`, "overlapbox") : null)}
           {visible.map((t) => sel.includes(t.name) ? selBox(boxes[t.name], `s${t.uid}`, "selbox") : null)}
           {show.ids && visible.map((t) => {
             const b = boxes[t.name];
@@ -284,6 +288,11 @@ export function Canvas2D() {
           <text x={3} y={13} className="unit">mm</text>
         </g>
       </svg>
+      {sceneIssues.length > 0 && (
+        <div className="scene-issues" data-testid="scene-issues">
+          {sceneIssues.map((i, k) => <div key={k} className={`issue lv-${i.level}`} data-kind={i.kind} data-tags={i.tags.join(",")}>{i.text}</div>)}
+        </div>
+      )}
       {!visible.length && (
         <div className="empty-hint">Add a tag: <b>Single</b>, <b>Grid</b> or <b>ChArUco</b> in the toolbar (keys S, G, C).</div>
       )}

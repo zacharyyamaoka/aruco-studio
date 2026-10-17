@@ -2,7 +2,7 @@
 // ChArUco), edit (Undo, Redo, Rotate, Duplicate, Delete), view (2D / 3D,
 // quiet zones, axes, layer outlines, fit), Verify and Export.
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useStudio } from "../store";
+import { isDirty, useStudio } from "../store";
 import { Icon, IconButton } from "../ui/controls";
 
 function Menu({ icon, label, children, testid }: { icon: string; label: string; children: (close: () => void) => ReactNode; testid?: string }) {
@@ -11,8 +11,11 @@ function Menu({ icon, label, children, testid }: { icon: string; label: string; 
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    // Escape closes the menu and goes no further (audit F3)
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setOpen(false); } };
     window.addEventListener("mousedown", close);
-    return () => window.removeEventListener("mousedown", close);
+    window.addEventListener("keydown", key, true);
+    return () => { window.removeEventListener("mousedown", close); window.removeEventListener("keydown", key, true); };
   }, [open]);
   return (
     <div className={`menu${open ? " open" : ""}`} ref={ref}>
@@ -40,6 +43,7 @@ export function Toolbar() {
   const hist = useStudio((s) => s.hist);
   const busy = useStudio((s) => s.busy);
   const name = useStudio((s) => s.scene.name);
+  const dirty = useStudio((s) => isDirty(s));
   const zScale = useStudio((s) => s.zScale);
   const none = !sel.length;
   return (
@@ -55,7 +59,8 @@ export function Toolbar() {
           </>
         )}
       </Menu>
-      <span className="scene-name" title="the open scene" data-testid="scene-name">{name}</span>
+      <span className={`scene-name${dirty ? " dirty" : ""}`} data-dirty={dirty ? "1" : "0"} data-testid="scene-name"
+        title={dirty ? "the open scene: changes not saved (Ctrl+S)" : "the open scene: saved"}>{name}</span>
       <span className="sep" />
       <div className="group" aria-label="Add a tag">
         <button type="button" className="tb" onClick={() => st.addTag("single")} data-testid="add-single" title="Add a single marker (S)"><Icon name="single" /><span>Single</span></button>

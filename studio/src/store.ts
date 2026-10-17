@@ -10,8 +10,8 @@ import type {
 } from "./api/types";
 import { matMul, poseOf, sceneZ, tagBox, unionBox } from "./model/geom";
 import {
-  arrangeRow, docOf, moveLocal, patchFor, placeNew, pushHistory, redoStep, renameSel, rotateLocal,
-  selectClick, toggleView, undoStep, type History, type View,
+  arrangeRow, docOf, fileKey, idsText, moveLocal, patchFor, placeNew, pushHistory, redoStep, renameSel,
+  rotateLocal, selectClick, specKey, toggleView, undoStep, type History, type View,
 } from "./model/scene";
 
 export interface Camera { cx: number; cy: number; zoom: number }   // scene mm, px per mm
@@ -40,7 +40,15 @@ export interface StudioState {
   log: LogLine[];
   drawer: Drawer;
   verify: Record<string, VerifyReport>;
+  /** the spec each verify report was made from (specKey): a changed tag's
+   *  report is stale (audit F4) */
+  verifySpec: Record<string, string>;
+  verifyProgress: { done: number; total: number } | null;
   sceneVerify: any | null;
+  /** a typed first id the server refused, per tag (audit F1) */
+  idErrors: Record<string, string>;
+  /** fileKey of the scene as last saved / opened / made (audit F12) */
+  savedKey: string;
   renumberReport: RenumberReport | null;
   newTarget: string;
   newThickness: number;
@@ -92,7 +100,19 @@ export interface StudioState {
   setDrawer(d: Drawer): void;
   setLibrary(open: boolean): void;
   setDialog(d: StudioState["dialog"]): void;
+  markSaved(): void;
   idle(): Promise<void>;
+}
+
+/** Changes since the scene was last saved, opened or made (audit F12). */
+export function isDirty(s: Pick<StudioState, "scene" | "savedKey">): boolean {
+  return fileKey(s.scene) !== s.savedKey;
+}
+
+/** A verify report made from another spec than the tag has now (audit F4). */
+export function isStale(s: Pick<StudioState, "scene" | "verifySpec">, name: string): boolean {
+  const t = s.scene.tags.find((x) => x.name === name);
+  return !t || s.verifySpec[name] !== specKey(t.spec);
 }
 
 const EMPTY: SceneDoc = { schema: "arucostudio.scene/1", units: "mm", name: "untitled", tags: [], ledger: null, overrides: {}, presets_used: [] };
@@ -132,7 +152,8 @@ export const useStudio = create<StudioState>((set, get) => {
         await get().refresh();
         if (label) get().say(label);
       } catch (e) {
-        const msg = e instanceof ApiError ? errorText((e.detail as any)?.detail ?? e.detail) : String(e);
+        const msg = e instanceof ApiError ? errorText((e.detail as any)?.detail ?? e.detail)
+          : e instanceof Error ? e.message : String(e);           // never "Error: ..." (audit F6)
         get().say(`${label ? label + ": " : ""}${msg}`, "error");
         await get().refresh().catch(() => undefined);
       } finally {
@@ -166,7 +187,11 @@ export const useStudio = create<StudioState>((set, get) => {
     log: [],
     drawer: null,
     verify: {},
+    verifySpec: {},
+    verifyProgress: null,
     sceneVerify: null,
+    idErrors: {},
+    savedKey: fileKey(EMPTY),
     renumberReport: null,
     newTarget: "box40",
     newThickness: 3,
@@ -181,6 +206,7 @@ export const useStudio = create<StudioState>((set, get) => {
       set({ form, options, dictionaries, targets });
       await get().loadPresets();
       await get().refresh();
+      get().markSaved();
       set({ ready: true });
       if (get().scene.tags.length) get().zoomToFit();
     },
@@ -239,7 +265,7 @@ export const useStudio = create<StudioState>((set, get) => {
         const { newTarget, newThickness, newPreset } = get();
         const spec = await api.newSpec({ layout, target_key: newTarget, thickness_mm: newThickness, preset: newPreset === "Default" ? "" : newPreset });
         const [x, y] = placeNew(get().scene.tags, spec.target.w_mm);
-        const t = await api.addTag(spec, x, y);
+        const t = await api.addTag(spec, x, y, 0, undefined, true);    // the next free ids (audit F5)
         set({ sel: [t.name] });
       });
       const t = get().scene.tags.find((x) => x.name === get().sel[0]);
@@ -382,11 +408,17 @@ export const useStudio = create<StudioState>((set, get) => {
     },
     async applyPreset(name, preset) {
       const tags = tagsSel();
-      await run(`preset '${name}'`, async () => {
+      await run("", async () => {
+        const inked: string[] = [];
         for (const t of tags) {
           const sp = await api.presetApply(t.spec as any, name, preset);
+          const was = String((t.spec.settings as any).dictionary ?? ""), now = String((sp.settings as any).dictionary ?? "");
+          if (was && now && was !== now) inked.push(`${t.name} ${was} → ${now}`);
           await api.patchTag(t.name, { settings: sp.settings, numbers: sp.numbers });
         }
+        // a print preset that changes a tag's dictionary changes its markers: said (audit F10)
+        get().say(inked.length ? `preset '${name}': it also changed the dictionary (${inked.join(", ")})` : `preset '${name}'`,
+          inked.length ? "warn" : "info");
         set({ newPreset: name });
         try { set({ recent: (await api.addRecent(name)).recent }); } catch { /* the list is a convenience */ }
       });
@@ -394,15 +426,30 @@ export const useStudio = create<StudioState>((set, get) => {
     async renumber() {
       await run("", async () => {
         const rep = await api.renumber();
-        set({ renumberReport: rep });
+        set({ renumberReport: rep, idErrors: {} });
         const n = rep.changed.length;
         get().say(n ? `Renumber: ${n} tag${n === 1 ? "" : "s"} changed (${rep.changed.map((c) => `${c.tag} ${c.from}→${c.to}`).join(", ")})` : "Renumber: every id already unique, nothing changed",
           rep.ok ? "info" : "warn");
       });
     },
     async override(name, id) {
-      await run(id === null ? `${name}: id back to auto` : `${name}: first id typed ${id}`, async () => {
-        await api.override(name, id);
+      // checked and used at once (audit F1): the tag's ids change now; a bad
+      // id is refused with its reason under the row
+      await run("", async () => {
+        try {
+          const r = await api.override(name, id);
+          set((s) => { const m = { ...s.idErrors }; delete m[name]; return { idErrors: m }; });
+          get().say(id === null ? `${name}: first id back to auto (its ids stay until the next Renumber)`
+            : `${name}: first id ${id}, ids ${idsText(r.ids)}`);
+        } catch (e) {
+          if (e instanceof ApiError && e.status === 409) {
+            const text = errorText(e.detail);
+            set((s) => ({ idErrors: { ...s.idErrors, [name]: text } }));
+            get().say(`${name}: first id ${id} not used: ${text}`, "error");
+            return;
+          }
+          throw e;
+        }
       });
     },
 
@@ -426,32 +473,51 @@ export const useStudio = create<StudioState>((set, get) => {
     },
 
     async newScene(name) {
+      let ok = false;
       await run(`new scene '${name}'`, async () => {
         await api.sceneNew(name);
-        set({ sel: [], hist: { undo: [], redo: [] }, verify: {}, sceneVerify: null, renumberReport: null });
+        set({ sel: [], hist: { undo: [], redo: [] }, verify: {}, verifySpec: {}, sceneVerify: null, renumberReport: null, idErrors: {} });
+        ok = true;
       }, { history: false });
+      if (ok) get().markSaved();
     },
     async saveScene(name) {
+      let ok = false;
       await run("", async () => {
         const r = await api.save(name || get().scene.name);
         get().say(`saved ${r.saved}`);
+        ok = true;
       }, { history: false });
+      if (ok) get().markSaved();
     },
     async openScene(name) {
+      let ok = false;
       await run(`opened '${name}'`, async () => {
         await api.open(name);
-        set({ sel: [], hist: { undo: [], redo: [] }, verify: {}, sceneVerify: null, renumberReport: null });
+        set({ sel: [], hist: { undo: [], redo: [] }, verify: {}, verifySpec: {}, sceneVerify: null, renumberReport: null, idErrors: {} });
+        ok = true;
       }, { history: false });
+      if (ok) get().markSaved();
       get().zoomToFit();
     },
 
     async verifySel() {
       const tags = tagsSel().length ? tagsSel() : get().scene.tags.filter((t) => !t.hidden);
-      set({ drawer: "verify" });
+      set({ drawer: "verify", verifyProgress: { done: 0, total: tags.length } });
       await run("", async () => {
         const out: Record<string, VerifyReport> = { ...get().verify };
-        for (const t of tags) out[t.name] = await api.verify(t.spec as any);
-        set({ verify: out });
+        const specs: Record<string, string> = { ...get().verifySpec };
+        try {
+          // one tag at a time: the drawer shows each as it comes (audit F14)
+          for (const [i, t] of tags.entries()) {
+            if (tags.length > 1) get().say(`Verify: ${t.name} (${i + 1} of ${tags.length})…`);
+            out[t.name] = await api.verify(t.spec as any);
+            specs[t.name] = specKey(t.spec);
+            set({ verify: { ...out }, verifySpec: { ...specs }, verifyProgress: { done: i + 1, total: tags.length } });
+          }
+        } finally {
+          set({ verifyProgress: null });
+        }
         const bad = tags.filter((t) => !out[t.name].ok);
         get().say(bad.length ? `Verify: ${bad.length} of ${tags.length} not read as planned (${bad.map((t) => t.name).join(", ")})`
           : `Verify: OpenCV read all ${tags.length} tag${tags.length === 1 ? "" : "s"} as planned`, bad.length ? "warn" : "info");
@@ -462,7 +528,10 @@ export const useStudio = create<StudioState>((set, get) => {
       await run("", async () => {
         const rep = await api.sceneVerify();
         set({ sceneVerify: rep });
-        get().say(rep.ok ? "Verify sheet: every marker found where the scene puts it" : "Verify sheet: not every marker was found", rep.ok ? "info" : "warn");
+        const over = (rep.overlaps || []).length;
+        get().say(rep.ok ? "Verify sheet: every marker found where the scene puts it"
+          : over ? `Verify sheet: ${over} overlap${over === 1 ? "" : "s"} (${rep.overlaps.map((o: any) => o.tags.join(" / ")).join(", ")})`
+          : "Verify sheet: not every marker was found", rep.ok ? "info" : "warn");
       }, { history: false });
     },
     async exportScene(fmt) {
@@ -504,6 +573,9 @@ export const useStudio = create<StudioState>((set, get) => {
     setDialog(d) {
       set({ dialog: d });
     },
+    markSaved() {
+      set((s) => ({ savedKey: fileKey(s.scene) }));
+    },
     async idle() {
       for (let i = 0; i < 50; i++) {
         await queue;
@@ -534,5 +606,8 @@ export function studioProbe() {
     sel: [...s.sel],
     tags: s.scene.tags.map((t) => ({ name: t.name, x_mm: t.x_mm, y_mm: t.y_mm, rotation_deg: t.rotation_deg, ids: t.plan?.ids ?? [], locked: t.locked })),
     doc: docOf(s.scene),
+    dirty: isDirty(s),
+    idErrors: { ...s.idErrors },
+    issues: s.scene.issues ?? [],
   };
 }

@@ -741,6 +741,11 @@
       ],
       "title": "Name"
      },
+     "number": {
+      "default": false,
+      "title": "Number",
+      "type": "boolean"
+     },
      "rotation_deg": {
       "default": 0.0,
       "title": "Rotation Deg",
@@ -1492,6 +1497,47 @@
  },
  "openapi": "3.1.0",
  "paths": {
+  "/api/auto_check": {
+   "post": {
+    "description": "Auto size at creation (plan.auto.auto_still_fits, REF _check_auto):\na tag stored with Auto and a number (made before 2026-10-13) shows Auto\nON only if Auto builds that same tag; else `note` says what it would build.",
+    "operationId": "auto_check_api_auto_check_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TagSpecIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Auto Check Api Auto Check Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Auto Check"
+   }
+  },
   "/api/candidates": {
    "post": {
     "description": "The ranked Layout list for a target (core.autosize).",
@@ -2303,7 +2349,7 @@
   },
   "/api/scene": {
    "get": {
-    "description": "The open scene; ?plans=1 adds each tag's TagPlan (?mesh=1 its mesh,\n?top=1 its top view).",
+    "description": "The open scene; ?plans=1 adds each tag's TagPlan (?mesh=1 its mesh,\n?top=1 its top view). Plain JSON already: written straight out, not\nwalked again by FastAPI's encoder (audit F14: a 25-tag scene with its\nmeshes is about 1 MB).",
     "operationId": "scene_get_api_scene_get",
     "parameters": [
      {
@@ -2341,11 +2387,7 @@
      "200": {
       "content": {
        "application/json": {
-        "schema": {
-         "additionalProperties": true,
-         "title": "Response Scene Get Api Scene Get",
-         "type": "object"
-        }
+        "schema": {}
        }
       },
       "description": "Successful Response"
@@ -2406,7 +2448,7 @@
   },
   "/api/scene/export/{fmt}": {
    "post": {
-    "description": "The scene as a 1:1 sheet (svg), its file (json), or every tag's\nplan / STL; written under <home>/exports/<scene>/ (save=1).",
+    "description": "The scene as a 1:1 sheet (svg, png), a PDF sticker sheet (pdf: REF's\nprint sheet), its file (json), or every tag's plan / STL; written under\n<home>/exports/<scene>/ (save=1).",
     "operationId": "scene_export_api_scene_export__fmt__post",
     "parameters": [
      {
@@ -2548,6 +2590,7 @@
   },
   "/api/scene/overrides/{name}": {
    "put": {
+    "description": "The IDs table's First field: checked against the tag's dictionary and\nits marker count, kept as the override and used at once (the tag's\nmarker_id); a bad one is a 409 with an Issue on \"override\". id null:\nback to auto.",
     "operationId": "scene_override_api_scene_overrides__name__put",
     "parameters": [
      {
@@ -2574,11 +2617,7 @@
      "200": {
       "content": {
        "application/json": {
-        "schema": {
-         "additionalProperties": true,
-         "title": "Response Scene Override Api Scene Overrides  Name  Put",
-         "type": "object"
-        }
+        "schema": {}
        }
       },
       "description": "Successful Response"
@@ -2797,6 +2836,7 @@
   },
   "/api/scene/tags/{name}/duplicate": {
    "post": {
+    "description": "A copy, `number`=1 (default): numbered at once with the next free ids\nof its family (a copy of a printed tag is a new tag to print).",
     "operationId": "scene_duplicate_api_scene_tags__name__duplicate_post",
     "parameters": [
      {
@@ -2826,6 +2866,16 @@
        "default": 0.0,
        "title": "Dy Mm",
        "type": "number"
+      }
+     },
+     {
+      "in": "query",
+      "name": "number",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "title": "Number",
+       "type": "integer"
       }
      }
     ],

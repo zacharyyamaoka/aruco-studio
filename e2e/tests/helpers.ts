@@ -72,3 +72,14 @@ export function detect(png: string, dictionary: string, box?: { x: number; y: nu
   const out = execFileSync(PY, args, { encoding: "utf-8" });
   return JSON.parse(out.trim().split("\n").pop()!).ids;
 }
+
+/** The whole texts of a row's messages (data-text: the line shown is the
+ *  short form, its tooltip the plan's words). */
+export async function issueTexts(page: Page, path: string): Promise<string[]> {
+  return page.locator(`[data-issues-for="${path}"] .issue`).evaluateAll((els) => els.map((e) => e.getAttribute("data-text") || ""));
+}
+
+/** Wait until a row's messages are exactly `want` (the plan's words). */
+export async function expectIssues(page: Page, path: string, want: string[]) {
+  await expect.poll(() => issueTexts(page, path)).toEqual(want);
+}

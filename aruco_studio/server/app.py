@@ -400,10 +400,14 @@ def _scene_out(plans: bool = False, mesh: bool = False, top: bool = False) -> di
 
 
 @app.get("/api/scene")
-def scene_get(plans: int = Query(0), mesh: int = Query(0), top: int = Query(0)) -> dict:
+def scene_get(plans: int = Query(0), mesh: int = Query(0), top: int = Query(0)):
     """The open scene; ?plans=1 adds each tag's TagPlan (?mesh=1 its mesh,
-    ?top=1 its top view)."""
-    return _scene_out(bool(plans), bool(mesh), bool(top))
+    ?top=1 its top view). Plain JSON already: written straight out, not
+    walked again by FastAPI's encoder (audit F14: a 25-tag scene with its
+    meshes is about 1 MB)."""
+    body = json.dumps(_scene_out(bool(plans), bool(mesh), bool(top)), separators=(",", ":"),
+                      allow_nan=False)
+    return Response(body, media_type="application/json")
 
 
 @app.put("/api/scene")

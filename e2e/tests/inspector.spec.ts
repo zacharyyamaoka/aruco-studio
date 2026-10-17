@@ -3,7 +3,7 @@
 // 0.68 mm" changes the pattern; every tab; per-field validation errors and
 // the summary line; a typed non-number never reaches the server.
 import { expect, test } from "@playwright/test";
-import { API, add, choose, fresh, idle, probe, shot, tab, type } from "./helpers";
+import { API, add, choose, expectIssues, fresh, idle, probe, shot, tab, type } from "./helpers";
 
 async function validateText(request: any, spec: any, field: string) {
   const issues = await (await request.post(`${API}/api/validate`, { data: spec })).json();
@@ -21,7 +21,7 @@ test("the size line is the plan's Issue; cells change the pattern; every tab", a
   await choose(page, "target", "disc40");
   let want = await validateText(request, await specOf(page, "tag1"), "numbers.size");
   expect(want.length).toBeGreaterThan(0);
-  await expect(page.locator('[data-issues-for="numbers.size"] .issue')).toHaveText(want);
+  await expectIssues(page, "numbers.size", want);
   // a typed 28 mm on the 40 mm box
   await choose(page, "target", "box40");
   await page.locator('.tog:has(input[data-path="numbers.size:auto"])').click();
@@ -30,7 +30,7 @@ test("the size line is the plan's Issue; cells change the pattern; every tab", a
   const spec28 = await specOf(page, "tag1");
   expect(spec28.numbers.size).toBe(28);
   want = await validateText(request, spec28, "numbers.size");
-  await expect(page.locator('[data-issues-for="numbers.size"] .issue')).toHaveText(want);
+  await expectIssues(page, "numbers.size", want);
   const d0 = await page.locator('g[data-tag="tag1"] [data-layer="pattern"]').getAttribute("d");
   await shot(page, "inspector_marker");
 
@@ -44,7 +44,7 @@ test("the size line is the plan's Issue; cells change the pattern; every tab", a
   expect(d1).not.toBe(d0);
   want = await validateText(request, sc, "numbers.size");
   await tab(page, "marker");
-  await expect(page.locator('[data-issues-for="numbers.size"] .issue')).toHaveText(want);
+  await expectIssues(page, "numbers.size", want);
   const p = await (await request.post(`${API}/api/plan`, { data: sc })).json();
   const mm = p.marker.marker_length_m * 1000;
   expect(Math.abs(mm / 6 / 0.68 - Math.round(mm / 6 / 0.68))).toBeLessThan(1e-6);   // whole 0.68 mm cells

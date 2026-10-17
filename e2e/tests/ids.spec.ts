@@ -18,7 +18,17 @@ test("Renumber all: unique, stable, typed ids kept", async ({ page }) => {
   await fresh(page, "e2e-ids");
   for (let i = 0; i < 6; i++) await add(page, "single");
   await expect(page.locator("[data-ids-row]")).toHaveCount(6);
-  await expect(page.getByTestId("dup-count")).toHaveAttribute("data-dups", "1");      // every tag prints #0
+  // a new tag takes the next free id at once (audit F5): no duplicates to start with
+  await expect(page.getByTestId("dup-count")).toHaveAttribute("data-dups", "0");
+  expect(new Set(Object.values(await idsOf(page))).size).toBe(6);
+  // two tags on the same id by hand: the duplicate is flagged, Renumber fixes it
+  await page.locator('input[data-path="override:tag4"]').fill("0");
+  await page.locator('input[data-path="override:tag4"]').press("Enter");
+  await idle(page);
+  await page.locator('[data-ids-row="tag4"]').click();
+  await page.locator('[data-ids-row="tag4"] button[title="Back to auto"]').click();
+  await idle(page);
+  await expect(page.getByTestId("dup-count")).toHaveAttribute("data-dups", "1");
   await shot(page, "ids_before_renumber");
 
   await page.getByTestId("renumber").click();

@@ -19,6 +19,10 @@ test("the server serves the built Studio on 5360", async ({ page, request }) => 
   await expect(page.getByTestId("drawer-messages")).toBeVisible();
   await expect(page.locator("table.keys")).toContainText("2D / 3D");
   await page.screenshot({ path: path.join(SCREENS, "served_keys.png") });
+  // Tab toggles 2D / 3D from the canvas, not from a focused button (audit F18)
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  // Tab toggles 2D / 3D from the canvas, not from a focused button (audit F18)
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press("Tab");
   await expect(page.locator('canvas[data-canvas3d="1"]')).toBeVisible();
 });

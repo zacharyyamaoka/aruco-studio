@@ -55,7 +55,20 @@ export function toggleView(v: View): View {
 
 /** The scene as a file holds it (plans dropped): what undo keeps. */
 export function docOf(doc: SceneDoc): SceneDoc {
-  return { ...doc, tags: doc.tags.map((t) => ({ ...t, plan: null })) };
+  const { issues: _issues, ...rest } = doc;
+  return { ...rest, tags: doc.tags.map((t) => ({ ...t, plan: null })) };
+}
+
+/** What a saved file of this scene holds, as one string: two equal keys =
+ *  nothing to save (audit F12). Plans, poses and scene issues are derived. */
+export function fileKey(doc: SceneDoc): string {
+  const d = docOf(doc);
+  return JSON.stringify({ ...d, tags: d.tags.map(({ plan: _p, pose: _q, ...t }: any) => t) });
+}
+
+/** A tag's request as one string (what a verify report was made from). */
+export function specKey(spec: unknown): string {
+  return JSON.stringify(spec);
 }
 
 export interface History { undo: SceneDoc[]; redo: SceneDoc[] }
@@ -133,6 +146,20 @@ export function routeIssues(issues: Issue[], paths: string[]): Record<string, Is
   return out;
 }
 
+/** One short line for an Issue (audit F7): what is wrong and, when the
+ *  plan's words say it, what to change. The plan's whole text (REF's long
+ *  advice) stays in the line's tooltip and in the Messages drawer. */
+export function shortText(text: string): string {
+  let t = text.replace(/^label: /, "").trim();
+  const room = /^Label not built: no room for (.+?) on the black or on the white, even at ([\d.]+) mm letters/.exec(t);
+  if (room) return `No room for ${room[1]}, even at ${room[2]} mm letters: a finer label nozzle or a smaller marker makes room`;
+  const cut = t.search(/ \(|\. |; /);
+  if (cut > 0) t = t.slice(0, cut);
+  t = t.replace(/…$/, "").trim();
+  if (t.length > 150) t = t.slice(0, 147).replace(/\s+\S*$/, "") + "…";
+  return t;
+}
+
 const RANK: Record<string, number> = { error: 0, warn: 1, info: 2 };
 
 export function worst(issues: Issue[]): "error" | "warn" | "info" | null {
@@ -147,7 +174,8 @@ export function summaryLine(issues: Issue[], where: (field: string) => string, o
   if (!counted.length) return { level: "ok", text: okText };
   const first = counted[0];
   const w = where(first.field);
-  if (counted.length === 1) return { level: first.level as "error" | "warn", text: `⚠ ${w ? w + ": " : ""}${first.text}` };
+  // the field and the message's first clause only (audit F7)
+  if (counted.length === 1) return { level: first.level as "error" | "warn", text: `⚠ ${w ? w + ": " : ""}${shortText(first.text)}` };
   const names = [...new Set(counted.map((i) => where(i.field)).filter(Boolean))];
   return {
     level: first.level as "error" | "warn",
@@ -164,6 +192,20 @@ export function duplicates(tags: SceneTag[], familyOf: (dict: string) => string)
     for (const id of t.plan.ids) (out[`${familyOf(dict)}#${id}`] ||= []).push(t.name);
   }
   return Object.fromEntries(Object.entries(out).filter(([, v]) => v.length > 1));
+}
+
+/** Messages that start "<tag>|<field>: text" (core.numbering's rows): each
+ *  under its tag, the "|field" marker dropped; the rest as they are (audit F15). */
+export function rowMessages(lines: string[], names: string[]): { byTag: Record<string, string[]>; rest: string[] } {
+  const byTag: Record<string, string[]> = {};
+  const rest: string[] = [];
+  const known = new Set(names);
+  for (const line of lines) {
+    const m = /^([^|:\s][^|:]*?)(?:\|[\w.]+)?: (.*)$/s.exec(line);
+    if (m && known.has(m[1])) (byTag[m[1]] ||= []).push(m[2]);
+    else rest.push(line.replace(/\|[\w.]+(?=:)/g, ""));
+  }
+  return { byTag, rest };
 }
 
 /** "0", "0–7" or "0, 3, 5" for a tag's ids. */

@@ -4,10 +4,23 @@
 // A React port of REF ArucoMarkers/resources/preset_library (library.js);
 // its state is server/library.py's (REF aruco_preset_library.Library).
 import { useEffect, useMemo, useState } from "react";
-import { api } from "../api/client";
+import { ApiError, api, errorText } from "../api/client";
 import type { LibraryCard, LibraryState } from "../api/types";
 import { useStudio } from "../store";
-import { Icon } from "../ui/controls";
+import { Dropdown, Icon } from "../ui/controls";
+
+/** A message for the Library's status line: the server's words, never its
+ *  HTTP status code (audit F16). */
+function msgOf(e: unknown): string {
+  if (e instanceof ApiError) return errorText((e.detail as any)?.detail ?? e.detail);
+  return e instanceof Error ? e.message : String(e);
+}
+
+/** "dictionary DICT_A → DICT_B" out of a card's "Changes the tag: ..." words. */
+function dictionaryChange(differs: string | null | undefined): string | null {
+  const m = /dictionary [^,;]+/.exec(differs || "");
+  return m ? m[0] : null;
+}
 
 const FILTERS: [string, string, (c: LibraryCard) => unknown, (v: any) => string][] = [
   ["nozzle", "Nozzle", (c) => c.nozzle, (v) => `${v} mm`],
@@ -56,8 +69,9 @@ function LibraryWindow({ tag }: { tag?: string }) {
   const cards = data?.cards ?? [];
   const card = cards.find((c) => c.id === picked) ?? null;
   const visible = useMemo(() => cards.filter((c) => {
-    if (coll && !c.in.includes(coll)) return false;
     const qq = q.trim().toLowerCase();
+    // typing searches every collection, not just the open one (audit F16)
+    if (coll && !qq && !c.in.includes(coll)) return false;
     if (qq && !`${c.name} ${c.profile || ""} ${c.subtitle}`.toLowerCase().includes(qq)) return false;
     for (const [k, , get] of FILTERS) if (filters[k].size && !filters[k].has(String(get(c)))) return false;
     return true;
@@ -70,12 +84,20 @@ function LibraryWindow({ tag }: { tag?: string }) {
       await load(sel === undefined ? picked : sel);
       setStatus({ text: label });
     } catch (e) {
-      setStatus({ text: String((e as Error).message), kind: "bad" });
+      setStatus({ text: msgOf(e), kind: "bad" });
     }
   };
   const close = () => st.setLibrary(false);
-  const doSelect = async () => {
+  const doSelect = async (confirmed = false) => {
     if (!card || card.unreadable) return;
+    // a print preset that also changes the tag's ink (its dictionary) says so
+    // before it is applied (audit F10)
+    const dict = tag ? dictionaryChange(card.differs) : null;
+    if (dict && !confirmed) {
+      setAsk({ text: `'${card.name}' also changes this tag's ${dict}: its markers change. Apply it?`, value: "", confirm: true,
+        ok: () => { void doSelect(true); } });
+      return;
+    }
     try {
       const r = await api.librarySelect(card.id);
       if (tag) await st.applyPreset(r.name, r.preset);
@@ -83,7 +105,7 @@ function LibraryWindow({ tag }: { tag?: string }) {
       await st.loadPresets();
       close();
     } catch (e) {
-      setStatus({ text: String((e as Error).message), kind: "bad" });
+      setStatus({ text: msgOf(e), kind: "bad" });
     }
   };
 
@@ -92,8 +114,9 @@ function LibraryWindow({ tag }: { tag?: string }) {
       if (ask) return;
       const tagName = (e.target as HTMLElement)?.tagName ?? "";
       if (["INPUT", "SELECT", "TEXTAREA"].includes(tagName)) return;
+      if (e.key === "Escape" && document.querySelector(".library .dd.open")) return;   // its list closes first (audit F3)
       if (e.key === "Escape") { e.stopPropagation(); close(); }
-      if (e.key === "Enter") doSelect();
+      if (e.key === "Enter") void doSelect();
       if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
         const i = visible.findIndex((c) => c.id === picked);
         const j = Math.max(0, Math.min(visible.length - 1, i + (e.key === "ArrowRight" ? 1 : -1)));
@@ -105,6 +128,15 @@ function LibraryWindow({ tag }: { tag?: string }) {
   });
 
   const collName = (id: string) => data?.collections.find((c) => c.id === id)?.name ?? id;
+  // a name prompt refuses an empty name itself (audit F16)
+  const [askErr, setAskErr] = useState<string | null>(null);
+  const okAsk = () => {
+    if (!ask) return;
+    if (!ask.confirm && !ask.value.trim()) { setAskErr("a preset needs a name"); return; }
+    setAskErr(null);
+    ask.ok(ask.value.trim());
+    setAsk(null);
+  };
   const anyFilter = Object.values(filters).some((s) => s.size) || q;
 
   return (
@@ -147,7 +179,7 @@ function LibraryWindow({ tag }: { tag?: string }) {
             <span className="sep" />
             <button className="link" disabled={!anyFilter} onClick={() => { setFilters({ nozzle: new Set(), layer: new Set(), dictionary: new Set(), mode: new Set() }); setQ(""); }}>Clear filters</button>
             <span className="grow" />
-            <span className="muted" data-testid="lib-count">{visible.length} of {cards.length}</span>
+            <span className="muted" data-testid="lib-count" data-scope={q.trim() ? "all" : "collection"}>{visible.length} of {cards.length}{q.trim() ? " · every collection" : ""}</span>
           </div>
           <div className="cards" role="listbox" aria-label="Presets">
             {!visible.length && <div className="empty">{cards.length ? "No preset here matches." : "No presets yet."}</div>}
@@ -157,7 +189,7 @@ function LibraryWindow({ tag }: { tag?: string }) {
                 <div key={c.id} className={`card${c.id === picked ? " on" : ""}${c.unreadable ? " bad" : ""}`} role="option" aria-selected={c.id === picked}
                   data-card={c.id} title={c.cells || ""}
                   onClick={() => { setPicked(c.id); setSide("info"); setEditing(false); }}
-                  onDoubleClick={() => { setPicked(c.id); setTimeout(doSelect, 0); }}>
+                  onDoubleClick={() => { setPicked(c.id); setTimeout(() => void doSelect(), 0); }}>
                   {c.used > 0 && <span className="badge" title={`used by ${c.used} tag(s) in this scene`}>{c.used}</span>}
                   <div className="thumb" dangerouslySetInnerHTML={{ __html: c.thumb || "" }} />
                   <div className="name">{c.name}</div>
@@ -198,6 +230,7 @@ function LibraryWindow({ tag }: { tag?: string }) {
                 <>
                   <div className="isect"><h4 className="title">{card.name}</h4><div className="muted">{card.cells}</div></div>
                   {data?.dialog && <div className="differs">{card.differs ? `Changes the tag: ${card.differs}` : "The same as the tag's settings."}</div>}
+                  {data?.dialog && dictionaryChange(card.differs) && <div className="issue lv-warn" data-testid="lib-ink-warn">A print preset that changes the {dictionaryChange(card.differs)}: the tag's markers change too.</div>}
                   {card.info.map(([title, rows]) => (
                     <div className="isect" key={title}><h4>{title}</h4>
                       {rows.map(([k, v]) => <div className="irow" key={k}><span className="k">{k}</span><span className="v">{v}</span></div>)}
@@ -205,8 +238,8 @@ function LibraryWindow({ tag }: { tag?: string }) {
                   ))}
                 </>
               )}
-              {card && editing && <EditForm card={card} schema={data?.schema ?? []} onCancel={() => setEditing(false)}
-                onSave={(name, values) => act(`saved '${name || card.name}'`, async () => { const r = await api.librarySave(card.id, name, values); setEditing(false); return `user:${r.name}`; })} />}
+              {card && editing && <EditForm card={card} schema={data?.schema ?? []} limits={data?.limits ?? {}} onCancel={() => setEditing(false)}
+                onSaved={async (name) => { setEditing(false); await load(`user:${name}`); setStatus({ text: `saved '${name}'` }); }} />}
             </div>
           )}
         </aside>
@@ -214,17 +247,18 @@ function LibraryWindow({ tag }: { tag?: string }) {
           <span className={`status ${status.kind ?? ""}`} role="status" data-testid="lib-status">{status.text}</span>
           <span className="grow" />
           <button className="btn" onClick={close} data-testid="lib-cancel">Cancel</button>
-          <button className="btn primary" disabled={!card || card.unreadable} onClick={doSelect} data-testid="lib-select">Select</button>
+          <button className="btn primary" disabled={!card || card.unreadable} onClick={() => void doSelect()} data-testid="lib-select">Select</button>
         </footer>
         {ask && (
           <div className="prompt">
             <div className="prompt-box">
               <div>{ask.text}</div>
               {!ask.confirm && <input autoFocus value={ask.value} data-testid="prompt-input" onChange={(e) => setAsk({ ...ask, value: e.target.value })}
-                onKeyDown={(e) => { if (e.key === "Enter") { ask.ok(ask.value); setAsk(null); } if (e.key === "Escape") setAsk(null); e.stopPropagation(); }} />}
+                onKeyDown={(e) => { if (e.key === "Enter") okAsk(); if (e.key === "Escape") setAsk(null); e.stopPropagation(); }} />}
+              {askErr && <div className="lib-form-err" data-testid="prompt-error">{askErr}</div>}
               <div className="prompt-buttons">
                 <button className="btn" onClick={() => setAsk(null)}>Cancel</button>
-                <button className="btn primary" data-testid="prompt-ok" onClick={() => { ask.ok(ask.value); setAsk(null); }}>OK</button>
+                <button className="btn primary" data-testid="prompt-ok" onClick={okAsk}>OK</button>
               </div>
             </div>
           </div>
@@ -234,8 +268,9 @@ function LibraryWindow({ tag }: { tag?: string }) {
   );
 }
 
-function EditForm({ card, schema, onCancel, onSave }: {
-  card: LibraryCard; schema: LibraryState["schema"]; onCancel: () => void; onSave: (name: string, values: Record<string, unknown>) => void;
+function EditForm({ card, schema, limits, onCancel, onSaved }: {
+  card: LibraryCard; schema: LibraryState["schema"]; limits: Record<string, [number, number]>;
+  onCancel: () => void; onSaved: (name: string) => void | Promise<void>;
 }) {
   const [name, setName] = useState(card.name);
   const [vals, setVals] = useState<Record<string, unknown>>(() => {
@@ -246,25 +281,64 @@ function EditForm({ card, schema, onCancel, onSave }: {
     }
     return out;
   });
+  const [errs, setErrs] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  /** Each number inside the range a preset keeps (server/library.LIMITS). */
+  const check = (): Record<string, string> => {
+    const out: Record<string, string> = {};
+    if (!name.trim()) out.name = "a preset needs a name";
+    for (const [path, label, kind] of schema) {
+      if (kind !== "number") continue;
+      const raw = String(vals[path] ?? "").trim().replace(",", ".");
+      const v = Number(raw);
+      if (raw === "" || !Number.isFinite(v)) { out[path] = `${label}: '${vals[path] ?? ""}' is not a number`; continue; }
+      const lim = limits[path];
+      if (lim && (v < lim[0] || v > lim[1])) out[path] = `${label}: ${raw} is outside ${lim[0]} to ${lim[1]}`;
+    }
+    return out;
+  };
+  const save = async () => {
+    const e = check();
+    setErrs(e);
+    if (Object.keys(e).length) return;
+    setBusy(true);
+    try {
+      const r = await api.librarySave(card.id, name.trim(), vals);
+      await onSaved(r.name);
+    } catch (x) {
+      const d = x instanceof ApiError ? ((x.detail as any)?.detail ?? x.detail) : null;
+      if (Array.isArray(d)) setErrs(Object.fromEntries(d.map((i: any) => [i.path ?? "form", i.msg])));
+      else setErrs({ form: msgOf(x) });
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <div className="form" data-testid="lib-form">
       <label><span>Name</span><input value={name} onChange={(e) => setName(e.target.value)} data-path="name" /></label>
+      {errs.name && <div className="lib-form-err" data-error-for="name">{errs.name}</div>}
       {schema.map(([path, label, kind, options]) => (
-        <label key={path}><span>{label}</span>
-          {kind === "select" ? (
-            <select data-path={path} value={String(vals[path] ?? "")} onChange={(e) => setVals({ ...vals, [path]: e.target.value })}>
-              {(options ?? []).map(([v, w]) => <option key={v} value={v}>{w}</option>)}
-            </select>
-          ) : kind === "bool" ? (
-            <input type="checkbox" data-path={path} checked={Boolean(vals[path])} onChange={(e) => setVals({ ...vals, [path]: e.target.checked })} />
-          ) : (
-            <input data-path={path} value={String(vals[path] ?? "")} onChange={(e) => setVals({ ...vals, [path]: e.target.value })} />
-          )}
-        </label>
+        <div key={path} className="form-row">
+          <label><span>{label}</span>
+            {kind === "select" ? (
+              <Dropdown path={`lib:${path}`} value={String(vals[path] ?? "")} wide
+                options={(options ?? []).map(([v, w]) => ({ value: v, label: w }))}
+                onChange={(v) => setVals({ ...vals, [path]: String(v) })} />
+            ) : kind === "bool" ? (
+              <input type="checkbox" data-path={path} checked={Boolean(vals[path])} onChange={(e) => setVals({ ...vals, [path]: e.target.checked })} />
+            ) : (
+              <input data-path={path} value={String(vals[path] ?? "")} className={errs[path] ? "bad" : ""}
+                title={limits[path] ? `${limits[path][0]} to ${limits[path][1]}` : undefined}
+                onChange={(e) => setVals({ ...vals, [path]: e.target.value })} />
+            )}
+          </label>
+          {errs[path] && <div className="lib-form-err" data-error-for={path}>{errs[path]}</div>}
+        </div>
       ))}
+      {errs.form && <div className="lib-form-err" data-error-for="form">{errs.form}</div>}
       <div className="row-btns">
         <button className="btn" onClick={onCancel}>Cancel</button>
-        <button className="btn primary" data-testid="lib-save" onClick={() => onSave(name, vals)}>Save</button>
+        <button className="btn primary" data-testid="lib-save" disabled={busy} onClick={save}>Save</button>
       </div>
     </div>
   );
