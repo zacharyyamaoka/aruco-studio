@@ -367,7 +367,9 @@ def presets(made_by: Optional[str] = None) -> dict:
     home). Each says what it makes (`made_by`: its profile's kind, M6a);
     `collections`: 3D printers and Inkjet printers; `?made_by=` keeps one.
     `legacy`: an older sticker preset (make rule 1, kept for the files that
-    name it; the Studio offers it only to a tag that has it, 2026-10-17)."""
+    name it; the Studio offers it only to a tag that has it, 2026-10-17).
+    `new_tag`: the preset the Studio's new-tag form starts on
+    (core.presets.NEW_TAG_PRESET, the one /api/new uses when none is named)."""
     cat = _P.catalog_all(S.presets_store(), _prusa())
     items = [(n, p, k) for n, p, k in cat["items"]
              if made_by in (None, "") or _P.kind_of(p) == made_by]
@@ -375,7 +377,7 @@ def presets(made_by: Optional[str] = None) -> dict:
                            **({"legacy": True} if k == "builtin" and _P.is_legacy(n) else {}))
                       for n, p, k in items],
             "collections": _P.collections(items), "last": cat["last"], "notes": cat["notes"],
-            "file": str(S.presets_path())}
+            "file": str(S.presets_path()), "new_tag": _P.NEW_TAG_PRESET}
 
 
 @app.post("/api/presets")
@@ -709,7 +711,10 @@ def scene_export(fmt: str, save: int = Query(1), inline: int = Query(0)) -> dict
 @app.post("/api/new")
 def new_tag(req: M.NewTagIn) -> dict:
     """A fresh tag's TagSpec: `layout` on a palette target (`target_key`,
-    `thickness_mm`) or a typed `target`, under a preset (by name)."""
+    `thickness_mm`) or a typed `target`, under a preset (by name). Naming
+    neither a preset nor `made_by` makes it under the new-tag preset
+    (core.presets.NEW_TAG_PRESET, "Inkjet · Letter vinyl": CF-13); a named
+    preset ("Default" for today's 3D tag) or `made_by` decide as before."""
     if req.target is not None:
         tgt = M.TagSpecIn(target=req.target).plain()["target"]
     else:
@@ -723,6 +728,8 @@ def new_tag(req: M.NewTagIn) -> dict:
         preset, _kind = _P.find(_P.catalog_all(S.presets_store(), _prusa()), req.preset)
         if preset is None:
             raise HTTPException(status_code=404, detail=f"no preset {req.preset!r}")
+    elif req.made_by is None:
+        preset = _P.new_tag_preset()      # 2026-10-17 (CF-13): inkjet on vinyl, make rule 2
     sp = _NEW.new_spec(req.layout, tgt, preset, marker_id=req.marker_id, name=req.name,
                        key=req.key)
     # M6a: the preset is the machine -- its kind says how the tag is made

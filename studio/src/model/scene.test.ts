@@ -6,7 +6,7 @@ import { layerD, loopD, loopsD, poseOf, sceneZ, snap, svgMatrix, tagBox, topD } 
 import {
   docOf, duplicates, idsText, issuesFor, marqueeSelect, moveLocal, patchFor, placeNew, pushHistory,
   redoStep, rotateLocal, routeIssues, rowMessages, selectClick, setLocked, shortText, summaryLine, toggleView,
-  undoStep, fileKey,
+  undoStep, fileKey, NEW_TAG_PRESET, newTagPreset,
 } from "./scene";
 
 function tag(name: string, x = 0, y = 0, w = 40, h = 40, ids = [0], extra: Partial<SceneTag> = {}): SceneTag {
@@ -176,5 +176,20 @@ describe("boxes, z, ids, messages", () => {
     const b: SceneDoc = { ...a, tags: [{ ...tag("t1"), plan: null }], issues: [] };
     expect(fileKey(a)).toBe(fileKey(b));
     expect(fileKey(moveLocal(a, ["t1"], 1, 0))).not.toBe(fileKey(a));
+  });
+});
+
+describe("the new-tag preset (CF-13: inkjet on vinyl)", () => {
+  const items = ["Default", "Inkjet · Letter vinyl", "Inkjet · A4 vinyl", "Mine 0.6"].map((name) => ({ name }));
+  it("starts the form on the vinyl Letter preset, not the 3D Default", () => {
+    expect(NEW_TAG_PRESET).toBe("Inkjet · Letter vinyl");
+    expect(newTagPreset(items)).toBe("Inkjet · Letter vinyl");
+    expect(newTagPreset(items, "Inkjet · Letter vinyl")).toBe("Inkjet · Letter vinyl");
+  });
+  it("follows the server's new_tag when it is listed, else falls back", () => {
+    expect(newTagPreset(items, "Inkjet · A4 vinyl")).toBe("Inkjet · A4 vinyl");
+    expect(newTagPreset(items, "gone")).toBe("Inkjet · Letter vinyl");
+    expect(newTagPreset([{ name: "Default" }], "gone")).toBe("Default");
+    expect(newTagPreset([])).toBe("Default");
   });
 });

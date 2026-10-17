@@ -23,7 +23,7 @@ import {
   refOfShape, rotateShapes, shapesOf, type Doc,
 } from "./model/design";
 import { centroid, outline, applyXf, invert } from "./model/shapes";
-import { docOf, idsText, patchFor, placeNew, renameSel, selectClick, specKey, toggleView, type View } from "./model/scene";
+import { docOf, idsText, NEW_TAG_PRESET, newTagPreset, patchFor, placeNew, renameSel, selectClick, specKey, toggleView, type View } from "./model/scene";
 import { typedNumbers } from "./sketch/handles";
 
 export interface Camera { cx: number; cy: number; zoom: number }   // scene mm, px per mm
@@ -498,7 +498,7 @@ export const useStudio = create<StudioState>((set, get) => {
     sceneVerify: null,
     idErrors: {},
     renumberReport: null,
-    newPreset: "Default",
+    newPreset: NEW_TAG_PRESET,          // CF-13: inkjet on vinyl; the server's new_tag on load
     libraryOpen: false,
     dialog: null,
     palette: false,
@@ -1224,7 +1224,12 @@ export const useStudio = create<StudioState>((set, get) => {
     },
     async loadPresets() {
       const [p, r] = await Promise.all([api.presets(), api.recent()]);
-      set({ presets: p.items, presetCollections: p.collections ?? [], recent: r.recent });
+      // the new-tag form starts on the core's new-tag preset (`new_tag`:
+      // core.presets.NEW_TAG_PRESET); once the app is up it keeps the user's pick
+      set((s) => ({
+        presets: p.items, presetCollections: p.collections ?? [], recent: r.recent,
+        ...(s.ready ? {} : { newPreset: newTagPreset(p.items, p.new_tag) }),
+      }));
     },
     setNew(k, v) {
       set({ [k]: v } as any);

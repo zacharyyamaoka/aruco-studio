@@ -3,7 +3,7 @@
 // when the server was started before `npm run build` (it mounts dist at
 // start).
 import { expect, test } from "@playwright/test";
-import { API, SCREENS, add } from "./helpers";
+import { API, SCREENS, TEST_NEW_PRESET, add, pickNewPreset } from "./helpers";
 import path from "node:path";
 
 test("the server serves the built Studio on 5360", async ({ page, request }) => {
@@ -12,6 +12,7 @@ test("the server serves the built Studio on 5360", async ({ page, request }) => 
   await request.post(`${API}/api/scene/new`, { data: { name: "e2e-served" } });
   await page.goto(`${API}/?draw=1`);                                  // the canvas first (the gallery is gallery.spec's)
   await expect(page.locator('.app[data-ready="1"]')).toBeVisible();
+  await pickNewPreset(page, TEST_NEW_PRESET);                         // a 3D board (the form starts on vinyl: CF-13)
   await add(page, "charuco");
   await expect(page.locator('g[data-tag="charuco1"] [data-layer="pattern"]')).toHaveCount(1);
   await page.keyboard.press("?");
