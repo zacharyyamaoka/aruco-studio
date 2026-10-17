@@ -27,6 +27,7 @@ from ..core import autosize as _A
 from ..core import board as _B
 from ..core import chamfer as _CH
 from ..core import dictionary as _D
+from ..core import form as _F
 from ..core import label as _L
 from ..core import origin as _OR
 from ..core import settings as _S
@@ -141,8 +142,7 @@ def settings_of(spec: TagSpec) -> dict:
     for k in ("x_ref", "x_base", "host_xform", "black_follows"):
         s.pop(k, None)
     s["source"] = "profile" if t.is_profile else "face"
-    if s.get("mode") == "auto":                       # the dialog's default (create())
-        s["mode"] = "black" if t.has_body else "both"
+    _F.resolve_mode(s, t.has_body)                     # Auto, the dialog's default (create())
     d = s.get("dictionary")
     if isinstance(d, str) and d not in _D.DICTIONARY_NAMES:
         for nm in _D.DICTIONARY_NAMES:

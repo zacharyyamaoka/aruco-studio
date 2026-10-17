@@ -20,6 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Sequence
 
+from . import form as _form
 from . import numbering as _numbering
 from . import restructure as _restructure
 from . import settings as _settings
@@ -120,8 +121,7 @@ def merged(node: NodeState, s_new, n_new):
               if k not in TARGET_KEYS})
     n = dict(n_old)
     n.update(n_new)
-    if s.get("mode") == "auto":
-        s["mode"] = "black" if s.get("has_body") else "both"
+    _form.resolve_mode(s, s.get("has_body"))
     # only an edit that ASKS puts the black at the white top: a node made
     # earlier today stored "black_follows", which must not undo a step the
     # user dialled in (the dialog sends the black offset it shows)

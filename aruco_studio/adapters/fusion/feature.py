@@ -27,7 +27,7 @@ import types
 import adsk.core
 import adsk.fusion
 
-from ...core import origin as OR
+from ...core import form as F
 from ...core import restructure as CR
 from ...core import settings as S
 from ...core import edits as E
@@ -200,13 +200,11 @@ def create(entity, s, n, *, key=None, name="", live=True, layout="create"):
     "recipe", "made"}."""
     des = design()
     s = dict(S.default_settings(), **S.normalise(dict(s)))
-    s["origin_v"] = OR.ORIGIN_RULE
     is_face = adsk.fusion.Profile.cast(entity) is None
     body_under = _body_under(entity) if is_face else None
     s["source"] = "face" if is_face else "profile"
     s["has_body"] = body_under is not None
-    if s.get("mode") == "auto":
-        s["mode"] = "black" if s["has_body"] else "both"
+    s = F.new_tag_settings(s, s["has_body"])         # origin_v + Extrude Auto: the core's rule
     key = key or s.get("key") or "tag"
     s["key"] = key
     n = S.resolve_follow(s, n)

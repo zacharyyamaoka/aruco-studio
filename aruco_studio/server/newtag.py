@@ -1,5 +1,5 @@
 """A new tag's TagSpec, and a print preset put on a tag (the Studio's
-stand-in for REF's ArUco Extrude dialog on OK: `values()` + `resolve_mode`
+stand-in for REF's ArUco Extrude dialog on OK: `values()` + `core.form.new_tag_settings`
 for a fresh tag, `apply_preset` for a Preset pick).
 
 Pure functions of plain dicts; the server calls them. A new tag gets what a
@@ -16,21 +16,14 @@ from __future__ import annotations
 import copy
 from typing import Optional
 
+from ..core import form as _F
 from ..core import presets as _P
 from ..core import settings as _S
 from ..core import slabs as _SL
-from ..core.origin import ORIGIN_RULE
 
 ADAPTER_KEYS = ("jo_v", "black_follows", "rotate_deg", "host_xform", "x_base", "x_ref",
                 "x_sketch", "source", "z_sign", "has_body", "key")
 LAYOUTS = ("single", "grid", "charuco")
-
-
-def resolve_mode(mode: str, has_body: bool) -> str:
-    """REF aruco_extrude_cmd.resolve_mode: Auto is Black only on a body."""
-    if mode == "auto":
-        return "black" if has_body else "both"
-    return mode
 
 
 def _print_into(s: dict, n: dict, p: dict, has_body: bool) -> None:
@@ -39,7 +32,7 @@ def _print_into(s: dict, n: dict, p: dict, has_body: bool) -> None:
     p = _P.normalise(p)
     t, lb = p["tag"], p["label"]
     s["dictionary"] = t["dictionary"]
-    s["mode"] = resolve_mode(t["mode"], has_body)
+    s["mode"] = _F.mode_for(t["mode"], has_body)
     s["op"] = t["op"]
     s["quiet_modules"] = float(t["quiet_modules"])
     s["grow"] = bool(t["grow"])
@@ -68,10 +61,12 @@ def new_spec(layout: str, target: dict, preset: Optional[dict] = None, marker_id
     s = _S.default_settings()
     for k in ADAPTER_KEYS:
         s.pop(k, None)
-    s.update(layout=layout, origin_v=ORIGIN_RULE, turn=0, size_auto=True, force=None)
+    s.update(layout=layout, turn=0, size_auto=True, force=None)
     n = _S.default_numbers("both")
     n.update(marker_id=int(marker_id), size=0.0, square=0.0)
-    _print_into(s, n, preset or _P.default_preset(), bool(target.get("has_body", False)))
+    has_body = bool(target.get("has_body", False))
+    _print_into(s, n, preset or _P.default_preset(), has_body)
+    s = _F.new_tag_settings(s, has_body)            # origin_v, Extrude Auto (core.form)
     return {"schema": "arucostudio.tagspec/1", "settings": s, "numbers": n,
             "target": copy.deepcopy(target), "name": name, "key": key}
 

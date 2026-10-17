@@ -238,6 +238,27 @@ def resolve_mode(s, has_body):
     return s
 
 
+def mode_for(mode, has_body):
+    """Extrude Auto resolved for a target, as a plain value: REF
+    resolve_mode's rule (Auto is Black only on a body, White + black
+    without one). Not REF's: the one call every caller makes (audit C4)."""
+    return resolve_mode({"mode": mode}, has_body)["mode"]
+
+
+def new_tag_settings(s, has_body):
+    """A NEW tag's settings as today's dialog stores them on OK (REF
+    aruco_feature.create): the Origin rule stamped (`origin_v` =
+    aruco_origin.ORIGIN_RULE) and Extrude Auto resolved (resolve_mode).
+    A copy; the adapter-only keys (`source`, `has_body`) stay the
+    caller's. Not REF's: the one home of this rule, called by the Studio's
+    new tag (server/newtag.py) and the Fusion adapter's create() (audit C4).
+    An EXISTING node never goes through here: one without `origin_v`
+    keeps the old Origin rule."""
+    s = dict(s)
+    s["origin_v"] = OR().ORIGIN_RULE
+    return resolve_mode(s, has_body)
+
+
 def _origin_line(spec, turn):
     """The info's Joint Origin line (aruco_origin.describe): OpenCV's frame
     for this Origin, and a quarter-turned rectangular board's swap."""
