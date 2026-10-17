@@ -1,7 +1,7 @@
 // The Studio's API (docs/API.md). Relative URLs: in dev Vite proxies /api to
 // 127.0.0.1:5360; built, the server itself serves this app on 5360.
 import type {
-  Dictionary, FormDoc, LibraryState, PaletteEntry, Preset, PresetItem, RenumberReport,
+  DesignInfo, Dictionary, FormDoc, LibraryState, PaletteEntry, Preset, PresetItem, RenumberReport,
   SceneDoc, SceneTag, TagPlan, TagSpec, Target, VerifyReport,
 } from "./types";
 
@@ -111,6 +111,14 @@ export const api = {
   save: (name: string) => post<{ saved: string; name: string }>("/api/scene/save", { name }),
   open: (name: string) => post<SceneDoc>("/api/scene/open", { name }),
   sceneVerify: () => post<any>("/api/scene/verify?px_per_mm=10"),
+  // the design file (M8a): the text, its state, the watcher's events
+  design: () => get<DesignInfo>("/api/design"),
+  designPut: (text: string, hash: string | null) => put<DesignInfo>("/api/design", hash ? { text, hash } : { text }),
+  designOpen: (path: string) => post<DesignInfo>("/api/design/open", { path }),
+  designSaveAs: (path: string) => post<DesignInfo>("/api/design/save_as", { path }),
+  designPreview: (text: string, mesh: boolean) =>
+    post<{ scene: SceneDoc | null; issues: any[]; error: any }>(`/api/design/preview?top=1${mesh ? "&mesh=1" : ""}`, { text }),
+  designReveal: (open: boolean) => post<{ path: string; command: string[]; opened: boolean }>("/api/design/reveal", { open }),
   sceneExport: (fmt: string) =>
     post<{ dir: string; files: string[]; inline: Record<string, string> | null }>(`/api/scene/export/${fmt}?save=1&inline=1`),
 };

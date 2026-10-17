@@ -3,7 +3,7 @@
 // when the server was started before `npm run build` (it mounts dist at
 // start).
 import { expect, test } from "@playwright/test";
-import { API, SCREENS } from "./helpers";
+import { API, SCREENS, add } from "./helpers";
 import path from "node:path";
 
 test("the server serves the built Studio on 5360", async ({ page, request }) => {
@@ -12,15 +12,12 @@ test("the server serves the built Studio on 5360", async ({ page, request }) => 
   await request.post(`${API}/api/scene/new`, { data: { name: "e2e-served" } });
   await page.goto(`${API}/`);
   await expect(page.locator('.app[data-ready="1"]')).toBeVisible();
-  await page.getByTestId("add-charuco").click();
-  await page.evaluate(() => (window as any).__studio.idle());
+  await add(page, "charuco");
   await expect(page.locator('g[data-tag="charuco1"] [data-layer="pattern"]')).toHaveCount(1);
   await page.keyboard.press("?");
   await expect(page.getByTestId("drawer-messages")).toBeVisible();
   await expect(page.locator("table.keys")).toContainText("2D / 3D");
   await page.screenshot({ path: path.join(SCREENS, "served_keys.png") });
-  // Tab toggles 2D / 3D from the canvas, not from a focused button (audit F18)
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   // Tab toggles 2D / 3D from the canvas, not from a focused button (audit F18)
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press("Tab");

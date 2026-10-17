@@ -1,12 +1,13 @@
 # ArUco Studio: the web app
 
-The Studio is the 2D / 3D app on top of the core. It draws what the core planned and nothing else: every outline, height, id and message on screen comes from a `TagPlan`, a `Target` or an `Issue` that the server sent.
+The Studio is a bare-bones mini CAD on top of the core. You draw shapes, extrude them, and put markers on a shape or a face. **The design file is the model** (`arucostudio.scene/2`, docs/FILE_FORMAT.md): the Studio draws it and writes it on every action; a person or an AI can edit the same file in any editor and the Studio follows. Every outline, height, id and message of a tag comes from a `TagPlan`, a `Target` or an `Issue` that the server sent.
 
 ## Run it
 
 | Do | Command |
 |---|---|
 | Run the Studio (one command) | `npm --prefix studio run studio`, then open http://127.0.0.1:5360 |
+| Run it on a file | `.venv/Scripts/python -m aruco_studio.server --open <file>.arucostudio.json` |
 | Develop (hot reload) | `.venv/Scripts/python -m aruco_studio.server` and, in a second window, `npm --prefix studio run dev`; open http://127.0.0.1:5361 |
 | Unit tests (vitest) | `npm --prefix studio test` |
 | End-to-end (Playwright) | `npm --prefix e2e test` (starts 5360 and 5361 when free, stops them after) |
@@ -15,76 +16,135 @@ The Studio is the 2D / 3D app on top of the core. It draws what the core planned
 
 First time only: `npm --prefix studio ci` and `npm --prefix e2e ci`. The e2e tests use the installed Chrome (no browser download).
 
+## The file is the truth
+
+| | |
+|---|---|
+| No Save | every action writes the open file at once. Ctrl+S only says so |
+| Undo, Redo | a history of the file's texts: Undo puts back the text from before the last action, byte for byte. A change made outside (an editor, an AI) is a step too |
+| An outside change | the server sees it (it checks the file 4 times a second) and tells the Studio, which redraws; no reload |
+| A file that does not parse | the bar at the bottom left turns red and says "line N col M"; the last good scene stays on the canvas; every write is refused until the file parses again |
+| A file that goes away | the bar says so; writes stop; Save as… writes it again |
+| New scene | a new file `scenes/<name>.arucostudio.json`, followed at once |
+| Open | a scene of the scenes folder, or any file by its path |
+| Save as | a copy at a name or a path; the Studio follows the copy from then on |
+| The File drawer | the file's text, read only, the selection's lines lit, Reveal opens Explorer on it (the status bar's File button) |
+
 ## The screen
 
 | Part | What it does |
 |---|---|
-| Toolbar | File (New, Open, Save, Save as) · add Single / Grid / ChArUco · Undo, Redo, Rotate 90°, Duplicate, Delete, Arrange · 2D / 3D, quiet zones, frame axes, layer outlines, zoom to fit · Verify · Export |
-| IDs (left) | one row per tag: type, dictionary, ids, a typed first id, locked and duplicate marks. A new tag or a copy takes the next free ids. A typed first id is used at once; one outside the dictionary is refused, with why, under its row. "Renumber all" makes the ids unique per dictionary family (the core's numbering and the scene's ledger). Click a row to select, double-click to zoom |
-| 2D canvas | like Figma. Each tag is drawn from its plan: the target, the top view (body, white, black), every layer as an outline (`data-layer`), the quiet zone, the label's clear zone, keep-outs, a refused label in orange, the trim outline, the OpenCV frame (x red, y green) |
-| 3D view | the server's mesh of every tag, placed on the canvas; heights, pockets, pins and the trim show. A height exaggeration (z ×1 to ×10) for thin layers |
-| Inspector (right) | the selection. Name, ids, lock, hide; the Preset row with the Library button; the target editor; tabs Marker · Heights · Print · Label · Advanced. Each message sits under the field it is about; one summary line is always at the bottom |
-| Library | print presets like Fusion's Machine Library: Recent, This scene, My presets, PrusaSlicer profiles, Built-in; cards with the marker's thumb; Filters and Info; New, Duplicate, Edit, Import, Delete; Select / Cancel |
-| Status bar and drawer | the last message; the Verify drawer (OpenCV's read of each tag: ids, corner error, PnP error 25° off, the image it read) and the Messages drawer (every message, the keyboard map) |
+| Top bar | File (New, Open, Save as, Reveal, the File drawer) and the scene's name · Undo, Redo, Rotate, Duplicate, Delete, Arrange · 2D / 3D, quiet zones, frame axes, layer outlines, zoom to fit · Verify · Export |
+| Tools (the canvas's foot) | the tools with their keys on badges; the active one is lit. Above them, while a tool runs: what it waits for and what you typed |
+| IDs (left) | one row per tag: type, dictionary, ids, a typed first id, locked and duplicate marks. "Renumber all" makes the ids unique per dictionary family |
+| 2D canvas | the shapes (a body's outline is brighter) and every tag drawn from its plan. A tag on a side face is drawn unfolded about its edge, like the net of a box, with a dashed hinge line (`data-hinge`) |
+| 3D view | each Extrude as a prism, each tag standing on its face by its full pose; the gizmo on the selected shape's sketch (move in X and Y, turn about Z) and the extrude arrow on its body |
+| Inspector (right) | a shape: its place, turn, size, holes, the Extrude's height, the tags on it. A tag: what it stands on (the ArUco Extrude's reference, the shape a click away), the Preset, then the tabs Marker · Heights · Print · Label · Advanced; each message under its field |
+| Library | print presets like Fusion's Machine Library |
+| Status bar and drawer | the file's state, the last message; the Verify, Messages (with the keys) and File drawers |
 
-The 2D / 3D toggle (bottom right of the canvas, or Tab) keeps the view's centre and scale, like Google Maps.
+## Commands and keys
 
-## Keys
+S opens the command palette: it lists exactly these commands (the e2e test diffs the two lists). A command without a key runs from the palette.
 
-| Key | Does |
+| Key | Command |
 |---|---|
-| S / G / C | add a single marker / a grid board / a ChArUco board |
+| V | Select / move |
+| R | Rectangle |
+| C | Circle |
+| P | Polygon |
+| O | Slot |
+| H | Hole |
+| Shift+H | Rectangular hole |
+| E | Extrude |
+| A | ArUco Extrude |
+| ] | Rotate 90° clockwise |
+| [ | Rotate 90° counter-clockwise |
+| S | Search commands |
+| Ctrl+D | Duplicate |
+| Del | Delete |
+| Ctrl+Z | Undo |
+| Ctrl+Y | Redo |
+| Ctrl+A | Select all |
+| Esc | Cancel |
+| Enter | Confirm |
+| | Arrange in a row |
+| F | Zoom to fit |
+| Tab | 2D / 3D |
+| ? | Keys |
+| | Quiet zones |
+| | Frame axes |
+| | Layer outlines |
+| | File drawer |
+| | Verify |
+| | Verify the sheet |
+| | Renumber all |
+| | ArUco: single |
+| | ArUco: grid |
+| | ArUco: ChArUco |
+| | Preset library |
+| | New scene |
+| Ctrl+O | Open |
+| | Save as |
+| | Reveal the file |
+| | Export: print sheet SVG |
+| | Export: sticker sheet PDF |
+| | Export: STL of every tag |
+
+### The tools
+
+| Tool | In 2D | In 3D |
+|---|---|---|
+| Select / move (V) | click, Shift+click, marquee; drag moves (0.5 mm; Alt no snap); handles on one selected shape | click a body or a tag; the gizmo and the extrude arrow |
+| Rectangle (R) | drag a box (Alt from the centre, Shift a square), or type `80 50` Enter (at the view's centre) | |
+| Circle (C) | drag a diameter, or type `50` Enter | |
+| Polygon (P) | click the points; Enter, or a click on the first point, closes it | |
+| Slot (O) | drag the length (the width is a quarter of it), or type `40 12` Enter | |
+| Hole (H), Shift+H | click inside a shape: a round hole (type the diameter first; 5 mm), a rectangular one with Shift+H (`10 6`); or type and Enter for the selected shape's centre | |
+| Extrude (E) | the selected shape: type the height, Enter (5 mm when nothing is typed); the view goes 3D | drag the arrow on the body's end face (0.5 mm steps) |
+| ArUco Extrude (A) | the selected shape is picked already; click a shape (an extruded one: its top), or a face of the net drawn around an extruded shape; Shift+click more; Enter. The tag appears placed (Auto size, the file's preset), the inspector on it | click a face (top, bottom, a flat side); Shift+click more; Enter |
+
+Several faces make one feature with a face list (one tag per face, named `<id>.<face>`); Renumber makes their ids unique.
+
+### The mouse
+
+| Do | Does |
+|---|---|
 | Click, Shift+click | select, add to the selection |
 | Drag on empty canvas | marquee select (Shift adds) |
-| Drag a tag | move it (0.5 mm snap) |
+| Drag a shape or a tag | move it (0.5 mm snap; Alt: no snap). A tag moves with its shape |
+| Drag a handle | resize or turn the shape: a rectangle has 8 handles, a circle one on its rim, a polygon its points, a slot its ends and its width; every shape a turn handle past its top (15° steps). The markers re-place live |
+| Alt+click a polygon's edge | a new point there; Del removes the point just dragged |
 | Drag a selected tag's label | place the label by hand (0.25 mm steps) |
-| Arrows (Shift) | nudge 0.5 mm (5 mm) |
+| Arrows (Shift) | nudge the selection 0.5 mm (5 mm) |
 | Wheel | zoom at the cursor; Shift+wheel pans |
 | Space+drag, middle or right drag | pan |
-| R / Shift+R | rotate 90° clockwise / counter-clockwise |
-| Ctrl+D | duplicate |
-| Del / Backspace | delete |
-| Shift+A | arrange in a row, 10 mm apart |
-| Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y | undo, redo |
-| Ctrl+A / Esc | select all / none (Esc on an open list closes the list only) |
-| Tab | 2D / 3D when the canvas has focus (on a button or a field, Tab moves focus) |
-| F | zoom to fit (the selection, or everything) |
-| Q / A / L | quiet zones / frame axes / layer outlines |
-| V | verify the selection with OpenCV |
-| Ctrl+S / Ctrl+O | save / open |
-| ? | the Messages drawer and this map |
+| Double-click a tag or an IDs row | zoom to it |
 
 ## How it works
 
 | Piece | Where |
 |---|---|
-| The store (zustand): the scene, the selection, the view, undo / redo | `studio/src/store.ts`; the pure reducers in `studio/src/model/scene.ts` |
-| Changes | each goes through the API and runs one at a time; the scene comes back with its plans (`GET /api/scene?plans=1&top=1`, `&mesh=1` in 3D). Undo keeps the scene as the file holds it and puts it back (`PUT /api/scene`) |
-| The inspector's fields | `GET /api/form` (never a list written in the app); `studio/src/inspector/layout.ts` only says which tab a field goes on and which icons its choices get |
-| Messages | the plan's `warnings`; each goes to the deepest field its key path names (`routeIssues`) |
-| A new tag | `POST /api/new` (what today's Fusion dialog stores for a fresh tag, under a preset) |
-| The target editor | `POST /api/target` makes the outline (box, disc, a palette face, holes, a thickness) |
-| Types | `studio/src/api/schema.d.ts`, generated from the server's OpenAPI |
-| Tests' handle | `window.__studio`: `center` (px), `zRange` (mm), `probe()`, `idle()`, the store |
+| The store (zustand): the design file, the scene with its plans, the selection, the tool, the text history | `studio/src/store.ts` |
+| The file's text, read and written as the server writes it (sorted keys, indent 1, each number as it was typed) | `studio/src/model/json.ts` |
+| The document's edits: shapes, holes, Extrude, ArUco Extrude, moves, turns, deletes | `studio/src/model/design.ts` |
+| Shapes drawn (outlines, faces, the net): for drawing only; the loops the planner fits are the server's | `studio/src/model/shapes.ts` |
+| Handles and what a drag writes | `studio/src/sketch/handles.ts` |
+| Commands (the toolbar, the palette, the keys, this doc's table) | `studio/src/app/commands.ts` |
+| The events client (server-sent events) | `studio/src/api/events.ts` |
+| The 3D gizmo and the extrude arrow | `studio/src/view3d/Gizmo.ts` |
+| The kit's primitives (Kbd, ToolButton, NumberField, Field, CommandPalette; Tailwind 4, cmdk, lucide) | `studio/src/kit/` |
+| Live re-placement | while a handle drags, the Studio sends the new text to `POST /api/design/preview` (15 times a second at most; nothing written); on release the plans of the last preview are drawn at once and the file is written |
+| Tests' handle | `window.__studio`: `probe()` (the file, the shapes, the tool, the picks, the revision), `idle()`, the store; `window.__studio3d`: the faces' and the gizmo's screen points, the tags' normals |
 
 ## Things to know
 
 | | |
 |---|---|
-| Typed columns × rows | REF's fit on a FACE lays out as many as fit; only a sketch profile takes a typed count. Set Advanced › Target to `profile` for a typed board |
-| Auto size | one Auto for the marker and the ChArUco checker, as in Fusion's dialog |
+| A tag on a shape's top | a click on the shape outside the marker selects the shape (its handles); a click on the marker selects the tag |
+| Typed columns × rows | REF's fit on a FACE lays out as many as fit; only a sketch profile takes a typed count (Advanced › Target kind) |
+| A new tag's ids | the next free ids of its dictionary family; a face list starts with the same ids on every face until Renumber |
+| The sugar | a hand-typed tag (`"layout": "charuco", "cols": 5`) stays short until the Studio edits that tag; then it holds the exact settings |
 | Colours (Extrude) | changing it keeps the black's step from the white top (REF's dialog does the same) |
-| Targets that grow | a tag's target can grow over its neighbours; Arrange (Shift+A) lays them out again |
-| Holes typed in the target editor | kept as the target's loops; the editor lists them only in the session that typed them |
-
-## After the M3 audit
-
-| What | How it works now |
-|---|---|
-| Unsaved changes | a dot after the scene's name; New and Open ask "Save changes?"; closing the tab asks too |
-| A locked (printed) tag | its ink fields are greyed out and say why; its name, place, lock and visibility still change |
-| Messages | one short line under the row its words name; the plan's whole text in the line's tooltip and in Messages |
-| Verify | a row goes grey ("not verified since the change") when its tag changes; Verify again redoes it; the drawer counts the tags as it goes |
+| Verify | a row goes grey when its tag changes; Verify again redoes it |
 | Overlapping tags | a dashed outline on both, a note on the canvas; the sheet's Verify says "Not as planned" |
-| 3D | each tag's name and ids above it; the axes keep their length at any z exaggeration; the grid fits the scene, with a 10 mm bar |
-| Export | a PDF sticker sheet (A4, cut marks, `#id`, the ruler), read back by OpenCV in the tests |

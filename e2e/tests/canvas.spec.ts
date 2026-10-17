@@ -4,21 +4,23 @@
 // a screenshot of the 2D canvas (what you see is what the core planned).
 import { expect, test } from "@playwright/test";
 import path from "node:path";
-import { API, SCREENS, add, choose, detect, fresh, idle, probe, shot, tab, type } from "./helpers";
+import { API, SCREENS, add, backToTag, choose, detect, fresh, idle, palette, probe, shapeOfTag, shot, tab, type } from "./helpers";
 
 test("three types on the canvas, ids as planned, read by OpenCV", async ({ page, request }) => {
   await fresh(page, "e2e-canvas");
   await add(page, "single");
 
   // a typed cols x rows needs a sketch profile (on a face REF's fit lays
-  // out as many as fit): Advanced > Kind
+  // out as many as fit): the plate 100 x 80 (its shape's rows), then
+  // Advanced > Kind
   await add(page, "grid");
+  await shapeOfTag(page);
+  await type(page, "shape.w", "100");
+  await type(page, "shape.h", "80");
+  await backToTag(page, "board1");
   await tab(page, "advanced");
   await choose(page, "target.kind", "profile");
   await tab(page, "marker");
-  await choose(page, "target", "box");
-  await type(page, "target.w_mm", "100");
-  await type(page, "target.h_mm", "80");
   await page.locator('.tog:has(input[data-path="numbers.size:auto"])').click();
   await idle(page);
   await type(page, "numbers.size", "14");
@@ -26,12 +28,13 @@ test("three types on the canvas, ids as planned, read by OpenCV", async ({ page,
   await type(page, "settings.force[1]", "3");
 
   await add(page, "charuco");
+  await shapeOfTag(page);
+  await type(page, "shape.w", "120");
+  await type(page, "shape.h", "160");
+  await backToTag(page, "charuco1");
   await tab(page, "advanced");
   await choose(page, "target.kind", "profile");
   await tab(page, "marker");
-  await choose(page, "target", "box");
-  await type(page, "target.w_mm", "120");
-  await type(page, "target.h_mm", "160");
   await page.locator('.tog:has(input[data-path="numbers.size:auto"])').click();
   await idle(page);
   await type(page, "numbers.size", "12");
@@ -64,8 +67,8 @@ test("three types on the canvas, ids as planned, read by OpenCV", async ({ page,
   }
 
   // OpenCV reads each tag off the canvas (axes and quiet zones hidden)
-  await page.keyboard.press("a");
-  await page.keyboard.press("q");
+  await palette(page, "Frame axes");
+  await palette(page, "Quiet zones");
   for (const t of tags) {
     await page.locator(`[data-ids-row="${t.name}"]`).dblclick();
     await page.keyboard.press("Escape");

@@ -1,15 +1,18 @@
-// The Studio: toolbar on top, IDs on the left, the canvas (2D or 3D) in the
-// middle, the inspector on the right, the status bar and drawer below.
+// The Studio: the top bar, IDs on the left, the canvas (2D or 3D) in the
+// middle with the tools at its foot, the inspector on the right, the status
+// bar and the drawer below. The keys are the commands of commands.ts.
 import { useEffect } from "react";
 import { Canvas2D } from "../canvas/Canvas2D";
 import { IdsTable } from "../ids/IdsTable";
 import { Inspector } from "../inspector/Inspector";
 import { Library } from "../library/Library";
-import { isDirty, useStudio } from "../store";
+import { TYPED_TOOLS, useStudio } from "../store";
 import { Icon } from "../ui/controls";
 import { View3D } from "../view3d/View3D";
+import { BottomBar } from "./BottomBar";
 import { Dialogs } from "./Dialogs";
 import { Drawer, StatusBar } from "./Drawer";
+import { Palette } from "./Palette";
 import { Toolbar } from "./Toolbar";
 
 function typing(e: KeyboardEvent) {
@@ -24,46 +27,52 @@ function onCanvas(e: KeyboardEvent) {
   return !t || t === document.body || t === document.documentElement || !!t.closest?.(".canvas2d, .canvas3d, .stage-wrap");
 }
 
+const TOOL_KEYS: Record<string, Parameters<ReturnType<typeof useStudio.getState>["setTool"]>[0]> = {
+  v: "select", r: "rect", c: "circle", p: "polygon", o: "slot", h: "hole", e: "extrude", a: "aruco",
+};
+
 function useKeys() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const st = useStudio.getState();
-      if (st.libraryOpen || st.dialog || typing(e)) return;
-      // a key an open dropdown or menu already took (its Escape) is not the app's (audit F3)
-      if (e.defaultPrevented) return;
+      if (st.libraryOpen || st.dialog || st.palette || typing(e)) return;
+      // what a tool takes typed: 80 50, 18, 5
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && TYPED_TOOLS.includes(st.tool) && (/^[0-9.\- ,x]$/.test(e.key) || (e.key === "Backspace" && st.typed))) {
+        e.preventDefault();
+        st.typeKey(e.key);
+        return;
+      }
+      if (e.defaultPrevented) return;                      // an open list's Escape (audit F3)
       if (e.key === "Escape" && document.querySelector(".dd.open, .menu.open")) return;
       const k = e.key.toLowerCase();
       const ctrl = e.ctrlKey || e.metaKey;
-      const step = e.shiftKey ? 5 : 0.5;
       const go = (fn: () => unknown) => { e.preventDefault(); fn(); };
       if (ctrl && k === "z" && !e.shiftKey) return go(() => st.undo());
       if (ctrl && ((k === "z" && e.shiftKey) || k === "y")) return go(() => st.redo());
       if (ctrl && k === "d") return go(() => st.duplicateSel());
       if (ctrl && k === "a") return go(() => st.selectAll());
-      if (ctrl && k === "s") return go(() => st.saveScene());
+      if (ctrl && k === "s") return go(() => st.say(st.design.path ? `saved as you typed: every change is in ${st.design.path}` : "in memory: Save as… gives it a file (then every change is saved as you go)"));
       if (ctrl && k === "o") return go(() => st.setDialog({ kind: "open" }));
-      if (ctrl) return;
+      if (ctrl || e.altKey) return;
+      if (k === "escape") return go(() => st.cancel());
+      if (k === "enter") return go(() => st.confirm());
       if (k === "delete" || k === "backspace") return go(() => st.deleteSel());
-      if (k === "escape") return go(() => st.setSel([]));
       if (k === "tab") {
-        if (e.shiftKey || !onCanvas(e)) return;              // focus moves on (audit F18)
+        if (e.shiftKey || !onCanvas(e)) return;
         return go(() => st.toggleView());
       }
+      const step = e.shiftKey ? 5 : 0.5;
       if (k === "arrowleft") return go(() => st.nudge(-step, 0));
       if (k === "arrowright") return go(() => st.nudge(step, 0));
       if (k === "arrowup") return go(() => st.nudge(0, step));
       if (k === "arrowdown") return go(() => st.nudge(0, -step));
-      if (k === "r") return go(() => st.rotateSel(e.shiftKey ? 90 : -90));
-      if (k === "s") return go(() => st.addTag("single"));
-      if (k === "g") return go(() => st.addTag("grid"));
-      if (k === "c") return go(() => st.addTag("charuco"));
-      if (k === "f") return go(() => st.zoomToFit(st.sel.length ? st.sel : undefined));
-      if (k === "q") return go(() => st.setShow("quiet", !st.show.quiet));
-      if (k === "a" && e.shiftKey) return go(() => st.arrange());
-      if (k === "a") return go(() => st.setShow("axes", !st.show.axes));
-      if (k === "l") return go(() => st.setShow("outlines", !st.show.outlines));
-      if (k === "v") return go(() => st.verifySel());
       if (e.key === "?") return go(() => st.setDrawer(st.drawer === "messages" ? null : "messages"));
+      if (e.key === "]") return go(() => st.rotateSel(-90));
+      if (e.key === "[") return go(() => st.rotateSel(90));
+      if (k === "s" && !e.shiftKey) return go(() => st.setPalette(true));
+      if (k === "f") return go(() => st.zoomToFit(st.sel.length ? st.sel : undefined));
+      if (k === "h" && e.shiftKey) return go(() => st.setTool("rhole"));
+      if (TOOL_KEYS[k] && !e.shiftKey) return go(() => st.setTool(TOOL_KEYS[k]));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -78,16 +87,6 @@ export function App() {
   const status = useStudio((s) => s.status);
   useKeys();
   useEffect(() => {
-    // closing the tab over unsaved changes asks first (audit F12)
-    const leave = (e: BeforeUnloadEvent) => {
-      if (!isDirty(useStudio.getState())) return;
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", leave);
-    return () => window.removeEventListener("beforeunload", leave);
-  }, []);
-  useEffect(() => {
     if (started) return;
     started = true;
     useStudio.getState().init().catch((e) => useStudio.getState().say(`The Studio's server did not answer on /api (${e}). Start it: .venv/Scripts/python -m aruco_studio.server`, "error"));
@@ -100,6 +99,7 @@ export function App() {
         <IdsTable />
         <main className="stage-wrap">
           {view === "2d" ? <Canvas2D /> : <View3D />}
+          <BottomBar />
           <button className="maptoggle" data-testid="map-toggle" title={`Switch to ${view === "2d" ? "3D" : "2D"} (Tab)`} onClick={() => st.toggleView()}>
             <Icon name={view === "2d" ? "view3d" : "view2d"} /><span>{view === "2d" ? "3D" : "2D"}</span>
           </button>
@@ -111,6 +111,7 @@ export function App() {
       <Drawer />
       <Library />
       <Dialogs />
+      <Palette />
     </div>
   );
 }

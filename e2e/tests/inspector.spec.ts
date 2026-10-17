@@ -3,7 +3,7 @@
 // 0.68 mm" changes the pattern; every tab; per-field validation errors and
 // the summary line; a typed non-number never reaches the server.
 import { expect, test } from "@playwright/test";
-import { API, add, choose, expectIssues, fresh, idle, probe, shot, tab, type } from "./helpers";
+import { API, add, choose, expectIssues, fresh, idle, probe, shot, tab, tagOn, type } from "./helpers";
 
 async function validateText(request: any, spec: any, field: string) {
   const issues = await (await request.post(`${API}/api/validate`, { data: spec })).json();
@@ -16,31 +16,30 @@ async function specOf(page: any, name: string) {
 
 test("the size line is the plan's Issue; cells change the pattern; every tab", async ({ page, request }) => {
   await fresh(page, "e2e-inspector");
-  await add(page, "single");
-  // the disc target: Auto size, its size line
-  await choose(page, "target", "disc40");
-  let want = await validateText(request, await specOf(page, "tag1"), "numbers.size");
+  // a tag on a disc (C, 40, A): Auto size, its size line
+  const disc = await tagOn(page, "c", "40");
+  let want = await validateText(request, await specOf(page, disc), "numbers.size");
   expect(want.length).toBeGreaterThan(0);
   await expectIssues(page, "numbers.size", want);
-  // a typed 28 mm on the 40 mm box
-  await choose(page, "target", "box40");
+  // a typed 28 mm on a 40 mm box, 3 mm thick (R, 40 40, E 3, A): tag2
+  expect(await tagOn(page, "r", "40 40", 3)).toBe("tag2");
   await page.locator('.tog:has(input[data-path="numbers.size:auto"])').click();
   await idle(page);
   await type(page, "numbers.size", "28");
-  const spec28 = await specOf(page, "tag1");
+  const spec28 = await specOf(page, "tag2");
   expect(spec28.numbers.size).toBe(28);
   want = await validateText(request, spec28, "numbers.size");
   await expectIssues(page, "numbers.size", want);
-  const d0 = await page.locator('g[data-tag="tag1"] [data-layer="pattern"]').getAttribute("d");
+  const d0 = await page.locator('g[data-tag="tag2"] [data-layer="pattern"]').getAttribute("d");
   await shot(page, "inspector_marker");
 
   // Print: cells, every cell a multiple of 0.68 mm
   await tab(page, "print");
   await choose(page, "settings.cells", "cell");
   await type(page, "settings.cells.mm", "0.68");
-  const sc = await specOf(page, "tag1");
+  const sc = await specOf(page, "tag2");
   expect(sc.settings.cells).toMatchObject({ rule: 1, of: "cell", mm: 0.68 });
-  const d1 = await page.locator('g[data-tag="tag1"] [data-layer="pattern"]').getAttribute("d");
+  const d1 = await page.locator('g[data-tag="tag2"] [data-layer="pattern"]').getAttribute("d");
   expect(d1).not.toBe(d0);
   want = await validateText(request, sc, "numbers.size");
   await tab(page, "marker");
@@ -60,7 +59,7 @@ test("the size line is the plan's Issue; cells change the pattern; every tab", a
   await page.locator('.tog:has(input[data-path="settings.label.on"])').click();
   await idle(page);
   await expect(page.locator('[data-row="settings.label.content"]')).toBeVisible();
-  await expect(page.locator('g[data-tag="tag1"] [data-layer^="label_"]').first()).toBeAttached();
+  await expect(page.locator('g[data-tag="tag2"] [data-layer^="label_"]').first()).toBeAttached();
   await shot(page, "inspector_label");
 
   await tab(page, "advanced");
