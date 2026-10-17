@@ -239,6 +239,7 @@ function LibraryWindow({ tag }: { tag?: string }) {
                 </>
               )}
               {card && editing && <EditForm card={card} schema={data?.schema ?? []} limits={data?.limits ?? {}} onCancel={() => setEditing(false)}
+                onStart={() => setStatus({ text: "…" })}
                 onSaved={async (name) => { setEditing(false); await load(`user:${name}`); setStatus({ text: `saved '${name}'` }); }} />}
             </div>
           )}
@@ -268,9 +269,9 @@ function LibraryWindow({ tag }: { tag?: string }) {
   );
 }
 
-function EditForm({ card, schema, limits, onCancel, onSaved }: {
+function EditForm({ card, schema, limits, onCancel, onStart, onSaved }: {
   card: LibraryCard; schema: LibraryState["schema"]; limits: Record<string, [number, number]>;
-  onCancel: () => void; onSaved: (name: string) => void | Promise<void>;
+  onCancel: () => void; onStart: () => void; onSaved: (name: string) => void | Promise<void>;
 }) {
   const [name, setName] = useState(card.name);
   const [vals, setVals] = useState<Record<string, unknown>>(() => {
@@ -302,6 +303,7 @@ function EditForm({ card, schema, limits, onCancel, onSaved }: {
     setErrs(e);
     if (Object.keys(e).length) return;
     setBusy(true);
+    onStart();
     try {
       const r = await api.librarySave(card.id, name.trim(), vals);
       await onSaved(r.name);

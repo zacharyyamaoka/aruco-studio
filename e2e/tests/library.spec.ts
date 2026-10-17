@@ -75,8 +75,8 @@ test("the Library: browse, filter, select a preset, make and edit your own", asy
   await lib.locator('[data-testid="lib-form"] input[data-path="tag.quiet_modules"]').fill("1.5");
   await lib.getByTestId("lib-save").click();
   await expect(lib.getByTestId("lib-status")).toContainText("saved");
-  mine = (await (await request.get(`${API}/api/presets`)).json()).items.filter((p: any) => p.kind === "user");
-  expect(mine.find((p: any) => p.name === "E2E preset").preset.tag.quiet_modules).toBe(1.5);
+  await expect.poll(async () => (await (await request.get(`${API}/api/presets`)).json()).items
+    .find((p: any) => p.kind === "user" && p.name === "E2E preset").preset.tag.quiet_modules).toBe(1.5);
 
   // Duplicate, then Delete the copy
   await lib.getByTestId("lib-dup").click();
