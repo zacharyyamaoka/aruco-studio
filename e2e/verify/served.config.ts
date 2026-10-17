@@ -12,7 +12,7 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: [["list"]],
-  outputDir: path.join(__dirname, "verify-results"),
+  outputDir: path.join(__dirname, "..", ".tmp", "verify-results"),
   use: {
     baseURL: "http://127.0.0.1:5360",
     channel: "chrome",
