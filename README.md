@@ -4,8 +4,13 @@ Zach's fiducial-marker project: one pure core plans every tag, and thin shells (
 
 Local only. Read `docs/BRIEF.md`, then `docs/ARCHITECTURE.md` and `docs/PLAN.md`.
 
+**Run the Studio with one command:** `npm --prefix studio run studio`, then open http://127.0.0.1:5360 (it builds the web app and serves it with the API; Ctrl+C stops it). How to use it: `docs/STUDIO.md`.
+
 | Do | Command |
 |---|---|
+| Run the Studio | `npm --prefix studio run studio` (first time: `npm --prefix studio ci`) |
+| Studio dev (hot reload) | the API (below) + `npm --prefix studio run dev`, open http://127.0.0.1:5361 |
+| Studio tests | `npm --prefix studio test` (vitest); `npm --prefix e2e test` (Playwright, first time `npm --prefix e2e ci`) |
 | Make the venv | `C:\Users\BAM\miniconda3\python.exe -m venv .venv` then `.venv/Scripts/python -m pip install -r requirements.txt` |
 | Run every test | `.venv/Scripts/python -m pytest -q` |
 | Run by group | `.venv/Scripts/python tools/check.py` (or `tools/check.py core`) |
@@ -19,6 +24,8 @@ Local only. Read `docs/BRIEF.md`, then `docs/ARCHITECTURE.md` and `docs/PLAN.md`
 | `aruco_studio/scene/` | many tags on one canvas, renumbering, the `.arucostudio.json` file, the 1:1 sheet (stdlib only) |
 | `aruco_studio/verify/` | OpenCV reads a plan: render, detect, PnP (numpy + cv2) |
 | `aruco_studio/server/` | FastAPI on 127.0.0.1:5360; the only module that touches files |
+| `studio/` | the web app: 2D / 3D views, inspector, Library, IDs (Vite + React + TypeScript) |
+| `e2e/` | Playwright end-to-end tests of the Studio; screenshots go to `reports/screens/` |
 | `goldens/` | JSON made by REF's own code, read only; never made by the new code |
 | `tests/` | pytest; `tests/core/` holds the ported REF suites and the golden replays |
 | `tools/` | the golden makers, `check.py`, `ref_sections.py`, `spec_status.py` |

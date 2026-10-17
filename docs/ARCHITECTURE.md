@@ -6,7 +6,7 @@ A functional core with thin shells. The core plans a tag from numbers. Every she
 |---|---|
 | Written | 2026-10-16, from `docs/BRIEF.md` and `docs/inventory/*.md` |
 | REF | `cad-exporter` worktree `aruco-fusion-plugin-0e9bcb` at `c8216ff`, read only |
-| Status | M1 (core) and M2 (plan, scene, verify, exports, server) are built. Where the built contract differs from this text (Target fields, Layer steps, combines, frames, levels): `docs/PLAN.md` section 8 and `docs/API.md` |
+| Status | M1 (core), M2 (plan, scene, verify, exports, server) and M3 (the Studio web app, with the Library) are built. Where the built contract differs from this text (Target fields, Layer steps, combines, frames, levels): `docs/PLAN.md` section 8 and `docs/API.md`; the web app: `docs/STUDIO.md` and `docs/status/M3.md` |
 
 ## 1. The idea in one picture
 
@@ -168,7 +168,7 @@ In this run the adapter is a skeleton tested against the fake. It is not install
 
 ## 4. The web app: `studio/`
 
-Stack: Vite + React + TypeScript. State in one store (zustand). No deviation planned; a deviation needs a written reason in `docs/status/M3.md`.
+Stack: Vite + React + TypeScript. State in one store (zustand). Built as planned; the few choices where this text was silent (the 2D view fills the plan's top view and outlines each layer, one path per layer, the installed Chrome for Playwright, e2e in `ROOT/e2e`) are in `docs/status/M3.md`.
 
 | Part | What it does |
 |---|---|

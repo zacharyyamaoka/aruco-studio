@@ -88,6 +88,22 @@ The open scene lives in the server's memory. New / Open / Save move it to and fr
 | `POST /api/scene/verify?px_per_mm=10` | the scene's sheet read back: every marker found, each centre against its place (mm) |
 | `POST /api/scene/export/{svg,png,json,stl,plan}` | into `exports/<scene>/`: the 1:1 sheet (SVG / PNG), the scene file, every tag's STL or plan |
 
+### The Studio (M3)
+
+| Route | Does |
+|---|---|
+| `POST /api/new` | `{layout, target_key?, thickness_mm?, target?, preset?, marker_id?}`: a fresh tag's TagSpec as today's dialog stores it (`origin_v`, the label's `rule`, `cells` from the preset, Auto Extrude resolved against the target) |
+| `POST /api/target` | `{shape: box / disc / face, key?, w_mm, h_mm, r_mm, holes: [[x, y, d]], thickness_mm}`: the target editor's Target |
+| `POST /api/preset/apply` | `{spec, name or preset}`: the spec with the preset's print settings (layout, ids, size, Origin, target kept) |
+| `POST /api/preset/of` | `{spec}`: `{preset, matches}`: the tag's print settings as a preset, and the catalog preset it equals |
+| `GET /api/library?tag=` | the Library's state: collections with counts, cards (thumb, Info, what Select changes on `tag`), the Edit form |
+| `POST /api/library/select` | `{id}`: `{name, preset}` to apply (a PrusaSlicer card is imported as yours first) |
+| `POST /api/library/save` | `{id, name, values}`: Edit -> Save of one of yours (a new name renames) |
+| `GET / POST /api/library/recent` | the recent presets (`{name}` puts one first) |
+| `?top=1` on `/api/plan` and `/api/scene` | `top`: `{body, white, black}` polygons, what is seen from above (plan/mesh.top) |
+| `image: true` in `/api/verify` | `image_png`: the raster OpenCV read (base64) |
+| `inline=1` on `/api/scene/export/{fmt}` | the files' bytes too (base64), for a download |
+
 ## The shapes
 
 | Shape | Schema string | Defined in |
