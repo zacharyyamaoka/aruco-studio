@@ -20,7 +20,7 @@ First time only: `npm --prefix studio ci` and `npm --prefix e2e ci`. The e2e tes
 | Part | What it does |
 |---|---|
 | Toolbar | File (New, Open, Save, Save as) · add Single / Grid / ChArUco · Undo, Redo, Rotate 90°, Duplicate, Delete, Arrange · 2D / 3D, quiet zones, frame axes, layer outlines, zoom to fit · Verify · Export |
-| IDs (left) | one row per tag: type, dictionary, ids, a typed first id, locked and duplicate marks. "Renumber all" makes the ids unique per dictionary family (the core's numbering and the scene's ledger). Click a row to select, double-click to zoom |
+| IDs (left) | one row per tag: type, dictionary, ids, a typed first id, locked and duplicate marks. A new tag or a copy takes the next free ids. A typed first id is used at once; one outside the dictionary is refused, with why, under its row. "Renumber all" makes the ids unique per dictionary family (the core's numbering and the scene's ledger). Click a row to select, double-click to zoom |
 | 2D canvas | like Figma. Each tag is drawn from its plan: the target, the top view (body, white, black), every layer as an outline (`data-layer`), the quiet zone, the label's clear zone, keep-outs, a refused label in orange, the trim outline, the OpenCV frame (x red, y green) |
 | 3D view | the server's mesh of every tag, placed on the canvas; heights, pockets, pins and the trim show. A height exaggeration (z ×1 to ×10) for thin layers |
 | Inspector (right) | the selection. Name, ids, lock, hide; the Preset row with the Library button; the target editor; tabs Marker · Heights · Print · Label · Advanced. Each message sits under the field it is about; one summary line is always at the bottom |
@@ -46,8 +46,8 @@ The 2D / 3D toggle (bottom right of the canvas, or Tab) keeps the view's centre 
 | Del / Backspace | delete |
 | Shift+A | arrange in a row, 10 mm apart |
 | Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y | undo, redo |
-| Ctrl+A / Esc | select all / none |
-| Tab | 2D / 3D |
+| Ctrl+A / Esc | select all / none (Esc on an open list closes the list only) |
+| Tab | 2D / 3D when the canvas has focus (on a button or a field, Tab moves focus) |
 | F | zoom to fit (the selection, or everything) |
 | Q / A / L | quiet zones / frame axes / layer outlines |
 | V | verify the selection with OpenCV |
@@ -76,3 +76,15 @@ The 2D / 3D toggle (bottom right of the canvas, or Tab) keeps the view's centre 
 | Colours (Extrude) | changing it keeps the black's step from the white top (REF's dialog does the same) |
 | Targets that grow | a tag's target can grow over its neighbours; Arrange (Shift+A) lays them out again |
 | Holes typed in the target editor | kept as the target's loops; the editor lists them only in the session that typed them |
+
+## After the M3 audit
+
+| What | How it works now |
+|---|---|
+| Unsaved changes | a dot after the scene's name; New and Open ask "Save changes?"; closing the tab asks too |
+| A locked (printed) tag | its ink fields are greyed out and say why; its name, place, lock and visibility still change |
+| Messages | one short line under the row its words name; the plan's whole text in the line's tooltip and in Messages |
+| Verify | a row goes grey ("not verified since the change") when its tag changes; Verify again redoes it; the drawer counts the tags as it goes |
+| Overlapping tags | a dashed outline on both, a note on the canvas; the sheet's Verify says "Not as planned" |
+| 3D | each tag's name and ids above it; the axes keep their length at any z exaggeration; the grid fits the scene, with a 10 mm bar |
+| Export | a PDF sticker sheet (A4, cut marks, `#id`, the ruler), read back by OpenCV in the tests |

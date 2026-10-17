@@ -53,6 +53,7 @@ A path under `%USERPROFILE%\CADExporter` is refused, even when a variable points
 | `POST /api/plan` (`?mesh=1`) | TagSpec | TagPlan; `mesh` per body (white / pattern / body) for the 3D view |
 | `POST /api/validate` | TagSpec | `[Issue]` |
 | `POST /api/candidates` | `{layout, dictionary, quiet_modules, cells, target, limit}` | the ranked Layout list (cols, rows, marker, square, badges) |
+| `POST /api/auto_check` | TagSpec | `{auto, note}`: a tag stored with Auto and a number (made before 2026-10-13) keeps Auto only if Auto builds that same tag (`plan.auto`, REF `_check_auto`) |
 | `POST /api/verify` | `{spec, px_per_mm, pose}` | OpenCV's read: `ids_expected`, `ids_read`, `missing`, `extra`, `corner_err_px` / `_mm`, ChArUco corners read, `pnp_err_mm` / `_deg`, `ok` |
 | `POST /api/export/{svg,png,stl,json}` | TagSpec | the file: SVG 1:1 mm, PNG at 20 px / mm with pHYs, binary STL (mm), the TagPlan JSON |
 
@@ -73,20 +74,20 @@ The open scene lives in the server's memory. New / Open / Save move it to and fr
 
 | Route | Does |
 |---|---|
-| `GET /api/scene` (`?plans=1&mesh=1`) | the scene (`arucostudio.scene/1`); with each tag's TagPlan |
+| `GET /api/scene` (`?plans=1&mesh=1`) | the scene (`arucostudio.scene/1`); with each tag's TagPlan and `issues` (the scene's own messages: overlapping tags, `scene/checks.py`). Plans are cached by their spec: a change re-plans only what it changed |
 | `PUT /api/scene` | replace it (a scene document; an unknown schema: 400) |
 | `POST /api/scene/new` | `{name}`: an empty scene |
-| `POST /api/scene/tags` | `{spec, x_mm, y_mm, rotation_deg, name?, locked?}`: add a tag; gives it and its plan |
+| `POST /api/scene/tags` | `{spec, x_mm, y_mm, rotation_deg, name?, locked?, number?}`: add a tag; gives it and its plan. `number: true` gives it the next free ids of its dictionary family at once (the Studio's Add) |
 | `PATCH /api/scene/tags/{name}` | move (`x_mm`, `y_mm`, `rotation_deg`), edit (`settings`, `numbers`, `target`, `key`), `new_name`, `locked`, `hidden`; a locked tag's ink change: 409 |
 | `DELETE /api/scene/tags/{name}` | delete it |
-| `POST /api/scene/tags/{name}/duplicate?dx_mm=&dy_mm=` | a copy with its own uid |
-| `PUT /api/scene/overrides/{name}` | `{id}` a typed first id; `{id: null}` back to auto |
+| `POST /api/scene/tags/{name}/duplicate?dx_mm=&dy_mm=&number=1` | a copy with its own uid; `number=1` (default): the next free ids of its family |
+| `PUT /api/scene/overrides/{name}` | `{id}` a typed first id: checked (0 or more; every id of the board inside the dictionary; not on a locked tag) and used at once: `{overrides, tag, ids}`; refused: 409 `{issues}` on field `override`. `{id: null}` back to auto (the ids stay until Renumber) |
 | `POST /api/scene/renumber` | unique ids per dictionary family (core.numbering, the scene's ledger): `{rows, changed, duplicates, warnings, errors, ok}` |
 | `GET /api/scenes` | the files in `scenes/` |
 | `POST /api/scene/save` | `{name}`: write `scenes/<name>.arucostudio.json` |
 | `POST /api/scene/open` | `{name}`: read it |
-| `POST /api/scene/verify?px_per_mm=10` | the scene's sheet read back: every marker found, each centre against its place (mm) |
-| `POST /api/scene/export/{svg,png,json,stl,plan}` | into `exports/<scene>/`: the 1:1 sheet (SVG / PNG), the scene file, every tag's STL or plan |
+| `POST /api/scene/verify?px_per_mm=10` | the scene's sheet read back: every marker found, each centre against its place (mm); `overlaps` (tags whose targets overlap); `ok` is false when any overlap, `markers_ok` is the markers alone |
+| `POST /api/scene/export/{svg,png,pdf,json,stl,plan}` | into `exports/<scene>/`: the 1:1 sheet (SVG / PNG), the PDF sticker sheet (REF's print sheet: A4, cut marks, `#id`, the ruler), the scene file, every tag's STL or plan |
 
 ### The Studio (M3)
 
@@ -98,7 +99,7 @@ The open scene lives in the server's memory. New / Open / Save move it to and fr
 | `POST /api/preset/of` | `{spec}`: `{preset, matches}`: the tag's print settings as a preset, and the catalog preset it equals |
 | `GET /api/library?tag=` | the Library's state: collections with counts, cards (thumb, Info, what Select changes on `tag`), the Edit form |
 | `POST /api/library/select` | `{id}`: `{name, preset}` to apply (a PrusaSlicer card is imported as yours first) |
-| `POST /api/library/save` | `{id, name, values}`: Edit -> Save of one of yours (a new name renames) |
+| `POST /api/library/save` | `{id, name, values}`: Edit -> Save of one of yours (a new name renames). A value outside what a preset keeps: 422, one error per field path (the ranges are in `GET /api/library`'s `limits`) |
 | `GET / POST /api/library/recent` | the recent presets (`{name}` puts one first) |
 | `?top=1` on `/api/plan` and `/api/scene` | `top`: `{body, white, black}` polygons, what is seen from above (plan/mesh.top) |
 | `image: true` in `/api/verify` | `image_png`: the raster OpenCV read (base64) |

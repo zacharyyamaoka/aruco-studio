@@ -256,7 +256,7 @@ Done checks:
 | | |
 |---|---|
 | Goal | `TagPlan` -> Fusion calls, proven against a fake adsk; the map that moves the live add-in to the new core later. Not installed into Fusion. Runs beside M2b in its own worktree; needs only M2's `plan/`. |
-| Owner paths | `aruco_studio/adapters/**`, `tests/adapters/**`, `docs/MIGRATION.md`, `docs/status/M4.md` |
+| Owner paths | `aruco_studio/adapters/**`, `tests/adapters/**`, `docs/FUSION_ADAPTER.md` (was `docs/MIGRATION.md`), `docs/status/M4.md` |
 | May edit | nothing outside its paths; `tools/check.py` discovers the `adapters` group by itself. A bug in `core/` or `plan/` is reported in `docs/status/M4.md` for M2b (which may edit them) |
 | Does not touch | `aruco_studio/core/**`, `plan/**`, `scene/**`, `verify/**`, `server/**`, `studio/**`, `tools/**`, `docs/spec.json` |
 
@@ -268,7 +268,7 @@ Steps:
 4. `adapters/fusion/records.py`: `plan/record.py`'s dict + the adapter's handles; `body_role`; `preset_of_node` through `core.presets.preset_of`; a REF record read back gives the same `TagSpec` (`plan/spec.from_record`).
 5. `adapters/fusion/joint_origin.py`: place the Joint Origin from `core.geometry.jo_decompose`'s three numbers, read it back, keep one per tag (REF `test_aruco_jo_one_per_tag`'s 12-edit run on the fake).
 6. `adapters/fusion/feature.py`: create / compute / edit outlines calling 2-5; `restructure.py`: the in-place `restructure()` on the fake timeline driven by `core.restructure.restructure_plan` (REF `test_aruco_restructure_sim`'s cases: every pair of structures x 2 layouts x sketch / none, a failure injected at each step leaves the fake document identical); `sync.py` around `core.edits.verdict`.
-7. `docs/MIGRATION.md`: every (F) responsibility of REF's add-in -> which adapter module and which plan field replaces it; every REF Fusion quirk (inventory "Fusion 2705 behaviours") -> where the adapter honours it; the switch-over steps for the live add-in (a later, Fusion-gated run) with the golden gates that must stay green.
+7. `docs/FUSION_ADAPTER.md` (the M4 builder put the migration map there; audit C6): every (F) responsibility of REF's add-in -> which adapter module and which plan field replaces it; every REF Fusion quirk (inventory "Fusion 2705 behaviours") -> where the adapter honours it; the switch-over steps for the live add-in (a later, Fusion-gated run) with the golden gates that must stay green.
 
 Done checks:
 
@@ -280,7 +280,7 @@ Done checks:
 | M4.4 | `from_record` on the records inside the cells / trim goldens, read through `records.py` from a fake component's attributes | the `TagSpec` replans to the same plan; Edit -> OK unchanged writes no attribute |
 | M4.5 | Joint Origin placement: 200 random frames -> `jo_decompose` -> the fake's Joint Origin -> read back | 1e-6 mm / 1e-6 deg; exactly one Joint Origin per tag after the 12-edit run |
 | M4.6 | `restructure()` on the fake timeline over every pair of structures x 2 layouts x sketch / none | the same node, roles in order, combines where `restructure_plan` says; a failure at each step leaves the fake document identical |
-| M4.7 | `docs/MIGRATION.md` names every (F) bullet of `docs/inventory/addin.md`'s detailed list (one row per file per (F) bullet, keyed by file and first function name) and every row of its quirk tables | `tests/adapters/test_migration_doc.py` counts: missing 0 |
+| M4.7 | `docs/FUSION_ADAPTER.md` names every (F) bullet of `docs/inventory/addin.md`'s detailed list (one row per file per (F) bullet, keyed by file and first function name) and every row of its quirk tables | `tests/adapters/test_migration_doc.py` counts: missing 0 |
 | M4.8 | nothing imports `adsk` for real: `python -c "import aruco_studio.adapters.fusion"` with no `adsk` in `sys.modules` raises `RuntimeError("... fake_adsk.install() ...")` | true |
 
 ### M5: the Library, zoom, and what M3 left
@@ -352,11 +352,11 @@ Groups are DISCOVERED, so no milestone edits the file after M1: every directory 
 | D3 | >= 600 `evaluate()` cases from REF replay through `plan_tag`, with and without the adapter-only settings keys | M2.2, M2.5 |
 | D4 | `docs/test_trace.md` covers 100 % of the 17 Fusion-free REF suites' sections | `tools/check.py --trace` prints `missing: 0` |
 | D5 | `aruco_studio/core` and `plan` import only the stdlib; `plan` and `scene` never import `adapters`, `server` or `verify` | M1.1, M1.2, `tests/core/test_purity.py` |
-| D6 | OpenCV reads every id off every rendered plan, every relabelled copy, every mesh raster, every PNG / PDF export and a 12-tag scene PNG; the dictionary and board tables equal cv2's own output; PnP within 0.1 mm / 0.1 deg | M2b.1-M2b.4, M2b.7 |
+| D6 | OpenCV reads every id off every rendered plan, every relabelled copy, every mesh raster, every PNG / PDF export and a 12-tag scene PNG; the dictionary and board tables equal cv2's own output; PnP within 0.1 mm / 0.1 deg | M2b.1-M2b.4, M2b.7; the PDF sheet: `tests/verify/test_pdf_sheet.py` (audit C1) |
 | D7 | a scene of 40 tags renumbers uniquely and stably; printed ids never move; a locked tag's ink never changes | M2b.5 |
 | D8 | the Studio builds and >= 8 Playwright tests pass with >= 10 screenshots, every bar read from the DOM or the store, not from a picture | M3.1-M3.10 |
 | D9 | the Fusion adapter skeleton builds every golden case on the fake, one body per layer | M4.2 |
-| D10 | `docs/MIGRATION.md` maps every (F) responsibility and every quirk | M4.7 |
+| D10 | `docs/FUSION_ADAPTER.md` (the migration map; it was to be `docs/MIGRATION.md`) maps every (F) responsibility and every quirk | M4.7 |
 | D11 | `docs/spec.json` statuses updated: every feature and test either `built` / `passing` with its check, or still `planned` with a reason | `tools/spec_status.py` renders `reports/spec.html` and lists the planned ones |
 | D12 | nothing written into REF, `%USERPROFILE%\CADExporter`, or Fusion; no server left on 5360 / 5361 | `git -C <REF> status --porcelain` unchanged; `netstat` empty; the orchestrator checks |
 | D13 | every commit on ROOT `main`, local only; the M2b and M4 branches merged fast-forward and their worktrees removed | `git remote -v` empty; `git worktree list` shows ROOT only |
@@ -367,7 +367,7 @@ Groups are DISCOVERED, so no milestone edits the file after M1: every directory 
 
 | Item | Why not now | When |
 |---|---|---|
-| Switching Zach's live Fusion add-in to the new core | needs Fusion open, the edit gates re-run, and his OK; the live add-in loads from REF | a later, Fusion-gated run, following `docs/MIGRATION.md` |
+| Switching Zach's live Fusion add-in to the new core | needs Fusion open, the edit gates re-run, and his OK; the live add-in loads from REF | a later, Fusion-gated run, following `docs/FUSION_ADAPTER.md` (gates F1-F8; re-pin REF first, audit C3) |
 | build123d adapter | the plan contract must settle first; build123d is not in any venv here | after M2 is stable |
 | viser adapter | same; viser lives on the Linux box | after M2 is stable |
 | A domain (arucostudio.com) or any website | out of scope; local only | Zach decides |
