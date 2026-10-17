@@ -275,7 +275,9 @@ def check_sheet(pdf: bytes, summary: dict, plans: Dict[str, dict], dpi: int = DP
         xor = float(np.count_nonzero(want ^ seen)) / float(union) if union else 0.0
         ids = _ids(crop, plan, s)
         lab = _labels(img, plan, st, s)
-        ol = _outline(crop, st, s, box)
+        ol = (_outline(crop, st, s, box) if summary.get("cut_lines", True)
+              else {"hausdorff_mm": None, "holes": 0, "holes_found": 0, "ok": True,
+                    "off": "the sheet's cut lines are off"})
         row = {"key": st["key"], "page": st["page"], "rotation": st["rotation"],
                "ink_xor": round(xor, 5), "ink_ok": bool(xor <= INK_XOR_MAX), "ids": ids,
                "label": lab, "outline": ol}
@@ -310,12 +312,16 @@ def check_sheet(pdf: bytes, summary: dict, plans: Dict[str, dict], dpi: int = DP
 
 def check_scene_sheet(scene, plans=None, page: str = "letter", landscape: bool = False,
                       mode: str = "spaced", margin_mm: float = 10.0, proofs: bool = False,
-                      dpi: int = DPI, date: Optional[str] = None) -> dict:
-    """The scene's own sticker sheet made and checked (POST /api/scene/verify/sheet)."""
+                      dpi: int = DPI, date: Optional[str] = None, *,
+                      sticker_margin_mm: float = 0.0, cut_lines: bool = True) -> dict:
+    """The scene's own sticker sheet made and checked (POST /api/scene/verify/sheet).
+    With the sheet's Sticker margin the outline checked is the grown one
+    (sheet.json's); with its cut lines off the outline step is skipped."""
     import json
     from ..scene import sheet as _SS
     plans = plans if plans is not None else scene.plans()
-    got = _SS.sticker_files(scene, plans, page, landscape, mode, margin_mm, proofs, date)
+    got = _SS.sticker_files(scene, plans, page, landscape, mode, margin_mm, proofs, date,
+                            sticker_margin_mm=sticker_margin_mm, cut_lines=cut_lines)
     summary = json.loads(got["sheet.json"].decode("utf-8"))
     rep = check_sheet(got["sheet.pdf"], summary, {k: plans[k].to_dict() if hasattr(plans[k], "to_dict")
                                                   else plans[k] for k in plans}, dpi)

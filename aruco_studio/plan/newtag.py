@@ -80,8 +80,31 @@ def apply_preset(spec: dict, preset: dict) -> dict:
     s = dict(out.get("settings") or {})
     n = dict(out.get("numbers") or {})
     _print_into(s, n, preset, bool((out.get("target") or {}).get("has_body", False)))
+    _make_into(s, preset)
     out["settings"], out["numbers"] = s, n
     return out
+
+
+def _make_into(s: dict, preset: dict) -> None:
+    """2026-10-17 (the inkjet presets, CF-4): an inkjet preset picked for a
+    tag makes it that preset's sticker -- its make rule, paper thickness
+    and page (core.make.new_make), the Perimeter kept -- and a 3D preset
+    picked for a sticker makes it 3D printed. A 3D preset on a 3D tag
+    leaves `make` as it is (absent stays absent)."""
+    from ..core import make as _MK
+    kind = _P.kind_of(preset)
+    have, _notes = _MK.make_of(s)
+    if kind != "sticker" and not have.sticker:
+        return
+    mk = _MK.new_make(kind, (preset or {}).get("profile"))
+    if kind == "sticker":
+        if have.sticker:
+            mk["perimeter"] = have.perimeter
+            if mk.get("rule") == _MK.MAKE_RULE and not have.inset:
+                mk.update(margin_mm=have.margin_mm, cut_line=have.cut_line)    # rule 1's own
+        s.update(mode="both", op="new", pin="none", grow=False)
+        s.pop("trim", None)
+    s["make"] = mk
 
 
 def preset_of(spec: dict, name: str = "") -> dict:

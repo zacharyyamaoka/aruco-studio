@@ -164,6 +164,8 @@ class SheetSettings:
     orient_mark: str = "triangle"  # "triangle" | "off"
     mode: str = "spaced"           # M6a, layout_stickers: "spaced" (gaps, captions, crop
                                    # marks) | "tight" (shared cut lines, guillotine shelves)
+    sticker_margin_mm: float = 0.0  # 2026-10-17 (Q7): white paper round each sticker, its
+                                    # cut line that much out (layout_stickers); 0 = as planned
 
 
 class RejectedItem(NamedTuple):
@@ -1161,11 +1163,76 @@ def _area(settings: SheetSettings):
     return page_w, page_h, x0, y0, area_w, area_h, ruler, warnings
 
 
+def printable_options(page: str = "letter", margin_mm: float = 10.0) -> dict:
+    """The printable area of `page` less `margin_mm` (and the footer and the
+    scale bars' band): what layout_stickers places stickers in, on a
+    portrait and on a landscape sheet. -> {"portrait": (w, h), "landscape":
+    (w, h)} mm (an orientation with no room: absent). ArUco Studio, not
+    REF's: the page lint of a rule-2 sticker (core.make.page_fit, CF-6)."""
+    out = {}
+    for name, land in (("portrait", False), ("landscape", True)):
+        try:
+            _pw, _ph, _x0, _y0, aw, ah, _r_, _w = _area(SheetSettings(
+                page=page, landscape=land, margin_mm=float(margin_mm)))
+        except ValueError:
+            continue
+        out[name] = (float(aw), float(ah))
+    return out
+
+
+def fit_area(w_mm: float, h_mm: float, opts: dict, page: str = "letter",
+             margin_mm: float = 10.0) -> dict:
+    """Does a w x h sticker fit one of `opts` (printable_options), as it is
+    or turned? -> {"fits", "how" ("portrait" / "portrait, turned" /
+    "landscape" / "landscape, turned" / None), "over_mm" [dw, dh] (the
+    least over, for the best way round), "worst_mm", "area_mm" (the
+    portrait area, the words'), "page", "margin_mm"}."""
+    best = None
+    for name in ("portrait", "landscape"):
+        if name not in opts:
+            continue
+        aw, ah = opts[name]
+        for turned, (a, b) in ((False, (w_mm, h_mm)), (True, (h_mm, w_mm))):
+            over = (max(0.0, a - aw), max(0.0, b - ah))
+            worst = max(over)
+            how = name + (", turned" if turned else "")
+            if best is None or worst < best[0] - 1e-9:
+                best = (worst, how, over, (aw, ah))
+    if best is None:
+        return {"fits": False, "how": None, "over_mm": [w_mm, h_mm], "worst_mm": max(w_mm, h_mm),
+                "area_mm": [0.0, 0.0], "page": page, "margin_mm": float(margin_mm)}
+    worst, how, over, _area_used = best
+    area = opts.get("portrait") or opts.get("landscape")
+    fits = worst <= _EPS
+    return {"fits": fits, "how": how if fits else None,
+            "over_mm": [round(over[0], 4), round(over[1], 4)], "worst_mm": round(worst, 4),
+            "area_mm": [round(area[0], 4), round(area[1], 4)], "page": page,
+            "margin_mm": float(margin_mm)}
+
+
+def grown_outline(outline: dict, d: float) -> dict:
+    """A sticker's cut polygon with `d` mm of white paper round it (the
+    sheet's Sticker margin, Zach's Q7): the outer loop grown by d (mitred,
+    offset_polygon), the holes as they are (they sit over the part's own)."""
+    if not d or d <= 0:
+        return outline
+    outer = [list(p) for p in offset_polygon([tuple(map(float, q)) for q in outline["outer"]],
+                                             float(d))]
+    return {"outer": outer, "holes": [[list(q) for q in h] for h in outline.get("holes", [])]}
+
+
 def layout_stickers(items: List[PrintItem], settings: Optional[SheetSettings] = None
                     ) -> StickerLayout:
     """Place every sticker at its exact size (spaced or tight), or reject it
-    with a reason. Deterministic for a given input."""
+    with a reason. Deterministic for a given input. A Sticker margin
+    (`sticker_margin_mm`) grows each sticker's cut outline first, so what is
+    placed, drawn and written to sheet.json is the sticker as it is cut."""
     settings = settings or SheetSettings()
+    sm = float(getattr(settings, "sticker_margin_mm", 0.0) or 0.0)
+    if sm > 0:
+        import dataclasses
+        items = [dataclasses.replace(it, cut_mm=grown_outline(outline_of(it), sm))
+                 for it in items]
     mode = settings.mode if settings.mode in MODES else "spaced"
     tight = mode == "tight"
     page_w, page_h, x0, y0, area_w, area_h, ruler, warnings = _area(settings)
@@ -1265,7 +1332,13 @@ def sticker_summary(layout: StickerLayout) -> dict:
     page numbers 1-based)."""
     s = layout.settings
     x, y, w, h = layout.printable_mm
+    extra = {}
+    if float(getattr(s, "sticker_margin_mm", 0.0) or 0.0) > 0:
+        extra["sticker_margin_mm"] = _r4(s.sticker_margin_mm)     # outline_mm is the grown one
+    if not s.cut_marks:
+        extra["cut_lines"] = False
     return {
+        **extra,
         "schema": "arucostudio.sheet/1", "mode": s.mode, "page": s.page,
         "page_mm": [_r4(layout.page_mm[0]), _r4(layout.page_mm[1])],
         "landscape": bool(s.landscape), "margin_mm": _r4(s.margin_mm),

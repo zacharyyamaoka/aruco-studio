@@ -58,7 +58,19 @@ not know, so a Studio file still loads in the add-in):
 A sticker printer's `line_mm` is its dot, 25.4 / dpi; its nozzle and
 layers are 0. Built-in: "Sticker · Letter · 600 dpi" and "Sticker · A4 ·
 600 dpi" (whole dots, stock 0.1 mm, min cell 1 mm, label stroke 0.2 mm,
-spaced). `collections` sorts a catalog into 3D printers / Sticker printers.
+spaced). `collections` sorts a catalog into 3D printers / Inkjet printers.
+
+2026-10-17 (the 2D pivot, CF-4 / CF-7): the stored kind stays "sticker"
+(every file), every label says **Inkjet printer**. A profile's
+`make_rule` says which make rule a new tag under it stores (core.make:
+2 = the black t/2 inside the paper); a sticker profile without it reads as
+1, so every preset file and frozen copy made before plans as it did. The
+built-ins new tags get are the vinyl ones, "Inkjet · Letter vinyl" and
+"Inkjet · A4 vinyl" (make rule 2, paper 0.10 mm: core.make.VINYL_MM,
+measure yours; page margins 10 mm); the two "Sticker · ..." built-ins stay
+for the files that name them (`LEGACY_STICKERS`: the Studio lists them
+only for a tag that already has one). The stock is the paper thickness;
+the page, margins and dpi are the paper size, the page margins and the dots.
 
 Reads are tolerant: a missing file is no presets; a broken one is no
 presets plus a note, and the next save first moves it aside
@@ -448,8 +460,12 @@ STICKER_PAGES = ("letter", "a4", "legal", "a3", "tabloid", "a5")   # core.sheet.
 DPIS = (300, 600, 1200)
 STICKER_DEFAULTS = {"dpi": 600, "page": "letter", "landscape": False, "margin_mm": 10.0,
                     "stock_mm": 0.1, "sheet": "spaced"}
-KIND_KEYS = ("kind",) + tuple(STICKER_DEFAULTS)
-KIND_COLLECTIONS = [("print3d", "3D printers", "cube"), ("sticker", "Sticker printers", "sticker")]
+MAKE_RULES = (1, 2)              # core.make.MAKE_RULES: a profile's make_rule
+KIND_KEYS = ("kind",) + tuple(STICKER_DEFAULTS) + ("make_rule",)
+KIND_COLLECTIONS = [("print3d", "3D printers", "cube"), ("sticker", "Inkjet printers", "sticker")]
+KIND_WORDS = {"print3d": "3D printer", "sticker": "Inkjet printer"}
+LEGACY_STICKERS = ("Sticker · Letter · 600 dpi", "Sticker · A4 · 600 dpi")   # make rule 1
+VINYL_STOCK_MM = 0.10            # core.make.VINYL_MM: vinyl, liner off (measure yours)
 STICKER_STROKE_MM = 0.2          # the label's stroke on paper (min cap = 5 x 0.2 = 1 mm)
 STICKER_MIN_CELL_MM = 1.0
 
@@ -472,6 +488,8 @@ def _kind_keys(src, pr):
     _pick(src, pr, "margin_mm", lambda v: _num(v, 0.0, 50.0))
     _pick(src, pr, "stock_mm", lambda v: _num(v, 0.05, 2.0))
     _pick(src, pr, "sheet", _choice(SHEET_MODES))
+    if isinstance(src.get("make_rule"), int) and not isinstance(src.get("make_rule"), bool)             and src["make_rule"] in MAKE_RULES and src["make_rule"] != 1:
+        pr["make_rule"] = int(src["make_rule"])       # absent = 1: every file before
 
 
 PRINTER_KEYS = ("physical", "preset", "model", "variant")
@@ -526,14 +544,50 @@ def sticker_preset(page="letter", dpi=600):
     return normalise(p)
 
 
+def vinyl_preset(page="letter", dpi=600):
+    """A built-in inkjet printer on vinyl sticker paper (2026-10-17, CF-4):
+    make rule 2 (the black t/2 inside the paper), paper 0.10 mm (vinyl,
+    liner off: measure yours), page margins 10 mm, whole dots, min cell
+    1 mm, label stroke 0.2 mm, spaced sheets."""
+    p = sticker_preset(page, dpi)
+    pg = "A4" if page == "a4" else page[:1].upper() + page[1:]
+    p["name"] = f"Inkjet · {pg} vinyl"
+    p["profile"].update(name=f"Inkjet printer, {pg} vinyl sticker paper, {dpi} dpi",
+                        stock_mm=VINYL_STOCK_MM, make_rule=2)
+    return normalise(p)
+
+
 def sticker_builtins():
-    """Letter first (Zach, 2026-10-16), then A4."""
-    return [sticker_preset("letter"), sticker_preset("a4")]
+    """The vinyl presets new tags get (Letter first: Zach, 2026-10-16),
+    then the two older sticker presets the files name (LEGACY_STICKERS)."""
+    return [vinyl_preset("letter"), vinyl_preset("a4"), sticker_preset("letter"),
+            sticker_preset("a4")]
+
+
+def is_legacy(name) -> bool:
+    """An older sticker preset (make rule 1): kept for the files naming it."""
+    return name in LEGACY_STICKERS
+
+
+def same_machine(a, b):
+    """Two presets of one machine, beyond same_print (which reads no profile
+    numbers): two inkjet printers of which one makes rule-2 tags have the
+    same make rule, page and paper thickness. Anything else: True (as
+    before 2026-10-17)."""
+    pa, pb = (normalise(x)["profile"] for x in (a, b))
+    if pa.get("kind") != "sticker" or pb.get("kind") != "sticker":
+        return True
+    ra, rb = pa.get("make_rule", 1), pb.get("make_rule", 1)
+    if 2 not in (ra, rb):
+        return True
+    if ra != rb or pa.get("page") != pb.get("page"):
+        return False
+    return abs(float(pa.get("stock_mm", 0.1)) - float(pb.get("stock_mm", 0.1))) <= TOL
 
 
 def collections(items):
     """[(name, preset, kind)] (a catalog's items) -> [{"id", "title", "icon",
-    "names"}]: the 3D printers and the Sticker printers, each in order."""
+    "names"}]: the 3D printers and the Inkjet printers, each in order."""
     out = []
     for cid, title, icon in KIND_COLLECTIONS:
         out.append({"id": cid, "title": title, "icon": icon,
@@ -849,6 +903,76 @@ def edit_schema():
     ]
 
 
+PAGE_WORDS = {"letter": "Letter (216 × 279 mm)", "a4": "A4 (210 × 297 mm)",
+              "legal": "Legal (216 × 356 mm)", "a3": "A3 (297 × 420 mm)",
+              "tabloid": "Tabloid (279 × 432 mm)", "a5": "A5 (148 × 210 mm)"}
+
+
+def inkjet_schema():
+    """ArUco Studio, 2026-10-17 (CF-4; not REF's): the Edit form of an
+    inkjet printer preset -- the paper size, the paper thickness, the page
+    margins, the dots -- then the cells, the tag's and the label's rows a
+    sticker has (no nozzle, layers, heights or pins)."""
+    ch = aruco_presets.LABEL_CHOICES
+    dicts = list(aruco_core.module("fiducials").ARUCO_DICTS)
+    return [
+        ["profile.name", "Inkjet printer", "text", None],
+        ["profile.page", "Paper size", "select", [[k, PAGE_WORDS[k]] for k in STICKER_PAGES]],
+        ["profile.stock_mm", "Paper thickness (mm, measure yours)", "number", None],
+        ["profile.margin_mm", "Page margins (mm)", "number", None],
+        ["profile.dpi", "Dots per inch", "number", None],
+        ["cells.min_mm", "Min cell (mm)", "number", None],
+        ["tag.dictionary", "Dictionary", "select", [[d, d] for d in dicts]],
+        ["tag.quiet_modules", "Quiet zone (modules)", "number", None],
+        ["tag.corner_mark", "Corner mark", "select", [[k, v] for k, v in MARK_WORDS.items()]],
+        ["label.on", "Label", "bool", None],
+        ["label.content", "Label text", "select", [[k, k] for k in ch["content"]]],
+        ["label.place", "Label position", "select", [[k, k] for k in ch["place"]]],
+        ["label.cap_mm", "Cap height (mm, 0 = auto)", "number", None],
+        ["label.nozzle_mm", "Label stroke (mm)", "number", None],
+    ]
+
+
+def edit_schema_for(p):
+    """The Edit form a preset gets: an inkjet printer's rows, else REF's."""
+    return inkjet_schema() if kind_of(p) == "sticker" else edit_schema()
+
+
+def subtitle_for(p):
+    """The card's line: an inkjet printer's paper, else REF's subtitle."""
+    if kind_of(p) != "sticker":
+        return subtitle(p)
+    pr = normalise(p)["profile"]
+    pg = PAGE_WORDS.get(pr.get("page"), str(pr.get("page"))).split(" (")[0]
+    return f"{pg} · paper {pr.get('stock_mm', 0.1):g} mm · {pr.get('dpi', 600)} dpi"
+
+
+def info_for(p):
+    """The Info panel: an inkjet printer's sections (its paper first),
+    else REF's info."""
+    if kind_of(p) != "sticker":
+        return info(p)
+    q = normalise(p)
+    pr, c, t, lb = q["profile"], q["cells"], q["tag"], q["label"]
+    rule = pr.get("make_rule", 1)
+    return [
+        ["Inkjet printer", [["Profile", pr["name"] or "none"],
+                            ["Paper size", PAGE_WORDS.get(pr.get("page"), str(pr.get("page")))],
+                            ["Paper thickness", f"{pr.get('stock_mm', 0.1):g} mm (measure yours)"],
+                            ["Page margins", f"{pr.get('margin_mm', 10.0):g} mm"],
+                            ["Dots", f"{pr.get('dpi', 600)} dpi (a dot {pr['line_mm']:g} mm)"],
+                            ["Make rule", "2: the black t/2 inside the paper" if rule == 2
+                             else "1: an ink film on the paper (an older preset)"]]],
+        ["Cells", [["Rounding", cells_words(q)], ["Min cell", aruco_presets.min_text(c)]]],
+        ["Tag", [["Dictionary", t["dictionary"]], ["Quiet zone", f"{t['quiet_modules']:g} module"],
+                 ["Corner mark", MARK_WORDS[t["corner_mark"]]]]],
+        ["Label", [["Label", "on" if lb["on"] else "off"], ["Text", lb["content"]],
+                   ["Position", lb["place"]],
+                   ["Cap height", "auto" if not lb["cap_mm"] else _g(lb["cap_mm"])],
+                   ["Stroke", _g(lb["nozzle_mm"])]]],
+    ]
+
+
 def set_path(p, path, value):
     sect, key = path.split(".", 1)
     p.setdefault(sect, {})[key] = value
@@ -1011,6 +1135,9 @@ def preset_of(settings, numbers, profile=None):
         profile = {"name": "", "nozzle_mm": 0.0, "line_mm": dot, "layer_mm": 0.0,
                    "first_layer_mm": 0.0, "source": "", "kind": "sticker",
                    "dpi": int(round(25.4 / dot)), "stock_mm": mk.thickness_mm}
+        if mk.inset:
+            # rule 2 (2026-10-17): the tag keeps its page (the lint's)
+            profile.update(make_rule=mk.rule, page=mk.page, margin_mm=mk.page_margin_mm)
         p = preset_of_node(settings, numbers, None)
         p["profile"] = profile
         return normalise(p)

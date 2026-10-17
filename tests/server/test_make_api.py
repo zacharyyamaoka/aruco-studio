@@ -79,13 +79,16 @@ def test_presets_both_kinds_two_collections(client):
     assert by[STICKER]["made_by"] == "sticker" and by["Default"]["made_by"] == "print3d"
     cols = {c["id"]: c for c in r["collections"]}
     assert cols["print3d"]["title"] == "3D printers" and cols["sticker"]["title"] == \
-        "Sticker printers"
+        "Inkjet printers"                     # 2026-10-17: the kind's words (CF-4)
     assert "Default" in cols["print3d"]["names"] and STICKER in cols["sticker"]["names"]
     prusa = [i["name"] for i in r["items"] if i["preset"]["profile"].get("source") == "prusaslicer"]
     assert prusa, "the fixture's Aruco profiles"
     assert set(prusa) <= set(cols["print3d"]["names"])
     st = client.get("/api/presets?made_by=sticker").json()
-    assert [i["name"] for i in st["items"]] == [STICKER, "Sticker · A4 · 600 dpi"]
+    assert [i["name"] for i in st["items"]] == ["Inkjet · Letter vinyl", "Inkjet · A4 vinyl",
+                                                STICKER, "Sticker · A4 · 600 dpi"]
+    # the older sticker presets stay for the files that name them, flagged legacy
+    assert [i["name"] for i in st["items"] if i.get("legacy")] == [STICKER, "Sticker · A4 · 600 dpi"]
     assert not [i for i in st["items"] if i["preset"]["profile"].get("source") == "prusaslicer"]
 
 

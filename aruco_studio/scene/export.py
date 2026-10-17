@@ -123,7 +123,8 @@ def print_bundle(scene: Scene, plans: Optional[dict] = None, page: str = "letter
                  landscape: bool = False, margin_mm: float = 10.0, mode: str = "spaced",
                  proofs: bool = False, bed_w_mm: float = None, bed_d_mm: float = None,
                  black_slot: int = 2, white_slot: int = 1, profile=None, when: str = "",
-                 date: Optional[str] = None, sheet_only: bool = False) -> dict:
+                 date: Optional[str] = None, sheet_only: bool = False, *,
+                 sticker_margin_mm: float = 0.0, cut_lines: bool = True) -> dict:
     """-> {"files": {relpath: bytes}, "report": {...}, "ledger": dict}.
     `sheet_only`: the sticker sheet's files (and markers.json) only, no 3D
     parts (the Sticker sheet dialog's Export; the parts are Send's)."""
@@ -137,7 +138,8 @@ def print_bundle(scene: Scene, plans: Optional[dict] = None, page: str = "letter
               "beds": 0, "rows": []}
     sheet_keys = set()
     if stickers or (proofs and solid):
-        got = _SS.sticker_files(scene, plans, page, landscape, mode, margin_mm, proofs, date)
+        got = _SS.sticker_files(scene, plans, page, landscape, mode, margin_mm, proofs, date,
+                                sticker_margin_mm=sticker_margin_mm, cut_lines=cut_lines)
         lay = got.pop("layout")
         files.update(got)
         files.update(images([p.item for p in lay.placed]))

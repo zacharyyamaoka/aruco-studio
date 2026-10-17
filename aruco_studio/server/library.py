@@ -7,7 +7,7 @@
 | `Library.nodes()`: the Fusion design's tags | the open scene's tags (`newtag.preset_of` of each) |
 | `Library.dialog()`: the open dialog's print settings | the selected tag's (`dialog` argument) |
 | `Library.prints()`: PrusaSlicer's print profiles | `core.prusa.user_prints` over `store.prusa_sources()` |
-| (M8c, not REF's) | a **Printers** collection: one card per PrusaSlicer physical printer, its fitting print presets as the card's `choices` (the "Aruco" ones first, the current pair marked); Select on a choice (`printer:<name>|<print>`, or the card for its default) makes the preset from the pair (`core.presets.from_pair`: the printer's nozzle, the print's line and layers) and imports it as one of yours. And a **Sticker printers** collection (M6a's sticker built-ins and yours): the catalog is `catalog_all` |
+| (M8c, not REF's) | a **Printers** collection: one card per PrusaSlicer physical printer, its fitting print presets as the card's `choices` (the "Aruco" ones first, the current pair marked); Select on a choice (`printer:<name>|<print>`, or the card for its default) makes the preset from the pair (`core.presets.from_pair`: the printer's nozzle, the print's line and layers) and imports it as one of yours. And an **Inkjet printers** collection (M6a's sticker built-ins and yours): the catalog is `catalog_all` |
 
 The words, thumbs, Info sections and the Edit form are core.presets'
 (`subtitle`, `cells_words`, `thumb_svg`, `info`, `edit_schema`,
@@ -82,12 +82,13 @@ def _card(cid, name, p, kind, where, dialog):
     p = _P.normalise(p, name)
     pr, t = p["profile"], p["tag"]
     return {"id": cid, "name": name, "kind": kind, "in": list(where),
-            "editable": kind == "user", "subtitle": _P.subtitle(p),
+            "editable": kind == "user", "subtitle": _P.subtitle_for(p),
             "nozzle": pr["nozzle_mm"], "line": pr["line_mm"], "layer": pr["layer_mm"] or None,
             "dictionary": t["dictionary"], "mode": t["mode"],
             "mode_words": _P.MODE_WORDS[t["mode"]], "profile": pr["name"],
             "cells": _P.cells_words(p), "thumb": _P.thumb_svg(p), "used": 0,
-            "info": _P.info(p), "recent": None,
+            "info": _P.info_for(p), "recent": None,
+            "edit": "2d" if _P.kind_of(p) == "sticker" else "3d",      # which Edit form (2026-10-17)
             "differs": _differs(dialog, p),
             "preset": p}
 
@@ -106,8 +107,8 @@ def build(nodes: List[Tuple[str, dict]], dialog: Optional[dict] = None):
     for name, p, kind in cat["items"]:
         cid = f"{'user' if kind == 'user' else 'builtin'}:{name}"
         where = ["mine" if kind == "user" else "builtin"]
-        if _P.kind_of(p) == "sticker":
-            where.append("stickers")
+        if _P.kind_of(p) == "sticker" and not (kind == "builtin" and _P.is_legacy(name)):
+            where.append("stickers")             # the older sticker presets: Built-in only
         cards[cid] = _card(cid, name, p, kind, where, dialog)
         names[name] = cid
     prints = []
@@ -162,7 +163,7 @@ def build(nodes: List[Tuple[str, dict]], dialog: Optional[dict] = None):
 
 
 COLLECTIONS = ([(c, "This scene" if c == "document" else n, i) for c, n, i in _P.COLLECTIONS]
-               + [("printers", "Printers", "printer"), ("stickers", "Sticker printers", "sticker")])
+               + [("printers", "Printers", "printer"), ("stickers", "Inkjet printers", "sticker")])
 
 
 # ------------------------------------------------------------------ the Printers (M8c)
@@ -251,7 +252,8 @@ def state(nodes, dialog=None, selected=None) -> dict:
             "collections": [{"id": c, "name": n, "icon": i, "count": counts[c]}
                             for c, n, i in COLLECTIONS],
             "cards": order, "selected": selected if selected in cards else None,
-            "schema": _P.edit_schema(), "limits": {k: list(v) for k, v in LIMITS.items()},
+            "schema": _P.edit_schema(), "schema_2d": _P.inkjet_schema(),
+            "limits": {k: list(v) for k, v in ALL_LIMITS.items()},
             "notes": notes, "dialog": dialog is not None}
 
 
@@ -303,6 +305,12 @@ def _limits() -> Dict[str, Tuple[float, float]]:
 
 
 LIMITS = _limits()
+# an inkjet printer's own numbers (2026-10-17, CF-4): core.presets._kind_keys'
+# ranges, kept only on a sticker profile (tests/server/test_2d_api.py checks
+# them against normalise at both ends, as F16 does LIMITS)
+LIMITS_2D = {"profile.stock_mm": (0.05, 2.0), "profile.margin_mm": (0.0, 50.0),
+             "profile.dpi": (72.0, 4800.0)}
+ALL_LIMITS = dict(LIMITS, **LIMITS_2D)
 
 
 class EditError(ValueError):
@@ -317,7 +325,7 @@ def check_values(values: dict) -> list:
     """The Edit form's values against the schema's kinds and LIMITS:
     [{path, msg}] (empty = fine)."""
     import math as _m
-    kinds = {path: (kind, label) for path, label, kind, _o in _P.edit_schema()}
+    kinds = {path: (kind, label) for path, label, kind, _o in _P.edit_schema() + _P.inkjet_schema()}
     errs = []
     for path, v in (values or {}).items():
         if path not in kinds or kinds[path][0] != "number":
@@ -328,7 +336,7 @@ def check_values(values: dict) -> list:
         except (TypeError, ValueError):
             errs.append({"path": path, "msg": f"{label}: '{v}' is not a number"})
             continue
-        lo, hi = LIMITS.get(path, (-_m.inf, _m.inf))
+        lo, hi = ALL_LIMITS.get(path, (-_m.inf, _m.inf))
         if not _m.isfinite(x) or not lo <= x <= hi:
             errs.append({"path": path, "msg": f"{label}: {v} is outside {lo:g} to {hi:g}"})
     return errs
@@ -351,15 +359,19 @@ def save_edit(card_id: str, name: str, values: dict, nodes) -> str:
         raise EditError(errs)
     import copy
     p = copy.deepcopy(c["preset"])
-    kinds = {path: kind for path, _l, kind, _o in _P.edit_schema()}
+    kinds = {path: kind for path, _l, kind, _o in _P.edit_schema_for(p)}
     for path, v in (values or {}).items():
         if path not in kinds:
             continue
         if kinds[path] == "number":
             v = float(v)
+            if path == "profile.dpi":
+                v = int(round(v))
         elif kinds[path] == "bool":
             v = bool(v)
         _P.set_path(p, path, v)
+    if _P.kind_of(p) == "sticker" and isinstance(p["profile"].get("dpi"), int) and p["profile"]["dpi"] > 0:
+        p["profile"]["line_mm"] = round(25.4 / p["profile"]["dpi"], 6)     # an inkjet printer's dot
     name = (name or "").strip() or c["name"]
     st = S.presets_store()
     if name != c["name"]:

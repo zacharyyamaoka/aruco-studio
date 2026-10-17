@@ -2,7 +2,7 @@
 
 | Route | Gives |
 |---|---|
-| `GET /api/scene/sheet.svg?page=&landscape=&mode=&margin_mm=&proofs=` | the sheet as SVG (the Studio's preview): each sticker an invisible `<rect data-sticker>` with its place |
+| `GET /api/scene/sheet.svg?page=&landscape=&mode=&margin_mm=&proofs=&sticker_margin_mm=&cut_lines=` | the sheet as SVG (the Studio's preview): each sticker an invisible `<rect data-sticker>` with its place |
 | `GET /api/scene/sheet.json?...` | the layout (`arucostudio.sheet/1`): per sticker page, x, y, rotation, outline, made by, ids |
 | `GET /api/scene/print.pdf?...` | the sheet as `application/pdf`, `Content-Disposition: inline` (the bytes `export/print` writes as sheet.pdf the same day) |
 | `POST /api/scene/export/print` | `{page, landscape, margin_mm, mode, proofs, bed_w_mm, bed_d_mm, black_slot, white_slot, inline, sheet_only}`: the print bundle (scene/export.py) into `exports/<scene>/`; the ledger marks every exported tag printed. `sheet_only`: the sheet files and markers.json only (the Sticker sheet dialog) |
@@ -61,6 +61,8 @@ class SheetIn(BaseModel):
     margin_mm: float = Field(10.0, ge=0.0, le=50.0)
     mode: MODES = "spaced"
     proofs: bool = False
+    sticker_margin_mm: float = Field(0.0, ge=0.0, le=20.0)   # 2026-10-17 (Q7): white round each
+    cut_lines: bool = True                                    # the sheet's cut lines on / off
 
 
 class PrintIn(SheetIn):
@@ -81,35 +83,42 @@ class VerifySheetIn(SheetIn):
     dpi: int = Field(600, ge=150, le=1200)
 
 
-def _files(page, landscape, margin_mm, mode, proofs):
+def _files(page, landscape, margin_mm, mode, proofs, sticker_margin_mm=0.0, cut_lines=True):
     sc = _scene()
     try:
         return _SS.sticker_files(sc, _plans(sc), page, landscape, mode, margin_mm, proofs,
-                                 date=_today())
+                                 date=_today(), sticker_margin_mm=sticker_margin_mm,
+                                 cut_lines=cut_lines)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
 
 
+STICKER_MARGIN = Query(0.0, ge=0.0, le=20.0)     # 2026-10-17 (Q7): the sheet's, not the tag's
+
+
 @router.get("/api/scene/sheet.svg")
 def sheet_svg(page: PAGES = "letter", landscape: bool = False, mode: MODES = "spaced",
-              margin_mm: float = Query(10.0, ge=0.0, le=50.0), proofs: bool = False):
-    got = _files(page, landscape, margin_mm, mode, proofs)
+              margin_mm: float = Query(10.0, ge=0.0, le=50.0), proofs: bool = False,
+              sticker_margin_mm: float = STICKER_MARGIN, cut_lines: bool = True):
+    got = _files(page, landscape, margin_mm, mode, proofs, sticker_margin_mm, cut_lines)
     return Response(got["sheet.svg"], media_type="image/svg+xml")
 
 
 @router.get("/api/scene/sheet.json")
 def sheet_json(page: PAGES = "letter", landscape: bool = False, mode: MODES = "spaced",
-               margin_mm: float = Query(10.0, ge=0.0, le=50.0), proofs: bool = False):
-    got = _files(page, landscape, margin_mm, mode, proofs)
+               margin_mm: float = Query(10.0, ge=0.0, le=50.0), proofs: bool = False,
+               sticker_margin_mm: float = STICKER_MARGIN, cut_lines: bool = True):
+    got = _files(page, landscape, margin_mm, mode, proofs, sticker_margin_mm, cut_lines)
     return Response(got["sheet.json"], media_type="application/json")
 
 
 @router.get("/api/scene/print.pdf")
 def print_pdf(page: PAGES = "letter", landscape: bool = False, mode: MODES = "spaced",
-              margin_mm: float = Query(10.0, ge=0.0, le=50.0), proofs: bool = False):
+              margin_mm: float = Query(10.0, ge=0.0, le=50.0), proofs: bool = False,
+              sticker_margin_mm: float = STICKER_MARGIN, cut_lines: bool = True):
     """The sticker sheet to print: inline, so a browser shows it and its
     print dialog prints it at 100 % (the MediaBox is the page)."""
-    got = _files(page, landscape, margin_mm, mode, proofs)
+    got = _files(page, landscape, margin_mm, mode, proofs, sticker_margin_mm, cut_lines)
     name = S.safe_name(_scene().name) + "-sheet.pdf"
     return Response(got["sheet.pdf"], media_type="application/pdf",
                     headers={"Content-Disposition": f'inline; filename="{name}"'})
@@ -145,7 +154,9 @@ def export_print(req: Optional[PrintIn] = None) -> dict:
                                bed_w_mm=req.bed_w_mm, bed_d_mm=req.bed_d_mm,
                                black_slot=req.black_slot, white_slot=req.white_slot,
                                when=datetime.datetime.now().isoformat(timespec="seconds"),
-                               date=_today(), sheet_only=req.sheet_only)
+                               date=_today(), sheet_only=req.sheet_only,
+                               sticker_margin_mm=req.sticker_margin_mm,
+                               cut_lines=req.cut_lines)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
     out_dir = S.exports_dir(sc.name)
@@ -171,7 +182,9 @@ def verify_sheet(req: Optional[VerifySheetIn] = None) -> dict:
     try:
         return check_scene_sheet(sc, _plans(sc), page=req.page, landscape=req.landscape,
                                  mode=req.mode, margin_mm=req.margin_mm, proofs=req.proofs,
-                                 dpi=req.dpi, date=_today())
+                                 dpi=req.dpi, date=_today(),
+                                 sticker_margin_mm=req.sticker_margin_mm,
+                                 cut_lines=req.cut_lines)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
 
