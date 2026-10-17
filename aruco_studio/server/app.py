@@ -39,7 +39,7 @@ from ..plan import target as _T
 from ..plan.fields import form as _form
 from ..plan.spec import TagSpec
 from ..plan.target import SpecTypeError
-from ..scene import Scene, SceneFileError, dumps, loads, number_one, renumber, set_first_id
+from ..scene import Scene, SceneFileError, number_one, renumber, set_first_id
 from ..scene import checks as _checks
 from ..scene import sheet as _sheet
 from . import library as _LIB
@@ -383,116 +383,159 @@ def remembered_put(command: str, values: Dict[str, Any] = Body(...)) -> dict:
 
 
 # ------------------------------------------------------------- the scene
+#
+# M8a: the open scene is a design document (server/design_api.py: the file,
+# its watcher, /api/design, /api/events). These routes keep their answers;
+# each change goes through the Scene API on the compiled scene, is written
+# back into the document and committed: the file is written when there is one.
+
+from . import design_api as _DA  # noqa: E402
+
+app.include_router(_DA.router)
+app.router.on_shutdown.append(_DA.shutdown)
+
 
 def _scene() -> Scene:
-    return STATE["scene"]
+    return _DA.D.current()
 
 
 def _scene_out(plans: bool = False, mesh: bool = False, top: bool = False) -> dict:
-    sc = _scene()
-    d = sc.to_dict()
-    if plans:
-        by = {t.name: t for t in sc.tags}
-        for t in d["tags"]:
-            t["plan"] = cached_plan_dict(by[t["name"]].spec, mesh=mesh, top=top)
-        d["issues"] = _checks.scene_issues(sc)          # overlaps (scene/checks.py)
-    return d
+    return _DA.scene_dict(_scene(), plans=plans, mesh=mesh, top=top, plan_dict=cached_plan_dict)
+
+
+def _conflict(fn):
+    """Run a change; the design's 409s (file not parseable / missing /
+    changed under us) as answers."""
+    try:
+        return fn()
+    except _DA.Conflict as exc:
+        return _DA.conflict_response(exc)
+
+
+def _tag_out(name: str, plan: bool = True) -> dict:
+    t = _scene().get(name)
+    out = _DA.tag_dict(t)
+    out["plan"] = cached_plan_dict(t.spec) if plan else None
+    return out
 
 
 @app.get("/api/scene")
 def scene_get(plans: int = Query(0), mesh: int = Query(0), top: int = Query(0)):
-    """The open scene; ?plans=1 adds each tag's TagPlan (?mesh=1 its mesh,
-    ?top=1 its top view). Plain JSON already: written straight out, not
-    walked again by FastAPI's encoder (audit F14: a 25-tag scene with its
-    meshes is about 1 MB)."""
+    """The open scene, compiled from the design file (the `/1` shape: tags
+    with their TagSpec); ?plans=1 adds each tag's TagPlan (?mesh=1 its mesh,
+    ?top=1 its top view). Written straight out (audit F14)."""
     body = json.dumps(_scene_out(bool(plans), bool(mesh), bool(top)), separators=(",", ":"),
                       allow_nan=False)
-    return Response(body, media_type="application/json")
+    return Response(body, media_type="application/json",
+                    headers={"X-Scene-Revision": str(_DA.D.revision),
+                             "X-Design-State": _DA.D.state})
 
 
 @app.put("/api/scene")
-def scene_put(doc: Dict[str, Any] = Body(...)) -> dict:
+def scene_put(doc: Dict[str, Any] = Body(...)):
+    """A whole scene: a design document (`/2`), or a compiled scene (the
+    `/1` shape GET gives, e.g. the Studio's Undo), written back onto the
+    open design."""
+    doc = json.loads(json.dumps(doc))
     try:
-        STATE["scene"] = loads(json.dumps(doc))
+        if doc.get("schema") == "arucostudio.scene/1" and "sketches" not in doc:
+            sc = _DA.parse_v1(doc)
+            return _conflict(lambda: (_DA.replace_scene(sc), _scene_out())[1])
+        d = _DA.migrate(doc)
     except SceneFileError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
-    return _scene_out()
+    _DA.D.current()
+    return _conflict(lambda: (_DA.D.commit(d), _scene_out())[1])
 
 
 @app.post("/api/scene/new")
 def scene_new(req: M.SceneNewIn) -> dict:
-    STATE["scene"] = Scene(name=req.name)
+    """An empty design in memory (Save or Save as gives it a file)."""
+    _DA.new_design(req.name)
     return _scene_out()
 
 
 @app.post("/api/scene/tags")
-def scene_add(req: M.SceneTagIn) -> dict:
-    sc = _scene()
-    t = sc.add(_spec(req.spec), float(req.x_mm), float(req.y_mm), float(req.rotation_deg),
-               name=req.name, locked=req.locked)
-    if req.number:
-        number_one(sc, t.name, _scene_plans(sc))
-    out = t.to_dict()
-    out["plan"] = cached_plan_dict(t.spec)
-    return out
+def scene_add(req: M.SceneTagIn):
+    """A tag: a sketch at (x, y, rotation) holding its target's shape, an
+    Extrude when it has a body, an ArUco Extrude with its exact settings."""
+    spec = _spec(req.spec)
+
+    def fn(doc, sc):
+        t = sc.add(spec, float(req.x_mm), float(req.y_mm), float(req.rotation_deg),
+                   name=req.name, locked=req.locked)
+        if req.number:
+            number_one(sc, t.name, _scene_plans(sc))
+        return t.name
+    return _conflict(lambda: _tag_out(_DA.mutate(fn)[0]))
 
 
 @app.patch("/api/scene/tags/{name}")
-def scene_patch(name: str, req: M.SceneTagPatch) -> dict:
-    sc = _scene()
-    try:
+def scene_patch(name: str, req: M.SceneTagPatch):
+    """A tag's place, flags, settings / numbers (written exactly into its
+    feature), target or name."""
+    if name not in _scene().names():
+        raise HTTPException(status_code=404, detail=f"no tag {name!r}")
+
+    def fn(doc, sc):
         t = sc.get(name)
-    except KeyError:
-        raise HTTPException(status_code=404, detail=f"no tag {name!r}") from None
-    if req.locked is not None:
-        t.locked = req.locked
-    if req.hidden is not None:
-        t.hidden = req.hidden
-    sc.move(name, req.x_mm, req.y_mm, req.rotation_deg)
-    issues = []
-    if req.settings is not None or req.numbers is not None or req.target is not None \
-            or req.key is not None:
-        try:
-            issues = sc.edit(name, settings=req.settings, numbers=req.numbers,
-                             target=req.target.model_dump() if req.target else None, key=req.key)
-        except SpecTypeError as exc:
-            raise _422(exc.path, exc.message) from None
-    if issues:
-        return JSONResponse(status_code=409, content={"issues": [i.to_dict() for i in issues]})
-    if req.new_name is not None and req.new_name != name:
-        try:
-            sc.rename(name, req.new_name)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from None
-        name = req.new_name
-    t = sc.get(name)
-    out = t.to_dict()
-    out["plan"] = cached_plan_dict(t.spec)
-    return out
+        if req.locked is not None:
+            t.locked = req.locked
+        if req.hidden is not None:
+            t.hidden = req.hidden
+        sc.move(name, req.x_mm, req.y_mm, req.rotation_deg)
+        if req.settings is not None or req.numbers is not None or req.target is not None \
+                or req.key is not None:
+            try:
+                issues = sc.edit(name, settings=req.settings, numbers=req.numbers,
+                                 target=req.target.model_dump() if req.target else None,
+                                 key=req.key)
+            except SpecTypeError as exc:
+                raise _422(exc.path, exc.message) from None
+            if issues:
+                return JSONResponse(status_code=409,
+                                    content={"issues": [i.to_dict() for i in issues]})
+        if req.new_name is not None and req.new_name != name:
+            try:
+                sc.rename(name, req.new_name)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from None
+            ids = _DA._DS.all_ids(doc)
+            if req.new_name in ids and ids[req.new_name] != "tag":
+                raise HTTPException(status_code=400, detail=(
+                    f"the name {req.new_name!r} is taken by a {ids[req.new_name]} of the file"))
+            return req.new_name
+        return name
+
+    def run():
+        out, _sc = _DA.mutate(fn)
+        if isinstance(out, JSONResponse):
+            return out
+        return _tag_out(out)
+    return _conflict(run)
 
 
 @app.delete("/api/scene/tags/{name}")
-def scene_delete(name: str) -> dict:
-    try:
-        _scene().delete(name)
-    except KeyError:
-        raise HTTPException(status_code=404, detail=f"no tag {name!r}") from None
-    return {"deleted": name}
+def scene_delete(name: str):
+    if name not in _scene().names():
+        raise HTTPException(status_code=404, detail=f"no tag {name!r}")
+    return _conflict(lambda: (_DA.mutate(lambda doc, sc: sc.delete(name)), {"deleted": name})[1])
 
 
 @app.post("/api/scene/tags/{name}/duplicate")
 def scene_duplicate(name: str, dx_mm: float = 10.0, dy_mm: float = 0.0,
-                    number: int = Query(1)) -> dict:
+                    number: int = Query(1)):
     """A copy, `number`=1 (default): numbered at once with the next free ids
     of its family (a copy of a printed tag is a new tag to print)."""
-    sc = _scene()
-    try:
+    if name not in _scene().names():
+        raise HTTPException(status_code=404, detail=f"no tag {name!r}")
+
+    def fn(doc, sc):
         t = sc.duplicate(name, dx_mm, dy_mm)
-    except KeyError:
-        raise HTTPException(status_code=404, detail=f"no tag {name!r}") from None
-    if number:
-        number_one(sc, t.name, _scene_plans(sc))
-    return t.to_dict()
+        if number:
+            number_one(sc, t.name, _scene_plans(sc))
+        return t.name
+    return _conflict(lambda: _tag_out(_DA.mutate(fn)[0], plan=False))
 
 
 @app.put("/api/scene/overrides/{name}")
@@ -501,21 +544,29 @@ def scene_override(name: str, req: M.OverrideIn):
     its marker count, kept as the override and used at once (the tag's
     marker_id); a bad one is a 409 with an Issue on "override". id null:
     back to auto."""
-    sc = _scene()
-    if name not in sc.names():
+    if name not in _scene().names():
         raise HTTPException(status_code=404, detail=f"no tag {name!r}")
-    issues = set_first_id(sc, name, req.id)
-    if issues:
-        return JSONResponse(status_code=409, content={"issues": [i.to_dict() for i in issues]})
-    t = sc.get(name)
-    return {"overrides": sc.overrides, "tag": name,
-            "ids": cached_plan(t.spec).data["ids"]}
+
+    def fn(doc, sc):
+        issues = set_first_id(sc, name, req.id)
+        if issues:
+            return JSONResponse(status_code=409,
+                                content={"issues": [i.to_dict() for i in issues]})
+        return None
+
+    def run():
+        out, sc = _DA.mutate(fn)
+        if isinstance(out, JSONResponse):
+            return out
+        return {"overrides": sc.overrides, "tag": name,
+                "ids": cached_plan(sc.get(name).spec).data["ids"]}
+    return _conflict(run)
 
 
 @app.post("/api/scene/renumber")
-def scene_renumber() -> dict:
+def scene_renumber():
     """Unique ids across the scene (core.numbering through the scene's ledger)."""
-    return renumber(_scene())
+    return _conflict(lambda: _DA.mutate(lambda doc, sc: renumber(sc))[0])
 
 
 @app.get("/api/scenes")
@@ -524,21 +575,29 @@ def scenes() -> List[dict]:
 
 
 @app.post("/api/scene/save")
-def scene_save(req: Optional[M.SceneFileIn] = None) -> dict:
-    sc = _scene()
-    if req is not None and req.name:
-        sc.name = req.name
-    p = S.write_atomic(S.scene_path(sc.name), dumps(sc))
-    return {"saved": str(p), "name": sc.name}
+def scene_save(req: Optional[M.SceneFileIn] = None):
+    """The design written to scenes/<name>.arucostudio.json, which the
+    server then follows (every later change writes it)."""
+    D = _DA.D
+    with D.lock:
+        sc = _scene()
+        name = req.name if req is not None and req.name else sc.name
+        if name != sc.name:
+            doc = copy.deepcopy(D.doc)
+            doc["name"] = name
+            D._set_doc(doc, None)
+        p = S.scene_path(name)
+        D.save_as(p)
+    return {"saved": str(p), "name": name}
 
 
 @app.post("/api/scene/open")
-def scene_open(req: M.SceneFileIn) -> dict:
+def scene_open(req: M.SceneFileIn):
     p = S.scene_path(req.name)
     if not p.exists():
         raise HTTPException(status_code=404, detail=f"no scene {req.name!r} in {S.scenes_dir()}")
     try:
-        STATE["scene"] = loads(p.read_text(encoding="utf-8"))
+        _DA.D.open(p)
     except SceneFileError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
     return _scene_out()
@@ -555,15 +614,15 @@ def scene_verify(px_per_mm: float = 10.0) -> dict:
 @app.post("/api/scene/export/{fmt}")
 def scene_export(fmt: str, save: int = Query(1), inline: int = Query(0)) -> dict:
     """The scene as a 1:1 sheet (svg, png), a PDF sticker sheet (pdf: REF's
-    print sheet), its file (json), or every tag's plan / STL; written under
-    <home>/exports/<scene>/ (save=1)."""
+    print sheet), its design file (json), or every tag's plan / STL; written
+    under <home>/exports/<scene>/ (save=1)."""
     sc = _scene()
     out_dir = S.exports_dir(sc.name)
     files = []
     if fmt == "svg":
         files.append(("sheet.svg", _sheet.to_svg(sc).encode("utf-8")))
     elif fmt == "json":
-        files.append((S.safe_name(sc.name) + S.SCENE_EXT, dumps(sc).encode("utf-8")))
+        files.append((S.safe_name(sc.name) + S.SCENE_EXT, _DA.D.text.encode("utf-8")))
     elif fmt in ("stl", "plan"):
         for t in sc.tags:
             p = plan_tag(t.spec)
@@ -619,35 +678,41 @@ def new_tag(req: M.NewTagIn) -> dict:
 def target_make(req: M.TargetMakeIn) -> dict:
     """The target editor: a box (w x h), a disc (r) or a palette face
     (`key`), round holes (x, y, diameter), a thickness (0 = no body), as a
-    Target (plan/target.py; the web app never makes outlines itself)."""
+    Target. M8a: made as a design shape (a `rect`, a `circle`, the face's
+    `loops`, with `circle` holes) and compiled as the design file compiles
+    a tag on its top (plan/shapes.py: circles stroked at the chord
+    tolerance), so the editor and a typed file give the same Target."""
+    from ..plan import shapes as _SHP
     th = float(req.thickness_mm)
-    holes = [(float(x), float(y), float(d) / 2.0) for x, y, d in req.holes]
-    if any(r <= 0 for _x, _y, r in holes):
-        raise _422("holes", "a hole's diameter must be > 0")
+    for k, (_x, _y, d) in enumerate(req.holes):
+        if float(d) <= 0:
+            raise _422("holes", "a hole's diameter must be > 0")
+    holes = [{"circle": float(d), "at": [float(x), float(y)]} for x, y, d in req.holes]
     if req.shape == "face":
         try:
-            t = _T.from_face(req.key or "", th)
+            f = _T.from_face(req.key or "", th)
         except KeyError:
             raise HTTPException(status_code=404, detail=f"no target {req.key!r}") from None
-        if holes:
-            loops = t.outline_mm() + [_T.circle_pts(x, y, r, 48, cw=True) for x, y, r in holes]
-            t = _T.from_loops(loops, th, centre=False, name=t.name)
+        if not holes:
+            return f.to_dict()
+        shape = {"loops": [[list(p) for p in lp] for lp in f.outline_mm()], "holes": holes,
+                 "name": f.name}
     elif req.shape == "disc":
         if req.r_mm <= 0:
             raise _422("r_mm", "the disc's radius must be > 0")
-        t = _T.disc(float(req.r_mm), holes, th)
-        t.name = f"Disc ⌀{2 * req.r_mm:g}"
+        shape = {"circle": 2.0 * float(req.r_mm), "holes": holes,
+                 "name": f"Disc ⌀{2 * req.r_mm:g}"}
     else:
         if req.w_mm <= 0 or req.h_mm <= 0:
             raise _422("w_mm" if req.w_mm <= 0 else "h_mm", "the box's sides must be > 0")
-        if holes:
-            w, h = float(req.w_mm) / 2.0, float(req.h_mm) / 2.0
-            loops = [[(-w, -h), (w, -h), (w, h), (-w, h)]] + [
-                _T.circle_pts(x, y, r, 48, cw=True) for x, y, r in holes]
-            t = _T.from_loops(loops, th, centre=False)
-        else:
-            t = _T.box(float(req.w_mm), float(req.h_mm), th)
-        t.name = f"Box {req.w_mm:g} x {req.h_mm:g}"
+        shape = {"rect": [float(req.w_mm), float(req.h_mm)], "holes": holes,
+                 "name": f"Box {req.w_mm:g} x {req.h_mm:g}"}
+    if not shape["holes"]:
+        shape.pop("holes")
+    try:
+        t = _SHP.extruded_top(shape, th)
+    except _SHP.ShapeError as exc:
+        raise _422(exc.path or "shape", exc.message) from None
     return t.to_dict()
 
 

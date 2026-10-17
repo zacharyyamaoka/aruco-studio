@@ -16,13 +16,15 @@ Local only. Read `docs/BRIEF.md`, then `docs/ARCHITECTURE.md` and `docs/PLAN.md`
 | Run by group | `.venv/Scripts/python tools/check.py` (or `tools/check.py core`) |
 | Rebuild the REF trace | `.venv/Scripts/python tools/check.py --trace` |
 | Status pages | `.venv/Scripts/python tools/status_page.py` (reports/status.html, with the hand-over screenshots); `tools/spec_status.py` (reports/spec.html); the record: `docs/STATUS.md` |
-| Run the API | `.venv/Scripts/python -m aruco_studio.server` (127.0.0.1:5360; Ctrl+C stops it; docs/API.md) |
+| Run the API | `.venv/Scripts/python -m aruco_studio.server` (127.0.0.1:5360; Ctrl+C stops it; docs/API.md); `--open <file>` follows a design file |
+| Check a design file | `.venv/Scripts/python -m aruco_studio check examples/*.json` (also `render <file> --svg out.svg`, `plan <file> --json`); the format: `docs/FILE_FORMAT.md` |
 
 | Folder | Holds |
 |---|---|
 | `aruco_studio/core/` | the pure core (stdlib only), ported from cad-exporter at `c8216ff` |
 | `aruco_studio/plan/` | `plan_tag(TagSpec) -> TagPlan` (REF's evaluate() as a pure function), the exact solids, SVG / STL / JSON exports (stdlib only) |
-| `aruco_studio/scene/` | many tags on one canvas, renumbering, the `.arucostudio.json` file, the 1:1 sheet (stdlib only) |
+| `aruco_studio/scene/` | many tags on one canvas, renumbering, the `.arucostudio.json` design file (`arucostudio.scene/2`: sketches, Extrude, ArUco Extrude) and its compile, the 1:1 sheet (stdlib only) |
+| `examples/` | three design files to start from: a plate with a ChArUco, the forearm (four sides), a sticker sheet |
 | `aruco_studio/verify/` | OpenCV reads a plan: render, detect, PnP (numpy + cv2) |
 | `aruco_studio/server/` | FastAPI on 127.0.0.1:5360; the only module that touches files |
 | `studio/` | the web app: 2D / 3D views, inspector, Library, IDs (Vite + React + TypeScript) |

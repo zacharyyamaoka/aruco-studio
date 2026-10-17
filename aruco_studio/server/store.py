@@ -8,6 +8,7 @@
 | exports | `<home>/exports/<scene>/` |
 | scenes | `ARUCO_STUDIO_SCENES`, else `ROOT/scenes/` (`<name>.arucostudio.json`) |
 | PrusaSlicer's profiles | `BAM_ARUCO_PRUSASLICER_DIR`, else PrusaSlicer's own config folder: READ ONLY |
+| an open design file (M8a) | anywhere Zach says (`design_path`): never under the two folders below |
 
 Never `%USERPROFILE%\\CADExporter` (Zach's live add-in's files): a path
 under it is refused even when an environment variable points there.
@@ -15,12 +16,14 @@ Writes are atomic (a temp file beside it, then os.replace).
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
+import threading
 import time
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from ..core import presets as _P
 from ..core import prusa as _PR
@@ -40,6 +43,20 @@ def _forbidden(p: Path) -> bool:
     for base in {Path(home), real}:
         try:
             Path(p).resolve().relative_to((base / "CADExporter").resolve())
+            return True
+        except (ValueError, OSError):
+            continue
+    return False
+
+
+def _prusa_owned(p: Path) -> bool:
+    """Is `p` under PrusaSlicer's own config folder (APPDATA/PrusaSlicer)?"""
+    appdata = os.environ.get("APPDATA")
+    bases = [Path(appdata) / "PrusaSlicer"] if appdata else []
+    bases.append(Path(os.path.expanduser("~")) / "AppData" / "Roaming" / "PrusaSlicer")
+    for base in bases:
+        try:
+            Path(p).resolve().relative_to(base.resolve())
             return True
         except (ValueError, OSError):
             continue
@@ -70,8 +87,29 @@ def safe_name(name: str) -> str:
     return s[:80] or "untitled"
 
 
+_WRITTEN: Dict[str, str] = {}
+_WLOCK = threading.Lock()
+
+
+def text_hash(data) -> str:
+    """sha256 of a text (utf-8) or bytes: the watcher's rule."""
+    if isinstance(data, str):
+        data = data.encode("utf-8")
+    return hashlib.sha256(data).hexdigest()
+
+
+def written_hash(path: Path) -> Optional[str]:
+    """The sha256 of the last bytes write_atomic wrote at `path` (None: none)."""
+    with _WLOCK:
+        return _WRITTEN.get(str(Path(path).resolve()))
+
+
 def write_atomic(path: Path, data, binary: bool = False) -> Path:
     path = _checked(Path(path))
+    if _prusa_owned(path):
+        raise StoreError(f"{path}: the Studio never writes under PrusaSlicer's folder")
+    with _WLOCK:
+        _WRITTEN[str(path.resolve())] = text_hash(data)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
     try:
@@ -174,6 +212,27 @@ def list_scenes() -> List[dict]:
         out.append({"name": f.name[:-len(SCENE_EXT)], "file": f.name, "bytes": st.st_size,
                     "modified": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(st.st_mtime))})
     return out
+
+
+# ------------------------------------------------------------- design files
+
+def design_path(path) -> Path:
+    """A design file anywhere Zach says, made absolute; refused under
+    USERPROFILE/CADExporter and PrusaSlicer's folder."""
+    p = Path(os.path.expanduser(str(path)))
+    if not p.is_absolute():
+        p = Path.cwd() / p
+    p = _checked(p)
+    if _prusa_owned(p):
+        raise StoreError(f"{p}: the Studio never writes under PrusaSlicer's folder")
+    return p
+
+
+def read_design(path: Path):
+    """A design file -> (its text (utf-8, a BOM dropped), the sha256 of its bytes)."""
+    with open(_checked(Path(path)), "rb") as fh:
+        b = fh.read()
+    return b.decode("utf-8-sig", errors="replace"), text_hash(b)
 
 
 # ------------------------------------------------------------- remembered

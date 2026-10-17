@@ -5,8 +5,8 @@
 * a printed id never moves: after an add, a delete, a rename, a move (REF
   G0.7's scenarios on the scene); a typed override is kept; a locked tag's
   ink (record) never changes;
-* .arucostudio.json: loads(dumps(s)) == s for 100 random scenes; an unknown
-  schema is refused with a message.
+* .arucostudio.json: loads(dumps(s)) == s for 100 random scenes (written as
+  arucostudio.scene/2 since M8a); an unknown schema is refused with a message.
 """
 from __future__ import annotations
 
@@ -153,8 +153,8 @@ def test_file_round_trip_100_random_scenes():
         assert back.to_dict() == json.loads(json.dumps(sc.to_dict()))
         assert dumps(back) == text
         d = json.loads(text)
-        assert d["schema"] == "arucostudio.scene/1"
-        assert all(t.get("plan") is None for t in d["tags"])
+        assert d["schema"] == "arucostudio.scene/2"         # M8a: the design file
+        assert "plan" not in text and "tags" not in d
 
 
 def test_an_unknown_schema_is_refused_with_a_message():
