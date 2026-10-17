@@ -1670,3 +1670,20 @@ Label · Inkjet Printer · label off
 ---
 
 Sources read: `docs/feedback/2026-10-17-markers-core-first.md`, `docs/feedback/2026-10-16-stickers-profiles-print.md`, `aruco_studio/plan/fields.py`, `aruco_studio/core/{make,presets}.py` (this repo); in the add-in worktree `aruco-fusion-plugin-0e9bcb`: `ArucoMarkers/aruco_extrude_ui.py`, `aruco_extrude_cmd.py`, `aruco_ui_config.py`, `bam_fusion_ui.py`, `docs/design_aruco_ui_v2.md`, `design_aruco_ui_proposals.md`, `design_aruco_print_presets.md`, `design_aruco_marker_table.md`, `reports/aruco/fusion-ui-language.html`.
+
+## Zach's decision (2026-10-17)
+
+**P3 is the core.**
+- "I like how you split it up into 3 clear different domains. 1 is the marker itself, 1 is the making of it, 1 is the label."
+- "I like how you are utilizing the 3d viewer for that ergonomic adjustments (instead of having to enter in fields by hand)."
+- "Selecting the different tabs is a natural way to change what is being focused on at the moment, it's a great design."
+
+**P5's lists join P3 as suggestions.**
+- "It's nice it can kinda be like 'suggestion': when you click it, it will auto fill in the information... we have something like that already, and I think you can add that to P3."
+- So each number keeps its row and its arrow, and also offers a short list of good values (whole cells, whole layers, real paper stocks, the largest size that fits). Picking one fills the value in, and it can still be typed or dragged.
+
+**Built in two steps:**
+1. **Today's model.** The three tabs, a handle on every value that exists, handles shown per tab, the outer-size dimension, other tags' IDs, and the suggestions.
+2. **After N-1's core lands, in the Studio core with new rule numbers.** Shift, the page / bed frame with the red size lint, print orientation, paper t/2, and Flip.
+
+Zach's open questions 1-7 above are still open. The build takes the recommended defaults and records them.
