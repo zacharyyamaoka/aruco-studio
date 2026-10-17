@@ -11,6 +11,7 @@ the oracle (G-code parsing, rasters) run everywhere.
 """
 from __future__ import annotations
 
+import copy
 import json
 import math
 from pathlib import Path
@@ -19,6 +20,7 @@ import numpy as np
 import pytest
 
 from aruco_studio.core import beds as BD
+from aruco_studio.core import label as L
 from aruco_studio.core import presets as P
 from aruco_studio.core import prusa as PR
 from aruco_studio.plan import plan_tag
@@ -100,12 +102,18 @@ def chain():
             "filament": fil}
 
 
-def sliced(name, chain, tmp_path, **extra):
+def sliced(name, chain, tmp_path, rule=None, **extra):
+    """The example `name` with `extra` on its ArUco features, sliced and
+    checked. `rule`: the label rule its tags are planned under (a new tag
+    stores label.NEW_RULE; an older tag keeps its own)."""
     doc = json.loads((EX / f"{name}.arucostudio.json").read_text(encoding="utf-8"))
     for f in doc["features"]:
         if "aruco" in f:
             f.update(extra)
     sc, _issues = DS.compile(doc, chain["presets"])
+    if rule is not None:
+        for t in sc.tags:
+            t.spec.settings["label"]["rule"] = rule
     plans = {t.name: plan_tag(t.spec) for t in sc.tags}
     ps, _sk = P3.parts(doc, sc, plans)
     prof = chain["profile"]
@@ -121,7 +129,9 @@ def sliced(name, chain, tmp_path, **extra):
     rep = SC.check_send(lay, ps, sc, plans, run["gcode"], chain["pp"]["layer_mm"],
                         chain["pp"]["first_layer_mm"])
     rep["seconds"] = run["seconds"]
-    REPORTS[name + ("" if not extra else " " + json.dumps(extra))] = rep
+    REPORTS[name + ("" if not extra else " " + json.dumps(extra))
+            + ("" if rule is None else f" rule {rule}")] = rep
+    rep["plans"] = plans
     return rep
 
 
@@ -141,14 +151,29 @@ def forearm(chain, tmp_path_factory):
     return sliced("forearm", chain, tmp_path_factory.mktemp("forearm"))
 
 
+NAMED = {"label": "#id + name", "marker_ids": None}
+LINE_MM = 0.68                                       # the fixture print's lines (the cell rule)
+FLOOR = L.LINE_STROKE * LINE_MM                      # rule 5's thinnest cut stroke: 0.748 mm
+AT_THE_LINE = {"label": {"on": True, "content": "id", "cap_mm": round(L.GLYPH_ROWS * FLOOR, 6)},
+               "marker_ids": None}
+
+
 @pytest.fixture(scope="module")
 def forearm_named(chain, tmp_path_factory):
-    """The forearm as M8c.7 sliced it: '#id + name' on every face and the
-    list's shared ids, so the front and back carry the two-line label whose
-    stroke is under one line (the example says "#id" with each face's own
-    ids since the 2026-10-17 audit; a bigger '#0-5' alone prints)."""
-    return sliced("forearm", chain, tmp_path_factory.mktemp("forearm_named"),
-                  label="#id + name", marker_ids=None)
+    """The forearm as M8c.7 sliced it, under label rule 4 (what a tag made
+    before rule 5 stores): '#id + name' on every face and the list's shared
+    ids, so the front and back carry the two-line label cut from the black
+    at a 0.64 mm stroke, under the 0.68 mm line."""
+    return sliced("forearm", chain, tmp_path_factory.mktemp("forearm_named"), rule=4, **NAMED)
+
+
+@pytest.fixture(scope="module")
+def forearm_at_the_line(chain, tmp_path_factory):
+    """Label rule 5 (a new tag): the tightest label it builds cut from the
+    black -- '#0-5' typed at 3.74 mm, so each stroke is exactly rule 5's
+    floor, 1.1 lines of the cell rule's 0.68 mm, in the front and back
+    ChArUco squares."""
+    return sliced("forearm", chain, tmp_path_factory.mktemp("forearm_line"), **AT_THE_LINE)
 
 
 @NEEDS
@@ -164,16 +189,63 @@ def test_the_forearm_slices_as_one_object_and_each_side_tag_passes(forearm):
 
 
 @NEEDS
-@pytest.mark.xfail(strict=True, reason="M8c.7 finding (docs/status/M8c.md): the front and back "
-                   "tags' label is cut from the black at a 0.64 mm stroke, under the preset's "
-                   "0.68 mm line; PrusaSlicer's black beads close parts of the glyphs, so some "
-                   "font pixels are under 60 % white. Strict: it fails loudly once they print")
-def test_the_forearm_labels_print_their_pixels(forearm_named):
-    labelled = {n: t["label"] for n, t in forearm_named["tags"].items() if t["label"].get("pixels")}
+def test_the_forearm_labels_print_their_pixels(forearm_at_the_line):
+    """M8c.7's label bar, PASSED under label rule 5 (Q1's recommended
+    default, 2026-10-17): a label cut out of the black strokes at least one
+    line of the cell rule (1.1 lines: at exactly one line, 0.68-0.72 mm, the
+    white prints but 10 of 85 one-pixel black counters drop out), so every
+    font pixel prints -- even at the floor itself (was a strict xfail under
+    rule 4: test_rule_4_is_unchanged_and_still_loses_pixels)."""
+    rep = forearm_at_the_line
+    for n in ("tag.back", "tag.front"):
+        lab = rep["plans"][n].ev["label"]
+        assert lab.settings.rule == L.NEW_RULE == 5 and lab.kind == "black", (n, lab.kind)
+        assert abs(lab.stroke - FLOOR) < 1e-6, (n, lab.stroke)     # exactly the floor
+    labelled = {n: t["label"] for n, t in rep["tags"].items() if t["label"].get("pixels")}
     assert sorted(labelled) == ["tag.back", "tag.front"]
     for name, lab in labelled.items():
         assert lab["mean_gap"] >= 0.85, (name, lab)      # the black around the text is there
     assert all(lab["ok"] for lab in labelled.values()), labelled
+
+
+def test_rule_5_refuses_what_rule_4_built_under_one_line(chain):
+    """No slicer: the forearm's '#id + name' (two lines in a 19 mm square)
+    is built at a 0.64 mm stroke under rule 4 and refused under rule 5 (one
+    message; never a label whose glyphs close up). A typed cap under the
+    floor is refused too, saying so."""
+    doc = json.loads((EX / "forearm.arucostudio.json").read_text(encoding="utf-8"))
+    for f in doc["features"]:
+        if "aruco" in f:
+            f.update(NAMED)
+    sc, _issues = DS.compile(doc, chain["presets"])
+    front = next(t for t in sc.tags if t.name == "tag.front")
+    assert front.spec.settings["label"]["rule"] == 5             # what a new tag stores
+    new = plan_tag(front.spec).ev["label"]
+    assert new.kind == "none" and "ChArUco square for '#0-5'" in new.reason, new.reason
+    assert f"{L.GLYPH_ROWS * FLOOR:.1f} mm letters" in new.reason, new.reason
+    spec4 = copy.deepcopy(front.spec)
+    spec4.settings["label"]["rule"] = 4
+    lab4 = plan_tag(spec4).ev["label"]
+    assert lab4.kind == "black" and abs(lab4.stroke - 0.64) < 1e-6 and lab4.texts() == ["#0-5|FOR…"]
+    typed = copy.deepcopy(front.spec)
+    typed.settings["label"] = {**typed.settings["label"], "content": "id", "cap_mm": 3.2}
+    lab = plan_tag(typed).ev["label"]
+    assert lab.kind == "none" and "rule 5" in lab.reason, lab.reason
+
+
+@NEEDS
+def test_rule_4_is_unchanged_and_still_loses_pixels(forearm_named):
+    """The M8c.7 finding, kept as it was found: a tag that stores label
+    rule 4 is planned exactly as before (stroke 0.64 mm, '#0-5|FOR...'),
+    and its slice still loses font pixels. Rule 5 is a new number, so no
+    stored tag changes."""
+    for n in ("tag.back", "tag.front"):
+        lab = forearm_named["plans"][n].ev["label"]
+        assert lab.settings.rule == 4 and abs(lab.stroke - 0.64) < 1e-6, (n, lab.stroke)
+    labelled = {n: t["label"] for n, t in forearm_named["tags"].items()
+                if t["label"].get("pixels")}
+    assert sorted(labelled) == ["tag.back", "tag.front"]
+    assert not all(lab["ok"] for lab in labelled.values()), labelled
 
 
 @NEEDS

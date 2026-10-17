@@ -40,6 +40,9 @@ def spec(layout="single", **s):
 def test_health_dictionaries_options_form_targets(client):
     h = client.get("/api/health").json()
     assert h["ok"] and h["ref_commit"] == "c8216ff"
+    from aruco_studio.scene import design as DS
+    assert h["schemas"]["scene"] == "arucostudio.scene/1"        # GET /api/scene's shape
+    assert h["schemas"]["file"] == DS.SCHEMA == "arucostudio.scene/2"   # the file (audit A5)
     ds = client.get("/api/dictionaries").json()
     assert len(ds) == 21 and sum(d["capacity"] for d in ds) == 9596
     o = client.get("/api/options").json()

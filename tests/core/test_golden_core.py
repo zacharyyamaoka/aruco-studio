@@ -72,7 +72,7 @@ def test_versioned_rule_numbers_kept():
     stored settings carry."""
     assert OR.ORIGIN_RULE == 2
     assert A.CELL_RULE == 1
-    assert L.RULE == 2 and sorted(L.RULES) == [1, 2, 3, 4]    # 3: M6a, 4: the 2026-10-17 audit
+    assert L.RULE == 2 and sorted(L.RULES) == [1, 2, 3, 4, 5]   # 3: M6a, 4: the 2026-10-17 audit, 5: Q1
     assert T.RULE == 1
     assert {c["in"]["rule"] for c in load("origin")["cases"]} == {2, None}
     assert {c["out"]["record"]["settings"]["rule"] for c in load("label")["cases"]} == {1, 2}

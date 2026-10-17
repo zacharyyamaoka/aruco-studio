@@ -82,6 +82,9 @@ def renumber(scene: Scene, when: str = "") -> dict:
     for r in plan.rows:
         d = r.to_dict()
         d["tag"] = _N.split_name(r.name)[0]
+        # how the tag is made (audit nit A10): the plan's, as the IDs table's column
+        p = plans.get(d["tag"])
+        d["made_by"] = (p.data.get("made_by") or "print3d") if p is not None and p.ok else ""
         rows.append(d)
     return {"rows": rows, "changed": changed, "duplicates": plan.duplicates(),
             "warnings": list(plan.warnings), "errors": list(plan.errors) + [

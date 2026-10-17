@@ -35,7 +35,7 @@ def test_the_warn_names_the_checker_that_passes_and_it_does():
     p, ws = _cellmin(_side())
     assert len(ws) == 1 and ws[0]["level"] == "warn" and ws[0]["field"] == "numbers.size"
     text = ws[0]["text"]
-    assert "; a Checker size of " in text and "mm passes (" in text and "on this face)" in text
+    assert " — a Checker size of " in text and "mm passes (" in text and "on this face)" in text
     sq = float(text.split("a Checker size of ")[1].split(" mm")[0])
     # typed, that checker clears the minimum
     sc, _ = DS.compile(_side())

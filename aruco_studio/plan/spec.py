@@ -218,10 +218,12 @@ def check(spec: TagSpec) -> List[Issue]:
     elif mid is not None:
         add("numbers.marker_id", "error", "marker id: not a finite number")
     # -- size, square
-    for k in ("size", "square"):
+    for k, word in (("size", "Marker size"), ("square", "Checker size")):
         v = n.get(k, 0.0)
         if v is not None and (not _finite(v) or v < 0):
-            add(f"numbers.{k}", "error", f"{k} {v}: 0 (Auto) or more than 0 mm")
+            # plain words, nothing the short line cuts (audit nit C2: "size -5.0: 0")
+            add(f"numbers.{k}", "error", f"{word} {v:g} mm: 0 for Auto, or more than 0 mm"
+                if _finite(v) else f"{word}: 0 for Auto, or more than 0 mm")
     sz, sq = n.get("size") or 0.0, n.get("square") or 0.0
     if s.get("layout") == "charuco" and _finite(sz) and _finite(sq) and sz > 0 and 0 < sq <= sz:
         add("numbers.square", "error",

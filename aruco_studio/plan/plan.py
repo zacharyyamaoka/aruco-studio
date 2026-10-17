@@ -201,7 +201,9 @@ def cell_min_fix(note: str, ev, spec: TagSpec) -> str:
         how = f"a Checker size of {sq:g} mm passes ({cols} × {rows} on this face)"
     else:
         how = f"{cols} × {rows} passes (a Checker size of {sq:g} mm)"
-    return f"{note.rstrip('.')}; {how}"
+    # " — ", not "; ": the inspector's short line (the kit's shortText) cuts at
+    # "; " and dropped the fix (the morning check, 2026-10-17)
+    return f"{note.rstrip('.')} — {how}"
 
 
 def issues_of(ev, s, n, spec: TagSpec) -> List[Issue]:

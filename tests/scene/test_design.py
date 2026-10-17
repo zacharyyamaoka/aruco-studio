@@ -135,7 +135,7 @@ def test_sugar_expands_to_what_api_new_stores():
     for k in ("origin_v", "cells", "label"):
         assert k in s.settings
     from aruco_studio.core import label as L
-    # a new tag stores label rule 3 (M6a, label.NEW_RULE; Merge 1), a 3D make and Holes avoid
+    # a new tag stores label.NEW_RULE (rule 5 since 2026-10-17), a 3D make and Holes avoid
     assert s.settings["label"]["rule"] == L.NEW_RULE and s.settings["cells"] == P.cell_setting(_preset())
     assert s.settings["make"]["by"] == "print3d" and s.settings["holes"] == "avoid"
     # one write (a size typed through the Scene API): exact settings / numbers, no sugar
@@ -297,3 +297,14 @@ def test_shapes_2d_places_every_shape():
     d = out[3]["loops"]
     assert len(d) == 2 and min(x for x, _ in d[0]) == pytest.approx(55.0)
     assert json.dumps(out)
+
+
+def test_renumber_rows_say_how_each_tag_is_made():
+    """Audit nit A10: the Renumber report's rows carry made_by (the plan's),
+    as the IDs table's Made-by column shows it."""
+    from aruco_studio.core import presets as P
+    presets = {n: p for n, p, _k in P.catalog_all(P.MemoryStore(), None)["items"]}
+    for name, want in (("forearm", {"print3d"}), ("sticker_sheet", {"sticker"})):
+        sc, _ = DS.compile(example(name), presets)
+        rep = renumber(sc)
+        assert rep["rows"] and {r["made_by"] for r in rep["rows"]} == want, (name, rep["rows"])

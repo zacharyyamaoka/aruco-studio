@@ -259,8 +259,10 @@ def new_tag_settings(s, has_body, preset=None, made_by=None):
     without it reads exactly as before: `make` (core.make, rule 1: how the
     tag is made -- `made_by`, else the preset's kind, else a `make` already
     there, else 3D printed; a sticker takes the preset's stock), `holes`
-    ("avoid" unless one is given) and the label's rule (label.NEW_RULE: a
-    ChArUco label by hand in any black square). A sticker is White + black,
+    ("avoid" unless one is given) and the label's rule (label.NEW_RULE: 5
+    since 2026-10-17 -- a ChArUco label by hand in any black square (3), on
+    auto in a black square only (4), and cut from the black at least 1.1
+    cell lines thick (5)). A sticker is White + black,
     New body, no pins, no trim."""
     from . import make as _MK
     from . import presets as _PS

@@ -158,8 +158,10 @@ def _scene_plans(sc: Scene) -> dict:
 @app.get("/api/health")
 def health() -> dict:
     return {"ok": True, "version": VERSION, "ref_commit": REF_COMMIT,
+            # "scene": the shape GET /api/scene answers (kept /1); "file": what a
+            # design file on disk is (audit nit A5)
             "schemas": {"tagspec": "arucostudio.tagspec/1", "tagplan": "arucostudio.tagplan/1",
-                        "scene": "arucostudio.scene/1"},
+                        "scene": "arucostudio.scene/1", "file": "arucostudio.scene/2"},
             "home": str(S.home()), "scenes": str(S.scenes_dir())}
 
 

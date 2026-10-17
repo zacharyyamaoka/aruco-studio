@@ -154,6 +154,13 @@ along `angle`, width across it; a label turned a quarter is still axis-
 aligned). `min_feature` is one pixel (and the black left around knocked-out
 text).
 
+NOT REF's (label rule 5, 2026-10-17): a label CUT OUT OF THE BLACK (role
+"cut") strokes at least LINE_STROKE (1.1) lines of the tag's cell rule
+(plan_label's line_mm, from the tag's "cells"), so the slicer's black beads
+leave the glyphs open and the one-pixel black counters print: 3.74 mm caps
+at the 0.68 mm lines of a 0.6 mm nozzle. A label on the white keeps the
+nozzle floor. Rules 1-4 never see the line.
+
 ### Colour (`role`, relative to the black footprint)
 
     black placement  "cut": the text comes OUT of the black cells; the white
@@ -290,19 +297,60 @@ RULES = {
     # keep their white fallback, so no stored label changes.
     4: Rule(gap_min=WHITE_GAP_MIN, gap_pref=WHITE_GAP_PREF, far=True, slack=SIDE_SLACK,
             exact=True),
+    # NOT REF's (ArUco Studio, 2026-10-17, M8c.7 / Q1's recommended default):
+    # rule 4, and a label CUT OUT OF THE BLACK has strokes of at least one
+    # line of the tag's cell rule (LabelSettings.line_mm, from the tag's
+    # "cells") -- LINE_STROKE (1.1) lines, the floor the slice measured --
+    # so the slicer's black beads do not close the glyphs (0.64 mm strokes
+    # under 0.68 mm lines lost 37 of 216 font pixels) and the one-pixel
+    # black counters print. A label on the white (black ink on the white)
+    # keeps the nozzle floor. Rules 1-4 are planned exactly as before.
+    5: Rule(gap_min=WHITE_GAP_MIN, gap_pref=WHITE_GAP_PREF, far=True, slack=SIDE_SLACK,
+            exact=True),
 }
 RULE = 2                   # what a NEW label is made under
 RULE_NOTE = ("older label rule (2-module gap): change any label setting to use the new one")
-NEW_RULE = 4               # what the Studio's new tag stores (core.form.new_tag_settings);
+NEW_RULE = 5               # what the Studio's new tag stores (core.form.new_tag_settings);
                            # REF's RULE (2) stays the LabelSettings default
 ANY_SQUARE_RULE = 3        # from this rule on a ChArUco label by hand takes any black square
 SQUARE_ONLY_RULE = 4       # from this rule a ChArUco label on auto stays in a black square
+LINE_RULE = 5              # from this rule a label cut from the black has strokes >= the cell line
+LINE_STROKE = 1.1          # ... times LINE_STROKE: measured in the slice (tests/verify/
+                           # test_slice_check.py, the 0.68 mm line): at 0.68-0.72 mm strokes
+                           # the white prints but the 1-pixel black counters drop out; from
+                           # 0.74 mm every pixel prints. 1.1 lines = 0.748 mm
 
 
 def rule_of(settings) -> Rule:
     """The Rule of a LabelSettings (or a Label's settings)."""
     r = getattr(settings, "rule", RULE) if settings is not None else RULE
     return RULES.get(r, RULES[RULE])
+
+
+def line_floor(settings) -> float:
+    """The cell line a label cut from the black must stroke at least (mm):
+    LabelSettings.line_mm from LINE_RULE on, else 0 (no floor beyond the
+    nozzle)."""
+    if settings is None or int(getattr(settings, "rule", RULE) or 0) < LINE_RULE:
+        return 0.0
+    v = float(getattr(settings, "line_mm", 0.0) or 0.0)
+    return v if math.isfinite(v) and v > 0 else 0.0
+
+
+def cut_stroke(settings) -> float:
+    """The thinnest stroke a label cut from the black may have under rule 5
+    (mm): LINE_STROKE cell lines; 0 under rules 1-4."""
+    return round(LINE_STROKE * line_floor(settings), 6)
+
+
+def cut_settings(settings: "LabelSettings") -> "LabelSettings":
+    """The settings a label CUT OUT OF THE BLACK is sized with (rule 5): the
+    stroke raised to cut_stroke when that is above the nozzle and any typed
+    stroke. The same object when nothing changes (rules 1-4)."""
+    w = cut_stroke(settings)
+    if w <= 0 or w <= min_stroke(settings.nozzle_mm, settings.stroke_mm) + EPS:
+        return settings
+    return replace(settings, stroke_mm=w)
 EPS = 1e-9
 TOL = 1e-6                 # mm: geometric checks
 SOLID_PAD_MM = 0.1         # a cut tool stands this far past the slab it cuts (no coplanar faces)
@@ -800,6 +848,9 @@ class LabelSettings:
     y_mm: float = 0.0              # pattern's centre, +y up (the frame after the Origin turn)
     rule: int = RULE               # the rule it was made under (RULES); a stored label
                                    # without one is rule 1 and keeps its exact layout
+    line_mm: float = 0.0           # NOT a setting (not in to_dict): the tag's cell line,
+                                   # set by the planner (plan_label's line_mm); from
+                                   # LINE_RULE a label cut from the black strokes >= it
 
     @property
     def manual(self) -> bool:
@@ -1090,6 +1141,8 @@ class Label:
                 d["preview"] = self.preview.to_dict(nd)
             if self.reason:
                 d["reason"] = self.reason
+            if line_floor(self.settings) > 0:
+                d["line_mm"] = round(line_floor(self.settings), 6)
             return d
         r = (lambda x: [round(v, nd) + 0.0 for v in x] if x is not None else None)
         d = {"kind": self.kind, "role": self.role, "side": self.side,
@@ -1104,6 +1157,8 @@ class Label:
             d["violations"] = list(self.violations)
         if self.forced:
             d["forced"] = True
+        if line_floor(self.settings) > 0:               # rule 5 only: rules 1-4 as before
+            d["line_mm"] = round(line_floor(self.settings), 6)
         return d
 
 
@@ -1112,6 +1167,10 @@ def from_dict(d: Optional[dict]) -> Label:
     if not isinstance(d, dict):
         return Label()
     s = LabelSettings.from_dict(d.get("settings"))
+    try:
+        s.line_mm = max(0.0, float(d.get("line_mm") or 0.0))       # rule 5's floor
+    except (TypeError, ValueError):
+        s.line_mm = 0.0
     if d.get("kind") in (None, "none"):
         pv = d.get("preview")
         return Label(settings=s, notes=list(d.get("notes") or []),
@@ -2170,9 +2229,15 @@ def label_violations(spec: TagSpec, lab: Label, *, loops=(), bounds=(),
     s = lab.settings
     need = min_cap(s.nozzle_mm, s.stroke_mm)
     low = min(p.cap for p in lab.parts)
+    line = cut_stroke(s) if lab.kind == "black" else 0.0
     if low < need - TOL:
         out.append(f"{low:.1f} mm letters at a {s.nozzle_mm:g} mm nozzle won't print cleanly "
                    f"(strokes {low / GLYPH_ROWS:.2f} mm; the nozzle needs {need:.1f} mm letters)")
+    elif line and low < GLYPH_ROWS * line - TOL:
+        # rule 5: cut out of the black, a stroke under one line closes up
+        out.append(f"{low:.1f} mm letters cut from the black won't print cleanly (strokes "
+                   f"{low / GLYPH_ROWS:.2f} mm, under {LINE_STROKE:g} of the "
+                   f"{line_floor(s):g} mm lines; they need {GLYPH_ROWS * line:.2f} mm letters)")
     clear = max(KEEPOUT_MM, KEEPOUT * m)
     if lab.kind == "black":
         squares = marker_squares(spec)
@@ -2583,7 +2648,8 @@ def plan_label(spec: TagSpec, settings: Optional[LabelSettings] = None, *, mode:
                bounds: Optional[Sequence[Sequence[Pt]]] = None, tile: Optional[Rect] = None,
                mark=None, pins: Optional[dict] = None,
                keepouts: Sequence[Sequence[Pt]] = (),
-               slab: Optional[Tuple[float, float]] = None) -> Label:
+               slab: Optional[Tuple[float, float]] = None,
+               line_mm: Optional[float] = None) -> Label:
     """One tag's label (see the module docstring). Never raises.
 
     spec      markers.TagSpec, the RESOLVED one (a copy's own ids)
@@ -2605,6 +2671,10 @@ def plan_label(spec: TagSpec, settings: Optional[LabelSettings] = None, *, mode:
     keepouts  more polygons (mm) to keep KEEPOUT_MM clear of
     slab      the pattern layer's (lo, hi) mm (pattern_slab): the label is
               built there (Label.solids)
+    line_mm   NOT REF's (rule 5): the tag's cell line (mm; None keeps the
+              settings' own line_mm). From LINE_RULE a label cut out of the
+              black strokes at least LINE_STROKE x this (cut_settings);
+              rules 1-4 ignore it
 
     settings.position "manual" puts the label's first block centred on
     (x_mm, y_mm): on the white and in a ChArUco square anywhere, re-checked
@@ -2626,8 +2696,15 @@ def plan_label(spec: TagSpec, settings: Optional[LabelSettings] = None, *, mode:
     if isinstance(settings, dict):
         settings = LabelSettings.from_dict(settings, notes)
     s = settings or LabelSettings()
+    if line_mm is not None:
+        try:
+            lv = float(line_mm)
+        except (TypeError, ValueError):
+            lv = 0.0
+        s = replace(s, line_mm=lv if math.isfinite(lv) and lv > 0 else 0.0)
     if not s.on:
         return Label(settings=s)
+    sb = cut_settings(s)          # rule 5: a label cut from the black strokes >= the cell line
     if s.stroke_mm and s.stroke_mm < s.nozzle_mm - EPS:
         notes.append(f"label: stroke {s.stroke_mm:g} mm is under the {s.nozzle_mm:g} mm nozzle "
                      "-- the nozzle used")
@@ -2657,7 +2734,7 @@ def plan_label(spec: TagSpec, settings: Optional[LabelSettings] = None, *, mode:
     wkeep = (extra + ([] if tile_cut else mark_keepouts(mark))) if strip else keep
 
     def black(cut, out):
-        return _plan_black(spec, s, name, key, keep, out, cut)
+        return _plan_black(spec, sb, name, key, keep, out, cut)
 
     def white(cut, out):
         return _plan_white(spec, s, name, key, mode=mode, op=op, region=region,
@@ -2701,18 +2778,26 @@ def plan_label(spec: TagSpec, settings: Optional[LabelSettings] = None, *, mode:
             first = resolve_text(s.template(), spec, name=name, key=key).split(LINE_BREAK)[0]
             S = spec.square_length_m * 1000.0
             reason = (f"no room in a {S:.1f} mm ChArUco square for {first!r}, even at "
-                      f"{min_cap(s.nozzle_mm, s.stroke_mm):.1f} mm letters")
+                      f"{min_cap(sb.nozzle_mm, sb.stroke_mm):.1f} mm letters")
         elif s.place == "auto":
             first = resolve_text(s.template(), spec, name=name, key=key).split(LINE_BREAK)[0]
             reason = (f"no room for {first!r} on the black or on the white, even at "
                       f"{min_cap(s.nozzle_mm, s.stroke_mm):.1f} mm letters (the smallest a "
                       f"{s.nozzle_mm:g} mm nozzle prints)")
+    if lab.kind == "none" and sb is not s and s.place != "white" and 0 < s.cap_mm             < min_cap(sb.nozzle_mm, sb.stroke_mm) - EPS:
+        # rule 5: a typed cap the line floor refuses on the black says so
+        reason = (f"a {s.cap_mm:g} mm cap cut from the black gives strokes under "
+                  f"{LINE_STROKE:g} of the {line_floor(s):g} mm lines: "
+                  f"{min_cap(sb.nozzle_mm, sb.stroke_mm):.2f} mm letters at least "
+                  f"(label rule 5)")
+        notes.append("label: " + reason)
     lab.settings = s
     lab.mode, lab.slab = mode, (tuple(map(float, slab)) if slab else None)
     if lab.kind == "none":
         lab.slots, lab.parts = [], []
     for i, sl in enumerate(lab.slots):
-        part = _lay(i, sl, _cands(s, spec, sl, name, key), s, notes)
+        part = _lay(i, sl, _cands(s, spec, sl, name, key), sb if lab.kind == "black" else s,
+                    notes)
         if part is not None:
             lab.parts.append(part)
     loops_c = [lp for lp in (_clean(l) for l in (region or ())) if len(lp) >= 3]
@@ -2727,7 +2812,8 @@ def plan_label(spec: TagSpec, settings: Optional[LabelSettings] = None, *, mode:
         """`new`'s parts laid out again; (it, why not) -- (None, why) when a
         text no longer fits there or the safety check objects."""
         for i, sl in enumerate(new.slots):
-            part = _lay(i, sl, _cands(s, spec, sl, name, key), s, said)
+            part = _lay(i, sl, _cands(s, spec, sl, name, key),
+                        sb if new.kind == "black" else s, said)
             if part is not None:
                 new.parts.append(part)
         probs = check_label(spec, new) if new.ok else ["a text no longer fits"]
@@ -2796,10 +2882,12 @@ def plan_label(spec: TagSpec, settings: Optional[LabelSettings] = None, *, mode:
     if lab.kind == "none" and lab.preview is None:
         # nothing fits inside the rules: lay it out where it was asked for
         def force(place):
-            return _force(spec, s, name, key, place, mode=mode, op=op, loops=loops_c,
-                          grow=bool(grow), bounds=bounds_c, tile=tile,
-                          mark=mark if strip else None, pins=pins if strip else None,
-                          keep=keep, wkeep=wkeep, at=target)
+            got = _force(spec, sb if place == "black" else s, name, key, place, mode=mode,
+                         op=op, loops=loops_c, grow=bool(grow), bounds=bounds_c, tile=tile,
+                         mark=mark if strip else None, pins=pins if strip else None,
+                         keep=keep, wkeep=wkeep, at=target)
+            got.settings = s                     # the stored settings, not the sized ones
+            return got
         if s.place in ("black", "white"):
             pv = force(s.place)
         elif square_only:
@@ -2935,7 +3023,8 @@ def relabel(label, spec: TagSpec, *, name: str = "", key: str = "") -> Label:
                                        lab.settings))
         return out
     for i, sl in enumerate(out.slots):
-        part = _lay(i, sl, _cands(lab.settings, spec, sl, name, key), lab.settings,
+        part = _lay(i, sl, _cands(lab.settings, spec, sl, name, key),
+                    cut_settings(lab.settings) if lab.kind == "black" else lab.settings,
                     out.notes)
         if part is not None:
             out.parts.append(part)
@@ -3152,10 +3241,14 @@ def check_label(spec: TagSpec, label, tol: float = 1e-6) -> List[str]:
     out: List[str] = []
     m, ext, _q = _mm(spec)
     noz = lab.settings.nozzle_mm
+    line = cut_stroke(lab.settings) if lab.kind == "black" else 0.0
     for p in lab.parts:
         polys = [b.corners() for b in p.boxes]
         if p.stroke < noz - tol:
             out.append(f"{p.text!r}: stroke {p.stroke:.3f} mm under the {noz:g} mm nozzle")
+        elif line and p.stroke < line - tol:
+            out.append(f"{p.text!r}: stroke {p.stroke:.3f} mm under {line:g} mm "
+                       f"({LINE_STROKE:g} lines, cut from the black: rule 5)")
         if p.min_feature < noz - tol:
             out.append(f"{p.text!r}: a feature of {p.min_feature:.3f} mm under the nozzle")
         sl = lab.slots[p.slot] if p.slot < len(lab.slots) else None

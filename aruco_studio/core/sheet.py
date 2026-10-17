@@ -830,15 +830,56 @@ class StickerLayout:
     def cuts(self) -> int:
         """Straight cuts to free every sticker (tight: shelves stacked, so a
         page of k shelves has k + 1 long cuts; a shelf of c stickers c + 1
-        short ones). Spaced: four per sticker."""
+        short ones). Spaced (audit nit A6, 2026-10-17): a guillotine count on
+        each page -- every straight cut that crosses no sticker, across the
+        piece it is made in, so stickers in line share one (four 30 mm
+        stickers in a row: 10, not 4 per sticker = 16)."""
         if self.settings.mode != "tight":
-            return 4 * len(self.placed)
+            n = 0
+            for pi, page in enumerate(self.pages):
+                rects = [(p.x_mm, p.y_mm, p.x_mm + p.w_mm, p.y_mm + p.h_mm) for p in page]
+                page_box = (0.0, 0.0) + tuple(self.page_mm)
+                n += min(_guillotine(rects, page_box, 0), _guillotine(rects, page_box, 1))
+            return n
         n = 0
         for pi in range(len(self.pages)):
             sh = [s for s in self.shelves if s["page"] == pi]
             if sh:
                 n += len(sh) + 1 + sum(len(s["keys"]) + 1 for s in sh)
         return n
+
+
+_CUT_TOL = 1e-6
+
+
+def _guillotine(rects, region, axis) -> int:
+    """The straight cuts that free each rect of `rects` (page mm, x0 y0 x1
+    y1) from `region`: along `axis` (0: cuts across y, 1: across x) every
+    edge line that crosses no rect is one cut through the region; each
+    piece is then cut along the other axis. A rect alone takes a cut per
+    side not already on the piece's edge. When neither axis has a cut
+    (stickers that interlock), four per sticker, as before."""
+    if not rects:
+        return 0
+    if len(rects) == 1:
+        r = rects[0]
+        return sum(1 for a, b in zip(r, region) if abs(a - b) > _CUT_TOL)
+    for ax in (axis, 1 - axis):
+        lo, hi = (1, 3) if ax == 0 else (0, 2)
+        cs = sorted({c for r in rects for c in (r[lo], r[hi])
+                     if region[lo] + _CUT_TOL < c < region[hi] - _CUT_TOL})
+        cs = [c for c in cs if not any(r[lo] + _CUT_TOL < c < r[hi] - _CUT_TOL for r in rects)]
+        if not cs:
+            continue
+        n = len(cs)
+        bounds = [region[lo]] + cs + [region[hi]]
+        for a, b in zip(bounds, bounds[1:]):
+            sub = [r for r in rects if r[lo] >= a - _CUT_TOL and r[hi] <= b + _CUT_TOL]
+            piece = list(region)
+            piece[lo], piece[hi] = a, b
+            n += _guillotine(sub, tuple(piece), 1 - ax)
+        return n
+    return 4 * len(rects)
 
 
 def _turn(u, v, rot):
