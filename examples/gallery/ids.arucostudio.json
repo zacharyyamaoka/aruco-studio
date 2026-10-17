@@ -1,0 +1,152 @@
+{
+ "schema": "arucostudio.scene/2",
+ "name": "IDs: 3D tags and stickers, one numbering",
+ "preset": "0.32mm SPEED @MK4IS 0.6 - Aruco",
+ "sketches": [
+  {
+   "id": "sk",
+   "shapes": [
+    {
+     "id": "p0",
+     "rect": [
+      40,
+      40
+     ],
+     "at": [
+      0,
+      0
+     ]
+    },
+    {
+     "id": "p1",
+     "rect": [
+      40,
+      40
+     ],
+     "at": [
+      55,
+      0
+     ]
+    },
+    {
+     "id": "p2",
+     "rect": [
+      60,
+      40
+     ],
+     "at": [
+      135,
+      0
+     ]
+    },
+    {
+     "id": "s0",
+     "rect": [
+      35,
+      35
+     ],
+     "at": [
+      0,
+      -60
+     ]
+    },
+    {
+     "id": "s1",
+     "rect": [
+      35,
+      35
+     ],
+     "at": [
+      55,
+      -60
+     ]
+    },
+    {
+     "id": "s2",
+     "rect": [
+      60,
+      40
+     ],
+     "at": [
+      135,
+      -60
+     ]
+    },
+    {
+     "id": "p6",
+     "rect": [
+      40,
+      40
+     ],
+     "at": [
+      215,
+      0
+     ]
+    }
+   ]
+  }
+ ],
+ "features": [
+  {
+   "id": "b0",
+   "extrude": "p0",
+   "height": 3
+  },
+  {
+   "id": "b1",
+   "extrude": "p1",
+   "height": 3
+  },
+  {
+   "id": "b2",
+   "extrude": "p2",
+   "height": 3
+  },
+  {
+   "id": "b6",
+   "extrude": "p6",
+   "height": 3
+  },
+  {
+   "id": "tagA",
+   "aruco": "b0.top",
+   "layout": "single"
+  },
+  {
+   "id": "tagB",
+   "aruco": "b1.top",
+   "layout": "single"
+  },
+  {
+   "id": "board",
+   "aruco": "b2.top",
+   "layout": "grid"
+  },
+  {
+   "id": "stickerA",
+   "aruco": "s0",
+   "preset": "Sticker · Letter · 600 dpi",
+   "layout": "single",
+   "label": "#id"
+  },
+  {
+   "id": "stickerB",
+   "aruco": "s1",
+   "preset": "Sticker · Letter · 600 dpi",
+   "layout": "single",
+   "label": "#id"
+  },
+  {
+   "id": "stickers",
+   "aruco": "s2",
+   "preset": "Sticker · Letter · 600 dpi",
+   "layout": "grid"
+  },
+  {
+   "id": "other",
+   "aruco": "b6.top",
+   "layout": "single",
+   "dictionary": "DICT_6X6_250"
+  }
+ ]
+}

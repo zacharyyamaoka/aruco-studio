@@ -863,3 +863,4 @@ if DIST.is_dir():
 from . import sheet_api  # noqa: E402,F401  (M6a: the sticker sheet routes)
 from . import prusa_api  # noqa: E402,F401  (M8c: PrusaSlicer printers, Send, the folder's watcher)
 from . import files_api  # noqa: E402,F401  (audit 2026-10-17: the Open dialog's examples, recent files, folders)
+from . import gallery_api  # noqa: E402,F401  (N-3, 2026-10-17: the gallery of golden examples)

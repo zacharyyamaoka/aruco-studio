@@ -1,0 +1,108 @@
+{
+ "schema": "arucostudio.scene/2",
+ "name": "0° or 90°: the fit and the Origin",
+ "preset": "0.32mm SPEED @MK4IS 0.6 - Aruco",
+ "sketches": [
+  {
+   "id": "sk",
+   "shapes": [
+    {
+     "id": "wide",
+     "rect": [
+      110,
+      30
+     ],
+     "at": [
+      0,
+      0
+     ]
+    },
+    {
+     "id": "tall",
+     "rect": [
+      30,
+      110
+     ],
+     "at": [
+      85,
+      0
+     ]
+    },
+    {
+     "id": "up0",
+     "rect": [
+      45,
+      45
+     ],
+     "at": [
+      135,
+      20
+     ]
+    },
+    {
+     "id": "up90",
+     "rect": [
+      45,
+      45
+     ],
+     "at": [
+      135,
+      -35
+     ]
+    }
+   ]
+  }
+ ],
+ "features": [
+  {
+   "id": "wb",
+   "extrude": "wide",
+   "height": 3
+  },
+  {
+   "id": "tb",
+   "extrude": "tall",
+   "height": 3
+  },
+  {
+   "id": "ub0",
+   "extrude": "up0",
+   "height": 3
+  },
+  {
+   "id": "ub90",
+   "extrude": "up90",
+   "height": 3
+  },
+  {
+   "id": "on_wide",
+   "aruco": "wb.top",
+   "layout": "grid",
+   "first_id": 0
+  },
+  {
+   "id": "on_tall",
+   "aruco": "tb.top",
+   "layout": "grid",
+   "first_id": 10
+  },
+  {
+   "id": "turn0",
+   "aruco": "ub0.top",
+   "layout": "single",
+   "size": 28.56,
+   "mark": "triangle",
+   "turn": 0,
+   "first_id": 20
+  },
+  {
+   "id": "turn90",
+   "aruco": "ub90.top",
+   "layout": "single",
+   "size": 28.56,
+   "mark": "triangle",
+   "turn": 90,
+   "first_id": 21
+  }
+ ]
+}

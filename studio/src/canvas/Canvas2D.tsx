@@ -14,6 +14,7 @@ import { idsText, marqueeSelect } from "../model/scene";
 import { addVertex, dragHandle, handlesOf, removeVertex, shapeFromDrag } from "../sketch/handles";
 import { filtered, madeBy, patternToScene, TYPED_TOOLS, useStudio } from "../store";
 import { SegmentedRow } from "@bam/ui";
+import { DRAW } from "../app/flags";
 import { TagSvg } from "./TagSvg";
 
 const RULER = 20;
@@ -599,10 +600,13 @@ export function Canvas2D() {
           {sceneIssues.map((i, k) => <div key={k} className={`issue lv-${i.level}`} data-kind={i.kind} data-tags={i.tags.join(",")}>{i.text}</div>)}
         </div>
       )}
-      {!visible.length && !tops.length && tool === "select" && (
+      {!visible.length && !tops.length && tool === "select" && (DRAW ? (
         <div className="empty-hint">Draw a shape: <b>R</b> rectangle, <b>C</b> circle, <b>P</b> polygon, <b>O</b> slot.
           Then <b>A</b> puts a marker on it, <b>E</b> extrudes it. <b>S</b> finds any command.</div>
-      )}
+      ) : (
+        <div className="empty-hint" data-testid="empty-hint">An empty scene. Open an example from the <b>Gallery</b> (top left),
+          or <b>S</b> › "ArUco: single" puts a marker on a 40 mm plate.</div>
+      ))}
     </div>
   );
 }

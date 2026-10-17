@@ -1,7 +1,12 @@
 // The Studio: the top bar, IDs on the left, the canvas (2D or 3D) in the
 // middle with the tools at its foot, the inspector on the right, the status
 // bar and the drawer below. The keys are the commands of commands.ts.
+// The landing page is the gallery (N-3): golden examples; a card opens a
+// copy in the Studio with its note. The drawing tools' keys work only with
+// the dev flag ?draw=1 (flags.ts).
 import { useEffect } from "react";
+import { ExampleNote, Gallery } from "../gallery/Gallery";
+import { toolOn } from "./flags";
 import { Canvas2D } from "../canvas/Canvas2D";
 import { IdsTable } from "../ids/IdsTable";
 import { Inspector } from "../inspector/Inspector";
@@ -35,6 +40,7 @@ function useKeys() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const st = useStudio.getState();
+      if (st.page === "gallery") return;                     // the gallery is a page, not a canvas
       if (st.libraryOpen || st.dialog || st.palette || typing(e)) return;
       // an open list, menu or dialog takes its own keys (audit F3)
       if (document.querySelector("[data-kit-popup][data-open]")) return;
@@ -72,8 +78,8 @@ function useKeys() {
       if (e.key === "[") return go(() => st.rotateSel(90));
       if (k === "s" && !e.shiftKey) return go(() => st.setPalette(true));
       if (k === "f") return go(() => st.zoomToFit(st.sel.length ? st.sel : undefined));
-      if (k === "h" && e.shiftKey) return go(() => st.setTool("rhole"));
-      if (TOOL_KEYS[k] && !e.shiftKey) return go(() => st.setTool(TOOL_KEYS[k]));
+      if (k === "h" && e.shiftKey && toolOn("rhole")) return go(() => st.setTool("rhole"));
+      if (TOOL_KEYS[k] && !e.shiftKey && toolOn(TOOL_KEYS[k])) return go(() => st.setTool(TOOL_KEYS[k]));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -86,6 +92,7 @@ export function App() {
   const ready = useStudio((s) => s.ready);
   const view = useStudio((s) => s.view);
   const status = useStudio((s) => s.status);
+  const page = useStudio((s) => s.page);
   useKeys();
   useEffect(() => {
     if (started) return;
@@ -94,9 +101,9 @@ export function App() {
   }, []);
   const st = useStudio.getState();
   return (
-    <div className="app" data-ready={ready ? "1" : "0"} data-view={view}>
+    <div className="app" data-ready={ready ? "1" : "0"} data-view={view} data-page={page}>
       <Toolbar />
-      <div className="body">
+      {page === "gallery" ? <Gallery /> : <div className="body">
         <IdsTable />
         <main className="stage-wrap">
           {view === "2d" ? <Canvas2D /> : <View3D />}
@@ -104,10 +111,11 @@ export function App() {
           <button className="maptoggle" data-testid="map-toggle" title={`Switch to ${view === "2d" ? "3D" : "2D"} (Tab)`} onClick={() => st.toggleView()}>
             <Icon name={view === "2d" ? "view3d" : "view2d"} /><span>{view === "2d" ? "3D" : "2D"}</span>
           </button>
+          <ExampleNote />
           {!ready && status.level === "error" && <div className="fatal">{status.text}</div>}
         </main>
         <Inspector />
-      </div>
+      </div>}
       <StatusBar />
       <Drawer />
       <Library />

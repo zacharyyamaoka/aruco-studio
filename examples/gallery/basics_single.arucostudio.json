@@ -1,0 +1,100 @@
+{
+ "schema": "arucostudio.scene/2",
+ "name": "A single marker, by hand",
+ "preset": "0.32mm SPEED @MK4IS 0.6 - Aruco",
+ "sketches": [
+  {
+   "id": "sk",
+   "shapes": [
+    {
+     "id": "plate",
+     "rect": [
+      50,
+      50
+     ],
+     "at": [
+      0,
+      0
+     ]
+    }
+   ]
+  }
+ ],
+ "features": [
+  {
+   "id": "body",
+   "extrude": "plate",
+   "height": 3
+  },
+  {
+   "id": "tag",
+   "aruco": "body.top",
+   "first_id": 0,
+   "name": "single",
+   "settings": {
+    "v": 2,
+    "mode": "black",
+    "op": "join",
+    "layout": "single",
+    "dictionary": "DICT_4X4_50",
+    "quiet_modules": 1.0,
+    "grow": false,
+    "legacy": false,
+    "size_auto": false,
+    "force": null,
+    "flip": false,
+    "pin": "triangle",
+    "turn": 0,
+    "corner_mark": "none",
+    "label": {
+     "on": false,
+     "content": "id",
+     "text": "",
+     "place": "auto",
+     "row": "auto",
+     "side": "auto",
+     "scope": "auto",
+     "cap_mm": 0.0,
+     "nozzle_mm": 0.6,
+     "stroke_mm": 0.0,
+     "offset_x_mm": 0.0,
+     "offset_y_mm": 0.0,
+     "build_anyway": false,
+     "position": "auto",
+     "x_mm": 0.0,
+     "y_mm": 0.0,
+     "rule": 5
+    },
+    "cells": {
+     "rule": 1,
+     "of": "cell",
+     "mm": 0.68,
+     "min_mm": 2.0
+    },
+    "origin_v": 2,
+    "make": {
+     "rule": 1,
+     "by": "print3d"
+    },
+    "holes": "avoid",
+    "trim": {
+     "rule": 1,
+     "axes": "both",
+     "margin_mm": 0.0
+    }
+   },
+   "numbers": {
+    "marker_id": 0,
+    "size": 30.0,
+    "square": 0.0,
+    "white_offset": 0.0,
+    "white_height": 2.0,
+    "black_offset": 0.0,
+    "black_height": -0.6,
+    "pin_size": 3.0,
+    "pin_length": 2.0,
+    "pin_tol": 0.15
+   }
+  }
+ ]
+}
