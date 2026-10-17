@@ -189,6 +189,21 @@ def _trim(tp):
             "z": list(tp.z) if tp.z is not None else None}
 
 
+BODY_NOMINAL_MM = 3.0      # a body whose thickness the adapter did not measure, as drawn
+
+
+def _body(target, loops):
+    """The body under the tag, for the views and the render: its outline in
+    the pattern frame and its z range (the target's body_mm; else a nominal
+    3 mm under the face, `nominal` true). None when there is no body."""
+    if not target.has_body or not loops:
+        return None
+    b = target.body_mm
+    if b:
+        return {"loops": loops, "z": [b["z0"], b["z1"]], "nominal": False}
+    return {"loops": loops, "z": [-BODY_NOMINAL_MM, 0.0], "nominal": True}
+
+
 def writes(s, n, ev):
     """What a node of this plan stores back (REF settle), as the changes to
     the request's settings / numbers. `jo_v` is the adapter's own key and
@@ -310,6 +325,7 @@ def build(spec: TagSpec, s: dict, n: dict, ev: dict, optical=None, issues=()) ->
             "rules": _rules(s, spec, ev), "writes": writes(s, n, ev), "record": rec,
             "notes": list(ev["notes"]), "node_warning": R.node_warning(ev),
             "digest": R.ev_digest(ev), "name": spec.name, "key": spec.key,
+            "body": _body(target, LY.guides_target(ev, fr, target)),
             "slabs": {"white": ev["plan"].layers.white, "black": ev["plan"].layers.black,
                       "pattern": list(ev["plan"].layers.pattern),
                       "surface": ev["plan"].layers.surface, "depth": ev["plan"].layers.depth,

@@ -360,12 +360,17 @@ def guides(ev, fr, target, base):
         out["label_preview"] = [_pts(b.corners()) for b in lab.preview.boxes()]
     if fr["tile_rect"] is not None:
         out["tile"] = [_r(v) for v in fr["tile_rect"]]
-    _o, x, y, _z = ev["tag"]
-    fo = fr["fo"]
-    out["target"] = [_pts(lp) for lp in _loops_mm(target.loops_m(), base, fo, x, y)]
+    out["target"] = guides_target(ev, fr, target)
     tp = ev.get("trim")
     if tp is not None:
         out["trim"] = {"outline": [_r(v) for v in tp.outline], "body": [_r(v) for v in tp.body],
                        "keep": [_r(v) for v in tp.column()],
                        "removed": [[_r(v) for v in r] for r in tp.regions()] if tp.cuts else []}
     return out
+
+
+def guides_target(ev, fr, target):
+    """The target's loops in the pattern frame (mm)."""
+    from ..core.geometry import _loops_mm
+    _o, x, y, _z = ev["tag"]
+    return [_pts(lp) for lp in _loops_mm(target.loops_m(), ev["base"], fr["fo"], x, y)]

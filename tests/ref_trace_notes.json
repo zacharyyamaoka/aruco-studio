@@ -10,9 +10,6 @@
   "== 2026-10-08's records (a chosen Frame, the Joint Origin there): OpenCV's frame": "skipped: venv (the CAD Exporter's URDF writer)",
   "== every target is OpenCV's frame, worked out by hand (yourdfpy FK)": "skipped: venv (yourdfpy)"
  },
- "tests/test_aruco_frame_pnp.py": {
-  "*": "skipped: venv (cv2 + a stand-in adsk for evaluate(); M2b's verify/ redoes it on plan_tag: PLAN M2b.1)"
- },
  "tests/test_aruco_label_print.py": {
   "*": "skipped: venv (the slicing oracle's tools and PrusaSlicer)"
  },
