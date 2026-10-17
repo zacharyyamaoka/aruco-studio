@@ -25,3 +25,21 @@
 | D12 | no server left on 5360 / 5361 | none after the run |
 | D12 | nothing written into REF | this run read REF only (`git show`, the Read tool). `git -C <REF> status` shows ` M .claude/launch.json` and untracked reports: other sessions' work in that worktree, not this run's |
 | D13 | local only | `git remote -v` is empty. `git worktree list` also shows `aruco-studio-preview` (detached at 827b0f5): another session's, left alone |
+
+## Final verification, 2026-10-16 about 20:55 (hand-over)
+
+`.venv/Scripts/python tools/check.py` from a clean shell, every group; 5360 / 5361 free before and after.
+
+| Group | Result |
+|---|---|
+| adapters | 97 passed in 40 s |
+| core | 7,245 passed, 4 skipped in 42 s |
+| plan | 193 passed in 65 s |
+| scene | 7 passed in 5 s |
+| server | 35 passed in 14 s |
+| verify | 104 passed in 92 s |
+| studio | build + vitest (19) passed in 6 s |
+| e2e | 19 passed (1.6 m) in 98 s |
+| **all** | **OK in 362 s**, exit 0 |
+
+`tools/check.py --trace`: `missing: 0`. The Definition of Done, check by check: `docs/STATUS.md`.

@@ -15,6 +15,7 @@ Local only. Read `docs/BRIEF.md`, then `docs/ARCHITECTURE.md` and `docs/PLAN.md`
 | Run every test | `.venv/Scripts/python -m pytest -q` |
 | Run by group | `.venv/Scripts/python tools/check.py` (or `tools/check.py core`) |
 | Rebuild the REF trace | `.venv/Scripts/python tools/check.py --trace` |
+| Status pages | `.venv/Scripts/python tools/status_page.py` (reports/status.html, with the hand-over screenshots); `tools/spec_status.py` (reports/spec.html); the record: `docs/STATUS.md` |
 | Run the API | `.venv/Scripts/python -m aruco_studio.server` (127.0.0.1:5360; Ctrl+C stops it; docs/API.md) |
 
 | Folder | Holds |

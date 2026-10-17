@@ -10,3 +10,4 @@ studio/playwright-report/
 reports/spec.html
 .studio_data/
 scenes/
+.audit/
