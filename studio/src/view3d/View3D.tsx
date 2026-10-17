@@ -525,6 +525,11 @@ export function View3D() {
       return [r.left + ((p.x + 1) / 2) * r.width, r.top + ((1 - p.y) / 2) * r.height];
     };
     probe3d.gizmo = () => state.gizmo.handles(renderer.domElement.getBoundingClientRect());
+    probe3d.project = (x: number, y: number, z: number): [number, number] => {
+      const p = new THREE.Vector3(x, y, z * useStudio.getState().zScale).project(camera);
+      const r = renderer.domElement.getBoundingClientRect();
+      return [r.left + ((p.x + 1) / 2) * r.width, r.top + ((1 - p.y) / 2) * r.height];
+    };
     probe3d.arrow = (): [number, number] | null => {
       if (!arrow.visible) return null;
       const p = new THREE.Vector3(0, 0, 6).applyMatrix4(arrow.matrixWorld).project(camera);
@@ -596,7 +601,7 @@ export function View3D() {
         if (t.hidden) continue;
         const si = t.source?.sketch ? sketchIdx.get(t.source.sketch) : undefined;
         let clip: THREE.Plane | null = null;
-        if (t.source?.body && t.pose_3d !== undefined || (t.source?.body && t.source.face)) {
+        if (t.source?.body && t.source.face) {                   // a tag on a body's face: its skin
           const P = new THREE.Matrix4().makeScale(1, 1, zScale).multiply(rowMajor(t.pose_3d ?? t.pose));
           clip = new THREE.Plane(new THREE.Vector3(0, 0, 1), skinDepth(t)).applyMatrix4(P);
         }

@@ -61,9 +61,10 @@ test("M8b1.6 the gizmo moves the sketch, the arrow sets the height; forearm.righ
 
   // the forearm: tag.right's normal is +x in 3D; in 2D a flap with a hinge
   const forearm = fs.readFileSync(path.join(ROOT, "examples", "forearm.arucostudio.json"), "utf-8");
+  await idle(page);
   fs.writeFileSync(file, forearm, "utf-8");
-  await expect(page.locator(".app")).toBeVisible();
-  await page.waitForFunction(() => Object.keys((window as any).__studio3d?.normals || {}).length === 4, null, { timeout: 5000 });
+  await expect.poll(async () => (await probe(page)).tags.length, { timeout: 10000 }).toBe(4);
+  await page.waitForFunction(() => Object.keys((window as any).__studio3d?.normals || {}).length === 4, null, { timeout: 10000 });
   const normals = await page.evaluate(() => (window as any).__studio3d.normals);
   expect(normals["tag.right"]).toEqual([1, 0, 0]);
   expect(normals["tag.front"]).toEqual([0, -1, 0]);
@@ -71,6 +72,7 @@ test("M8b1.6 the gizmo moves the sketch, the arrow sets the height; forearm.righ
   expect(normals["tag.left"]).toEqual([-1, 0, 0]);
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
+  await page.keyboard.press("f");                                        // the 3D camera fits the forearm
   await page.waitForTimeout(400);
   await shot(page, "m8b1_3d_forearm");
   await page.getByTestId("view-2d").click();

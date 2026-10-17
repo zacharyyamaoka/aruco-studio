@@ -172,6 +172,8 @@ let previewSeq = 0;
 let previewBusy = false;
 let previewNext: string | null = null;
 const previews = new Map<string, SceneDoc>();
+const inflight = new Map<string, Promise<SceneDoc | null>>();
+let liveBusy = 0;
 const HIST = 200;
 
 function stamp() {
@@ -307,6 +309,27 @@ export const useStudio = create<StudioState>((set, get) => {
     return [Math.round(c.cx * 2) / 2, Math.round(c.cy * 2) / 2];
   }
 
+  /** The compiled, planned scene of a text (POST /api/design/preview):
+   *  cached by text; one request per text at a time. */
+  function fetchPreview(t: string): Promise<SceneDoc | null> {
+    const mesh = get().view === "3d";
+    const key = (mesh ? "3d|" : "2d|") + t;              // 3D needs the meshes too
+    const hit = previews.get(key);
+    if (hit) return Promise.resolve(hit);
+    let p = inflight.get(key);
+    if (!p) {
+      p = api.designPreview(t, mesh).then((r) => {
+        if (r.scene) {
+          previews.set(key, r.scene);
+          if (previews.size > 8) previews.delete(previews.keys().next().value as string);
+        }
+        return r.scene;
+      }).catch(() => null).finally(() => inflight.delete(key));
+      inflight.set(key, p);
+    }
+    return p;
+  }
+
   /** An ArUco Extrude on refs, named <base><n> (the old Add's names for
    *  grid / ChArUco): -> its id. */
   function arucoNamed(d: Doc, refs: string[], extra: Record<string, unknown>, base: string): string {
@@ -418,6 +441,7 @@ export const useStudio = create<StudioState>((set, get) => {
     },
 
     async refresh() {
+      ++previewSeq;                                   // the file's scene wins over a preview in flight
       const [d, scene] = await Promise.all([api.design(), api.scene(get().view === "3d")]);
       setDesign(d);
       setScene(scene);
@@ -614,14 +638,9 @@ export const useStudio = create<StudioState>((set, get) => {
           previewBusy = true;
           const seq = ++previewSeq;
           const t0 = performance.now();
-          try {
-            const r = previews.get(t) ? { scene: previews.get(t)!, error: null } : await api.designPreview(t, get().view === "3d");
-            if (r.scene) {
-              previews.set(t, r.scene);
-              if (previews.size > 8) previews.delete(previews.keys().next().value as string);
-              if (seq === previewSeq) { setScene(r.scene); set({ previewing: true }); }
-            }
-          } catch { /* a preview is only a preview */ }
+          const sc = await fetchPreview(t);
+          // drawn only while it is still the newest (a release may have come)
+          if (sc && seq === previewSeq) { setScene(sc); set({ previewing: true }); }
           const wait = 1000 / 15 - (performance.now() - t0);
           if (wait > 0) await new Promise((res) => setTimeout(res, wait));
           previewBusy = false;
@@ -630,22 +649,25 @@ export const useStudio = create<StudioState>((set, get) => {
       void go();
     },
     async commitLive(text, label, t0) {
-      // the pointer is up: the plans of the final text on screen at once
-      // (the preview's, when it has that text), then the file written
+      // the pointer is up: the plans of the final text on screen first (the
+      // preview's: cached, or the one in flight, or asked now), then the file
+      // written
       const start = t0 ?? performance.now();
       previewNext = null;
-      let shown = false;
-      const show = (sc: SceneDoc) => {
-        if (shown) return;
-        shown = true;
-        setScene(sc);
-        set({ lastLive: performance.now() - start });
-      };
-      const ready = previews.get(text);
-      if (ready) show(ready);
-      else api.designPreview(text, get().view === "3d").then((r) => { if (r.scene) show(r.scene); }).catch(() => undefined);
+      ++previewSeq;                                   // an older preview in flight is not drawn
+      liveBusy++;                                     // idle() waits for the write too
+      let sc: SceneDoc | null = null;
+      try {
+        sc = await fetchPreview(text);
+        if (sc) {
+          setScene(sc);
+          set({ lastLive: performance.now() - start });
+        }
+      } finally {
+        liveBusy--;
+      }
       await get().writeText(label, text);
-      if (!shown) { shown = true; set({ lastLive: performance.now() - start }); }
+      if (!sc) set({ lastLive: performance.now() - start });
     },
     async createShape(shape, at, rot = 0) {
       let key = "";
@@ -1026,7 +1048,7 @@ export const useStudio = create<StudioState>((set, get) => {
         const q = queue;
         await q;
         await new Promise((r) => setTimeout(r, 0));
-        if (q === queue && !get().busy && !previewBusy) return;
+        if (q === queue && !get().busy && !previewBusy && !liveBusy) return;
         await new Promise((r) => setTimeout(r, 15));
       }
     },

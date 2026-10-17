@@ -56,6 +56,7 @@ test("M8b1.3 live re-placement: a handle drag on one of ten tags, redrawn under 
   await shot(page, "m8b1_live_ten");
   const times: number[] = [];
   const sizes: number[] = [];
+  const previews: number[][] = [];
   for (let k = 0; k < 5; k++) {
     // select r3 by its end (outside its marker), then drag its right edge
     const r3 = readFile(file).sketches[2];
@@ -76,11 +77,14 @@ test("M8b1.3 live re-placement: a handle drag on one of ten tags, redrawn under 
     await page.waitForFunction(() => (window as any).__live.drawn > 0, null, { timeout: 5000 });
     const t = await page.evaluate(() => (window as any).__live.drawn - (window as any).__live.up);
     times.push(Math.round(t * 10) / 10);
+    // where the time goes: the previews' round trips (ms), the last ones
+    previews.push(await page.evaluate(() => performance.getEntriesByType("resource")
+      .filter((e) => e.name.includes("/api/design/preview")).slice(-3).map((e) => Math.round(e.duration))));
     await idle(page);
     sizes.push(readFile(file).sketches[2].shapes[0].rect[0]);
   }
-  record("M8b1.3", { ms: times, widths: sizes, store_last_live_ms: (await probe(page)).lastLive });
-  console.log(`M8b1.3 pointer-up to redraw (ms): ${times.join(", ")}`);
+  record("M8b1.3", { ms: times, widths: sizes, preview_round_trips_ms: previews });
+  console.log(`M8b1.3 pointer-up to redraw (ms): ${times.join(", ")}; previews ${JSON.stringify(previews)}`);
   expect(sizes).toEqual([68, 60, 68, 60, 68]);
   for (const t of times) expect(t).toBeLessThan(100);
   await shot(page, "m8b1_live_after_drag");
