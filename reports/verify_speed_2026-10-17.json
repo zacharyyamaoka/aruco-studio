@@ -1,0 +1,459 @@
+{
+ "what": "2026-10-17 verification of lane speed on main (959fb84): the served Studio on 5360 (python -m aruco_studio.server, studio/dist), Chrome via Playwright (e2e/verify/speed_served.spec.ts), a NEW box length / height per run so no plan is cached; then tools/bench_preview.py (TestClient) and an httpx loop to 5360",
+ "browser_served_uncached": {
+  "2d.run1": {
+   "round_trips_ms": [
+    98,
+    125,
+    131,
+    147,
+    174,
+    211,
+    129,
+    132,
+    124
+   ],
+   "median_ms": 131,
+   "requests": [
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1"
+   ]
+  },
+  "3d.run1": {
+   "drag_round_trips_ms": [
+    156,
+    121,
+    121,
+    119,
+    127,
+    127,
+    129,
+    141,
+    136,
+    143
+   ],
+   "drag_median_ms": 127,
+   "release_round_trip_ms": [
+    267
+   ],
+   "release_to_meshes_ms": 385,
+   "requests": [
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1&mesh=1"
+   ]
+  },
+  "2d.run2": {
+   "round_trips_ms": [
+    106,
+    116,
+    146,
+    127,
+    143,
+    129,
+    117,
+    126,
+    169,
+    147
+   ],
+   "median_ms": 127,
+   "requests": [
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1"
+   ]
+  },
+  "3d.run2": {
+   "drag_round_trips_ms": [
+    150,
+    170,
+    134,
+    129,
+    135,
+    147,
+    138,
+    131,
+    130,
+    155
+   ],
+   "drag_median_ms": 135,
+   "release_round_trip_ms": [
+    270
+   ],
+   "release_to_meshes_ms": 395,
+   "requests": [
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1&mesh=1"
+   ]
+  },
+  "2d.run3": {
+   "round_trips_ms": [
+    138,
+    198,
+    145,
+    131,
+    125,
+    125,
+    139,
+    121,
+    132
+   ],
+   "median_ms": 132,
+   "requests": [
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1"
+   ]
+  },
+  "3d.run3": {
+   "drag_round_trips_ms": [
+    151,
+    163,
+    123,
+    144,
+    151,
+    126,
+    133,
+    135,
+    158
+   ],
+   "drag_median_ms": 144,
+   "release_round_trip_ms": [
+    168,
+    617
+   ],
+   "release_to_meshes_ms": 758,
+   "requests": [
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1",
+    "top=1&mesh=1"
+   ]
+  }
+ },
+ "browser_served_speed_spec_runs": {
+  "run1": {
+   "speed.2d": {
+    "round_trips_ms": [
+     78,
+     102,
+     105,
+     127,
+     104,
+     99,
+     108,
+     95,
+     129,
+     109,
+     136,
+     190
+    ],
+    "median_ms": 105,
+    "requests": [
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1"
+    ]
+   },
+   "speed.3d": {
+    "drag_round_trips_ms": [
+     139,
+     112,
+     110,
+     129,
+     130,
+     121,
+     122,
+     126,
+     128,
+     127
+    ],
+    "drag_median_ms": 126,
+    "release_to_meshes_ms": 521,
+    "requests": [
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1&mesh=1"
+    ]
+   }
+  },
+  "run2": {
+   "speed.2d": {
+    "round_trips_ms": [
+     11,
+     13,
+     15,
+     14,
+     13,
+     13,
+     17,
+     13,
+     14,
+     12,
+     12,
+     14
+    ],
+    "median_ms": 13,
+    "requests": [
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1"
+    ]
+   },
+   "speed.3d": {
+    "drag_round_trips_ms": [
+     20,
+     19,
+     13,
+     12,
+     15,
+     15,
+     23,
+     18,
+     14,
+     15
+    ],
+    "drag_median_ms": 15,
+    "release_to_meshes_ms": 173,
+    "requests": [
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1&mesh=1"
+    ]
+   }
+  },
+  "run3": {
+   "speed.2d": {
+    "round_trips_ms": [
+     10,
+     15,
+     17,
+     13,
+     11,
+     12,
+     15,
+     12,
+     13,
+     14,
+     13,
+     16
+    ],
+    "median_ms": 13,
+    "requests": [
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1"
+    ]
+   },
+   "speed.3d": {
+    "drag_round_trips_ms": [
+     25,
+     28,
+     16,
+     12,
+     14,
+     13,
+     11,
+     11,
+     14,
+     11
+    ],
+    "drag_median_ms": 13,
+    "release_to_meshes_ms": 194,
+    "requests": [
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1",
+     "top=1&mesh=1"
+    ]
+   }
+  }
+ },
+ "testclient_bench_preview": {
+  "code": "C:\\Users\\BAM\\Documents\\aruco-studio",
+  "rows": {
+   "bare 2d": {
+    "median": 74.2,
+    "min": 71.5,
+    "max": 78.5,
+    "n": 8
+   },
+   "bare 3d": {
+    "median": 199.4,
+    "min": 193.6,
+    "max": 242.2,
+    "n": 8
+   },
+   "open 2d": {
+    "median": 71.0,
+    "min": 67.4,
+    "max": 95.0,
+    "n": 8
+   },
+   "open 3d": {
+    "median": 215.1,
+    "min": 207.8,
+    "max": 245.6,
+    "n": 8
+   }
+  }
+ },
+ "httpx_to_5360_box_300mm": {
+  "open 2d": {
+   "median": 98.3,
+   "min": 91.6,
+   "max": 147.5,
+   "all": [
+    93,
+    92,
+    95,
+    98,
+    125,
+    148,
+    109,
+    99
+   ]
+  },
+  "open 3d release": {
+   "median": 282.5,
+   "min": 277.4,
+   "max": 296.7,
+   "all": [
+    279,
+    287,
+    297,
+    279,
+    277,
+    296,
+    285,
+    280
+   ]
+  }
+ },
+ "httpx_to_5360_box_180mm": {
+  "open 2d": {
+   "median": 76.7,
+   "min": 72.6,
+   "max": 103.5,
+   "all": [
+    103,
+    77,
+    86,
+    76,
+    75,
+    73,
+    75,
+    79
+   ]
+  },
+  "open 3d release": {
+   "median": 230.4,
+   "min": 215.7,
+   "max": 253.9,
+   "all": [
+    221,
+    216,
+    240,
+    254,
+    241,
+    227,
+    234,
+    220
+   ]
+  }
+ }
+}

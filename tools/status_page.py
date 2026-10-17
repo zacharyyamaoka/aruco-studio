@@ -61,6 +61,9 @@ SHOTS = [
     ("morning_05_printers_collection.png", "The Library's Printers collection: one card per PrusaSlicer physical printer (names only, no host), the current pair marked"),
     ("morning_06_kit_light_inspector.png", "The light kit: the inspector's Marker tab (Preset first, Made by read only, the rows from /api/form)"),
     ("morning_06b_kit_light_label_tab.png", "The light kit: the Label tab, a message anchored under it while its own row is hidden"),
+    ("speed_3d_light_drag.png", "Lane speed (2026-10-17): the forearm's arrow drag in 3D while the pointer is down, each tag a light slab of its top view"),
+    ("speed_3d_after_release.png", "The release: one request with the meshes, the four tags' relief back"),
+    ("speed_2d_after_drag.png", "A 2D handle drag on the forearm after the release: four tags re-planned on the wider box"),
     ("final_2d_three_types.png", "2026-10-16: 2D canvas with a single marker, a 4 x 3 grid board and a 5 x 7 ChArUco board"),
     ("final_3d_view.png", "2026-10-16: 3D view (z x5), the raised single marker's white and black layers"),
     ("final_inspector_validation_error.png", "2026-10-16: two validation errors, each under its field, one summary line"),
@@ -117,7 +120,7 @@ def render(spec):
                     ("How", "how"), ("Result", "result")])
     out.append("<h2>Screenshots</h2><p class='about'>Taken from the served build "
                "(<code>python -m aruco_studio.server</code> with studio/dist, http://127.0.0.1:5360) at hand-over: "
-               "the morning of 2026-10-17 first, then the evening of 2026-10-16.</p>")
+               "the morning of 2026-10-17 first, then lane speed's drag (the same morning), then the evening of 2026-10-16.</p>")
     out.append("<div class='shots'>")
     for name, caption in SHOTS:
         if (SCREENS / name).exists():

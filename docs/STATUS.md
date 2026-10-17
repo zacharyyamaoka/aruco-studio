@@ -15,25 +15,27 @@ The morning hand-over of 2026-10-17. `main` of `C:\Users\BAM\Documents\aruco-stu
 
 Two questions wait for you (section 4): a sticker's ChArUco Auto size, and the forearm's labels on three faces. The third, the cut-from-black label stroke (Q1), took its recommended default while you slept: label rule 5 (lane polish, `docs/status/polish.md`).
 
+After the morning hand-over, two lanes were built and merged (`docs/status/merge-polish.md`): lane polish (label rule 5, a paste and an input method in the tool box, the final audit's nits A5-A7, A10 and C2's server half) and lane speed (live re-placement on the forearm about 3x faster on the server, bit-identical results, the light drag preview in 3D). A fresh session then verified `main` independently: the full check, the drag medians through the served Studio, the label goldens and rule 5, the paste (`docs/status/verify-2026-10-17.md`).
+
 ## 2. The check run
 
-`.venv/Scripts/python tools/check.py` from a clean shell, 2026-10-17 03:11-03:20 (the raw lines: `reports/morning_check_2026-10-17.log`). Ports 5360 / 5361 were free before and nothing listened on them after (5370 is Zach's preview and was left alone).
+`.venv/Scripts/python tools/check.py` from a clean shell, 2026-10-17 04:50-05:00, on `main` after the merge of lane/polish and lane/speed: the independent verification (`docs/status/verify-2026-10-17.md`; the raw lines: `reports/verify_check_2026-10-17.log`). Ports 5360 / 5361 were free before and nothing listened on them after (5371 is Zach's preview and was left alone). The morning column is the hand-over run of 03:11-03:20, before the two lanes (`reports/morning_check_2026-10-17.log`).
 
-| Group | Result |
-|---|---|
-| adapters | 97 passed in 39 s |
-| core | 7,354 passed, 4 skipped in 36 s |
-| plan | 529 passed in 78 s |
-| scene | 42 passed in 13 s |
-| server | 91 passed in 18 s |
-| verify | 117 passed, 1 skipped in 93 s |
-| studio | build (the app and the kit) + vitest (44) passed in 9 s |
-| e2e | 47 Playwright passed (3.9 m) in 236 s |
-| **all** | **OK in 523 s**, exit 0 |
+| Group | Verified (after the merge) | The morning run (before) |
+|---|---|---|
+| adapters | 97 passed in 40 s | 97 in 39 s |
+| core | 7,387 passed, 4 skipped in 36 s | 7,354 + 4 skipped |
+| plan | 544 passed in 100 s | 529 |
+| scene | 43 passed in 12 s | 42 |
+| server | 97 passed in 17 s | 91 |
+| verify | 120 passed in 88 s | 117 + 1 skipped (the strict xfail) |
+| studio | build (the app and the kit) + vitest passed in 9 s | passed (vitest 44) |
+| e2e | 52 Playwright passed (4.0 m) in 244 s | 47 in 236 s |
+| **all** | **OK in 546 s**, exit 0 | OK in 523 s |
 
-After the merge of lane/polish and lane/speed (later the same morning): **OK in 562 s**, every group, e2e 52 (`docs/status/merge-polish.md`, `reports/merge_polish_check_2026-10-17.log`).
+The new tests: plan +12 (lane speed's digests) +2 (lane polish) +1 (the merge's overlay test); server +6 (lane speed); verify: the xfail is a pass and +2 slice tests; e2e +3 (the typed box) +2 (speed). The merge's own run was OK in 562 s (`docs/status/merge-polish.md`).
 
-`tools/check.py --trace`: 233 REF sections, ported 212, not ported (Fusion / UI) 17, skipped (other venvs) 4, **missing 0**. The 4 core skips are the parked `evaluate()` sections of two legacy goldens (`tests/plan/test_golden_evaluate.py` covers them). The verify skip was M8c's strict xfail (section 4, Q1); lane polish turned it into a pass under label rule 5.
+`tools/check.py --trace`: 233 REF sections, ported 212, not ported (Fusion / UI) 17, skipped (other venvs) 4, **missing 0**. The 4 core skips are the parked `evaluate()` sections of two legacy goldens (`tests/plan/test_golden_evaluate.py` covers them). `tools/spec_status.py --check`: 92 tests passing, 4 planned, 0 failing. `tools/mesh_digests.py --check`: 947 cases, 0 differ.
 
 ### The morning screenshots
 
@@ -161,7 +163,7 @@ The 15-point Definition of Done of `docs/PLAN.md` section 4 was verified on 2026
 
 | What | State |
 |---|---|
-| Live re-placement on the forearm (audit B1) | mostly fixed by lane speed (`docs/status/speed.md`): a drag step is about 75 ms in 2D and 3D on a quiet box (was 245 ms and 715 ms), the 3D release 210-280 ms; the results are bit-identical. Still open: on a busy box a drag step takes 120-155 ms; the next step is a process pool (about 2.5x in a trial, not built). In 3D the drag shows flat slabs; the relief comes on release |
+| Live re-placement on the forearm (audit B1) | mostly fixed by lane speed (`docs/status/speed.md`): the server answers a drag step in about 75 ms in 2D and 3D on a quiet box (was 245 ms and 715 ms), the 3D release in 215-230 ms; the results are bit-identical (947 digests). Verified again on `main` through the served Studio in Chrome (`docs/status/verify-2026-10-17.md`, every step a new plan): a 2D drag step's round trip is 131 ms median, a 3D step's 135 ms, the 3D release 270 ms (395 ms to the meshes on screen); a re-drag over widths the server has seen is 13-19 ms (its cache). So the 100 ms target is met by the server, not yet by the browser round trip: the page's own work between a fetch's start and end is the other 55 ms. Next steps: a process pool on the server (about 2.5x in a trial, not built); less main-thread work per response on the page. In 3D the drag shows flat slabs; the relief comes on release |
 | A typed Columns x rows on a face is explained, not honoured | a new fit rule (audit B10) |
 | Send… does not preselect the printer the tags were planned for; it names the matching printers and a click picks one | as M8b2.3 requires (audit B2) |
 | The nits of the final audit (A5-A10, C1-C4) | lane polish fixed A5 (`/api/health` names the file's `/2`), A6 (spaced `cuts()` is a guillotine count: 10, not 16), A7 (the trivially true assertion is gone; the watcher's event and route are scanned), A10 (renumber rows carry `made_by`) and the server's half of C2 (the size error and the cell-minimum warn read whole in the short line). Left, with reasons in `docs/status/polish.md`: A9 (the "Old sticker sheet" entry), C1 (key paths in the status bar), the Studio half of C2, C3 (floats and exact keys), C4 (drawing slips): all in `studio/`, which the drag-preview lane owned this run. Both lanes are merged now (`docs/status/merge-polish.md`), so these can be done next |
@@ -221,4 +223,4 @@ The server's files go under `ROOT/.studio_data/` and scenes under `ROOT/scenes/`
 | `studio/src` + `studio/packages/bam-ui/src` | 10,244 + 1,478 |
 | `tests` + `e2e/tests` | 23,914 + 2,825 |
 
-63 commits on `main`, 18 of them since the 2026-10-16 evening hand-over. Fable 5.1 planned, audited and verified; Opus built the milestones and the fixes (each commit's `Co-Authored-By` line says which).
+72 commits on `main`, 27 of them since the 2026-10-16 evening hand-over (9 since the morning hand-over: the two lanes, their merges, the merge's fix and the verification). Fable 5.1 planned, audited and verified; Opus built the milestones and the fixes (each commit's `Co-Authored-By` line says which).
