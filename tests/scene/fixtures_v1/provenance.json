@@ -1,0 +1,5 @@
+{
+ "what": "The three /1 scene files the e2e suite saved in its last full run on main (tools/check.py, 2026-10-16 21:07, temp home aruco_check_r554cdrv): scene.spec.ts 'save, reload, open', audit.spec.ts F12 'e2e-audit-dirty', export.spec.ts 'export-json'. Copied unchanged (M8a.2's input); never edited.",
+ "files": ["e2e-scene.arucostudio.json", "e2e-audit-dirty.arucostudio.json", "e2e-export.arucostudio.json"],
+ "main_commit": "the main of 2026-10-16 21:07 (ddcba53 or just before)"
+}

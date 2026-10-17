@@ -1,0 +1,15 @@
+{
+  "schema": "arucostudio.scene/2",
+  "name": "plate with a ChArUco",
+  "preset": "0.32mm SPEED @MK4IS 0.6 - Aruco",
+  "sketches": [
+    {"id": "sk", "shapes": [
+      {"id": "plate", "rect": [80, 50], "holes": [{"circle": 18}]}
+    ]}
+  ],
+  "features": [
+    {"id": "body", "extrude": "plate", "height": 5},
+    {"id": "tag", "aruco": "body.top", "layout": "charuco", "cols": 5, "rows": 3,
+     "mark": "triangle", "label": "#id + name", "name": "plate"}
+  ]
+}

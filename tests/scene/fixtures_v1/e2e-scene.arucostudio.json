@@ -1,0 +1,536 @@
+{
+ "ledger": {
+  "entries": [
+   {
+    "at": [
+     50.0,
+     0.5,
+     0.0
+    ],
+    "born": 1,
+    "count": 4,
+    "family": "aruco4x4",
+    "id": 1,
+    "name": "board1|tag",
+    "seen": 1,
+    "state": "active",
+    "uid": "#1337c208f1b8|tag"
+   },
+   {
+    "at": [
+     100.0,
+     0.0,
+     0.0
+    ],
+    "born": 1,
+    "count": 4,
+    "family": "aruco4x4",
+    "id": 5,
+    "name": "charuco1|tag",
+    "seen": 1,
+    "state": "active",
+    "uid": "#597db0d72916|tag"
+   },
+   {
+    "at": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "born": 1,
+    "count": 1,
+    "family": "aruco4x4",
+    "id": 0,
+    "name": "tag1|tag",
+    "seen": 1,
+    "state": "active",
+    "uid": "#2d46707262a4|tag"
+   }
+  ],
+  "printed": {
+   "aruco4x4": {
+    "0": [
+     1,
+     "tag1|tag"
+    ],
+    "1": [
+     1,
+     "board1|tag"
+    ],
+    "2": [
+     1,
+     "board1|tag"
+    ],
+    "3": [
+     1,
+     "board1|tag"
+    ],
+    "4": [
+     1,
+     "board1|tag"
+    ],
+    "5": [
+     1,
+     "charuco1|tag"
+    ],
+    "6": [
+     1,
+     "charuco1|tag"
+    ],
+    "7": [
+     1,
+     "charuco1|tag"
+    ],
+    "8": [
+     1,
+     "charuco1|tag"
+    ]
+   }
+  },
+  "schema": "bam_aruco_ids_ledger/1",
+  "seq": 1,
+  "updated": ""
+ },
+ "name": "e2e-scene-1792210057513",
+ "overrides": {},
+ "presets_used": [],
+ "schema": "arucostudio.scene/1",
+ "tags": [
+  {
+   "hidden": false,
+   "locked": false,
+   "name": "tag1",
+   "pose": [
+    1,
+    0,
+    0.0,
+    0.0,
+    0,
+    1,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "rotation_deg": 0.0,
+   "spec": {
+    "key": "tag1",
+    "name": "",
+    "numbers": {
+     "black_height": -0.6,
+     "black_offset": 0.0,
+     "marker_id": 0,
+     "pin_length": 2.0,
+     "pin_size": 3.0,
+     "pin_tol": 0.15,
+     "size": 0.0,
+     "square": 0.0,
+     "white_height": 2.0,
+     "white_offset": 0.0
+    },
+    "schema": "arucostudio.tagspec/1",
+    "settings": {
+     "cells": {
+      "min_mm": 2,
+      "mm": 0.5,
+      "of": "marker",
+      "rule": 1
+     },
+     "corner_mark": "none",
+     "dictionary": "DICT_4X4_50",
+     "flip": false,
+     "force": null,
+     "grow": false,
+     "label": {
+      "build_anyway": false,
+      "cap_mm": 0,
+      "content": "id",
+      "nozzle_mm": 0.6,
+      "offset_x_mm": 0,
+      "offset_y_mm": 0,
+      "on": false,
+      "place": "auto",
+      "position": "auto",
+      "row": "auto",
+      "rule": 2,
+      "scope": "auto",
+      "side": "auto",
+      "stroke_mm": 0,
+      "text": "",
+      "x_mm": 0,
+      "y_mm": 0
+     },
+     "layout": "single",
+     "legacy": false,
+     "mode": "black",
+     "op": "join",
+     "origin_v": 2,
+     "pin": "triangle",
+     "quiet_modules": 1,
+     "size_auto": true,
+     "turn": 0,
+     "v": 2
+    },
+    "target": {
+     "body_loops_mm": [
+      [
+       [
+        -20.0,
+        -20.0
+       ],
+       [
+        20.0,
+        -20.0
+       ],
+       [
+        20.0,
+        20.0
+       ],
+       [
+        -20.0,
+        20.0
+       ]
+      ]
+     ],
+     "body_mm": {
+      "measured": true,
+      "u0": -20.0,
+      "u1": 20.0,
+      "v0": -20.0,
+      "v1": 20.0,
+      "z0": -3.0,
+      "z1": 0.0
+     },
+     "face_loops_mm": null,
+     "h_mm": 40.0,
+     "has_body": true,
+     "kind": "face",
+     "loops_mm": [
+      [
+       [
+        -20.0,
+        -20.0
+       ],
+       [
+        20.0,
+        -20.0
+       ],
+       [
+        20.0,
+        20.0
+       ],
+       [
+        -20.0,
+        20.0
+       ]
+      ]
+     ],
+     "name": "Box 40 x 40",
+     "w_mm": 40.0,
+     "x_ref": null,
+     "z_sign": 1
+    }
+   },
+   "uid": "2d46707262a4",
+   "x_mm": 0.0,
+   "y_mm": 0.0
+  },
+  {
+   "hidden": false,
+   "locked": false,
+   "name": "board1",
+   "pose": [
+    0,
+    1,
+    0.0,
+    50.0,
+    -1,
+    0,
+    0.0,
+    0.5,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "rotation_deg": 270.0,
+   "spec": {
+    "key": "board1",
+    "name": "",
+    "numbers": {
+     "black_height": -0.6,
+     "black_offset": 0.0,
+     "marker_id": 1,
+     "pin_length": 2.0,
+     "pin_size": 3.0,
+     "pin_tol": 0.15,
+     "size": 0.0,
+     "square": 0.0,
+     "white_height": 2.0,
+     "white_offset": 0.0
+    },
+    "schema": "arucostudio.tagspec/1",
+    "settings": {
+     "cells": {
+      "min_mm": 2,
+      "mm": 0.5,
+      "of": "marker",
+      "rule": 1
+     },
+     "corner_mark": "none",
+     "dictionary": "DICT_4X4_50",
+     "flip": false,
+     "force": null,
+     "grow": false,
+     "label": {
+      "build_anyway": false,
+      "cap_mm": 0,
+      "content": "id",
+      "nozzle_mm": 0.6,
+      "offset_x_mm": 0,
+      "offset_y_mm": 0,
+      "on": false,
+      "place": "auto",
+      "position": "auto",
+      "row": "auto",
+      "rule": 2,
+      "scope": "auto",
+      "side": "auto",
+      "stroke_mm": 0,
+      "text": "",
+      "x_mm": 0,
+      "y_mm": 0
+     },
+     "layout": "grid",
+     "legacy": false,
+     "mode": "black",
+     "op": "join",
+     "origin_v": 2,
+     "pin": "triangle",
+     "quiet_modules": 1,
+     "size_auto": true,
+     "turn": 0,
+     "v": 2
+    },
+    "target": {
+     "body_loops_mm": [
+      [
+       [
+        -20.0,
+        -20.0
+       ],
+       [
+        20.0,
+        -20.0
+       ],
+       [
+        20.0,
+        20.0
+       ],
+       [
+        -20.0,
+        20.0
+       ]
+      ]
+     ],
+     "body_mm": {
+      "measured": true,
+      "u0": -20.0,
+      "u1": 20.0,
+      "v0": -20.0,
+      "v1": 20.0,
+      "z0": -3.0,
+      "z1": 0.0
+     },
+     "face_loops_mm": null,
+     "h_mm": 40.0,
+     "has_body": true,
+     "kind": "face",
+     "loops_mm": [
+      [
+       [
+        -20.0,
+        -20.0
+       ],
+       [
+        20.0,
+        -20.0
+       ],
+       [
+        20.0,
+        20.0
+       ],
+       [
+        -20.0,
+        20.0
+       ]
+      ]
+     ],
+     "name": "Box 40 x 40",
+     "w_mm": 40.0,
+     "x_ref": null,
+     "z_sign": 1
+    }
+   },
+   "uid": "1337c208f1b8",
+   "x_mm": 50.0,
+   "y_mm": 0.5
+  },
+  {
+   "hidden": false,
+   "locked": false,
+   "name": "charuco1",
+   "pose": [
+    1,
+    0,
+    0.0,
+    100.0,
+    0,
+    1,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "rotation_deg": 0.0,
+   "spec": {
+    "key": "charuco1",
+    "name": "",
+    "numbers": {
+     "black_height": -0.6,
+     "black_offset": 0.0,
+     "marker_id": 5,
+     "pin_length": 2.0,
+     "pin_size": 3.0,
+     "pin_tol": 0.15,
+     "size": 0.0,
+     "square": 0.0,
+     "white_height": 2.0,
+     "white_offset": 0.0
+    },
+    "schema": "arucostudio.tagspec/1",
+    "settings": {
+     "cells": {
+      "min_mm": 2,
+      "mm": 0.5,
+      "of": "marker",
+      "rule": 1
+     },
+     "corner_mark": "none",
+     "dictionary": "DICT_4X4_50",
+     "flip": false,
+     "force": null,
+     "grow": false,
+     "label": {
+      "build_anyway": false,
+      "cap_mm": 0,
+      "content": "id",
+      "nozzle_mm": 0.6,
+      "offset_x_mm": 0,
+      "offset_y_mm": 0,
+      "on": false,
+      "place": "auto",
+      "position": "auto",
+      "row": "auto",
+      "rule": 2,
+      "scope": "auto",
+      "side": "auto",
+      "stroke_mm": 0,
+      "text": "",
+      "x_mm": 0,
+      "y_mm": 0
+     },
+     "layout": "charuco",
+     "legacy": false,
+     "mode": "black",
+     "op": "join",
+     "origin_v": 2,
+     "pin": "triangle",
+     "quiet_modules": 1,
+     "size_auto": true,
+     "turn": 0,
+     "v": 2
+    },
+    "target": {
+     "body_loops_mm": [
+      [
+       [
+        -20.0,
+        -20.0
+       ],
+       [
+        20.0,
+        -20.0
+       ],
+       [
+        20.0,
+        20.0
+       ],
+       [
+        -20.0,
+        20.0
+       ]
+      ]
+     ],
+     "body_mm": {
+      "measured": true,
+      "u0": -20.0,
+      "u1": 20.0,
+      "v0": -20.0,
+      "v1": 20.0,
+      "z0": -3.0,
+      "z1": 0.0
+     },
+     "face_loops_mm": null,
+     "h_mm": 40.0,
+     "has_body": true,
+     "kind": "face",
+     "loops_mm": [
+      [
+       [
+        -20.0,
+        -20.0
+       ],
+       [
+        20.0,
+        -20.0
+       ],
+       [
+        20.0,
+        20.0
+       ],
+       [
+        -20.0,
+        20.0
+       ]
+      ]
+     ],
+     "name": "Box 40 x 40",
+     "w_mm": 40.0,
+     "x_ref": null,
+     "z_sign": 1
+    }
+   },
+   "uid": "597db0d72916",
+   "x_mm": 100.0,
+   "y_mm": 0.0
+  }
+ ],
+ "units": "mm"
+}

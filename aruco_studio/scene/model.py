@@ -5,6 +5,13 @@ Each SceneTag is a TagSpec (its target included) placed on the canvas: its
 target's frame sits at (x_mm, y_mm), turned by rotation_deg about +z. The
 canvas is mm, x right, y up (the 2D view flips y on screen).
 
+`pose_3d` (M8a): the tag's full pose when it does not lie z-up at z 0 on
+the canvas: a tag on a body's top (at its height), bottom or side (from
+the design file, scene/design.py). `pose` stays the canvas place (x_mm,
+y_mm, rotation_deg; a side tag's is its face unfolded about its edge, the
+box's net), so the sheet, the overlap check and the numbering stay 2D.
+`source` (not stored): where a compiled tag comes from in the design file.
+
 `locked`: a printed tag. An edit that would change its ink (the board, its
 frame, the corner mark, the label's text and strokes) is refused with an
 Issue; moving it on the canvas, renaming it or hiding it is allowed.
@@ -50,16 +57,26 @@ class SceneTag:
     locked: bool = False
     hidden: bool = False
     uid: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
+    pose_3d: Optional[List[float]] = None
+    source: Optional[dict] = field(default=None, compare=False, repr=False)
 
     @property
     def pose(self) -> List[float]:
         return pose_of(self.x_mm, self.y_mm, self.rotation_deg)
 
+    @property
+    def pose_full(self) -> List[float]:
+        """The tag's pose in 3D: `pose_3d`, else the canvas pose."""
+        return list(self.pose_3d) if self.pose_3d is not None else self.pose
+
     def to_dict(self) -> dict:
-        return {"name": self.name, "uid": self.uid, "spec": self.spec.to_dict(),
-                "x_mm": float(self.x_mm), "y_mm": float(self.y_mm),
-                "rotation_deg": float(self.rotation_deg), "pose": self.pose,
-                "locked": bool(self.locked), "hidden": bool(self.hidden), "plan": None}
+        d = {"name": self.name, "uid": self.uid, "spec": self.spec.to_dict(),
+             "x_mm": float(self.x_mm), "y_mm": float(self.y_mm),
+             "rotation_deg": float(self.rotation_deg), "pose": self.pose,
+             "locked": bool(self.locked), "hidden": bool(self.hidden), "plan": None}
+        if self.pose_3d is not None:
+            d["pose_3d"] = [float(v) for v in self.pose_3d]
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "SceneTag":
@@ -69,11 +86,16 @@ class SceneTag:
             v = d.get(k, 0.0)
             if isinstance(v, bool) or not isinstance(v, (int, float)):
                 raise ValueError(f"tag {d['name']!r}: {k} must be a number")
+        p3 = d.get("pose_3d")
+        if p3 is not None and (not isinstance(p3, list) or len(p3) != 16 or any(
+                isinstance(v, bool) or not isinstance(v, (int, float)) for v in p3)):
+            raise ValueError(f"tag {d['name']!r}: pose_3d must be 16 numbers")
         return cls(name=d["name"], spec=TagSpec.from_dict(d["spec"]),
                    x_mm=float(d.get("x_mm", 0.0)), y_mm=float(d.get("y_mm", 0.0)),
                    rotation_deg=float(d.get("rotation_deg", 0.0)),
                    locked=bool(d.get("locked", False)), hidden=bool(d.get("hidden", False)),
-                   uid=str(d.get("uid") or uuid.uuid4().hex[:12]))
+                   uid=str(d.get("uid") or uuid.uuid4().hex[:12]),
+                   pose_3d=[float(v) for v in p3] if p3 is not None else None)
 
 
 @dataclass

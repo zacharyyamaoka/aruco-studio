@@ -1,0 +1,21 @@
+{
+  "schema": "arucostudio.scene/2",
+  "name": "stickers for the rack",
+  "preset": "Sticker · Letter · 600 dpi",
+  "sheet": {"page": "letter", "mode": "tight"},
+  "sketches": [
+    {"id": "sk", "shapes": [
+      {"id": "a", "rect": [30, 30], "at": [0, 0]},
+      {"id": "b", "rect": [30, 30], "at": [40, 0]},
+      {"id": "c", "rect": [60, 40], "at": [0, 50]},
+      {"id": "d", "circle": 50, "at": [80, 50], "holes": [{"circle": 6}]}
+    ]}
+  ],
+  "features": [
+    {"id": "t1", "aruco": "a", "layout": "single", "label": "#id"},
+    {"id": "t2", "aruco": "b", "layout": "single", "label": "#id"},
+    {"id": "t3", "aruco": "c", "layout": "grid", "cols": 2, "rows": 1},
+    {"id": "t4", "aruco": "d", "layout": "charuco", "cols": 4, "rows": 4,
+     "perimeter": "profile", "holes": "avoid"}
+  ]
+}

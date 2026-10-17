@@ -1,0 +1,14 @@
+{
+  "schema": "arucostudio.scene/2",
+  "name": "forearm, 1-DoF arm",
+  "preset": "0.32mm SPEED @MK4IS 0.6 - Aruco",
+  "sketches": [
+    {"id": "sk", "shapes": [{"id": "outline", "rect": [120, 40]}]}
+  ],
+  "features": [
+    {"id": "forearm", "extrude": "outline", "height": 40},
+    {"id": "tag", "aruco": ["forearm.front", "forearm.right", "forearm.back", "forearm.left"],
+     "layout": "charuco", "cols": 5, "rows": 2, "mark": "triangle",
+     "label": "#id + name", "name": "forearm"}
+  ]
+}
