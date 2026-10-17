@@ -1,0 +1,11 @@
+﻿started 2026-10-17 03:11:46
+adapters: 97 passed in 39 s
+core: 7,354 passed, 4 skipped in 36 s
+plan: 529 passed in 78 s
+scene: 42 passed in 13 s
+server: 91 passed in 18 s
+verify: 117 passed, 1 skipped in 93 s
+studio: build + vitest passed in 9 s
+e2e: 47 passed (3.9m) in 236 s
+OK in 523 s
+exit=0 finished 2026-10-17 03:20:29

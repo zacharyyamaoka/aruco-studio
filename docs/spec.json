@@ -1,7 +1,7 @@
 {
   "schema": "arucostudio.spec/1",
   "title": "ArUco Studio: the functionality we want, and the tests",
-  "updated": "2026-10-17 (the audit fixes after M8b2)",
+  "updated": "2026-10-17 morning hand-over (after the audit fixes)",
   "about": [
     "Two separate lists, as Zach asked: 'features' is the functionality we want; 'tests' is how we check it.",
     "Every feature and test starts as 'planned'. A builder sets a feature to 'built' and a test to 'passing' / 'failing' with the command that shows it.",
@@ -14,7 +14,8 @@
     "M3 audit (2026-10-16): the fixes of the post-M3 audit set the PDF sheet built, the core's purity test passing, the Fusion adapter features partial (skeleton on the fake adsk; gates F1-F8 pending) with their tests passing on the fake, and added ST-T-AUDIT-1 / 2. Numbers: docs/status/AUDIT.md and docs/status/M4.md.",
     "Feature statuses: planned, built, partial, deferred. Test statuses: planned, passing, failing, skipped.",
     "Final verification (2026-10-16, about 21:00): every status checked against a clean run of tools/check.py (OK in 362 s: adapters 97, core 7,245 + 4 skipped, plan 193, scene 7, server 35, verify 104, studio build + vitest, e2e 19) and --trace (missing 0). ST-T-RUN-1 set passing from that run; every planned or deferred entry carries a reason. The record: docs/STATUS.md and reports/status.html.",
-    "Waves 1-3 and the 2026-10-17 audit (the orchestrator): the M6a, M8a, M8b1, M8c and M8b2 entries added with their tests; the M6 note's ST-HOLES is ST-HOLES-RULE here (ST-HOLES is the older screws-and-holes item); ST-UI-TARGET deferred (replaced by ST-UI-SKETCH); the audit added ST-FROZEN-PRESETS, ST-LABEL-RULE4, ST-UI-OPEN and ST-T-FROZEN-1, ST-T-LABEL-RULE4-1, ST-T-AUDIT-3. Numbers: docs/status/audit-2026-10-17.md."
+    "Waves 1-3 and the 2026-10-17 audit (the orchestrator): the M6a, M8a, M8b1, M8c and M8b2 entries added with their tests; the M6 note's ST-HOLES is ST-HOLES-RULE here (ST-HOLES is the older screws-and-holes item); ST-UI-TARGET deferred (replaced by ST-UI-SKETCH); the audit added ST-FROZEN-PRESETS, ST-LABEL-RULE4, ST-UI-OPEN and ST-T-FROZEN-1, ST-T-LABEL-RULE4-1, ST-T-AUDIT-3. Numbers: docs/status/audit-2026-10-17.md.",
+    "Morning hand-over (2026-10-17, 03:11-03:30): every status checked against a clean run of tools/check.py (OK in 523 s: adapters 97, core 7,354 + 4 skipped, plan 529, scene 42, server 91, verify 117 + 1 strict xfail, studio build + vitest 44, e2e 47) and --trace (missing 0). Set from what is built: ST-EXP-3MF and ST-T-EXP-2 (M6a's beds 3MF and M8c's Send project), ST-EXP-STL (the bundle's oriented parts/ STLs), ST-UI-EXPORT (Sticker sheet…, Print…, Send to PrusaSlicer…); ST-T-FUSION-M7-1 added as planned (M7, Fusion). The record: docs/STATUS.md and reports/status.html (with reports/screens/morning_*.png)."
   ],
   "statuses": {
     "feature": ["planned", "built", "partial", "deferred"],
@@ -142,13 +143,12 @@
     {"id": "ST-EXP-PDF", "area": "export", "name": "PDF print sheet", "status": "built", "milestone": "M2b", "ref_ids": ["EXP-PDF"],
      "description": "A true-size sheet on letter or A4, never scaled, ruler bars, '#id' in the border, the orientation triangle, the part name. Later: the 3D label's text (REF OI-PDF-LABEL).",
      "result": "scene/sheet.to_pdf: every visible, planned tag as a sticker on REF's print sheet (core.sheet: A4, cut marks, '#id' in the border, the ruler); POST /api/scene/export/pdf; Export > Sticker sheet (PDF). tests/verify/test_pdf_sheet.py: pdfium at 300 dpi, OpenCV reads every id of 12 tags in 3 dictionaries, a sticker's square within 1.5 px (0.13 mm) of its planned size (audit C1)"},
-    {"id": "ST-EXP-STL", "area": "export", "name": "STL per layer / per colour", "status": "partial", "milestone": "M2b", "ref_ids": ["EXP-STL", "BEDS-ORIENT"],
+    {"id": "ST-EXP-STL", "area": "export", "name": "STL per layer / per colour", "status": "built", "milestone": "M2b, M6a", "ref_ids": ["EXP-STL", "BEDS-ORIENT"],
      "description": "One STL per tag part (tile, cells), face-down orientation for printing, from plan/mesh.",
-     "result": "plan/exports.to_stl: binary STL of the tag's closed bodies (all, or one of body / white / pattern), stdlib, no trimesh needed. Not yet: one file per printed part oriented face down",
-     "reason": "one file per printed part, oriented face down, is not built (the STL is one file per body as modelled)"},
-    {"id": "ST-EXP-3MF", "area": "export", "name": "PrusaSlicer project with beds", "status": "planned", "milestone": "M2b", "ref_ids": ["EXP-PRUSA", "BEDS-PACK", "BEDS-PROJECT", "EXP-SLICER"],
+     "result": "plan/exports.to_stl: binary STL of the tag's closed bodies (all, or one of body / white / pattern), stdlib. M6a's print bundle (scene/export.print3d, POST /api/scene/export/print): print3d/stl/<tag>__tile.stl and __cells.stl per 3D tag, and core.beds.render_beds's print3d/parts/<part>__tile.stl / __cells.stl oriented for printing (face down when the black is inlaid flush; the reason recorded per part); tests/scene/test_print_bundle.py"},
+    {"id": "ST-EXP-3MF", "area": "export", "name": "PrusaSlicer project with beds", "status": "built", "milestone": "M2b, M6a, M8c", "ref_ids": ["EXP-PRUSA", "BEDS-PACK", "BEDS-PROJECT", "EXP-SLICER"],
      "description": "The scene's tags packed on the printer's beds, tile on extruder 1 and cells on extruder 2, with the presets resolved from PrusaSlicer's vendor bundle (fixture).",
-     "reason": "not built in M2: core.beds (REF print_beds) is ported; the scene -> beds -> 3MF step is next"},
+     "result": "Two ways. M6a's bundle (scene/export.print3d): parts.json (bam_aruco_print3d/1, what core.beds.load_parts reads), core.beds.layout_beds + render_beds -> print3d/aruco_tags.3mf and print3d/beds/bed_*.3mf, one object per part, the cells on the black slot (tests/scene/test_print_bundle.py::test_print3d_holds_exactly_the_3d_tags: exactly the 3D tags, the ledger marked). M8c's Send (scene/print3d.py, POST /api/scene/send/prusaslicer): one object per body, the tags as volumes, white on extruder 1, black on 2, negative volumes per slab, the config = the chosen physical printer's full preset chain and its bed (tests/scene/test_print3d.py, tests/server/test_prusa_api.py; the headless slice: tests/verify/test_slice_check.py)"},
 
     {"id": "ST-API", "area": "server", "name": "The Studio API on 127.0.0.1:5360", "status": "built", "milestone": "M2b", "ref_ids": [],
      "description": "FastAPI: health, dictionaries, plan, validate, candidates, scene open / save / renumber, exports, verify, presets, profiles; OpenAPI for the web app's types; serves studio/dist.",
@@ -176,10 +176,9 @@
     {"id": "ST-UI-LIBRARY", "area": "studio", "name": "The print preset library", "status": "built", "milestone": "M3", "ref_ids": ["EX-PRESETS"],
      "description": "Cards with an SVG thumb, filters, Select / New / Duplicate / Edit / Delete / Import from a PrusaSlicer profile; a React port of REF's HTML library.",
      "result": "brought forward from M5: studio/src/library (React port of REF preset_library) over server/library.py (REF Library on the Studio's store): Recent / This scene / My presets / PrusaSlicer / Built-in, thumbs, Filters | Info, New / Duplicate / Edit / Import / Delete, Select / Cancel (e2e/tests/library.spec.ts)"},
-    {"id": "ST-UI-EXPORT", "area": "studio", "name": "Export and Verify from the app", "status": "partial", "milestone": "M3", "ref_ids": ["EXP-TYPES", "EXP-CHECK"],
+    {"id": "ST-UI-EXPORT", "area": "studio", "name": "Export and Verify from the app", "status": "built", "milestone": "M3, M8b2", "ref_ids": ["EXP-TYPES", "EXP-CHECK"],
      "description": "SVG / PNG / PDF / STL / 3MF buttons; Verify shows every id read and the PnP error per tag.",
-     "result": "Export: the 1:1 SVG sheet, a PNG sheet, the PDF sticker sheet, STL and plan JSON per tag, the scene file, one tag's SVG / STL / JSON; Verify: every tag (ids, corner and PnP error, the raster; a row goes stale when its tag changes; progress per tag) and the sheet (every marker found, overlapping tags) (e2e/tests/export.spec.ts, audit.spec.ts)",
-     "reason": "no 3MF: the server has none yet (ST-EXP-3MF)"},
+     "result": "Export: the 1:1 SVG sheet, a PNG sheet, the old PDF sticker sheet, STL and plan JSON per tag, the scene file, one tag's SVG / STL / JSON (e2e/tests/export.spec.ts, audit.spec.ts); since M8b2: Sticker sheet… (the dialog, its SVG preview, Export of the sheet files), Print sticker sheet… and Send to PrusaSlicer… (the 3MF project with the colours on their extruders: e2e/tests/send.spec.ts); Verify: every tag (ids, corner and PnP error, the raster; a row goes stale when its tag changes; progress per tag) and the sheet (every marker found, overlapping tags). The beds 3MF of the print bundle has no menu item: POST /api/scene/export/print writes it"},
     {"id": "ST-UI-SCENE-FILE", "area": "studio", "name": "Open and save scenes", "status": "partial", "milestone": "M3", "ref_ids": [],
      "description": "New, open, save, save as of .arucostudio.json; the recent list.",
      "result": "File: New, Open (every saved scene with its date), Save, Save as; save, reload, open gives the same tags and poses (e2e/tests/scene.spec.ts); unsaved changes shown by a dot on the scene name, New / Open ask 'Save changes?', closing the tab asks too (e2e/tests/audit.spec.ts)",
@@ -506,9 +505,9 @@
     {"id": "ST-T-EXP-1", "feature_ids": ["ST-EXP-IMAGE", "ST-EXP-PDF"], "kind": "opencv", "milestone": "M2b", "status": "passing", "ref_tests": ["EXP-PDF-5", "EXP-PDF-6"],
      "how": "pytest tests/plan/test_exports.py: the SVG parses and its viewBox is the tile in mm; the PNG decodes to every id; the PDF sheet's items are at true size (every tag found within 0.15 mm on a 600 dpi raster).",
      "result": "SVG and PNG: tests/plan/test_exports.py, tests/server/test_api.py. PDF: tests/verify/test_pdf_sheet.py (pdfium 300 dpi: every id of 12 tags found; a single sticker within 0.13 mm of its size) and e2e/tests/export.spec.ts (OpenCV reads every id off the exported sheet.pdf)"},
-    {"id": "ST-T-EXP-2", "feature_ids": ["ST-EXP-3MF"], "kind": "pytest", "milestone": "M2b", "status": "planned", "ref_tests": ["EXP-PRUSA-2", "BEDS-PROJECT-2"],
-     "how": "pytest tests/plan/test_export_3mf.py: a scene of 41 tags gives 3 beds; the 3MF members and presets are as REF's test_print_beds expects.",
-     "reason": "the 3MF beds export is not built yet (ST-EXP-3MF)"},
+    {"id": "ST-T-EXP-2", "feature_ids": ["ST-EXP-3MF"], "kind": "pytest", "milestone": "M2b, M6a, M8c", "status": "passing", "ref_tests": ["EXP-PRUSA-2", "BEDS-PROJECT-2"],
+     "how": "The 3MFs read back with zipfile + ElementTree only (as REF's verify_print_beds.py): the bundle's aruco_tags.3mf holds exactly the 3D tags, one object per part, the cells on the black slot; Send's project has every volume closed and two-manifold, the right volume_type, black on extruder 2, the config equal to the chosen printer's chain and its bed_shape.",
+     "result": "tests/scene/test_print_bundle.py::test_print3d_holds_exactly_the_3d_tags (20 of 40 tags), tests/scene/test_print3d.py (6: the forearm one object, 1 + 4 x 3 volumes with New-body tiles, the plate, the config and bed, the sticker example's 400). Not replayed: REF's 41-tags-on-3-beds case (core.beds is REF's text; its goldens are unchanged)"},
     {"id": "ST-T-API-1", "feature_ids": ["ST-API"], "kind": "pytest", "milestone": "M2b", "status": "passing", "ref_tests": [],
      "how": "pytest tests/server/test_api.py (TestClient): every route of ARCHITECTURE 3.5 answers 200 with a schema-valid body; /api/plan on a golden case equals plan_tag; a wrong TYPE gives 422 naming the key path; a wrong VALUE gives 200 with the Issue; /api/form lists every row of ARCHITECTURE 5.6; /api/targets lists box, disc and the ten faces.",
      "result": "tests/server/test_api.py: every route, response schemas (TagPlanOut), 422 naming the key path, OpenAPI components for the web app"},
@@ -578,7 +577,7 @@
 
     {"id": "ST-T-RUN-1", "feature_ids": ["ST-API", "ST-UI-2D", "ST-FUSION-BUILD"], "kind": "pytest", "milestone": "", "status": "passing", "ref_tests": ["SAFE-DOCS-1"],
      "how": "The orchestrator, after every milestone: git -C REF status --porcelain unchanged; nothing new under %USERPROFILE%/CADExporter; netstat shows 5360 / 5361 free; git remote -v empty in ROOT.",
-     "result": "final verification 2026-10-16: git -C REF status --porcelain unchanged by the run (one new untracked file and two .install_*.pyc appeared at 21:08-21:10 from another session's add-in install); nothing new under %USERPROFILE%/CADExporter but the Fusion bridge's heartbeat (other sessions); netstat shows no listener on 5360 / 5361 after the run; git remote -v empty in ROOT"},
+     "result": "morning hand-over 2026-10-17: the full check (OK in 523 s) and the served Studio for the screenshots left no listener on 5360 / 5361 (5370, Zach's preview, untouched); REF only read; the tests ran with USERPROFILE in a temp folder and the e2e PrusaSlicer folder set to tests/fixtures/prusaslicer_m8c; git remote -v empty in ROOT. Earlier (2026-10-16): git -C REF status --porcelain unchanged by the run; nothing new under %USERPROFILE%/CADExporter but the Fusion bridge's heartbeat (other sessions)"},
     {"id": "ST-T-LIVE-1", "feature_ids": ["ST-LIVE-SWITCH"], "kind": "manual", "milestone": "", "status": "planned", "ref_tests": ["EX-EDIT-RT-3", "SAFE-LIVE-1"],
      "how": "Deferred: REF's edit gates and live_test re-run with the add-in on the new core, in a Fusion window Zach opens.",
      "reason": "deferred with ST-LIVE-SWITCH: needs a Fusion window Zach opens"},
@@ -642,6 +641,9 @@
      "reason": "Zach decides: a new label rule (a cut-from-black label's stroke is at least one line width; rule 5, since 4 is taken) or a finer black nozzle"},
     {"id": "ST-T-AUDIT-3", "feature_ids": ["ST-UI-TOOLBAR", "ST-UI-OPEN", "ST-UI-SEND", "ST-UI-SKETCH", "ST-UI-SHEET"], "kind": "playwright", "milestone": "audit 2026-10-17", "status": "passing", "ref_tests": [],
      "how": "The 2026-10-17 audit's Studio fixes: a new tag after a split list takes a fresh id and is selected alone; the palette selects every command by its whole name and the short names; Open's examples, recent files and folder; Send's nozzle line; a rect hole's W x H; a ChArUco label's auto Position; the sheet dialog's sheet-only Export; a new face list's own ids.",
-     "result": "e2e/tests/audit2.spec.ts, palette.spec.ts, sheet.spec.ts, drag3d.spec.ts; vitest paletteRank.test.ts, design.test.ts, formModel.test.ts"}
+     "result": "e2e/tests/audit2.spec.ts, palette.spec.ts, sheet.spec.ts, drag3d.spec.ts; vitest paletteRank.test.ts, design.test.ts, formModel.test.ts"},
+    {"id": "ST-T-FUSION-M7-1", "feature_ids": ["ST-FUSION-CORE-VENDOR", "ST-FUSION-PRINT", "ST-FUSION-MULTI", "ST-FUSION-HOLES-PERIMETER", "ST-FUSION-STICKER", "ST-FUSION-FIELDS"], "kind": "manual", "milestone": "M7", "status": "planned", "ref_tests": [],
+     "how": "The M6 note's ST-T-FUSION-M7-1..5: the Fusion gate records F-M7.1 to F-M7.5 (the vendored core, Print from Fusion, multi-select, the Holes and Perimeter rows, the sticker node), each run in a Fusion test document and written up in the cad-exporter worktree.",
+     "reason": "M7 runs only when no Studio milestone is waiting for an agent and a Fusion test window is free (ROADMAP section 3); nothing in M6 or M8 waits on it"}
   ]
 }

@@ -49,11 +49,22 @@ td.id { white-space:nowrap; font-family:ui-monospace, monospace; font-size:12.5p
 """
 
 # The hand-over screenshots, in the order the task named them, with a caption.
+# The morning ones (2026-10-17) first, then the 2026-10-16 evening ones.
 SHOTS = [
-    ("final_2d_three_types.png", "2D canvas: a single marker, a 4 x 3 grid board and a 5 x 7 ChArUco board"),
-    ("final_3d_view.png", "3D view (z x5): the raised single marker's white and black layers"),
-    ("final_inspector_validation_error.png", "Inspector: two validation errors, each under its field, one summary line"),
-    ("final_preset_library.png", "The preset Library window"),
+    ("morning_01_mini_cad_sketch.png", "The mini CAD: R 80 50, H 18; the rectangle selected with its handles, the hole, the shape rows"),
+    ("morning_02_body_charuco_3d.png", "E 5, A: a ChArUco on the extruded plate, in the clear 31 x 50 mm rectangle beside the hole (3D)"),
+    ("morning_02b_body_charuco_2d.png", "The same plate in 2D, the inspector on the Marker tab"),
+    ("morning_03_forearm_3d.png", "examples/forearm: four ChArUco tags on the sides of a 120 x 40 x 40 box (3D, fitted)"),
+    ("morning_03b_forearm_2d_net.png", "The forearm in 2D: the side tags unfolded like a box net, with their hinge lines"),
+    ("morning_04_sheet_dialog_tight.png", "Export > Sticker sheet… on examples/sticker_sheet: Letter, Tight (4 stickers, 1 page, 11 cuts, 3 shelves)"),
+    ("morning_04a_stickers_2d.png", "The four stickers of examples/sticker_sheet on the canvas (2D badges, cut lines)"),
+    ("morning_05_printers_collection.png", "The Library's Printers collection: one card per PrusaSlicer physical printer (names only, no host), the current pair marked"),
+    ("morning_06_kit_light_inspector.png", "The light kit: the inspector's Marker tab (Preset first, Made by read only, the rows from /api/form)"),
+    ("morning_06b_kit_light_label_tab.png", "The light kit: the Label tab, a message anchored under it while its own row is hidden"),
+    ("final_2d_three_types.png", "2026-10-16: 2D canvas with a single marker, a 4 x 3 grid board and a 5 x 7 ChArUco board"),
+    ("final_3d_view.png", "2026-10-16: 3D view (z x5), the raised single marker's white and black layers"),
+    ("final_inspector_validation_error.png", "2026-10-16: two validation errors, each under its field, one summary line"),
+    ("final_preset_library.png", "2026-10-16: the preset Library window"),
 ]
 
 
@@ -105,7 +116,8 @@ def render(spec):
                    [("Id", "id"), ("Kind", "kind"), ("Milestone", "milestone"), ("Status", "status"),
                     ("How", "how"), ("Result", "result")])
     out.append("<h2>Screenshots</h2><p class='about'>Taken from the served build "
-               "(<code>npm --prefix studio run studio</code>, http://127.0.0.1:5360) at hand-over.</p>")
+               "(<code>python -m aruco_studio.server</code> with studio/dist, http://127.0.0.1:5360) at hand-over: "
+               "the morning of 2026-10-17 first, then the evening of 2026-10-16.</p>")
     out.append("<div class='shots'>")
     for name, caption in SHOTS:
         if (SCREENS / name).exists():
