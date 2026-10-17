@@ -10,8 +10,8 @@
 
 The routes live here, not in app.py (ROADMAP wave-1 rule): app.py includes
 them with ONE line, `from . import sheet_api  # noqa: E402,F401`, anywhere
-after `app` is made. `install(app)` is idempotent and keeps the web app's
-static mount last, so the routes are reached whatever the line's place.
+after `app` is made. `install(app)` is idempotent and puts these routes
+first, so they are reached whatever the line's place.
 """
 from __future__ import annotations
 
@@ -22,9 +22,7 @@ from typing import Literal, Optional
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field
-from starlette.routing import Mount
 
-from ..core import sheet as _SH
 from ..scene import export as _EX
 from ..scene import sheet as _SS
 from . import store as S
@@ -155,11 +153,16 @@ def verify_sheet(req: Optional[VerifySheetIn] = None) -> dict:
 
 
 def install(app) -> None:
-    """Add the routes once, before the web app's static mount ("/")."""
+    """Add the routes once, FIRST: before app.py's `/api/scene/export/{fmt}`
+    (which would take `export/print` as a format) and before the web app's
+    static mount ("/")."""
     if getattr(app.state, "sheet_api", False):
         return
+    n = len(app.router.routes)
     app.include_router(router)
-    app.router.routes.sort(key=lambda r: isinstance(r, Mount))     # stable: mounts last
+    mine = app.router.routes[n:]
+    del app.router.routes[n:]
+    app.router.routes[0:0] = mine
     app.state.sheet_api = True
 
 

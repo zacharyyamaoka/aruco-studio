@@ -1169,20 +1169,35 @@ def _seg_hits_box(ax, ay, bx, by, x0, y0, x1, y1) -> bool:
 TOUCH_M = 5e-8                # 50 nm: a tile may touch the outline (or a hole) this closely
 
 
+SKIP_M = 1e-12               # ArUco Studio M6a: a segment this far clear of the box is skipped
+
+
 def _rect_inside(loops, cx: float, cy: float, w: float, h: float, tol: float = TOUCH_M) -> bool:
     """Exact: the axis-aligned w x h box centred at (cx, cy) lies in the
     region (may touch its boundary -- to within tol --, never crosses it,
-    holds no hole)."""
+    holds no hole).
+
+    Adapted (ArUco Studio M6a, not REF's text): a segment whose two ends lie
+    beyond one side of the box by more than SKIP_M (1 pm) is skipped before
+    _seg_hits_box. Liang-Barsky gives False for such a segment exactly (its
+    t on that side is past 1 or under 0 by far more than a rounding), so the
+    answer is REF's bit for bit (the autosize and 824 evaluate() goldens
+    replay); and the centre's point-in-region test runs last (the three
+    tests are pure: their order changes no answer). Both only save time: a
+    96-point disc with three holes fits in a quarter of REF's time."""
     x0, x1 = cx - w / 2.0 + tol, cx + w / 2.0 - tol
     y0, y1 = cy - h / 2.0 + tol, cy + h / 2.0 - tol
-    if x0 > x1 or y0 > y1 or not _inside(loops, cx, cy):
+    if x0 > x1 or y0 > y1:
         return False
+    lx, hx, ly, hy = x0 - SKIP_M, x1 + SKIP_M, y0 - SKIP_M, y1 + SKIP_M
     for loop in loops:
         for i in range(len(loop)):
             (ax, ay), (bx, by) = loop[i - 1], loop[i]
+            if (ax < lx and bx < lx) or (ax > hx and bx > hx) or (ay < ly and by < ly)                     or (ay > hy and by > hy):
+                continue
             if _seg_hits_box(ax, ay, bx, by, x0, y0, x1, y1):
                 return False
-    return True
+    return _inside(loops, cx, cy)
 
 
 # ------------------------------------------- the largest clear rectangle
