@@ -39,7 +39,9 @@ from ..plan.spec import TagSpec
 from ..plan.target import SpecTypeError
 from ..scene import Scene, SceneFileError, dumps, loads, renumber
 from ..scene import sheet as _sheet
+from . import library as _LIB
 from . import models as M
+from . import newtag as _NEW
 from . import store as S
 
 VERSION = "0.2.0"
@@ -85,10 +87,12 @@ def _spec(spec_in) -> TagSpec:
         raise _422(exc.path, exc.message) from None
 
 
-def _plan_dict(p, mesh: bool = False) -> dict:
+def _plan_dict(p, mesh: bool = False, top: bool = False) -> dict:
     d = p.to_dict()
     if mesh and p.ok:
         d["mesh"] = _ME.mesh(p)
+    if top and p.ok:
+        d["top"] = _ME.top(p)          # {colour: polygons}: what is seen from above
     return d
 
 
@@ -145,9 +149,10 @@ def targets(thickness_mm: float = 3.0) -> List[dict]:
 
 @app.post("/api/plan", response_model=M.TagPlanOut, response_model_exclude_none=False,
           response_model_by_alias=True)
-def plan(spec: M.TagSpecIn, mesh: int = Query(0)) -> dict:
-    """TagSpec -> TagPlan. ?mesh=1 fills `mesh` (per body, for the 3D view)."""
-    return _plan_dict(plan_tag(_spec(spec)), mesh=bool(mesh))
+def plan(spec: M.TagSpecIn, mesh: int = Query(0), top: int = Query(0)) -> dict:
+    """TagSpec -> TagPlan. ?mesh=1 fills `mesh` (per body, for the 3D view);
+    ?top=1 adds `top` ({colour: polygons}, the top view the 2D view fills)."""
+    return _plan_dict(plan_tag(_spec(spec)), mesh=bool(mesh), top=bool(top))
 
 
 @app.post("/api/validate", response_model=List[M.IssueOut])
@@ -176,7 +181,14 @@ def verify(req: M.VerifyIn) -> dict:
     """The tag rendered and read by OpenCV (frontal), and its pose 25 deg off."""
     from ..verify.report import verify_plan
     p = plan_tag(_spec(req.spec))
-    return verify_plan(p, px_per_mm=float(req.px_per_mm), pose=req.pose)
+    rep = verify_plan(p, px_per_mm=float(req.px_per_mm), pose=req.pose)
+    if req.image and p.ok:
+        import cv2
+        from ..verify.render import top_view
+        r = top_view(p, px_per_mm=float(req.px_per_mm))
+        rep["image_png"] = base64.b64encode(cv2.imencode(".png", r.img)[1].tobytes()).decode(
+            "ascii")
+    return rep
 
 
 def png_true_size(png: bytes, px_per_mm: float) -> bytes:
@@ -269,6 +281,7 @@ def preset_delete(name: str) -> dict:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
     st.flush()
+    _LIB.forget_recent(name)
     return {"deleted": name}
 
 
@@ -300,20 +313,21 @@ def _scene() -> Scene:
     return STATE["scene"]
 
 
-def _scene_out(plans: bool = False, mesh: bool = False) -> dict:
+def _scene_out(plans: bool = False, mesh: bool = False, top: bool = False) -> dict:
     sc = _scene()
     d = sc.to_dict()
     if plans:
         ps = sc.plans()
         for t in d["tags"]:
-            t["plan"] = _plan_dict(ps[t["name"]], mesh=mesh)
+            t["plan"] = _plan_dict(ps[t["name"]], mesh=mesh, top=top)
     return d
 
 
 @app.get("/api/scene")
-def scene_get(plans: int = Query(0), mesh: int = Query(0)) -> dict:
-    """The open scene; ?plans=1 adds each tag's TagPlan (?mesh=1 its mesh)."""
-    return _scene_out(bool(plans), bool(mesh))
+def scene_get(plans: int = Query(0), mesh: int = Query(0), top: int = Query(0)) -> dict:
+    """The open scene; ?plans=1 adds each tag's TagPlan (?mesh=1 its mesh,
+    ?top=1 its top view)."""
+    return _scene_out(bool(plans), bool(mesh), bool(top))
 
 
 @app.put("/api/scene")
@@ -445,7 +459,7 @@ def scene_verify(px_per_mm: float = 10.0) -> dict:
 
 
 @app.post("/api/scene/export/{fmt}")
-def scene_export(fmt: str, save: int = Query(1)) -> dict:
+def scene_export(fmt: str, save: int = Query(1), inline: int = Query(0)) -> dict:
     """The scene as a 1:1 sheet (svg), its file (json), or every tag's
     plan / STL; written under <home>/exports/<scene>/ (save=1)."""
     sc = _scene()
@@ -477,7 +491,108 @@ def scene_export(fmt: str, save: int = Query(1)) -> dict:
             written.append(str(S.write_atomic(out_dir / fn, data, binary=True)))
     return {"dir": str(out_dir), "files": written or [fn for fn, _ in files],
             "inline": {fn: base64.b64encode(data).decode("ascii") for fn, data in files}
-            if not save else None}
+            if (inline or not save) else None}
+
+
+# ------------------------------------------------------------- the Studio (M3)
+
+@app.post("/api/new")
+def new_tag(req: M.NewTagIn) -> dict:
+    """A fresh tag's TagSpec: `layout` on a palette target (`target_key`,
+    `thickness_mm`) or a typed `target`, under a preset (by name)."""
+    if req.target is not None:
+        tgt = M.TagSpecIn(target=req.target).plain()["target"]
+    else:
+        key = req.target_key or "box40"
+        pal = {x["key"]: x["target"] for x in _T.palette(float(req.thickness_mm))}
+        if key not in pal:
+            raise HTTPException(status_code=404, detail=f"no target {key!r}: {', '.join(pal)}")
+        tgt = pal[key]
+    preset = None
+    if req.preset:
+        preset, _kind = _P.find(_P.catalog(S.presets_store(), _prusa()), req.preset)
+        if preset is None:
+            raise HTTPException(status_code=404, detail=f"no preset {req.preset!r}")
+    return _NEW.new_spec(req.layout, tgt, preset, marker_id=req.marker_id, name=req.name,
+                         key=req.key)
+
+
+@app.post("/api/preset/apply")
+def preset_apply(req: M.PresetApplyIn) -> dict:
+    """`spec` with a preset's print settings (by `name`, or a `preset`)."""
+    p = req.preset
+    if p is None:
+        p, _kind = _P.find(_P.catalog(S.presets_store(), _prusa()), req.name)
+        if p is None:
+            raise HTTPException(status_code=404, detail=f"no preset {req.name!r}")
+    _spec(req.spec)
+    return _NEW.apply_preset(req.spec.plain(), p)
+
+
+@app.post("/api/preset/of")
+def preset_of(req: M.PresetOfIn) -> dict:
+    """A tag's print settings as a preset, and the catalog preset it equals."""
+    _spec(req.spec)
+    p = _NEW.preset_of(req.spec.plain(), req.name)
+    match = None
+    for n, cp, _k in _P.catalog(S.presets_store(), _prusa())["items"]:
+        if _P.same_print(p, cp):
+            match = n
+            break
+    return {"preset": p, "matches": match}
+
+
+def _nodes():
+    return [(t.name, _NEW.preset_of(t.spec.to_dict())) for t in _scene().tags]
+
+
+@app.get("/api/library")
+def library(tag: Optional[str] = None, selected: Optional[str] = None) -> dict:
+    """The preset Library's state (REF aruco_preset_library.Library.state):
+    collections, cards with thumbs, the Edit form. `tag`: the scene tag the
+    Library opened for (its print settings are the dialog's)."""
+    dialog = None
+    if tag:
+        try:
+            dialog = _NEW.preset_of(_scene().get(tag).spec.to_dict())
+        except KeyError:
+            raise HTTPException(status_code=404, detail=f"no tag {tag!r}") from None
+    return _LIB.state(_nodes(), dialog, selected)
+
+
+@app.post("/api/library/select")
+def library_select(req: M.LibraryCardIn) -> dict:
+    """Select a card: {name, preset} to apply (a PrusaSlicer profile is
+    imported as one of yours first)."""
+    try:
+        name, p = _LIB.select(req.id, _nodes())
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"no preset card {req.id!r}") from None
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    return {"name": name, "preset": p}
+
+
+@app.post("/api/library/save")
+def library_save(req: M.LibrarySaveIn) -> dict:
+    """Edit -> Save of one of your presets (its fields by path; a new name renames)."""
+    try:
+        got = _LIB.save_edit(req.id, req.name, req.values, _nodes())
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"no preset card {req.id!r}") from None
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    return {"name": got}
+
+
+@app.get("/api/library/recent")
+def library_recent() -> dict:
+    return {"recent": _LIB.recent()}
+
+
+@app.post("/api/library/recent")
+def library_recent_add(req: M.RecentIn) -> dict:
+    return {"recent": _LIB.add_recent(req.name)}
 
 
 # ------------------------------------------------------------- the web app

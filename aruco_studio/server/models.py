@@ -158,6 +158,7 @@ class VerifyIn(BaseModel):
     spec: TagSpecIn
     px_per_mm: Num = 20.0
     pose: StrictBool = True
+    image: StrictBool = False          # the raster OpenCV read, as a PNG (base64)
 
 
 class CandidatesIn(BaseModel):
@@ -207,3 +208,45 @@ class PresetIn(BaseModel):
 
 class OverrideIn(BaseModel):
     id: Optional[StrictInt] = None
+
+
+# ------------------------------------------------------------- the Studio (M3)
+
+class NewTagIn(BaseModel):
+    """A fresh tag's spec (server/newtag.py): a layout on a target from the
+    palette (`target_key`, `thickness_mm`) or a typed `target`, under a
+    preset (its name; Default when empty)."""
+    model_config = ConfigDict(extra="forbid")
+    layout: Literal["single", "grid", "charuco"] = "single"
+    target_key: Optional[StrictStr] = None
+    thickness_mm: Num = 3.0
+    target: Optional[TargetIn] = None
+    preset: StrictStr = ""
+    marker_id: StrictInt = 0
+    name: StrictStr = ""
+    key: StrictStr = ""
+
+
+class PresetApplyIn(BaseModel):
+    spec: TagSpecIn
+    name: StrictStr = ""
+    preset: Optional[Dict[str, Any]] = None
+
+
+class PresetOfIn(BaseModel):
+    spec: TagSpecIn
+    name: StrictStr = ""
+
+
+class LibraryCardIn(BaseModel):
+    id: StrictStr
+
+
+class LibrarySaveIn(BaseModel):
+    id: StrictStr
+    name: StrictStr = ""
+    values: Dict[str, Any] = Field(default_factory=dict)
+
+
+class RecentIn(BaseModel):
+    name: StrictStr
