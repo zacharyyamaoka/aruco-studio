@@ -20,7 +20,7 @@ def main(argv=None):
     a = ap.parse_args(argv)
     if a.host not in ("127.0.0.1", "localhost"):
         raise SystemExit("the Studio serves on 127.0.0.1 only")
-    if a.port in (5322, 5331, 5340, 5350, 5370, 8080):
+    if a.port in (5322, 5331, 5340, 5350, 8080):
         raise SystemExit(f"port {a.port} belongs to another tool")
     if a.open_path:
         from . import design_api
