@@ -442,3 +442,14 @@ Tests:
 | 7 | The Made-by row: gone (the preset decides) or kept as an override? | **Gone**: a read-only line under Preset; a tag matching no preset shows "custom" |
 | 8 | A ChArUco label by hand in any black square (rule 3) or the top-left only? | **Any black square** (rule 3; auto stays top-left) |
 | 9 | The earlier note's six questions (the row's words, stock 0.1 mm, proofs off, a black triangle on paper, no switch on a locked tag, a thin body in Fusion) | as answered there, with question 1 now moot |
+
+## Zach's answers (2026-10-16, about 20:40)
+
+| # | Question | Answer |
+|---|---|---|
+| 1 | Sticker page | **Letter first**, then A4 |
+| 2 | Holes default | **Avoid**, for both kinds |
+| 5 | Fusion multi-select | **One tag per face**: N nodes in one timeline group, one undo |
+| 6 | Fusion Print | **Print dialog if possible**: try the verb, else open the PDF with the Ctrl+P / Actual size note. Studio: the browser's print dialog at 100 % |
+
+Questions 3, 4, 7, 8 and 9 keep their defaults: 0°/90° only, bounding boxes, no Made-by row, rule 3, and the earlier note's answers.
