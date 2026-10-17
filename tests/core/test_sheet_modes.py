@@ -22,7 +22,7 @@ def item(key, w, h, holes=(), marker_m=0.02, ids=(0,), name=""):
     a, b = w / 2.0, h / 2.0
     return SH.PrintItem(key=key, dictionary="DICT_4X4_50", marker_id=ids[0],
                         marker_length_m=marker_m,
-                        outline_mm={"outer": [[-a, -b], [a, -b], [a, b], [-a, b]],
+                        cut_mm={"outer": [[-a, -b], [a, -b], [a, b], [-a, b]],
                                     "holes": [list(hh) for hh in holes]},
                         ink_mm=[], ids=list(ids), name=name or key, made_by="sticker")
 

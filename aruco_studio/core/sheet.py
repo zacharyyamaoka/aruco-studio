@@ -1,4 +1,4 @@
-# Ported from REF CADExporter/bam_cad_core/print_sheet.py at c8216ff:
+# Ported from REF CADExporter/bam_cad_core/print_sheet.py at c8216ff, brought up to f5ebf4e (N-1):
 # copied verbatim, only the package-relative imports renamed. ArUco Studio
 # M6a (2026-10-16) adds fields to PrintItem and SheetSettings (defaults =
 # REF's behaviour) and, below "the sticker sheet", the plan-driven sheet:
@@ -35,7 +35,18 @@ decides where the edges fall.
 Every page carries a scale-check ruler (a 100 mm bar and a 4 in bar) because
 the last thing between this file and a mis-scaled marker is a print dialog
 defaulting to "fit to page". The PDF is hand-written PDF 1.4 with the base-14
-Helvetica, stdlib only, so it can be produced inside Fusion.
+Helvetica, stdlib only, so it can be produced inside Fusion. Its catalog says
+/PrintScaling /None, which tells the viewer's print dialog to start at
+Actual size instead of "fit"; `render_layout_pdf(print_dialog=True)` makes a
+copy that opens that dialog itself (document JavaScript, bUI true: nothing
+prints until the user presses Print).
+
+### A ChArUco board prints exactly as the CAD has it (2026-10-17)
+
+A board item made from a CAD tag has `marks="cad"`: its sticker carries the
+board, the CAD's own label and corner mark (`ink`, pure black or pure white,
+from the tag record) and nothing else -- no grey triangle, no grey board
+label, no cut line over the board (the line is drawn outside the sticker).
 """
 from __future__ import annotations
 
@@ -108,12 +119,28 @@ class PrintItem:
     # "#id" bottom + part name top costs -0.2 pp vs "#id" alone, within
     # noise). "" = nothing in the top row.
     top_label: str = ""
+    # What the sticker carries besides the pattern:
+    #   "sheet"  the sheet's own marks (SheetSettings id_mark / orient_mark /
+    #            top_label; a ChArUco board's grey label)
+    #   "cad"    exactly the CAD tag's: `ink`, and nothing else (ChArUco
+    #            boards, 2026-10-17: the paper board is the CAD board)
+    marks: str = "sheet"
+    # marks="cad": the CAD's own label and corner mark, painted over the
+    # pattern in order -- [(colour, polygon)], colour "black" | "white",
+    # polygon [(x, y), ...] in mm in the pattern's CENTRE frame (+y up)
+    ink: List[Tuple[str, List[Tuple[float, float]]]] = field(default_factory=list)
+    # marks="cad": the CAD tile's outline when it is not the pattern + quiet
+    # zone (a label strip grows it; a cut corner), a polygon in the same
+    # frame. The sticker is the box round it, the pattern and the ink.
+    outline_mm: Optional[List[Tuple[float, float]]] = None
     # ArUco Studio M6a (not REF's; None / "" = REF's sticker): the sticker as
     # its plan has it, in the sticker's own frame (mm, y up, the pattern's
     # centre at 0): the cut polygon {"outer": [[u, v]...], "holes": [...]}
     # and the black seen from above [[outer, hole, ...], ...]. With ink_mm
-    # the sheet draws THIS and none of its own marks.
-    outline_mm: Optional[dict] = None
+    # the sheet draws THIS and none of its own marks. (N-1, 2026-10-17: the
+    # cut polygon was `outline_mm`; REF f5ebf4e gave that name to its CAD
+    # tile outline, a list polygon, so the Studio's is `cut_mm`.)
+    cut_mm: Optional[dict] = None
     ink_mm: Optional[list] = None
     caption: str = ""               # spaced mode: the words under the sticker
     made_by: str = ""               # "sticker" / "print3d" (a paper proof)
@@ -287,6 +314,47 @@ class _Prepared(NamedTuple):
     label_h: float
     cell_w: float
     cell_h: float
+    pad_l: float = 0.0              # sticker's left edge -> the pattern's
+    pad_t: float = 0.0              # sticker's top edge -> the pattern's
+    note: str = ""                  # placed, but something was left off (a warning)
+
+
+INK_COLOURS = {"black": 0.0, "white": 1.0}
+
+
+def _cad_points(item):
+    """marks="cad": every point of the outline and the ink (centre frame,
+    mm) -> list, or raise ValueError naming what is wrong."""
+    pts = []
+    if item.outline_mm is not None:
+        if len(item.outline_mm) < 3:
+            raise ValueError("outline_mm needs 3 or more points")
+        pts += [(float(x), float(y)) for x, y in item.outline_mm]
+    for k, entry in enumerate(item.ink or ()):
+        colour, poly = entry
+        if colour not in INK_COLOURS:
+            raise ValueError("ink %d: colour %r is not black or white" % (k, colour))
+        if len(poly) < 3:
+            raise ValueError("ink %d: a polygon needs 3 or more points" % k)
+        pts += [(float(x), float(y)) for x, y in poly]
+    if not all(math.isfinite(v) for p in pts for v in p):
+        raise ValueError("outline / ink points must be finite numbers")
+    return pts
+
+
+def sticker_box_mm(item: PrintItem) -> Tuple[float, float, float, float]:
+    """The sticker (what is cut out) as (x0, y0, x1, y1) in mm in the
+    pattern's centre frame (+y up): the pattern + quiet zone, and for
+    marks="cad" also the CAD's outline and ink. Raises ValueError on a bad
+    item (layout_sheet rejects it with that reason)."""
+    info = aruco_dict.dictionary_info(item.dictionary)
+    w, h = (v * 1000.0 for v in aruco_board.extent_m(board_spec(item)))
+    q = float(item.quiet_modules) * float(item.marker_length_m) * 1000.0 / info["modules"]
+    x0, y0, x1, y1 = -w / 2.0 - q, -h / 2.0 - q, w / 2.0 + q, h / 2.0 + q
+    if item.marks == "cad":
+        for x, y in _cad_points(item):
+            x0, y0, x1, y1 = min(x0, x), min(y0, y), max(x1, x), max(y1, y)
+    return x0, y0, x1, y1
 
 
 def _prepare(index, item, settings, area_w, area_h):
@@ -308,6 +376,8 @@ def _prepare(index, item, settings, area_w, area_h):
         return None, "marker_length_m must be > 0 (got %r)" % (item.marker_length_m,)
     if not (math.isfinite(quiet) and quiet >= 0):
         return None, "quiet_modules must be >= 0 (got %r)" % (item.quiet_modules,)
+    if item.marks not in ("sheet", "cad"):
+        return None, "marks must be 'sheet' or 'cad' (got %r)" % (item.marks,)
     try:
         extent_w, extent_h = (v * 1000.0 for v in aruco_board.extent_m(board_spec(item)))
     except (ValueError, TypeError) as exc:
@@ -317,6 +387,14 @@ def _prepare(index, item, settings, area_w, area_h):
     module_mm = marker_mm / modules
     sticker_w = extent_w + 2.0 * quiet * module_mm
     sticker_h = extent_h + 2.0 * quiet * module_mm
+    pad_l = pad_t = (sticker_w - extent_w) / 2.0
+    if item.marks == "cad" and (item.ink or item.outline_mm is not None):
+        try:
+            x0, y0, x1, y1 = sticker_box_mm(item)
+        except (ValueError, TypeError) as exc:
+            return None, "the CAD's label / corner mark: %s" % exc
+        sticker_w, sticker_h = x1 - x0, y1 - y0
+        pad_l, pad_t = -extent_w / 2.0 - x0, y1 - extent_h / 2.0
 
     lines: List[str] = []
     font_pt = LABEL_FONT_PT
@@ -332,6 +410,16 @@ def _prepare(index, item, settings, area_w, area_h):
         label_h = LABEL_GAP_MM + len(lines) * font_pt * LABEL_LEADING / MM_TO_PT
     cell_w = max(sticker_w, label_w)
     cell_h = sticker_h + label_h
+    note = ""
+    if (label_h and cell_h > area_h + _EPS and sticker_w <= area_w + _EPS
+            and sticker_h <= area_h + _EPS):
+        # the sticker fits, only the text under it does not: print the
+        # sticker without it rather than not at all (the label is not part
+        # of the target; a CAD label on the board still prints)
+        note = ("the label under it was left off: the %.1f mm tall sticker fits the %.1f mm "
+                "printable height only without it" % (sticker_h, area_h))
+        lines, label_h = [], 0.0
+        cell_w, cell_h = sticker_w, sticker_h
     if sticker_w > area_w + _EPS or cell_h > area_h + _EPS:
         what = ("%.1f mm marker" % marker_mm if item.layout == "single" else
                 "%.1f x %.1f mm %s board" % (extent_w, extent_h, item.layout))
@@ -342,7 +430,8 @@ def _prepare(index, item, settings, area_w, area_h):
             % (sticker_w, cell_h, what, " + label" if label_h else "",
                area_w, area_h))
     return _Prepared(index, item, modules, marker_mm, module_mm, sticker_w, sticker_h,
-                     extent_w, extent_h, lines, font_pt, label_h, cell_w, cell_h), None
+                     extent_w, extent_h, lines, font_pt, label_h, cell_w, cell_h,
+                     pad_l, pad_t, note), None
 
 
 def layout_sheet(items: List[PrintItem], settings: Optional[SheetSettings] = None) -> SheetLayout:
@@ -388,6 +477,8 @@ def layout_sheet(items: List[PrintItem], settings: Optional[SheetSettings] = Non
             rejected.append(RejectedItem(item, reason))
         else:
             prepared.append(prep)
+            if prep.note:
+                warnings.append("%s: %s" % (item.key, prep.note))
             if prep.module_mm < SMALL_MODULE_MM:
                 warnings.append("%s: module is %.2f mm — below ~%.1f mm many "
                                 "printers blur the cells" % (item.key, prep.module_mm,
@@ -418,13 +509,12 @@ def layout_sheet(items: List[PrintItem], settings: Optional[SheetSettings] = Non
             next_shelf_y[spot[0]] = spot[2] + p.cell_h + gap
         page_index, cx, cy = spot
         sx = cx + (p.cell_w - p.sticker_w) / 2.0
-        quiet_mm = (p.sticker_w - p.extent_w) / 2.0
         label_box = ((cx, cy + p.sticker_h, p.cell_w, p.label_h)
                      if p.label_h else None)
         pages[page_index].append(PlacedItem(
             item=p.item, page=page_index, x_mm=sx, y_mm=cy,
             sticker_mm=p.sticker_w, marker_mm=p.marker_mm, module_mm=p.module_mm,
-            modules=p.modules, marker_x_mm=sx + quiet_mm, marker_y_mm=cy + quiet_mm,
+            modules=p.modules, marker_x_mm=sx + p.pad_l, marker_y_mm=cy + p.pad_t,
             cell=(cx, cy, p.cell_w, p.cell_h), label_box=label_box,
             label_lines=list(p.lines), label_font_pt=p.font_pt,
             sticker_w_mm=p.sticker_w, sticker_h_mm=p.sticker_h,
@@ -434,6 +524,26 @@ def layout_sheet(items: List[PrintItem], settings: Optional[SheetSettings] = Non
     return SheetLayout(settings=settings, page_mm=(page_w, page_h),
                        printable_mm=(x0, y0, area_w, area_h), pages=pages,
                        rejected=rejected, ruler=ruler, warnings=warnings)
+
+
+def fit_pages(item: PrintItem, settings: Optional[SheetSettings] = None,
+              pages=None) -> List[Tuple[str, bool]]:
+    """Every (page, landscape) of `pages` (default PAGE_SIZES_MM, in its
+    order) on which `item` is placed with `settings`' margin, ruler and
+    labels -- what to suggest when it does not fit the page chosen."""
+    import dataclasses
+    base = settings or SheetSettings()
+    out = []
+    for page in (pages or PAGE_SIZES_MM):
+        for landscape in (False, True):
+            s = dataclasses.replace(base, page=page, landscape=landscape, custom_page_mm=None)
+            try:
+                lay = layout_sheet([item], s)
+            except ValueError:
+                continue
+            if lay.placed:
+                out.append((page, landscape))
+    return out
 
 
 def _r(v: float) -> float:
@@ -475,6 +585,9 @@ def layout_summary(layout: SheetLayout) -> dict:
             "marker_x_mm": _r(p.marker_x_mm), "marker_y_mm": _r(p.marker_y_mm),
             "label_lines": list(p.label_lines),
             **_board_summary(p.item),
+            **({"marks": "cad", "ink_polygons": len(p.item.ink),
+                "outline": p.item.outline_mm is not None}
+               if p.item.marks == "cad" else {}),
         } for p in layout.placed],
         "rejected": [{
             "key": r.item.key, "dictionary": r.item.dictionary,
@@ -546,6 +659,44 @@ class _Page:
                         % (_n(grey), _n(x * MM_TO_PT), _n(yy * MM_TO_PT),
                            _n((x + leg) * MM_TO_PT), _n(yy * MM_TO_PT),
                            _n(x * MM_TO_PT), _n((yy - leg) * MM_TO_PT)))
+
+    def _path(self, pts) -> str:
+        """A closed path through page points (mm, y down)."""
+        ops = ["%s %s %s" % (_n(x * MM_TO_PT), _n((self.h - y) * MM_TO_PT), "m" if k == 0 else "l")
+               for k, (x, y) in enumerate(pts)]
+        return " ".join(ops) + " h"
+
+    def fill_poly(self, pts, grey):
+        """One polygon filled on its own (overlapping ones never cancel)."""
+        self.ops.append("%s g %s f" % (_n(grey), self._path(pts)))
+
+    def stroke_poly(self, pts, grey, width_mm):
+        self.ops.append("%s G %s w %s S" % (_n(grey), _n(width_mm * MM_TO_PT), self._path(pts)))
+
+
+def offset_polygon(pts, d):
+    """A simple polygon grown outward by `d` (mitred corners): each edge
+    moved out along its normal, consecutive edges met again. Either
+    orientation."""
+    n = len(pts)
+    area = sum(pts[i - 1][0] * pts[i][1] - pts[i][0] * pts[i - 1][1] for i in range(n))
+    s = 1.0 if area > 0 else -1.0                 # CCW: the outward normal is (dy, -dx)
+    lines = []
+    for i in range(n):
+        (x0, y0), (x1, y1) = pts[i], pts[(i + 1) % n]
+        L = math.hypot(x1 - x0, y1 - y0) or 1.0
+        nx, ny = s * (y1 - y0) / L, -s * (x1 - x0) / L
+        lines.append(((x0 + nx * d, y0 + ny * d), (x1 - x0, y1 - y0)))
+    out = []
+    for i in range(n):
+        (p, r), (q, t) = lines[i - 1], lines[i]
+        den = r[0] * t[1] - r[1] * t[0]
+        if abs(den) < 1e-12:                       # collinear edges: keep the moved point
+            out.append(q)
+            continue
+        u = ((q[0] - p[0]) * t[1] - (q[1] - p[1]) * t[0]) / den
+        out.append((p[0] + u * r[0], p[1] + u * r[1]))
+    return out
 
 
 def _border_text(pg, text, left_mm, edge_mm, length_mm, module_mm, row="bottom",
@@ -669,10 +820,27 @@ def _page_content(layout: SheetLayout, page_index: int, page_total: int,
         cells = [(cx + x0 * 1000.0, cy - y1 * 1000.0, (x1 - x0) * 1000.0, (y1 - y0) * 1000.0)
                  for x0, y0, x1, y1 in aruco_board.black_rects_m(board_spec(p.item))]
         pg.fill_rects(cells)
-        _marks(pg, p, s)
-        if s.cut_marks:
-            pg.stroke_rect(p.x_mm, p.y_mm, p.sticker_w_mm, p.sticker_h_mm,
-                           CUT_GREY, CUT_LINE_MM)
+        if p.item.marks == "cad":
+            # the CAD's own label and corner mark, pure black / white, in
+            # order; nothing of the sheet's own on the sticker
+            for colour, poly in p.item.ink:
+                pg.fill_poly([(cx + float(x), cy - float(y)) for x, y in poly],
+                             INK_COLOURS[colour])
+            if s.cut_marks:
+                # the line OUTSIDE the sticker: its inner edge is the cut, so
+                # no grey lands on a board drawn to its edge (quiet zone 0)
+                if p.item.outline_mm is not None:
+                    edge = [(cx + float(x), cy - float(y)) for x, y in p.item.outline_mm]
+                else:
+                    x0, y0 = p.x_mm, p.y_mm
+                    x1, y1 = x0 + p.sticker_w_mm, y0 + p.sticker_h_mm
+                    edge = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+                pg.stroke_poly(offset_polygon(edge, CUT_LINE_MM / 2.0), CUT_GREY, CUT_LINE_MM)
+        else:
+            _marks(pg, p, s)
+            if s.cut_marks:
+                pg.stroke_rect(p.x_mm, p.y_mm, p.sticker_w_mm, p.sticker_h_mm,
+                               CUT_GREY, CUT_LINE_MM)
         if p.label_box is not None:
             bx, by, bw, _ = p.label_box
             line_mm = p.label_font_pt * LABEL_LEADING / MM_TO_PT
@@ -700,9 +868,22 @@ def _utf16_hex(text: str) -> str:
     return "<FEFF" + text.encode("utf-16-be").hex().upper() + ">"
 
 
-def render_layout_pdf(layout: SheetLayout, date: Optional[str] = None) -> bytes:
+# The print copy's document JavaScript (Acrobat's Doc.print; Chrome's and
+# Edge's viewers, pdf.js and Acrobat run it when the file opens): the print
+# dialog with its own UI, never silent, never shrunk to fit.
+PRINT_DIALOG_JS = "this.print({bUI: true, bSilent: false, bShrinkToFit: false});"
+
+
+def render_layout_pdf(layout: SheetLayout, date: Optional[str] = None,
+                      print_dialog: bool = False) -> bytes:
     """PDF 1.4 bytes for an existing layout (one page per layout page, and a
-    single page when nothing was placed)."""
+    single page when nothing was placed).
+
+    The catalog asks for /PrintScaling /None (the viewer's print dialog
+    starts at Actual size, not "fit"). `print_dialog`: the copy that opens
+    the print dialog when it is opened (PRINT_DIALOG_JS) -- the dialog
+    shows, nothing prints until the user presses Print; a viewer without
+    PDF JavaScript only shows the sheet."""
     date = date or datetime.date.today().isoformat()
     page_w, page_h = layout.page_mm
     total = max(1, layout.page_count)
@@ -712,7 +893,7 @@ def render_layout_pdf(layout: SheetLayout, date: Optional[str] = None) -> bytes:
         objects.append(body)
         return len(objects)
 
-    add(b"<< /Type /Catalog /Pages 2 0 R >>")
+    add(b"")                                                    # 1: Catalog, below
     add(b"")                                                    # 2: Pages, below
     font = add(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica "
                b"/Encoding /WinAnsiEncoding >>")
@@ -730,6 +911,15 @@ def render_layout_pdf(layout: SheetLayout, date: Optional[str] = None) -> bytes:
                          "/Contents %d 0 R >>" % (media, font, content)).encode("ascii")))
     objects[1] = ("<< /Type /Pages /Kids [%s] /Count %d >>"
                   % (" ".join("%d 0 R" % k for k in kids), len(kids))).encode("ascii")
+    names = b""
+    if print_dialog:
+        js = add(("<< /Type /Action /S /JavaScript /JS %s >>"
+                  % pdf_string(PRINT_DIALOG_JS)).encode("ascii"))
+        names = b" /Names << /JavaScript << /Names [(print) %d 0 R] >> >>" % js
+    # /Version: PrintScaling is PDF 1.6; the catalog's version overrides the
+    # header's (PDF 1.4 section 3.6.1), and nothing else here is past 1.4
+    objects[0] = (b"<< /Type /Catalog /Version /1.6 /Pages 2 0 R "
+                  b"/ViewerPreferences << /PrintScaling /None >>" + names + b" >>")
 
     out = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
     offsets = []
@@ -921,7 +1111,7 @@ def default_ink(item: PrintItem) -> list:
 
 
 def outline_of(item: PrintItem) -> dict:
-    return item.outline_mm if item.outline_mm else default_outline(item)
+    return item.cut_mm if item.cut_mm else default_outline(item)
 
 
 def ink_of(item: PrintItem) -> list:

@@ -1,7 +1,8 @@
 """The port is a copy: every function said to be REF's verbatim IS, line for line.
 
 For each core module, every top-level def / class / constant it shares with
-its REF file (at the pinned commit) has the same source text, except the
+its REF file (at ref_path.REF_HEAD, the add-in the core was last brought
+up to: N-1, 2026-10-17) has the same source text, except the
 ones listed as ADAPTED (they took a Fusion object or the dialog's state, and
 their docstrings say what changed). Skipped when REF is not on this machine.
 """
@@ -125,7 +126,7 @@ CASES = [(m, ref, skip) for m, refs in PORTS.items() for ref, skip in refs]
 @pytest.mark.parametrize("module,ref,adapted", CASES, ids=[f"{m}<-{Path(r).name}" for m, r, _ in CASES])
 def test_shared_names_are_refs_text(module, ref, adapted):
     mine = defs((CORE / f"{module}.py").read_text(encoding="utf-8"))
-    theirs = defs(renamed(ref_path.show(ref).decode("utf-8")))
+    theirs = defs(renamed(ref_path.show(ref, ref_path.REF_HEAD).decode("utf-8")))
     shared = sorted((set(mine) & set(theirs)) - set(adapted))
     assert shared, f"{module} shares nothing with {ref}"
     differ = [n for n in shared if mine[n] != theirs[n]]
@@ -143,7 +144,7 @@ def test_beds_io_is_refs_text():
     """server/beds_io.py: each function is print_beds' own text, and the
     core's beds no longer holds any of them."""
     mine = defs(BEDS_IO.read_text(encoding="utf-8"))
-    theirs = defs(renamed(ref_path.show(B + "print_beds.py").decode("utf-8")))
+    theirs = defs(renamed(ref_path.show(B + "print_beds.py", ref_path.REF_HEAD).decode("utf-8")))
     funcs = {n for n in mine if mine[n].lstrip().startswith("def ")} - BEDS_IO_M8C
     assert BEDS_IO_M8C <= set(mine) and not (BEDS_IO_M8C & set(theirs))
     assert len(funcs) == 12, sorted(funcs)
@@ -168,6 +169,6 @@ def test_whole_core_copies_keep_every_ref_name():
         mine = set(defs((CORE / f"{module}.py").read_text(encoding="utf-8")))
         if module == "beds":
             mine |= beds_io
-        theirs = set(defs(ref_path.show(ref).decode("utf-8")))
+        theirs = set(defs(ref_path.show(ref, ref_path.REF_HEAD).decode("utf-8")))
         missing = theirs - mine - (not_ported if module == "markers" else set())
         assert not missing, (module, sorted(missing))

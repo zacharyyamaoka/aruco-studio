@@ -131,8 +131,41 @@ def summary_text(issues, names, tabs, ok_text="", limit=3):
     return f"<span style='color:{c}'>{html(head + body)}</span>"
 
 
-def rows_for(text, chars):
-    return max(1, min(3, -(-len(text) // max(10, chars))))
+MAX_ROWS = 3
+
+
+def rows_for(text, chars, most=MAX_ROWS):
+    return max(1, min(most, -(-len(text) // max(10, chars))))
+
+
+def fit_text(text, chars, rows):
+    """`text` cut to fit `rows` lines of about `chars` characters, so a
+    message row never scrolls (Fusion 2026-10-16: a refused label's words
+    took four lines in a three-row box and the box scrolled). What goes
+    first: asides in brackets, then whole sentences from the end (" …" says
+    there is more), then words ("…"). The text itself when it fits."""
+    import re
+    budget = max(10, chars) * max(1, rows)
+    t = re.sub(r"\s+", " ", str(text or "")).strip()
+    if len(t) <= budget:
+        return t
+    t = re.sub(r"\s*\([^()]*\)", "", t)
+    if len(t) <= budget:
+        return t
+    kept = ""
+    for part in re.split(r"(?<=[.;])\s+", t):
+        cand = (kept + " " + part).strip()
+        if len(cand) + 2 > budget:
+            break
+        kept = cand
+    if kept:
+        kept = kept.rstrip(" ;,:")
+        return kept + (" …" if kept.endswith(".") else "…")
+    cut = t[:budget - 1]
+    space = cut.rfind(" ")
+    if space > budget // 2:
+        cut = cut[:space]
+    return cut.rstrip(" ;,:") + "…"
 
 
 class K:

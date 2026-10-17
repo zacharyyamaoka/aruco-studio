@@ -155,7 +155,7 @@ def sticker_item(t, p) -> "_SH.PrintItem":
     return _SH.PrintItem(key=t.name, dictionary=sp["dictionary"], marker_id=int(sp["marker_id"]),
                          marker_length_m=float(sp["marker_length_m"]),
                          quiet_modules=float(sp.get("quiet_modules", 1.0)),
-                         outline_mm=outline, ink_mm=ink, caption=caption_of(d, t.name),
+                         cut_mm=outline, ink_mm=ink, caption=caption_of(d, t.name),
                          made_by=d.get("made_by") or "print3d", name=t.name,
                          ids=list(d.get("ids") or []), **kw)
 
