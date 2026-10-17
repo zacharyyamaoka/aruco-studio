@@ -54,8 +54,10 @@ export async function printPdf(q: SheetQuery): Promise<PrintOutcome> {
 }
 
 /** Why Print is off for this scene (null: it can print). */
-export function printBlock(stickers: number): string | null {
-  return stickers ? null : "no stickers in this scene (3D tags print on beds)";
+export function printBlock(stickers: number, printed3d = 0): string | null {
+  if (stickers) return null;
+  // a 3D scene prints through PrusaSlicer: say where (audit 2026-10-17, FB-16)
+  return printed3d ? "3D tags: Send to PrusaSlicer…" : "no stickers in this scene";
 }
 
 /** Why Send to PrusaSlicer is off for this scene (null: it can send). */

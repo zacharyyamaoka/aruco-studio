@@ -355,6 +355,109 @@ def read_design(path: Path):
     return b.decode("utf-8-sig", errors="replace"), text_hash(b)
 
 
+# ------------------------------------------------------------- the Open dialog (audit 2026-10-17)
+
+EXAMPLES = ROOT / "examples"
+MAX_RECENT_DESIGNS = 12
+
+
+def recent_path() -> Path:
+    return home() / "recent_designs.json"
+
+
+def recent_designs() -> List[dict]:
+    """The design files opened lately, newest first: {path, name, exists, modified}."""
+    try:
+        data = json.loads(recent_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = {}
+    out = []
+    for x in data.get("recent") or []:
+        if not isinstance(x, str) or not x:
+            continue
+        f = Path(x)
+        ok = f.is_file()
+        out.append({"path": x, "name": f.name[:-len(SCENE_EXT)] if f.name.endswith(SCENE_EXT)
+                    else f.name, "exists": ok,
+                    "modified": time.strftime("%Y-%m-%dT%H:%M:%S",
+                                              time.localtime(f.stat().st_mtime)) if ok else None})
+    return out
+
+
+def remember_design(path: Path) -> None:
+    """Put `path` first in the recent list (best effort: never raises)."""
+    try:
+        now = [x["path"] for x in recent_designs()]
+        p = str(Path(path).resolve())
+        rec = ([p] + [x for x in now if x != p])[:MAX_RECENT_DESIGNS]
+        write_atomic(recent_path(), json.dumps({"schema": "arucostudio.recent/1", "recent": rec},
+                                               indent=1) + "\n")
+    except (OSError, StoreError, ValueError):
+        pass
+
+
+def examples() -> List[dict]:
+    """ROOT/examples' design files: {name, file, title}."""
+    out = []
+    for f in sorted(EXAMPLES.glob("*" + SCENE_EXT)):
+        title = ""
+        try:
+            title = str(json.loads(f.read_text(encoding="utf-8")).get("name") or "")
+        except (OSError, ValueError):
+            pass
+        out.append({"name": f.name[:-len(SCENE_EXT)], "file": f.name, "title": title})
+    return out
+
+
+def copy_example(name: str) -> Path:
+    """An example copied into the scenes folder (a fresh name when taken):
+    the repo's examples are never opened, so never written."""
+    n = name[:-len(SCENE_EXT)] if name.endswith(SCENE_EXT) else name
+    src = EXAMPLES / (n + SCENE_EXT)
+    if safe_name(n) != n or not src.is_file():
+        raise FileNotFoundError(name)
+    text = src.read_text(encoding="utf-8")
+    dst = scene_path(n)
+    k = 2
+    while dst.exists():
+        dst = scene_path(f"{n}-{k}")
+        k += 1
+    write_atomic(dst, text)
+    return dst
+
+
+def browse(folder=None) -> dict:
+    """A folder's design files and subfolders (not recursive): {dir, parent,
+    folders: [{name, path}], files: [{name, path, bytes, modified}]}. The
+    scenes folder when `folder` is empty."""
+    if folder:
+        d = design_path(folder)
+    else:
+        d = scenes_dir()
+        d.mkdir(parents=True, exist_ok=True)          # a fresh box: the folder New writes to
+    if not d.is_dir():
+        raise FileNotFoundError(str(d))
+    folders, files = [], []
+    try:
+        entries = sorted(d.iterdir(), key=lambda x: x.name.lower())
+    except OSError:
+        entries = []
+    for f in entries:
+        try:
+            if f.is_dir():
+                if not f.name.startswith(".") and not _forbidden(f):
+                    folders.append({"name": f.name, "path": str(f)})
+            elif f.name.endswith(SCENE_EXT):
+                st = f.stat()
+                files.append({"name": f.name[:-len(SCENE_EXT)], "path": str(f), "bytes": st.st_size,
+                              "modified": time.strftime("%Y-%m-%dT%H:%M:%S",
+                                                        time.localtime(st.st_mtime))})
+        except OSError:
+            continue
+    parent = str(d.parent) if d.parent != d else None
+    return {"dir": str(d), "parent": parent, "folders": folders, "files": files}
+
+
 # ------------------------------------------------------------- remembered
 
 def remembered_path() -> Path:

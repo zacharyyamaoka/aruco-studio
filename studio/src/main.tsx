@@ -16,7 +16,7 @@ initTheme();
 // the hooks a test sets so nothing leaves the browser (printHook: called
 // with the PDF's bytes instead of the print dialog; it returns false to act
 // as a browser that cannot print a PDF; sendOpen: false keeps PrusaSlicer
-// closed on Send).
+// closed on Send; revealOpen: false keeps the file browser closed on Reveal).
 declare global {
   interface Window { __studio: any }
 }
@@ -29,6 +29,7 @@ window.__studio = {
   theme: { get: getTheme, set: setTheme },
   printHook: null as null | ((bytes: Uint8Array, url: string) => boolean | Promise<boolean>),
   sendOpen: true,
+  revealOpen: true,
 };
 
 createRoot(document.getElementById("root")!).render(

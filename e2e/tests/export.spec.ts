@@ -5,7 +5,7 @@
 import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
-import { add, detect, fresh, idle, probe, shot } from "./helpers";
+import { API, add, detect, fresh, idle, probe, shot } from "./helpers";
 
 async function exportVia(page: any, item: string) {
   const dl = page.waitForEvent("download");
@@ -67,7 +67,7 @@ test("verify every tag and the sheet; export SVG, STL, plan JSON, the scene", as
   expect(pdf.download.suggestedFilename()).toBe("sheet.pdf");
   const pdfFile = path.join(pdf.dir, "sheet.pdf");
   expect(fs.readFileSync(pdfFile).subarray(0, 5).toString("latin1")).toBe("%PDF-");
-  const dict = String((await (await page.request.get("http://127.0.0.1:5360/api/scene?plans=1")).json()).tags[0].plan.marker.dictionary);
+  const dict = String((await (await page.request.get(`${API}/api/scene?plans=1`)).json()).tags[0].plan.marker.dictionary);
   const allIds = tags.flatMap((t: any) => t.ids).sort((a: number, b: number) => a - b);
   expect(detect(pdfFile, dict)).toEqual(allIds);
 

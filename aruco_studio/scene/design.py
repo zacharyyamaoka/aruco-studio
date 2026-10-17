@@ -9,6 +9,7 @@ only; never opens a file (server/ reads and writes them).
 | `write_back(doc, scene, presets)` | a Scene changed through the Scene API (add, delete, rename, move, edit, renumber, overrides) written back into the document: changed features get exact `settings` / `numbers` and lose their sugar; a multi-face list stays one feature while its faces agree and splits when one differs |
 | `add_tag`, `delete_tag`, `rename_tag`, `move_tag` | the single edits `write_back` is made of |
 | `shapes_2d(doc)` | every shape's loops on the canvas (mm), for drawings |
+| `freeze(doc, presets)` | the presets a sugar feature names, copied into `frozen_presets` (once; unused ones dropped): sugar expands against the copy, so a changed PrusaSlicer profile never changes a typed tag by itself (the server calls it on open and on every write) |
 
 `presets` is a function name -> a preset dict (or None), or a dict; the
 compile never reads a file. Sugar on an ArUco Extrude expands through
@@ -32,7 +33,8 @@ from .model import NAME_BAD, Scene, SceneTag, mat_mul, pose_of
 SCHEMA = "arucostudio.scene/2"
 
 TOP_KEYS = ("schema", "name", "units", "preset", "sheet", "sketches", "features", "overrides",
-            "ledger", "presets_used", "note")
+            "ledger", "presets_used", "frozen_presets", "note")
+FROZEN = "frozen_presets"          # {preset name: the preset as the sugar was first expanded with}
 SKETCH_KEYS = ("id", "at", "rot", "shapes", "name", "note")
 SHAPE_KEYS = ("id", "at", "rot", "name", "holes", "note") + _SH.KINDS
 EXTRUDE_KEYS = ("id", "extrude", "height", "name", "note")
@@ -94,6 +96,79 @@ def _presets_fn(presets: Presets) -> Callable[[str], Optional[dict]]:
     if callable(presets):
         return presets
     return lambda name: presets.get(name)
+
+
+def _frozen_first(doc, resolve, issues=None):
+    """name -> the file's frozen copy of that preset, else `resolve(name)`."""
+    fr = doc.get(FROZEN)
+    if fr is None:
+        return resolve
+    if not isinstance(fr, dict):
+        if issues is not None:
+            issues.append(Issue(FROZEN, "error", "frozen_presets: {preset name: a preset}"))
+        return resolve
+    bad = [k for k, v in fr.items() if not isinstance(v, dict)]
+    if bad and issues is not None:
+        issues.append(Issue(f"{FROZEN}.{bad[0]}", "error",
+                            "a frozen preset is an object (the preset's JSON)"))
+
+    def get(name):
+        v = fr.get(name)
+        return v if isinstance(v, dict) else resolve(name)
+    return get
+
+
+def is_sugar(f) -> bool:
+    """An ArUco Extrude still expanded from its sugar (no exact settings or numbers)."""
+    return isinstance(f, dict) and "aruco" in f and (f.get("settings") is None
+                                                       or f.get("numbers") is None)
+
+
+def sugar_presets(doc) -> List[str]:
+    """The preset names the sugar features expand with (a feature's, else the file's)."""
+    out: List[str] = []
+    for f in doc.get("features") or []:
+        if is_sugar(f):
+            name = f.get("preset", doc.get("preset"))
+            if isinstance(name, str) and name not in out:
+                out.append(name)
+    return out
+
+
+def freeze(doc, presets: Presets = None) -> bool:
+    """Copy each preset a sugar feature names into `doc["frozen_presets"]`
+    (in place), unless it is there already, and drop the copies no sugar
+    feature names any more. A name the catalog does not know is left out
+    (the compile's warn says "Default used"). -> True when `doc` changed.
+
+    Why: sugar expands against a preset; without the copy a changed
+    PrusaSlicer profile would change a typed tag at its next compile, with
+    no word. With it, the tag keeps what it was made with and the "Apply?"
+    info (server/prusa_watch.stale) offers the new profile."""
+    fr = doc.get(FROZEN)
+    if fr is not None and not isinstance(fr, dict):
+        return False                                # the compile reports it
+    fr = dict(fr or {})
+    resolve = _presets_fn(presets)
+    want = sugar_presets(doc)
+    changed = False
+    for name in want:
+        if isinstance(fr.get(name), dict):
+            continue
+        p = resolve(name)
+        if isinstance(p, dict):
+            fr[name] = copy.deepcopy(p)
+            changed = True
+    for name in [k for k in fr if k not in want]:
+        del fr[name]
+        changed = True
+    if fr:
+        if doc.get(FROZEN) != fr:
+            doc[FROZEN] = fr
+    elif FROZEN in doc:
+        del doc[FROZEN]
+        changed = True
+    return changed
 
 
 def _xf_of(d, path, issues) -> Xf:
@@ -313,7 +388,7 @@ def compile(doc, presets: Presets = None) -> Tuple[Scene, List[Issue]]:
     if not isinstance(doc, dict):
         raise DesignError("a design document is a JSON object")
     issues: List[Issue] = []
-    resolve = _presets_fn(presets)
+    resolve = _frozen_first(doc, _presets_fn(presets), issues)
     _unknown(doc, TOP_KEYS, "", issues)
     ov = doc.get("overrides") or {}
     if not isinstance(ov, dict) or not all(isinstance(v, int) and not isinstance(v, bool)

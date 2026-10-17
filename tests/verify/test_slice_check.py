@@ -141,6 +141,16 @@ def forearm(chain, tmp_path_factory):
     return sliced("forearm", chain, tmp_path_factory.mktemp("forearm"))
 
 
+@pytest.fixture(scope="module")
+def forearm_named(chain, tmp_path_factory):
+    """The forearm as M8c.7 sliced it: '#id + name' on every face and the
+    list's shared ids, so the front and back carry the two-line label whose
+    stroke is under one line (the example says "#id" with each face's own
+    ids since the 2026-10-17 audit; a bigger '#0-5' alone prints)."""
+    return sliced("forearm", chain, tmp_path_factory.mktemp("forearm_named"),
+                  label="#id + name", marker_ids=None)
+
+
 @NEEDS
 def test_the_forearm_slices_as_one_object_and_each_side_tag_passes(forearm):
     rep = forearm
@@ -158,8 +168,8 @@ def test_the_forearm_slices_as_one_object_and_each_side_tag_passes(forearm):
                    "tags' label is cut from the black at a 0.64 mm stroke, under the preset's "
                    "0.68 mm line; PrusaSlicer's black beads close parts of the glyphs, so some "
                    "font pixels are under 60 % white. Strict: it fails loudly once they print")
-def test_the_forearm_labels_print_their_pixels(forearm):
-    labelled = {n: t["label"] for n, t in forearm["tags"].items() if t["label"].get("pixels")}
+def test_the_forearm_labels_print_their_pixels(forearm_named):
+    labelled = {n: t["label"] for n, t in forearm_named["tags"].items() if t["label"].get("pixels")}
     assert sorted(labelled) == ["tag.back", "tag.front"]
     for name, lab in labelled.items():
         assert lab["mean_gap"] >= 0.85, (name, lab)      # the black around the text is there

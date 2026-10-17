@@ -31,7 +31,9 @@ PORTS = {
                                             "_Grid"})],        # Merge 1: snapping on a dot grid (_snap)
     # M6a: label rule 3 (a ChArUco label by hand in any black square)
     "label": [(B + "aruco_label.py", {"RULES", "_offset_label", "label_violations",
-                                      "check_label", "describe"})],
+                                      "check_label", "describe",
+                                      # audit 2026-10-17: rule 4 (a ChArUco label on auto stays in a black square)
+                                      "plan_label", "_describe"})],
     "trim": [(B + "aruco_trim.py", set())],
     "numbering": [(B + "aruco_numbering.py", set())],
     "markers": [(B + "markers.py", set())],

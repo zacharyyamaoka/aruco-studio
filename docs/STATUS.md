@@ -1,4 +1,27 @@
-# ArUco Studio: status at hand-over
+# ArUco Studio: status
+
+## Now: 2026-10-17, after the audit fixes
+
+`main` of `C:\Users\BAM\Documents\aruco-studio` (local only, no remote). Since the hand-over below, these milestones were built and merged, each with its record:
+
+| Step | What | Record |
+|---|---|---|
+| M6a | stickers, the preset as the machine, Holes avoid / ignore, Perimeter, label rule 3, the sheet (spaced / tight, SVG and JSON), the print bundle, WYSIWYG | `docs/status/M6a.md` |
+| M8a | the design file `arucostudio.scene/2`, its compile, the watcher, `/api/events`, the CLI, the three examples | `docs/status/M8a.md` |
+| Merge 1 | wave 1 merged | `docs/status/merge-Merge 1.md` |
+| M8c | PrusaSlicer's physical printers, live sync, Send to PrusaSlicer, the headless slice check | `docs/status/M8c.md`, `docs/API_prusa.md` |
+| M8b1 | the bare-bones mini CAD in the Studio, file first | `docs/status/M8b1.md` |
+| Merge 2 | wave 2 merged | `docs/status/merge-Merge 2.md` |
+| M8b2 | the kit (`@bam/ui`), the form from `plan/fields.py`, M6b's rows, multi-select, the sheet dialog, Print, Send to PrusaSlicer…, the Printers collection | `docs/status/M8b2.md`, `docs/KIT.md` |
+| Audit fixes | frozen presets for typed files, label rule 4 (a ChArUco label stays in a black square), the palette by name, ids after a split list, Open's examples / recent / folders, Send's nozzle line, the sheet-only Export, hermetic port tests | `docs/status/audit-2026-10-17.md` |
+
+The check, 2026-10-17 02:59-03:08 (`tools/check.py`, every group): adapters 97, core 7,354 + 4 skipped, plan 529, scene 42, server 86 (91 with the port tests added after), verify 117 + 1 strict xfail, studio build + vitest 44, e2e 47; **OK in 518 s**. `--trace`: missing 0.
+
+Open, for Zach: the cut-from-black label stroke (a new label rule 5 or a finer black nozzle); a sticker's ChArUco Auto (a new rule); the forearm's live preview speed; M6c.5 (measure a printed 100 mm bar); M8c.2's dropdowns checked once in PrusaSlicer. The list with reasons: `docs/status/audit-2026-10-17.md`. `docs/spec.json` lists every milestone's features and tests (updated 2026-10-17).
+
+Everything below is the 2026-10-16 ~21:00 hand-over, kept as it was.
+
+# The hand-over of 2026-10-16
 
 Final verification on 2026-10-16, about 21:00, on `main` of `C:\Users\BAM\Documents\aruco-studio` (local only, no remote). REF is cad-exporter's worktree `aruco-fusion-plugin-0e9bcb`, read at commit `c8216ff`.
 

@@ -210,18 +210,27 @@ def _port_free(port):
         return s.connect_ex(("127.0.0.1", port)) != 0
 
 
-def test_uvicorn_serves_on_5360_and_stops(tmp_path):
-    if not _port_free(5360):
-        pytest.fail("port 5360 is already in use: another Studio server is running")
+def _free_port():
+    """A port the OS has free now (ephemeral, never another tool's): the test
+    is hermetic beside a lane's own server on 5360 (audit 2026-10-17)."""
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def test_uvicorn_serves_and_stops(tmp_path):
+    from aruco_studio.server.app import PORT
+    assert PORT == 5360                                  # the default the README names
+    port = _free_port()
     env = dict(os.environ, ARUCO_STUDIO_HOME=str(tmp_path / "home"),
                ARUCO_STUDIO_SCENES=str(tmp_path / "scenes"), PYTHONDONTWRITEBYTECODE="1")
-    p = subprocess.Popen([sys.executable, "-m", "aruco_studio.server", "--port", "5360"],
+    p = subprocess.Popen([sys.executable, "-m", "aruco_studio.server", "--port", str(port)],
                          cwd=str(ROOT), env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     try:
         body = None
         for _ in range(100):
             try:
-                with urllib.request.urlopen("http://127.0.0.1:5360/api/health", timeout=1) as r:
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=1) as r:
                     body = json.loads(r.read())
                     break
             except OSError:
@@ -235,7 +244,7 @@ def test_uvicorn_serves_on_5360_and_stops(tmp_path):
             p.kill()
             p.wait(timeout=10)
     for _ in range(50):
-        if _port_free(5360):
+        if _port_free(port):
             break
         time.sleep(0.1)
-    assert _port_free(5360)
+    assert _port_free(port)

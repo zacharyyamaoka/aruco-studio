@@ -283,12 +283,20 @@ RULES = {
     # the top-left one. Rule 2 refused a spot outside the top-left square.
     3: Rule(gap_min=WHITE_GAP_MIN, gap_pref=WHITE_GAP_PREF, far=True, slack=SIDE_SLACK,
             exact=True),
+    # NOT REF's (ArUco Studio audit, 2026-10-17, FB-13 again): rule 3, and a
+    # ChArUco label with Position auto goes in a black square ONLY: when no
+    # square holds the text it is refused with one message (the preview in
+    # the square), never moved to the white beside the board. Rules 1-3
+    # keep their white fallback, so no stored label changes.
+    4: Rule(gap_min=WHITE_GAP_MIN, gap_pref=WHITE_GAP_PREF, far=True, slack=SIDE_SLACK,
+            exact=True),
 }
 RULE = 2                   # what a NEW label is made under
 RULE_NOTE = ("older label rule (2-module gap): change any label setting to use the new one")
-NEW_RULE = 3               # what the Studio's new tag stores (core.form.new_tag_settings);
+NEW_RULE = 4               # what the Studio's new tag stores (core.form.new_tag_settings);
                            # REF's RULE (2) stays the LabelSettings default
 ANY_SQUARE_RULE = 3        # from this rule on a ChArUco label by hand takes any black square
+SQUARE_ONLY_RULE = 4       # from this rule a ChArUco label on auto stays in a black square
 
 
 def rule_of(settings) -> Rule:
@@ -2657,15 +2665,19 @@ def plan_label(spec: TagSpec, settings: Optional[LabelSettings] = None, *, mode:
                            mark=mark if strip else None, pins=pins if strip else None,
                            keep=wkeep, notes=out, cut=cut)
     n0 = len(notes)
+    square_only = spec.layout == "charuco" and int(s.rule or 0) >= SQUARE_ONLY_RULE
     if s.place == "black":
         lab = black(True, notes)
     elif s.place == "white":
         lab = white(True, notes)
     else:
         # auto: the whole text on the black, else the whole text on the
-        # white, else cut short -- on the white (more room), else the black
+        # white, else cut short -- on the white (more room), else the black.
+        # From rule 4 a ChArUco board's label never leaves its black square.
         lab, why = None, []
-        for fn, cut in ((black, False), (white, False), (white, True), (black, True)):
+        order = (((black, False), (black, True)) if square_only
+                 else ((black, False), (white, False), (white, True), (black, True)))
+        for fn, cut in order:
             said: List[str] = []
             got = fn(cut, said)
             if got.kind != "none":
@@ -2679,12 +2691,18 @@ def plan_label(spec: TagSpec, settings: Optional[LabelSettings] = None, *, mode:
                 why = said
         if lab is None:
             lab = Label(settings=s)
-            notes += why
+            if not square_only:
+                notes += why                     # rule 4: the one reason below says it
     reason = ""
     if lab.kind == "none":
         reason = next((n[len("label: "):] if n.startswith("label: ") else n
                        for n in notes[n0:]), "")
-        if s.place == "auto":
+        if s.place == "auto" and square_only:
+            first = resolve_text(s.template(), spec, name=name, key=key).split(LINE_BREAK)[0]
+            S = spec.square_length_m * 1000.0
+            reason = (f"no room in a {S:.1f} mm ChArUco square for {first!r}, even at "
+                      f"{min_cap(s.nozzle_mm, s.stroke_mm):.1f} mm letters")
+        elif s.place == "auto":
             first = resolve_text(s.template(), spec, name=name, key=key).split(LINE_BREAK)[0]
             reason = (f"no room for {first!r} on the black or on the white, even at "
                       f"{min_cap(s.nozzle_mm, s.stroke_mm):.1f} mm letters (the smallest a "
@@ -2784,6 +2802,8 @@ def plan_label(spec: TagSpec, settings: Optional[LabelSettings] = None, *, mode:
                           keep=keep, wkeep=wkeep, at=target)
         if s.place in ("black", "white"):
             pv = force(s.place)
+        elif square_only:
+            pv = force("black")                  # drawn in the square it was tried in
         else:
             tried = [force("black"), force("white")]
             pv = min(tried, key=lambda t: (not t.parts, len(t.violations)))
@@ -3067,6 +3087,8 @@ def _describe(label, mode: str = "both") -> List[Tuple[str, str]]:
             if "under the smallest" in lab.reason:
                 fix = (f"Tick Auto size, or type {min_cap(s.nozzle_mm, s.stroke_mm):.1f} mm "
                        "letters or more")
+            elif pv.side == "square" and lab.reason.startswith("no room in a ")                     and int(s.rule or 0) >= SQUARE_ONLY_RULE:
+                fix = "Fewer columns (bigger squares), a bigger checker or Content #id"
             elif pv.kind == "white":
                 fix = ("Try another Side, On the black or a finer nozzle -- or untick Auto "
                        "position and place it")

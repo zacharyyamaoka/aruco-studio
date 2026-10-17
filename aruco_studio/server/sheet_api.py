@@ -5,7 +5,8 @@
 | `GET /api/scene/sheet.svg?page=&landscape=&mode=&margin_mm=&proofs=` | the sheet as SVG (the Studio's preview): each sticker an invisible `<rect data-sticker>` with its place |
 | `GET /api/scene/sheet.json?...` | the layout (`arucostudio.sheet/1`): per sticker page, x, y, rotation, outline, made by, ids |
 | `GET /api/scene/print.pdf?...` | the sheet as `application/pdf`, `Content-Disposition: inline` (the bytes `export/print` writes as sheet.pdf the same day) |
-| `POST /api/scene/export/print` | `{page, landscape, margin_mm, mode, proofs, bed_w_mm, bed_d_mm, black_slot, white_slot, inline}`: the print bundle (scene/export.py) into `exports/<scene>/`; the ledger marks every exported tag printed |
+| `POST /api/scene/export/print` | `{page, landscape, margin_mm, mode, proofs, bed_w_mm, bed_d_mm, black_slot, white_slot, inline, sheet_only}`: the print bundle (scene/export.py) into `exports/<scene>/`; the ledger marks every exported tag printed. `sheet_only`: the sheet files and markers.json only (the Sticker sheet dialog) |
+| `POST /api/scene/export/reveal {open}` | the OS file browser on `exports/<scene>/` (`open: false`: only the command) |
 | `POST /api/scene/verify/sheet` | `{page, landscape, mode, margin_mm, proofs, dpi}`: the WYSIWYG check (verify/sheet_check.py) on the scene's own sheet, per sticker and the worst numbers |
 
 The routes live here, not in app.py (ROADMAP wave-1 rule): app.py includes
@@ -69,6 +70,11 @@ class PrintIn(SheetIn):
     white_slot: int = Field(1, ge=1, le=16)
     open: bool = False                   # never used by a test: nothing is launched here
     inline: bool = False
+    sheet_only: bool = False             # the sheet dialog's Export: no 3D parts
+
+
+class RevealIn(BaseModel):
+    open: bool = True
 
 
 class VerifySheetIn(SheetIn):
@@ -109,6 +115,24 @@ def print_pdf(page: PAGES = "letter", landscape: bool = False, mode: MODES = "sp
                     headers={"Content-Disposition": f'inline; filename="{name}"'})
 
 
+@router.post("/api/scene/export/reveal")
+def export_reveal(req: Optional[RevealIn] = None) -> dict:
+    """The OS file browser on the scene's export folder (`open: false`: only
+    say the command; the tests never open a window)."""
+    import subprocess
+    from .design_api import reveal_command
+    out_dir = S.exports_dir(_scene().name)
+    cmd = reveal_command(out_dir)
+    opened = False
+    if (req is None or req.open) and out_dir.exists():
+        try:
+            subprocess.Popen(cmd, close_fds=True)
+            opened = True
+        except OSError:
+            opened = False
+    return {"dir": str(out_dir), "command": cmd, "opened": opened}
+
+
 @router.post("/api/scene/export/print")
 def export_print(req: Optional[PrintIn] = None) -> dict:
     """The print bundle (manufacturing_intent.md 5.3): the sticker sheet and
@@ -121,7 +145,7 @@ def export_print(req: Optional[PrintIn] = None) -> dict:
                                bed_w_mm=req.bed_w_mm, bed_d_mm=req.bed_d_mm,
                                black_slot=req.black_slot, white_slot=req.white_slot,
                                when=datetime.datetime.now().isoformat(timespec="seconds"),
-                               date=_today())
+                               date=_today(), sheet_only=req.sheet_only)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
     out_dir = S.exports_dir(sc.name)

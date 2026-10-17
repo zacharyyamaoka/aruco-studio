@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -85,7 +86,9 @@ def test_render_draws_each_tag_as_api_export_svg(env, client, tmp_path):
         assert r.returncode == 0, r.stdout + r.stderr
         svg = out.read_text(encoding="utf-8")
         assert svg.startswith("<svg") and 'data-shape="' in svg
-        client.post("/api/design/open", json={"path": str(p)})
+        q = tmp_path / p.name                      # a copy: opening a sugar file freezes its presets into it
+        shutil.copy(p, q)
+        client.post("/api/design/open", json={"path": str(q)})
         tags = client.get("/api/scene?plans=1").json()["tags"]
         drawn = 0
         for t in tags:
@@ -109,6 +112,8 @@ def test_plan_json_equals_the_scenes_plans(env, client, tmp_path):
         r = cli(env, "plan", str(p), "--json", "--out", str(out))
         assert r.returncode == 0, r.stdout + r.stderr
         got = json.loads(out.read_text(encoding="utf-8"))
-        client.post("/api/design/open", json={"path": str(p)})
+        q = tmp_path / p.name                      # a copy: opening a sugar file freezes its presets into it
+        shutil.copy(p, q)
+        client.post("/api/design/open", json={"path": str(q)})
         want = {t["name"]: t["plan"] for t in client.get("/api/scene?plans=1").json()["tags"]}
         assert got == want

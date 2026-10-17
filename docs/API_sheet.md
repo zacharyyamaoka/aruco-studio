@@ -39,6 +39,8 @@ Common query / body fields: `page` (`letter` default, `a4`, `legal`, `a3`, `tabl
 | `GET /api/scene/sheet.json` | `arucostudio.sheet/1`: per sticker `key, name, made_by, ids, page, x_mm, y_mm, w_mm, h_mm, rotation, box_mm, origin_mm, outline_mm, outline_page_mm, caption`; `shelves`, `cuts`, `rejected` (with the reason), `ruler` |
 | `GET /api/scene/print.pdf` | the sheet as `application/pdf`, `Content-Disposition: inline`: the bytes `export/print` writes as `sheet.pdf` the same day; the MediaBox is the page, so 100 % is the viewer's default |
 | `POST /api/scene/export/print` | `{..., bed_w_mm, bed_d_mm, black_slot (2), white_slot (1), inline}`: writes `exports/<scene>/sheet.pdf`, `sheet.svg`, `sheet.json`, `images/`, `print3d/` (STLs, `parts.json`, `aruco_tags.3mf`, `beds/`, `parts/`) and `markers.json`; marks every exported tag's ids printed in the scene's ledger. Answers `{stickers, parts, pages, beds, rows, rejected, files, dir, written}` (`inline`: the sheet's and markers.json's bytes, base64) |
+| `POST /api/scene/export/print` with `sheet_only: true` | the Sticker sheet dialog's Export: the sheet's files, `images/` and `markers.json` only, no `print3d/` (the 3D parts are Send's); only the stickers' ids are marked printed (audit 2026-10-17) |
+| `POST /api/scene/export/reveal` | `{open}`: the OS file browser on `exports/<scene>/`; `open: false` answers the command only (`{dir, command, opened}`) |
 | `POST /api/scene/verify/sheet` | `{..., dpi (600)}`: the scene's sheet rasterised by pdfium and checked against each plan: per sticker `ink_xor`, `ids` (read, `side_err_mm`, ChArUco corners), `label` (`iou_min`), `outline` (`hausdorff_mm`, holes found); per page the two bars; `worst`; `ok` |
 
 | Mode | Layout |

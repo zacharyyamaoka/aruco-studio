@@ -31,6 +31,7 @@ A `"note"` key is allowed anywhere and kept. Any other key the Studio does not k
 | `overrides` | `{tag name: first id}`: typed ids (as `/1`) |
 | `ledger` | the numbering's ledger: printed ids never move (as `/1`) |
 | `presets_used` | the presets named, as `/1` kept them (written only when it is not what the file names) |
+| `frozen_presets` | `{preset name: the preset}`: a copy of each preset a sugar feature expands with, taken the first time the Studio opens or writes the file. Sugar expands against the copy, so a changed PrusaSlicer profile never changes a typed tag by itself; the tag's Preset row offers **Apply**. The Studio adds it at the end of the text and keeps the rest as typed; a copy no sugar feature names is dropped (audit 2026-10-17) |
 
 ## 3. Sketches and shapes
 
@@ -109,6 +110,8 @@ Sugar expands through the new-tag rule (`plan/newtag.new_spec`: what POST /api/n
 | `uid` | the ledger's stamp, when it is not the tag's name (a renamed tag, a `/1` tag) |
 | `locked`, `hidden` | a printed tag; a hidden one |
 
+**A typed file is frozen when the Studio opens it:** the presets its sugar names are copied into `frozen_presets` (section 2), so the tags stay what they were made with.
+
 **On its first write the Studio replaces the sugar with the exact `settings` and `numbers`.** A hand-typed file stays short until the Studio touches that feature; after that it is exact and round-trips bit for bit. A typed `first_id` moves into `overrides`.
 
 A list stays one feature while its faces agree (their ids aside: `marker_ids`). The moment one face differs (another mark, another size), the list splits into one feature per face, each named as its tag was (`tag.right`).
@@ -120,8 +123,10 @@ They are in `examples/`, as the design note has them.
 | File | Holds |
 |---|---|
 | `plate_charuco.arucostudio.json` | a plate 80 x 50 with a Ø18 hole, 5 mm thick, a ChArUco 5 x 3 on its top |
-| `forearm.arucostudio.json` | a box 120 x 40 x 40 with one ChArUco on each of its four sides |
-| `sticker_sheet.arucostudio.json` | four stickers on bare shapes: two singles, a grid, a ChArUco on a disc with a hole |
+| `forearm.arucostudio.json` | a box 120 x 40 x 40 with one ChArUco on each of its four sides, the label `#id`, each face its own ids (`marker_ids` 0, 6, 10, 16) |
+| `sticker_sheet.arucostudio.json` | four stickers on bare shapes: two singles, a grid, a ChArUco on a disc with a hole; each its own ids (`first_id`) |
+
+The forearm and sticker files open renumbered (audit 2026-10-17); on the forearm only the front's `#0-5` fits its square at a 0.6 mm nozzle, the other faces say "no room in a … mm square". Open › Examples opens a copy in the scenes folder, so the files here are never written.
 
 ## 7. What it compiles to
 

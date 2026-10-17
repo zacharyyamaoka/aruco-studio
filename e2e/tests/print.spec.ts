@@ -82,7 +82,7 @@ test("M6c.4 a scene with no sticker: Print is off, and says why", async ({ page 
   await page.getByTestId("menu-export").click();
   const item = page.getByTestId("export-print");
   await expect(item).toHaveAttribute("data-disabled", "");
-  await expect(item).toContainText("no stickers in this scene (3D tags print on beds)");
+  await expect(item).toContainText("3D tags: Send to PrusaSlicer…");          // audit 2026-10-17: where to go
   await expect(page.getByTestId("export-sheet")).toHaveAttribute("data-disabled", "");
   await shot(page, "m8b2_print_disabled");
   await page.keyboard.press("Escape");

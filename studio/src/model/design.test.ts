@@ -175,3 +175,15 @@ describe("handles (sketch/handles)", () => {
     expect(typedNumbers("a")).toBeNull();
   });
 });
+
+describe("ids after a split list (audit 2026-10-17)", () => {
+  it("a split list's <id>.<face> features keep <id> taken: the next tag is tag2, not tag1 again", () => {
+    const d: Doc = {
+      schema: "arucostudio.scene/2", name: "x", sketches: [], features: [
+        { id: "body1", extrude: "rect1", height: 20 },
+        { id: "tag1.front", aruco: "body1.front" }, { id: "tag1.right", aruco: "body1.right" },
+      ],
+    } as any;
+    expect(addAruco(d, ["circle1"])).toBe("tag2");
+  });
+});

@@ -91,6 +91,7 @@ def test_the_forearm_four_faces():
 
 def test_one_edit_splits_the_list_and_renumber_does_not():
     doc = example("forearm")
+    doc["features"][1].pop("marker_ids")      # the list as typed, before the shipped ids
     sc, _ = DS.compile(doc)
     renumber(sc)
     ids = [t.spec.numbers["marker_id"] for t in sc.tags]

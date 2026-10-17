@@ -103,7 +103,12 @@ Since M8a the open scene is a design file (`arucostudio.scene/2`, docs/FILE_FORM
 | `POST /api/design/save_as` | `{path}`: write the open design there and follow that file |
 | `POST /api/design/preview` | `{text}` (`?mesh=1&top=1`): `{scene (with plans), issues, error}`; nothing written or kept (a drag's preview) |
 | `POST /api/design/reveal` | `{open: true}`: the OS file browser on the file; `open: false` only answers the command |
+| `GET /api/design/files` | the Open dialog's lists: `{examples, recent, scenes, scenes_dir}` (`server/files_api.py`) |
+| `POST /api/design/open_example` | `{name}`: the example copied into the scenes folder (a fresh name when taken) and opened; `examples/` is never written |
+| `GET /api/design/browse` | `?dir=`: a folder's `*.arucostudio.json` and subfolders, `{dir, parent, folders, files}`; the scenes folder by default. 403 under the two forbidden folders |
 | `GET /api/events` | server-sent events (`text/event-stream`): `hello {revisions, file}` on connect; `scene {revision, path, why}` when the file changed on disk; `file {state, path, error}` when it breaks, goes, or parses again. `prusa {revision, added, removed, changed, files, ms, stale}` when PrusaSlicer's folder changed (M8c, docs/API_prusa.md); `presets` is reserved. Each event's data has `t` (the server's clock). `?max_events=N&timeout=S` end the stream (tests, one-shot pollers) |
+
+A typed file is frozen: on open, on an outside change and on every write the server copies the presets its sugar names into `frozen_presets` (scene/design.freeze) and writes that one key at the end of the text, the rest kept as typed. A design file opened or saved goes first in `<home>/recent_designs.json`.
 
 The rules: the server's own writes are atomic, and their sha256 is remembered before they land, so they are never read back as a change. A rewrite of the same text (an editor's touch, a cloud sync) is no change. While the file does not parse, the last good scene stays and every write is refused. Before a write the server checks the file still holds what it last read; if not, it reloads, pushes the change and drops the action (409).
 

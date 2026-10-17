@@ -80,3 +80,27 @@ test("M8b1.5 the toolbar's badges, the lit tool, the palette = the keys table, E
   for (const [, c] of doc) await expect(page.locator(`[data-key-row="${c}"]`)).toHaveCount(1);
   await shot(page, "m8b1_palette_keymap");
 });
+
+// the 2026-10-17 audit: "send" Enter ran Search commands. A command is found
+// by its name first: its whole name selects it, and so does the start of it.
+test("S + a command's whole name selects that command first; short names too", async ({ page }) => {
+  await freshFile(page, "e2e-palette-rank");
+  await page.keyboard.press("s");
+  const input = page.getByTestId("palette-input");
+  await expect(input).toBeVisible();
+  const names = await page.locator('[cmdk-item]:not([aria-disabled="true"])').evaluateAll((els) => els.map((e) => e.getAttribute("data-command") || ""));
+  expect(names.length).toBeGreaterThan(30);
+  const first = page.locator('[cmdk-item][data-selected="true"]');
+  for (const n of names) {
+    await input.fill(n);
+    await expect(first, n).toHaveAttribute("data-command", n);
+  }
+  const short: [string, string][] = [["send", "Send to PrusaSlicer…"], ["new", "New scene"], ["save", "Save as"],
+    ["fit", "Zoom to fit"], ["delete", "Delete"], ["redo", "Redo"], ["undo", "Undo"], ["verify", "Verify"]];
+  for (const [typed, want] of short) {
+    if (!names.includes(want)) continue;                                  // off in this scene
+    await input.fill(typed);
+    await expect(first, typed).toHaveAttribute("data-command", want);
+  }
+  await page.keyboard.press("Escape");
+});

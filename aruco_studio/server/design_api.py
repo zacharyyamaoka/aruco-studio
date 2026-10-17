@@ -21,6 +21,12 @@ stops the writes ("file missing"). Before it writes, the server checks the
 file still holds what it last saw; if not it reloads, pushes the change
 and drops the action (409). Without a file (a new, untitled scene) the
 design lives in memory until Save / Save as / open.
+
+**Sugar is frozen.** A typed ArUco Extrude in sugar (`"preset": "..."`, no
+exact settings) expands against the preset's copy in the file's
+`frozen_presets` (scene/design.freeze). The server adds the copy when it
+opens or reloads the file and on every write, so a PrusaSlicer profile
+changed later never changes a tag by itself; the "Apply?" info offers it.
 """
 from __future__ import annotations
 
@@ -75,6 +81,31 @@ def resolver():
         p, _kind = _P.find(cat["cat"], name)
         return p
     return get
+
+
+def with_frozen(text: str, doc: dict, had: bool) -> str:
+    """`text` with `doc`'s new `frozen_presets` added at its end, the rest of
+    the person's text kept as typed; the whole document dumped when the
+    text already had the key (or was not `/2` text)."""
+    import json as _json
+    fr = doc.get(_DS.FROZEN)
+    body = text.rstrip()
+    try:
+        verbatim = _json.loads(text).get("schema") == _DS.SCHEMA
+    except ValueError:
+        verbatim = False
+    if had or not verbatim or not isinstance(fr, dict) or not body.endswith("}"):
+        return dumps_design(doc)
+    inner = body[:-1].rstrip()
+    blob = _json.dumps(fr, indent=1, sort_keys=True, ensure_ascii=False, allow_nan=False)
+    nl = "\r\n" if "\r\n" in text else "\n"          # the person's line ends
+    blob = blob.replace("\n", nl + "  ")
+    out = inner + ("" if inner.endswith("{") else ",") + f'{nl}  "{_DS.FROZEN}": {blob}{nl}}}{nl}'
+    try:
+        ok = _json.loads(out) == doc
+    except ValueError:
+        ok = False
+    return out if ok else dumps_design(doc)
 
 
 class Design:
@@ -139,11 +170,31 @@ class Design:
                                interval=WATCH_S, name="design-watch")
         self.watcher.remember(self.path, digest)
         self.watcher.start()
+        S.remember_design(self.path)              # the Open dialog's Recent (best effort)
+
+    def _frozen_text(self, path: Path, doc: dict, text: str, digest: str):
+        """Freeze the sugar's presets into `doc`; when that adds or drops a
+        copy, write the file now (the hash remembered first, so the watcher
+        never reads it back). -> (text, digest) of the file."""
+        had = _DS.FROZEN in doc
+        if not _DS.freeze(doc, resolver()):
+            return text, digest
+        text = with_frozen(text, doc, had)
+        digest = text_hash(text)
+        if self.watcher is not None:
+            self.watcher.remember(path, digest)
+        S.write_atomic(path, text)
+        return text, digest
 
     def open(self, path: Path) -> None:
         text, digest = S.read_design(path)
         doc = loads_design(text)                   # raises: nothing changes
         with self.lock:
+            self.unbind()
+            try:
+                text, digest = self._frozen_text(path, doc, text, digest)
+            except OSError:
+                pass                     # a read-only file: the copies kept in memory, written with the next action
             self._set_doc(doc, text)
             self.state, self.error = "ok", None
             self.revision += 1
@@ -195,6 +246,11 @@ class Design:
                                          "error": self.error})
                 return
             was = self.state
+            try:
+                text, digest = self._frozen_text(self.path, doc, text, digest)
+                self.hash = digest
+            except OSError:
+                pass                                  # kept in memory; written with the next action
             self._set_doc(doc, text)
             self.state, self.error = "ok", None
             self.revision += 1
@@ -217,6 +273,9 @@ class Design:
         """Make `doc` the design and write it (when there is a file)."""
         with self.lock:
             self.writable()
+            had = _DS.FROZEN in doc
+            if _DS.freeze(doc, resolver()):        # the copies changed: the text follows the doc
+                text = with_frozen(text, doc, had) if text is not None else None
             text = text if text is not None else dumps_design(doc)
             if self.path is not None:
                 try:
@@ -398,6 +457,10 @@ def design_preview(req: DesignTextIn, mesh: int = Query(0), top: int = Query(0))
     except SceneFileError as exc:
         return {"scene": None, "issues": [], "error": {"line": None, "col": None,
                                                        "message": str(exc), "text": str(exc)}}
+    with D.lock:
+        frozen = copy.deepcopy(D.doc.get(_DS.FROZEN)) if isinstance(D.doc, dict) else None
+    if isinstance(frozen, dict) and isinstance(doc, dict) and _DS.FROZEN not in doc:
+        doc[_DS.FROZEN] = frozen                   # a drag's text: the open design's copies
     sc, issues = _DS.compile(doc, resolver())
     return {"scene": scene_dict(sc, plans=True, mesh=bool(mesh), top=bool(top),
                                 plan_dict=cached_plan_dict),

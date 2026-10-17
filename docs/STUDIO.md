@@ -26,7 +26,8 @@ First time only: `npm --prefix studio ci` and `npm --prefix e2e ci`. The e2e tes
 | A file that does not parse | the bar at the bottom left turns red and says "line N col M"; the last good scene stays on the canvas; every write is refused until the file parses again |
 | A file that goes away | the bar says so; writes stop; Save as… writes it again |
 | New scene | a new file `scenes/<name>.arucostudio.json`, followed at once |
-| Open | a scene of the scenes folder, or any file by its path |
+| Open | the examples (a copy opens in the scenes folder), the recent files, a folder to browse (the scenes folder first), or any file by its path |
+| A typed file | opening it freezes the presets its sugar names into the file (`frozen_presets`): a PrusaSlicer profile changed later shows **Apply** under the Preset, never a changed tag |
 | Save as | a copy at a name or a path; the Studio follows the copy from then on |
 | The File drawer | the file's text, read only, the selection's lines lit, Reveal opens Explorer on it (the status bar's File button) |
 
@@ -152,10 +153,10 @@ Several faces make one feature with a face list (one tag per face, named `<id>.<
 |---|---|
 | A sticker | pick a sticker printer as the Preset (nothing selected: the new-tag Preset; a tag: its Preset row), then A on a shape. The tag is a printed sticker: 0.1 mm stock and the ink on it. Perimeter: Marker (a rectangle) or Profile (the shape's outline, holes included); with Marker and no margin the label goes on the black only |
 | Holes | shown when the shape has holes: Avoid (the marker keeps clear) or Ignore (it may cover them; the plan says when it crosses one) |
-| A ChArUco label | goes in a black square only (Position offers that alone); drag it into any black square |
-| Export › Sticker sheet… | the page, Landscape, Spaced (gaps, a caption and crop marks per sticker) or Tight (shelves that share their cut lines), the margin; the preview is the server's own `sheet.svg`; the stickers that do not fit are listed with the reason. Export writes `sheet.pdf`, `sheet.svg`, `sheet.json` and the rest of the print bundle to `exports/<scene>/`. It starts from the file's `sheet` key |
-| Export › Print sticker sheet… | the sheet's PDF (`/api/scene/print.pdf`) goes to the browser's print dialog through a hidden frame; Chrome and Edge print it at 100 %. Print at Actual size and check the 100 mm bar. Where the browser cannot (Firefox), a dialog offers **Open the PDF** and the Ctrl+P note. Off, with the reason, when the scene has no sticker |
-| Export › Send to PrusaSlicer… | the physical printer (PrusaSlicer's current one first), a print preset that fits it, the white and black extruders, Open PrusaSlicer. Send writes a 3MF project with the colours on their extruders (`exports/<scene>/prusaslicer/`) and opens it in PrusaSlicer. Off, "nothing to slice", when the scene has no 3D tag |
+| A ChArUco label | goes in a black square only (Position offers that alone; Auto reads "In a black square"); drag it into any black square. Label rule 4 (new tags): when no square holds the text it is not built, with one message under Label ("No room in a 13 mm square for '#0-3': fewer columns (bigger squares) or Content #id") and the orange preview in the square; it never moves to the white |
+| Export › Sticker sheet… | the page, Landscape, Spaced (gaps, a caption and crop marks per sticker) or Tight (shelves that share their cut lines), the margin; the preview is the server's own `sheet.svg`; the stickers that do not fit are listed with the reason. Export writes the sheet only (`sheet.pdf`, `sheet.svg`, `sheet.json`, `markers.json`; the 3D parts are Send's) to `exports/<scene>/`, then says the folder, with **Reveal**. It starts from the file's `sheet` key |
+| Export › Print sticker sheet… | the sheet's PDF (`/api/scene/print.pdf`) goes to the browser's print dialog through a hidden frame; Chrome and Edge print it at 100 %. Print at Actual size and check the 100 mm bar. Where the browser cannot (Firefox), a dialog offers **Open the PDF** and the Ctrl+P note. Off when the scene has no sticker; on a 3D scene it says "3D tags: Send to PrusaSlicer…" |
+| Export › Send to PrusaSlicer… | the physical printer (PrusaSlicer's current one first), a print preset that fits it, the white and black extruders, Open PrusaSlicer. Send writes a 3MF project with the colours on their extruders (`exports/<scene>/prusaslicer/`) and opens it in PrusaSlicer. Off, "nothing to slice", when the scene has no 3D tag. When the tags were planned for another nozzle than the printer's, a line says so and names the printers that match (a click picks one) |
 | A changed PrusaSlicer profile | a tag whose preset came from it shows the change under its Preset with **Apply**; nothing changes without the click |
 | Light / dark | the moon / sun button of the top bar (or S › "Light / dark theme"); light is the default; the browser remembers the choice |
 
@@ -164,8 +165,11 @@ Several faces make one feature with a face list (one tag per face, named `<id>.<
 | | |
 |---|---|
 | A tag on a shape's top | a click on the shape outside the marker selects the shape (its handles); a click on the marker selects the tag |
-| Typed columns × rows | REF's fit on a FACE lays out as many as fit; only a sketch profile takes a typed count (Advanced › Target kind) |
-| A new tag's ids | the next free ids of its dictionary family; a face list starts with the same ids on every face until Renumber |
+| Typed columns × rows | REF's fit on a FACE lays out as many as fit; only a sketch profile takes a typed count (Advanced › Target kind). On a face the row says so: set the Checker (or Marker) size, the count follows |
+| A new tag's ids | the next free ids of its dictionary family; a new face list gets a run per face (`marker_ids`), so Renumber is a repair, not a step |
+| A split list | its features are named `tag1.front`, `tag1.right`; the next new tag is `tag2` and is selected alone |
+| The cell minimum | when Auto's board has cells under the preset's minimum, the warn says the Checker size that passes |
+| The palette (S) | finds a command by its name first: the whole name, then its start, then a word of it; Enter runs the first |
 | The sugar | a hand-typed tag (`"layout": "charuco", "cols": 5`) stays short until the Studio edits that tag; then it holds the exact settings |
 | Colours (Extrude) | changing it keeps the black's step from the white top (REF's dialog does the same) |
 | Verify | a row goes grey when its tag changes; Verify again redoes it |

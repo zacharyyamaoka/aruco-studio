@@ -6,15 +6,16 @@
 // * Sticker sheet… (M6b): page, landscape, Spaced / Tight, the margin; the
 //   preview is the server's own sheet.svg (the same layout as the PDF), the
 //   rejected stickers with their reasons; Print and Export (sheet.pdf,
-//   sheet.svg, sheet.json and the rest of the print bundle).
+//   sheet.svg, sheet.json, markers.json: the sheet only, never the 3D parts,
+//   which are Send's), then "written to <folder>" and Reveal.
 // * Send to PrusaSlicer… (M8c's route): the physical printer (the current
 //   one first), a print preset that fits it, the white and black slots.
 // * Print's fallback (M6c): Open the PDF, then Ctrl+P at Actual size.
 import { Badge, Button, Dialog, FieldRow, NumberField, Select, SegmentedRow, Switch, Glyph as Icon } from "@bam/ui";
 import { useEffect, useMemo, useState } from "react";
-import { api, errorText, ApiError } from "../api/client";
-import type { PrusaPrinter, SheetJson } from "../api/types";
-import { useStudio } from "../store";
+import { api, errorText, ApiError, type Browse, type DesignFiles } from "../api/client";
+import type { PrusaPrinter, SceneTag, SheetJson } from "../api/types";
+import { madeBy, useStudio } from "../store";
 import { printBlock, sendBlock } from "./Print";
 import { kinds } from "./Toolbar";
 
@@ -32,8 +33,6 @@ function FileDialog({ kind }: { kind: "new" | "open" | "save" }) {
   const st = useStudio.getState();
   const [text, setText] = useState(kind === "new" ? "scene" : name);
   const [path, setPath] = useState("");
-  const [list, setList] = useState<{ name: string; modified: string; bytes: number }[] | null>(null);
-  useEffect(() => { if (kind === "open") api.scenes().then(setList).catch(() => setList([])); }, [kind]);
   const close = () => st.setDialog(null);
   const ok = async () => {
     const v = (kind === "open" ? path : text).trim();
@@ -47,6 +46,7 @@ function FileDialog({ kind }: { kind: "new" | "open" | "save" }) {
   return (
     <Dialog open onClose={close} testid={`dialog-${kind}`} icon={kind === "open" ? "open" : kind === "new" ? "newdoc" : "save"}
       title={kind === "open" ? "Open a design file" : kind === "new" ? "New scene (a new file)" : "Save the scene as"}
+      width={kind === "open" ? 600 : undefined}
       footer={<>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={ok} testid="dialog-ok">{kind === "new" ? "Create" : kind === "open" ? "Open" : "Save as"}</Button>
@@ -59,24 +59,67 @@ function FileDialog({ kind }: { kind: "new" | "open" | "save" }) {
             : "A name (the scenes folder) or a whole path. The Studio then follows that file."}</div>
         </div>
       )}
-      {kind === "open" && (
-        <>
-          <div className="scenes">
-            {list === null && <div className="muted">…</div>}
-            {list && !list.length && <div className="muted">No saved scenes yet.</div>}
-            {list && list.map((x) => (
-              <button key={x.name} className="scene-item" data-scene={x.name} onClick={async () => { close(); await st.openScene(x.name); }}>
-                <Icon name="file" /><span>{x.name}</span><span className="muted">{x.modified.replace("T", " ")} · {(x.bytes / 1024).toFixed(1)} kB</span>
-              </button>
-            ))}
-          </div>
-          <div className="dlg-pad" onKeyDown={keys}>
-            <input className="kit-text" placeholder="or a file's path: C:\…\name.arucostudio.json" value={path} data-testid="dialog-path"
-              onChange={(e) => setPath(e.target.value)} />
-          </div>
-        </>
-      )}
+      {kind === "open" && <OpenLists close={close} path={path} setPath={setPath} keys={keys} />}
     </Dialog>
+  );
+}
+
+/** Open's lists (audit 2026-10-17): the examples (opened as a copy in the
+ *  scenes folder), the recent files, and a folder browser (the scenes
+ *  folder first; a folder's *.arucostudio.json files and subfolders). */
+function OpenLists({ close, path, setPath, keys }: { close: () => void; path: string; setPath: (v: string) => void; keys: (e: React.KeyboardEvent) => void }) {
+  const st = useStudio.getState();
+  const [files, setFiles] = useState<DesignFiles | null>(null);
+  const [dir, setDir] = useState<Browse | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const go = (d?: string) => api.browse(d).then((b) => { setDir(b); setErr(null); }).catch((e) => setErr(msgOf(e)));
+  useEffect(() => {
+    api.designFiles().then(setFiles).catch(() => setFiles({ examples: [], recent: [], scenes: [], scenes_dir: "" }));
+    void go();
+  }, []);
+  const recent = (files?.recent ?? []).filter((r) => r.exists);
+  return (
+    <div className="open-lists">
+      <div className="open-head">Examples <span className="muted">a copy opens in the scenes folder</span></div>
+      <div className="scenes" data-testid="open-examples">
+        {files === null && <div className="muted">…</div>}
+        {files?.examples.map((x) => (
+          <button key={x.name} className="scene-item" data-example={x.name} onClick={async () => { close(); await st.openExample(x.name); }}>
+            <Icon name="file" /><span>{x.title || x.name}</span><span className="muted">{x.file}</span>
+          </button>
+        ))}
+      </div>
+      {recent.length > 0 && (<>
+        <div className="open-head">Recent</div>
+        <div className="scenes" data-testid="open-recent">
+          {recent.map((x) => (
+            <button key={x.path} className="scene-item" data-recent={x.path} title={x.path} onClick={async () => { close(); await st.openPath(x.path); }}>
+              <Icon name="file" /><span>{x.name}</span><span className="muted">{(x.modified ?? "").replace("T", " ")}</span>
+            </button>
+          ))}
+        </div>
+      </>)}
+      <div className="open-head">Folder <span className="muted path" data-testid="open-dir">{dir?.dir ?? ""}</span></div>
+      <div className="scenes" data-testid="open-browse">
+        {dir?.parent && (
+          <button className="scene-item" data-folder=".." onClick={() => go(dir.parent!)}><Icon name="folder" /><span>..</span></button>
+        )}
+        {dir?.folders.map((f) => (
+          <button key={f.path} className="scene-item" data-folder={f.name} onClick={() => go(f.path)}><Icon name="folder" /><span>{f.name}</span></button>
+        ))}
+        {dir?.files.map((x) => (
+          <button key={x.path} className="scene-item" data-scene={x.name} title={x.path} onClick={async () => { close(); await st.openPath(x.path); }}>
+            <Icon name="file" /><span>{x.name}</span><span className="muted">{x.modified.replace("T", " ")} · {(x.bytes / 1024).toFixed(1)} kB</span>
+          </button>
+        ))}
+        {dir && !dir.files.length && !dir.folders.length && <div className="muted">No design files in this folder.</div>}
+        {err && <div className="issue lv-error">{err}</div>}
+      </div>
+      <div className="dlg-pad" onKeyDown={keys}>
+        <input className="kit-text" placeholder="or a file's path: C:\…\name.arucostudio.json" value={path} data-testid="dialog-path"
+          onChange={(e) => setPath(e.target.value)} />
+      </div>
+    </div>
   );
 }
 
@@ -96,7 +139,7 @@ function SheetDialog() {
   const [svg, setSvg] = useState<string>("");
   const [json, setJson] = useState<SheetJson | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [files, setFiles] = useState<string[] | null>(null);
+  const [files, setFiles] = useState<{ dir: string; files: string[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const key = JSON.stringify(sheet);
   useEffect(() => {
@@ -147,8 +190,11 @@ function SheetDialog() {
             </div>
           )}
           {files && (
-            <div className="sheet-files" data-testid="sheet-files">
-              {files.map((f) => <div key={f}>{f}</div>)}
+            <div className="sheet-files" data-testid="sheet-files" data-dir={files.dir}
+              data-files={JSON.stringify(files.files.map((f) => f.replace(/\\/g, "/").slice(files.dir.replace(/\\/g, "/").length + 1)))}>
+              <div className="muted">{files.files.length} file{files.files.length === 1 ? "" : "s"} written to</div>
+              <div className="path" title={files.files.join("\n")}>{files.dir}</div>
+              <Button icon="folder" testid="sheet-reveal" onClick={() => { void api.exportReveal((window as any).__studio?.revealOpen !== false).catch(() => undefined); }}>Reveal</Button>
             </div>
           )}
           <div className="dlg-note">Spaced puts the id and name under each sticker and crop marks at its corners. Tight packs the
@@ -187,6 +233,10 @@ function SendDialog() {
   }, [cur?.name]);
   const k = kinds();
   const noSend = sendBlock(k.printed, k.stickers);
+  const tags = useStudio((s) => s.scene.tags);
+  const planned = useMemo(() => plannedFor(tags), [tags]);
+  const mismatch = cur && planned.nozzle !== null && Math.abs(Number(cur.printer.nozzle_mm) - planned.nozzle) > 1e-6;
+  const matching = list.filter((p) => planned.nozzle !== null && Math.abs(Number(p.printer.nozzle_mm) - planned.nozzle) <= 1e-6);
   const close = () => st.setDialog(null);
   const send = async () => {
     if (!cur) return;
@@ -219,6 +269,16 @@ function SendDialog() {
               options={list.map((p) => ({ value: p.name, label: `${p.name}${p.current ? " (current)" : ""}`, icon: "printer", hint: `${p.printer.model} ${p.printer.variant} · nozzle ${p.printer.nozzle_mm} mm` }))} />
           </FieldRow>
           {cur && <div className="dlg-note" data-testid="send-printer-info">{cur.printer.preset} · nozzle {cur.printer.nozzle_mm} mm · bed {cur.printer.bed_mm?.join(" × ")} mm</div>}
+          {cur && mismatch && (
+            <div className="msgs dlg-pad" data-testid="send-mismatch" data-planned={planned.nozzle ?? ""} data-printer-nozzle={cur.printer.nozzle_mm}>
+              <div className="issue lv-warn">
+                The tags are planned for {planned.line !== null ? `${planned.line} mm lines (` : ""}a {planned.nozzle} mm nozzle{planned.line !== null ? ")" : ""}; {cur.name} prints with a {cur.printer.nozzle_mm} mm nozzle
+                {matching.length ? <> — pick {matching.map((m, i) => (
+                  <span key={m.name}>{i ? " / " : ""}<button type="button" className="link" data-testid={`send-pick-${m.name}`} onClick={() => setPrinter(m.name)}>{m.name}</button></span>
+                ))}</> : null}, or pick {cur.name}'s print in the Preset row of the tags first.
+              </div>
+            </div>
+          )}
           <FieldRow path="send.print" label="Print preset">
             <Select path="send.print" value={print} wide onChange={(v) => setPrint(String(v))} placeholder={cur && !cur.prints.length ? "none fits this printer" : "–"}
               options={(cur?.prints ?? []).map((x) => ({ value: x.name, label: `${x.name}${x.current ? " (current)" : ""}`, icon: x.aruco ? "star" : "t-print",
@@ -246,6 +306,18 @@ function SendDialog() {
       )}
     </Dialog>
   );
+}
+
+/** What the scene's 3D tags were planned for: the nozzle (the label's,
+ *  which is the preset's) and the line their cells step by, when every 3D
+ *  tag agrees (null otherwise). Audit 2026-10-17: Send said nothing when a
+ *  0.6 mm plan went to a 0.4 mm printer. */
+export function plannedFor(tags: SceneTag[]): { nozzle: number | null; line: number | null } {
+  const td = tags.filter((t) => !t.hidden && madeBy(t) === "print3d");
+  const noz = [...new Set(td.map((t) => Number((t.spec.settings as any)?.label?.nozzle_mm)).filter((x) => x > 0))];
+  const cells = td.map((t) => (t.spec.settings as any)?.cells).filter((c) => c && c.of === "cell" && c.mm > 0).map((c) => Number(c.mm));
+  const lines = [...new Set(cells)];
+  return { nozzle: noz.length === 1 ? noz[0] : null, line: lines.length === 1 ? lines[0] : null };
 }
 
 /** Print's fallback (M6c.3): the PDF in a new tab, then Ctrl+P. */

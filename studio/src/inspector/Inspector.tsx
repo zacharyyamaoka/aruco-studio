@@ -135,7 +135,7 @@ function TagInspector({ tag, tags, form, tab, setTab }: {
       if (tag.spec.target.kind === "face") {
         // REF evaluate(): on a face the fit lays out as many as fit; only a
         // sketch profile takes a typed count (Advanced > Target kind)
-        return <span className="ro" data-path={p} title="On a face the fit lays out as many as fit; a sketch profile (Advanced › Target) takes a typed count">{m?.cols ?? "–"} × {m?.rows ?? "–"} (as many as fit on a face)</span>;
+        return <span className="ro" data-path={p} title="On a face the fit lays out as many as fit; a sketch profile (Advanced › Target) takes a typed count">{m?.cols ?? "–"} × {m?.rows ?? "–"}: on a face set the {m?.layout === "charuco" ? "Checker" : "Marker"} size; the count follows</span>;
       }
       return (
         <span className="pair">
@@ -178,7 +178,11 @@ function TagInspector({ tag, tags, form, tab, setTab }: {
     }
     if (f.type === "choice" && !f.read_only && (f.choices_by_layout || f.choices_when)) {
       const opts: Opt[] = choicesFor(f, ctx).map((c: any) => ({ value: c.value, label: c.label, icon: c.icon || undefined }));
-      return <Select disabled={disabled} path={p} value={v as any} mixed={mixed} options={opts} onChange={(x) => edit(p, x)} />;
+      // a stored Auto the layout no longer offers reads as what it does: a
+      // ChArUco label on auto IS "In a black square" (audit 2026-10-17: the row read "–")
+      let shown = v as any;
+      if (!mixed && shown === "auto" && !opts.some((o) => o.value === "auto") && opts.length === 1) shown = opts[0].value;
+      return <Select disabled={disabled} path={p} value={shown} mixed={mixed} options={opts} onChange={(x) => edit(p, x)} />;
     }
     if (p === "settings.mode") {
       const opts: Opt[] = (f.choices ?? []).map((c) => ({ value: c.value, label: c.label, icon: c.icon || undefined }));

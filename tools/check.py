@@ -10,7 +10,7 @@ milestone edits this file after M1.
 |---|---|---|
 | core, plan, scene, verify, server, adapters, ... | `tests/<name>/` holds a `test_*.py` | pytest on that folder (pytest-xdist) |
 | studio | `studio/package.json` | `npm run build`, then `npm run test` (vitest) |
-| e2e | `e2e/package.json` (or `studio/e2e/`) | uvicorn on 127.0.0.1:5360 + Vite on 5361, `npx playwright test` in `e2e/`; the server's home, scenes and PrusaSlicer folder are a temp dir and the fixture; both stopped in `finally`; refused when a port is already bound |
+| e2e | `e2e/package.json` (or `studio/e2e/`) | uvicorn on 127.0.0.1:5360 + Vite on 5361, `npx playwright test` in `e2e/`; the server's home, scenes and PrusaSlicer folder are a temp dir and the fixture; both stopped in `finally`; refused when a port is already bound. `ARUCO_STUDIO_API_PORT` / `ARUCO_STUDIO_UI_PORT` move the two (a check run beside a lane's own server on 5360) |
 
 One line per group ("core: 2,311 passed in 38 s"); exit 1 on any failure.
 `--trace` writes docs/test_trace.md: one row per section of
@@ -35,7 +35,21 @@ ROOT = Path(__file__).resolve().parents[1]
 PY = sys.executable
 STUDIO = ROOT / "studio"
 E2E = ROOT / "e2e"
-PORTS = (5360, 5361)
+OTHER_TOOLS = (5322, 5331, 5340, 5350, 5370, 8080)     # never ours, whatever the env says
+
+
+def ports():
+    """(API, UI) for the e2e servers: 5360 / 5361, or ARUCO_STUDIO_API_PORT /
+    ARUCO_STUDIO_UI_PORT (so a check can run beside a lane's server)."""
+    api = int(os.environ.get("ARUCO_STUDIO_API_PORT") or 5360)
+    ui = int(os.environ.get("ARUCO_STUDIO_UI_PORT") or 5361)
+    bad = [p for p in (api, ui) if p in OTHER_TOOLS]
+    if bad or api == ui:
+        raise SystemExit(f"e2e ports {api} / {ui}: {bad or 'the same port twice'} not allowed")
+    return api, ui
+
+
+PORTS = ports()
 
 
 # --------------------------------------------------------------- discovery
@@ -148,30 +162,34 @@ def _stop(proc):
 
 
 def run_e2e():
+    api_port, ui_port = PORTS
     busy = [p for p in PORTS if _bound(p)]
     if busy:
-        return False, f"e2e: refused, port(s) {busy} already bound (stop what holds them first)"
+        return False, (f"e2e: refused, port(s) {busy} already bound (stop what holds them first, "
+                       "or set ARUCO_STUDIO_API_PORT / ARUCO_STUDIO_UI_PORT)")
     t0 = time.time()
     api = ui = None
     env = _env()
-    env.update({"ARUCO_STUDIO_SCENES": os.path.join(env["ARUCO_STUDIO_HOME"], "scenes"),
+    env.update({"ARUCO_STUDIO_API_PORT": str(api_port), "ARUCO_STUDIO_UI_PORT": str(ui_port),
+                "ARUCO_STUDIO_SCENES": os.path.join(env["ARUCO_STUDIO_HOME"], "scenes"),
                 "BAM_ARUCO_PRUSASLICER_DIR": str(ROOT / "tests" / "fixtures" / "prusaslicer_m8c")})  # M8b2: the physical printers too
     where = E2E if (E2E / "package.json").exists() else STUDIO
     _npm_install(STUDIO)
     _npm_install(where)
     try:
         api = subprocess.Popen([PY, "-m", "uvicorn", "aruco_studio.server.app:app", "--host",
-                                "127.0.0.1", "--port", "5360"], cwd=str(ROOT), env=env,
+                                "127.0.0.1", "--port", str(api_port)], cwd=str(ROOT), env=env,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        ui = subprocess.Popen([_npm(), "run", "dev", "--", "--host", "127.0.0.1", "--port", "5361",
+        npx = shutil.which("npx.cmd") or shutil.which("npx") or "npx"
+        ui = subprocess.Popen([npx, "vite", "--host", "127.0.0.1", "--port", str(ui_port),
                                "--strictPort"], cwd=str(STUDIO), env=env,
                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if not (_wait(5360) and _wait(5361)):
-            return False, "e2e: the servers did not come up on 5360 / 5361"
-        npx = shutil.which("npx.cmd") or shutil.which("npx") or "npx"
+        if not (_wait(api_port) and _wait(ui_port)):
+            return False, f"e2e: the servers did not come up on {api_port} / {ui_port}"
         # the browser keeps the real profile folder (Chrome refuses a temp
         # USERPROFILE); only the servers run on the temp home
-        penv = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PYTHONIOENCODING="utf-8")
+        penv = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PYTHONIOENCODING="utf-8",
+                    ARUCO_STUDIO_API_PORT=str(api_port), ARUCO_STUDIO_UI_PORT=str(ui_port))
         p = subprocess.run([npx, "playwright", "test"], cwd=str(where), env=penv, capture_output=True,
                            text=True, encoding="utf-8", errors="replace")
         ok = p.returncode == 0

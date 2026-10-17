@@ -123,6 +123,11 @@ def test_the_forearm_and_the_stickers_equal_the_old_routes(client, tmp_path):
                 s["holes"] = f["holes"]
             if s:
                 edits["settings"] = s
+            # the shipped ids (audit 2026-10-17: the examples open renumbered)
+            if "marker_ids" in f:
+                edits["numbers"] = {"marker_id": f["marker_ids"][t["source"]["entry"]]}
+            if "first_id" in f:
+                edits["numbers"] = {"marker_id": f["first_id"]}
             target = t["spec"]["target"]
             if name == "sticker_sheet":            # the target editor's own shapes
                 sh = {"a": ("box", 30, 30), "b": ("box", 30, 30), "c": ("box", 60, 40)}

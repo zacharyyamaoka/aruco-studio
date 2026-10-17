@@ -31,7 +31,7 @@ export function Toolbar() {
   const none = !sel.length && !shapes;
   void tags;
   const k = kinds();
-  const noPrint = printBlock(k.stickers);
+  const noPrint = printBlock(k.stickers, k.printed);
   const noSend = sendBlock(k.printed, k.stickers);
   return (
     <header className="toolbar" data-testid="toolbar">
@@ -82,7 +82,7 @@ export function Toolbar() {
           <MenuItem icon="sheet" label="The sheet (every marker in place)" onClick={() => st.verifyScene()} testid="verify-scene" />
         </Menu>
         <Menu icon="export" label="Export" testid="menu-export" align="end">
-          <MenuItem icon="sticker" label="Sticker sheet…" hint={noPrint ? "no stickers" : "page, spaced / tight, preview"} disabled={!!noPrint} title={noPrint ?? undefined}
+          <MenuItem icon="sticker" label="Sticker sheet…" hint={noPrint ?? "page, spaced / tight, preview"} disabled={!!noPrint} title={noPrint ?? undefined}
             onClick={() => st.setDialog({ kind: "sheet" })} testid="export-sheet" />
           <MenuItem icon="print" label="Print sticker sheet…" hint={noPrint ?? "at 100 %"} disabled={!!noPrint} title={noPrint ?? undefined}
             onClick={() => st.printSheet()} testid="export-print" />

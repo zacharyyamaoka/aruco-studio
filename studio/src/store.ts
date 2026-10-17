@@ -17,7 +17,7 @@ import { printPdf, type PrintOutcome } from "./app/Print";
 import { matMul, poseOf, sceneZ, tagBox, unionBox } from "./model/geom";
 import { dump, parse, type Span } from "./model/json";
 import {
-  addAruco, addHole, addShape, deleteShapes, deleteTag, duplicateShapes, extrude, findShape, moveShapes, nextFreeId,
+  addAruco, addHole, addShape, allIds, deleteShapes, deleteTag, duplicateShapes, extrude, findShape, moveShapes, nextFreeId,
   refOfShape, rotateShapes, shapesOf, type Doc,
 } from "./model/design";
 import { centroid, outline, applyXf, invert } from "./model/shapes";
@@ -163,6 +163,7 @@ export interface StudioState {
   saveAs(nameOrPath: string): Promise<void>;
   openScene(name: string): Promise<void>;
   openPath(path: string): Promise<void>;
+  openExample(name: string): Promise<void>;
   reveal(): Promise<void>;
   verifySel(): Promise<void>;
   verifyScene(): Promise<void>;
@@ -179,7 +180,7 @@ export interface StudioState {
   loadStale(): Promise<void>;
   loadPrinters(): Promise<PrusaPrinters | null>;
   printSheet(q?: SheetQuery): Promise<PrintOutcome>;
-  exportSheet(q?: SheetQuery): Promise<string[]>;
+  exportSheet(q?: SheetQuery): Promise<{ dir: string; files: string[] } | null>;
   sendPrusa(b: SendBody): Promise<SendAnswer | null>;
   idle(): Promise<void>;
 }
@@ -328,6 +329,29 @@ export const useStudio = create<StudioState>((set, get) => {
     }
   }
 
+  /** A new face list: each face its own run of ids, the next free ones in
+   *  the order of the list (marker_ids in the file, so it stays one feature;
+   *  Renumber is a repair, not a required step). */
+  async function numberList(fid: string, names: string[]) {
+    const tags = names.map((n) => get().scene.tags.find((x) => x.name === n));
+    if (tags.some((t) => !t?.plan?.ok || !t.plan.ids.length)) return;
+    const dict = String((tags[0]!.plan!.marker as any)?.dictionary ?? "");
+    const used = familyIds(dict, names);
+    let next = nextFreeId(used);
+    const ids: number[] = [];
+    for (const t of tags) {
+      const span = Math.max(...t!.plan!.ids) - Math.min(...t!.plan!.ids) + 1;
+      ids.push(next);
+      next += span;
+    }
+    const d = parse(get().design.text).value as Doc;
+    const f = (d.features || []).find((x: any) => x?.id === fid);
+    if (!f || !Array.isArray(f.aruco) || f.aruco.length !== ids.length) return;
+    f.marker_ids = ids;
+    await api.designPut(dump(d), get().design.hash);
+    await get().refresh();
+  }
+
   function keepInView(names: string[]) {
     const tags = get().scene.tags.filter((x) => names.includes(x.name));
     const b = unionBox(tags.map((t) => tagBox(t)));
@@ -370,13 +394,10 @@ export const useStudio = create<StudioState>((set, get) => {
   /** An ArUco Extrude on refs, named <base><n> (the old Add's names for
    *  grid / ChArUco): -> its id. */
   function arucoNamed(d: Doc, refs: string[], extra: Record<string, unknown>, base: string): string {
+    const taken = allIds(d);                 // before the new one (a split list's <id> included)
     let fid = addAruco(d, refs, extra);
     if (base !== "tag") {
       const f = d.features![d.features!.length - 1];
-      const taken = new Set<string>();
-      for (const x of d.features || []) if (x !== f && x?.id) taken.add(String(x.id));
-      for (const x of shapesOf(d)) if (x.id) taken.add(x.id);
-      for (const x of d.sketches || []) if (x?.id) taken.add(String(x.id));
       for (let n = 1; ; n++) if (!taken.has(`${base}${n}`)) { f.id = `${base}${n}`; break; }
       fid = f.id;
     }
@@ -393,8 +414,12 @@ export const useStudio = create<StudioState>((set, get) => {
       const fid = build(d);
       await api.designPut(dump(d), get().design.hash);
       await get().refresh();
-      const names = get().scene.tags.filter((t) => t.name === fid || t.name.startsWith(fid + ".")).map((t) => t.name);
+      // the new feature's own tags, by its index (never by a name prefix:
+      // a split list's features are named <id>.<face>)
+      const fi = (d.features || []).findIndex((f: any) => f?.id === fid);
+      const names = get().scene.tags.filter((t) => t.source ? t.source.feature === fi : t.name === fid).map((t) => t.name);
       if (names.length === 1) await numberNew(names);
+      else if (names.length > 1) await numberList(fid, names);
       set({ sel: names, shapeSel: [], tool: "select", picks: [], typed: "" });
     });
   }
@@ -1024,6 +1049,13 @@ export const useStudio = create<StudioState>((set, get) => {
       }, { history: false });
       get().zoomToFit();
     },
+    async openExample(name) {
+      await run(`opened a copy of the example '${name}'`, async () => {
+        await api.openExample(name);
+        set({ sel: [], shapeSel: [], hist: { undo: [], redo: [] }, verify: {}, verifySpec: {}, sceneVerify: null, renumberReport: null, idErrors: {} });
+      }, { history: false });
+      get().zoomToFit();
+    },
     async reveal() {
       await run("", async () => {
         const r = await api.designReveal(true);
@@ -1138,13 +1170,14 @@ export const useStudio = create<StudioState>((set, get) => {
     },
     async exportSheet(q) {
       const query = { ...get().sheet, ...(q ?? {}) };
-      let files: string[] = [];
+      let out: { dir: string; files: string[] } | null = null;
       await run("", async () => {
-        const r = await api.exportPrint({ ...query, inline: false });
-        files = r.written ?? r.files;
+        // the sheet's files only: the 3D parts are Send's (audit 2026-10-17)
+        const r = await api.exportPrint({ ...query, inline: false, sheet_only: true });
+        out = { dir: r.dir, files: r.written ?? r.files };
         get().say(`sticker sheet: ${r.stickers} sticker${r.stickers === 1 ? "" : "s"} on ${r.pages} page${r.pages === 1 ? "" : "s"}, written to ${r.dir}`);
       }, { history: false });
-      return files;
+      return out;
     },
     async sendPrusa(b) {
       let ans: SendAnswer | null = null;

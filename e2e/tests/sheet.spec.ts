@@ -64,17 +64,20 @@ test("M6b.6 the sheet dialog: tight shelves, spaced captions and crop marks, the
   await page.locator('.kit-select-popup[data-for="sheet.page"][data-open] [data-value="a4"]').click();
   await expect(pv.locator("svg")).toHaveAttribute("width", "210mm");
 
-  // Export: the print bundle (sheet.pdf, sheet.svg, sheet.json)
+  // Export: the sheet's files only (sheet.pdf, sheet.svg, sheet.json), never
+  // the 3D parts (audit 2026-10-17); "written to <folder>" and Reveal
+  await page.evaluate(() => { (window as any).__studio.revealOpen = false; });
   await page.getByTestId("sheet-export").click();
   await idle(page);
   const files = page.getByTestId("sheet-files");
   await expect(files).toBeVisible();
-  const listed = await files.locator("div").allTextContents();
-  for (const f of ["sheet.pdf", "sheet.svg", "sheet.json"]) {
-    const hit = listed.find((x) => x.replace(/\\/g, "/").endsWith("/" + f) || x === f);
-    expect(hit, f).toBeTruthy();
-  }
-  const pdf = listed.find((x) => x.endsWith("sheet.pdf"))!;
-  if (path.isAbsolute(pdf)) expect(fs.existsSync(pdf)).toBeTruthy();
+  const listed: string[] = JSON.parse((await files.getAttribute("data-files"))!);
+  for (const f of ["sheet.pdf", "sheet.svg", "sheet.json"]) expect(listed, f).toContain(f);
+  expect(listed.filter((f) => f.startsWith("print3d/"))).toEqual([]);
+  const dir = (await files.getAttribute("data-dir"))!;
+  expect(fs.existsSync(path.join(dir, "sheet.pdf"))).toBeTruthy();
+  await expect(files).toContainText(dir);
+  const [rev] = await Promise.all([page.waitForResponse("**/api/scene/export/reveal"), page.getByTestId("sheet-reveal").click()]);
+  expect((await rev.json()).opened).toBe(false);
   await shot(page, "m8b2_sheet_exported");
 });

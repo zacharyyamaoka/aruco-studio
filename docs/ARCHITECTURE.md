@@ -75,7 +75,7 @@ One module per REF core module, same public names, so the port is a copy and the
 | `core/slabs.py` | `aruco_slabs.py` | Offset / Height slabs, `layers`, `plan` (the parts), `from_legacy`, pins and their grown holes | mm along the normal |
 | `core/chamfer.py` | `aruco_chamfer.py` | the corner mark: `valid_marks`, `choice_of`, `plan_mark`, `mark_for_spec`, `Mark` | mm, pattern frame |
 | `core/autosize.py` | `aruco_autosize.py` | `CELL_RULE = 1`, `cells_of`, `Layout`, `layout_for_size`, `default_layout`, `clamp_to_fit`, `face_default`, `candidates`, `candidates_on_loops`, `auto_dictionary`, `largest_clear_rect`, `fit_on_loops` | metres, face frame |
-| `core/label.py` | `aruco_label.py` | `RULES {1, 2}`, `RULE = 2`, the pixel font, `LabelSettings`, `plan_label`, `label_violations`, `relabel`, `copy_regions`, `check_label`, `loops_to_pattern` | mm, pattern frame |
+| `core/label.py` | `aruco_label.py` | `RULES {1, 2}` (+ the Studio's 3: a hand-placed ChArUco label in any black square, and 4: a ChArUco label on auto stays in a black square; `NEW_RULE = 4`), `RULE = 2`, the pixel font, `LabelSettings`, `plan_label`, `label_violations`, `relabel`, `copy_regions`, `check_label`, `loops_to_pattern` | mm, pattern frame |
 | `core/trim.py` | `aruco_trim.py` | `RULE = 1`, `trim_of`, `plan_trim`, `TrimPlan`, the refusals | mm, pattern frame |
 | `core/numbering.py` | `aruco_numbering.py` | `plan_ids`, `plan_stable`, the ledger, `node_state`, `decode`, `auto_decision`, the digests | design units, ids |
 | `core/sheet.py` | `print_sheet.py` | the true-size PDF sheet | mm |
@@ -146,6 +146,7 @@ FastAPI + uvicorn on `127.0.0.1:5360`. Serves `studio/dist/` at `/` when it exis
 | `POST /api/verify` | `TagPlan` -> the verify report |
 | `GET/POST /api/presets`, `GET /api/prusa/profiles` | `core.presets` over `server/store.py` |
 | `GET /api/prusa/printers`, `/api/prusa/stale`, `/api/prusa/watch`, `POST /api/scene/send/prusaslicer` | M8c, in `server/prusa_api.py` (the folder's watcher in `server/prusa_watch.py`): docs/API_prusa.md |
+| `GET /api/design/files`, `POST /api/design/open_example`, `GET /api/design/browse` | the Open dialog (2026-10-17 audit), in `server/files_api.py`; the files themselves through `server/store.py`: docs/API.md |
 
 `server/store.py` owns every file: presets (`bam_aruco_presets/1`, same shape as REF so a preset file can be copied over), remembered options, the recent list, PrusaSlicer's config directory (read only; `BAM_ARUCO_PRUSASLICER_DIR` points at a fixture).
 

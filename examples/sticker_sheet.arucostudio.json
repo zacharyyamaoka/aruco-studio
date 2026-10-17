@@ -12,10 +12,10 @@
     ]}
   ],
   "features": [
-    {"id": "t1", "aruco": "a", "layout": "single", "label": "#id"},
-    {"id": "t2", "aruco": "b", "layout": "single", "label": "#id"},
-    {"id": "t3", "aruco": "c", "layout": "grid", "cols": 2, "rows": 1},
+    {"id": "t1", "aruco": "a", "layout": "single", "label": "#id", "first_id": 0},
+    {"id": "t2", "aruco": "b", "layout": "single", "label": "#id", "first_id": 1},
+    {"id": "t3", "aruco": "c", "layout": "grid", "cols": 2, "rows": 1, "first_id": 2},
     {"id": "t4", "aruco": "d", "layout": "charuco", "cols": 4, "rows": 4,
-     "perimeter": "profile", "holes": "avoid"}
+     "perimeter": "profile", "holes": "avoid", "first_id": 8}
   ]
 }

@@ -125,6 +125,10 @@ export const api = {
   autoCheck: (spec: TagSpec) => post<{ auto: boolean; note: string }>("/api/auto_check", spec),
   renumber: () => post<RenumberReport>("/api/scene/renumber"),
   scenes: () => get<{ name: string; file: string; bytes: number; modified: string }[]>("/api/scenes"),
+  // the Open dialog (audit 2026-10-17): examples, recent files, a folder
+  designFiles: () => get<DesignFiles>("/api/design/files"),
+  openExample: (name: string) => post<any>("/api/design/open_example", { name }),
+  browse: (dir?: string) => get<Browse>(`/api/design/browse${dir ? `?dir=${encodeURIComponent(dir)}` : ""}`),
   save: (name: string) => post<{ saved: string; name: string }>("/api/scene/save", { name }),
   open: (name: string) => post<SceneDoc>("/api/scene/open", { name }),
   sceneVerify: () => post<any>("/api/scene/verify?px_per_mm=10"),
@@ -145,7 +149,8 @@ export const api = {
     if (!r.ok) throw new ApiError(r.status, await r.text(), `${r.status}: the sheet's PDF was refused`);
     return new Uint8Array(await r.arrayBuffer());
   },
-  exportPrint: (b: SheetQuery & { inline?: boolean }) =>
+  exportReveal: (open: boolean) => post<{ dir: string; command: string[]; opened: boolean }>("/api/scene/export/reveal", { open }),
+  exportPrint: (b: SheetQuery & { inline?: boolean; sheet_only?: boolean }) =>
     post<{ stickers: number; parts: number; pages: number; rejected: any[]; files: string[]; dir: string; written: string[]; inline?: Record<string, string> }>("/api/scene/export/print", b),
   // PrusaSlicer (M8c, docs/API_prusa.md)
   prusaPrinters: () => get<PrusaPrinters>("/api/prusa/printers"),
@@ -154,3 +159,15 @@ export const api = {
   sceneExport: (fmt: string) =>
     post<{ dir: string; files: string[]; inline: Record<string, string> | null }>(`/api/scene/export/${fmt}?save=1&inline=1`),
 };
+
+export interface DesignFiles {
+  examples: { name: string; file: string; title: string }[];
+  recent: { path: string; name: string; exists: boolean; modified: string | null }[];
+  scenes: { name: string; file: string; bytes: number; modified: string }[];
+  scenes_dir: string;
+}
+export interface Browse {
+  dir: string; parent: string | null;
+  folders: { name: string; path: string }[];
+  files: { name: string; path: string; bytes: number; modified: string }[];
+}

@@ -161,7 +161,7 @@ test("M6b.4 a ChArUco label: In a black square only; dragged into another black 
   t = await tagOf(page, name);
   const lab = t.spec.settings.label;
   expect(lab.position).toBe("manual");
-  expect(lab.rule).toBe(3);
+  expect(lab.rule).toBeGreaterThanOrEqual(3);                        // rule 3 (any black square), kept by rule 4 (audit 2026-10-17)
   expect(Math.abs(lab.x_mm - (c0[0] + 2 * sq))).toBeLessThan(0.6);
   expect(t.plan.label?.parts?.length ?? 0).toBeGreaterThan(0);                            // built there
   expect((t.plan.guides.label_preview ?? []).length).toBe(0);                            // no orange

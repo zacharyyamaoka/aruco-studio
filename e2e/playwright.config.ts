@@ -10,6 +10,9 @@ import path from "node:path";
 const ROOT = path.resolve(__dirname, "..");
 const TMP = path.join(__dirname, ".tmp");
 const PY = path.join(ROOT, ".venv", "Scripts", "python.exe");
+// 5360 / 5361 unless tools/check.py says otherwise (it runs beside a lane's own server)
+const API_PORT = process.env.ARUCO_STUDIO_API_PORT || "5360";
+const UI_PORT = process.env.ARUCO_STUDIO_UI_PORT || "5361";
 
 export default defineConfig({
   testDir: "./tests",
@@ -21,7 +24,7 @@ export default defineConfig({
   reporter: [["list"]],
   outputDir: path.join(TMP, "results"),
   use: {
-    baseURL: "http://127.0.0.1:5361",
+    baseURL: `http://127.0.0.1:${UI_PORT}`,
     channel: "chrome",
     viewport: { width: 1500, height: 900 },
     launchOptions: { args: ["--enable-unsafe-swiftshader", "--use-angle=swiftshader", "--ignore-gpu-blocklist"] },
@@ -30,9 +33,9 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `"${PY}" -B -m uvicorn aruco_studio.server.app:app --host 127.0.0.1 --port 5360`,
+      command: `"${PY}" -B -m uvicorn aruco_studio.server.app:app --host 127.0.0.1 --port ${API_PORT}`,
       cwd: ROOT,
-      url: "http://127.0.0.1:5360/api/health",
+      url: `http://127.0.0.1:${API_PORT}/api/health`,
       reuseExistingServer: true,
       timeout: 60_000,
       env: {
@@ -43,9 +46,9 @@ export default defineConfig({
       },
     },
     {
-      command: "npm run dev",
+      command: `npx vite --host 127.0.0.1 --port ${UI_PORT} --strictPort`,
       cwd: path.join(ROOT, "studio"),
-      url: "http://127.0.0.1:5361/",
+      url: `http://127.0.0.1:${UI_PORT}/`,
       reuseExistingServer: true,
       timeout: 60_000,
     },

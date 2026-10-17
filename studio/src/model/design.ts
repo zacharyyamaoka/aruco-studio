@@ -87,6 +87,9 @@ export function allIds(d: Doc): Set<string> {
   }
   for (const f of fs(d)) {
     if (f?.id) out.add(String(f.id));
+    // a split list names its features <id>.<face>: <id> stays taken, so a
+    // new tag never takes the old list's name (audit 2026-10-17)
+    if (f?.id && String(f.id).includes(".")) out.add(String(f.id).split(".")[0]);
     if (Array.isArray(f?.aruco)) for (const r of f.aruco) out.add(`${f.id}.${String(r).split(".").pop()}`);
   }
   for (const k of Object.keys(d.overrides || {})) out.add(k);

@@ -123,6 +123,8 @@ export function routeIssues(issues: Issue[], rows: FormRow[], shown: Iterable<st
  *  what to change. The whole text stays in the line's tooltip. */
 export function shortText(text: string): string {
   let t = text.replace(/^label: /, "").trim();
+  const sq = /^Label not built: no room in a ([\d.]+) mm ChArUco square for (.+?), even at /.exec(t);
+  if (sq) return `No room in a ${Number(sq[1]).toFixed(0)} mm square for ${sq[2]}: fewer columns (bigger squares) or Content #id`;
   const room = /^Label not built: no room for (.+?) on the black or on the white, even at ([\d.]+) mm letters/.exec(t);
   if (room) return `No room for ${room[1]}, even at ${room[2]} mm letters: a finer label nozzle or a smaller marker makes room`;
   const cut = t.search(/ \(|\. |; /);

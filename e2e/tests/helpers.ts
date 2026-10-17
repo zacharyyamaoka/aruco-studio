@@ -8,7 +8,8 @@ import path from "node:path";
 
 export const ROOT = path.resolve(__dirname, "..", "..");
 export const SCREENS = path.join(ROOT, "reports", "screens");
-export const API = "http://127.0.0.1:5360";
+// the ports: 5360 / 5361, or what tools/check.py was given (ARUCO_STUDIO_API_PORT / _UI_PORT)
+export const API = `http://127.0.0.1:${process.env.ARUCO_STUDIO_API_PORT || 5360}`;
 const PY = path.join(ROOT, ".venv", "Scripts", "python.exe");
 
 /** A fresh scene on the server, the app loaded on it. */

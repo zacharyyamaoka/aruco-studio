@@ -19,7 +19,8 @@ export { Tooltip, TooltipProvider } from "./Tooltip";
 export { Dialog } from "./Dialog";
 export { Menu, MenuItem, MenuSeparator } from "./Menu";
 export { Field, FieldRow, Messages, Section } from "./Field";
-export { CommandPalette, type PaletteItem } from "./CommandPalette";
+export { CommandPalette, rankedGroups, type PaletteItem } from "./CommandPalette";
+export { rankCommand } from "./paletteRank";
 export { LibraryShell, type LibCard, type LibCollection } from "./Library";
 export { Form, typeControl, type Cell, type ControlArgs, type FormProps } from "./Form";
 export {

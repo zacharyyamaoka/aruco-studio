@@ -39,8 +39,9 @@ def squares():
 
 
 def test_the_rules():
-    assert sorted(L.RULES) == [1, 2, 3] and L.RULE == 2 and L.NEW_RULE == 3
-    assert L.RULES[3] == L.RULES[2]                   # the white's rule is rule 2's
+    assert sorted(L.RULES) == [1, 2, 3, 4] and L.RULE == 2
+    assert L.NEW_RULE == 4                            # the 2026-10-17 audit (test_label_rule4.py)
+    assert L.RULES[3] == L.RULES[2] == L.RULES[4]     # the white's rule is rule 2's
 
 
 def test_the_black_squares_of_a_5_x_7_board():
@@ -111,7 +112,7 @@ def test_the_form_offers_a_charuco_board_a_black_square_only():
     assert rows["settings.label.row"]["hidden_layouts"] == ["charuco"]
     assert rows["settings.label.side"]["hidden_layouts"] == ["charuco"]
     assert 3 in [c["value"] for c in rows["settings.label.rule"]["choices"]]
-    assert rows["settings.label.rule"]["new"] == 3
+    assert rows["settings.label.rule"]["new"] == L.NEW_RULE == 4
 
 
 def test_the_label_goldens_keep_their_rules():

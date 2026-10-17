@@ -1,6 +1,6 @@
 // bam.form/1's pure half: show_when, the anchors, mixed values.
 import { describe, expect, it } from "vitest";
-import { common, routeIssues, shows, summaryLine, visibleRows, type FormCtx, type FormRow, type Issue } from "./formModel";
+import { common, routeIssues, shortText, shows, summaryLine, visibleRows, type FormCtx, type FormRow, type Issue } from "./formModel";
 import { themed } from "./Glyph";
 
 const ROWS: FormRow[] = [
@@ -88,5 +88,12 @@ describe("glyphs", () => {
   it("fixed colours become tokens, one style per element", () => {
     const out = themed('<path d="M0 0" fill="#38a6e8" fill-opacity=".3" stroke="#38A6E8"/><path stroke="#123456"/>', { "#38a6e8": "var(--accent)" });
     expect(out).toBe('<path d="M0 0" fill-opacity=".3" style="fill:var(--accent);stroke:var(--accent)"/><path stroke="#123456"/>');
+  });
+});
+
+describe("shortText of label rule 4 (audit 2026-10-17)", () => {
+  it("a ChArUco square too small says what to change, in one line", () => {
+    const t = "Label not built: no room in a 13.0 mm ChArUco square for '#0-3', even at 3.0 mm letters. Fewer columns (bigger squares), a bigger checker or Content #id; Build anyway builds it there.";
+    expect(shortText(t)).toBe("No room in a 13 mm square for '#0-3': fewer columns (bigger squares) or Content #id");
   });
 });

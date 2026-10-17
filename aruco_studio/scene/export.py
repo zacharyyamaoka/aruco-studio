@@ -123,8 +123,10 @@ def print_bundle(scene: Scene, plans: Optional[dict] = None, page: str = "letter
                  landscape: bool = False, margin_mm: float = 10.0, mode: str = "spaced",
                  proofs: bool = False, bed_w_mm: float = None, bed_d_mm: float = None,
                  black_slot: int = 2, white_slot: int = 1, profile=None, when: str = "",
-                 date: Optional[str] = None) -> dict:
-    """-> {"files": {relpath: bytes}, "report": {...}, "ledger": dict}."""
+                 date: Optional[str] = None, sheet_only: bool = False) -> dict:
+    """-> {"files": {relpath: bytes}, "report": {...}, "ledger": dict}.
+    `sheet_only`: the sticker sheet's files (and markers.json) only, no 3D
+    parts (the Sticker sheet dialog's Export; the parts are Send's)."""
     plans = plans if plans is not None else scene.plans()
     files: Dict[str, bytes] = {}
     stickers = [t for t in scene.tags if not t.hidden and plans[t.name].ok
@@ -146,7 +148,7 @@ def print_bundle(scene: Scene, plans: Optional[dict] = None, page: str = "letter
                               f"-> sheet.pdf ({lay.page_count} page"
                               f"{'s' if lay.page_count != 1 else ''}, {page.upper() if page == 'a4' else page.capitalize()})")
     solid_keys = set()
-    if solid:
+    if solid and not sheet_only:
         bed = _BD.BedSettings(tile_extruder=int(white_slot), cells_extruder=int(black_slot))
         if bed_w_mm:
             bed.bed_w_mm = float(bed_w_mm)

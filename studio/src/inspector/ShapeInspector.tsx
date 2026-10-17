@@ -92,6 +92,13 @@ export function ShapeInspector({ info }: { info: ShapeInfo }) {
                   onCommit={(v) => st.editDoc(`${key}: hole ${i} y ${v}`, (d) => setShape(d, `${key}/h${i}`, { ...h, at: [h.at?.[0] ?? 0, v] }))} />
                 {kindOf(h) === "circle" && <NumberField path={`hole.${i}.d`} value={h.circle} unit="⌀" min={0.01} onBad={setBad}
                   onCommit={(v) => st.editDoc(`${key}: hole ${i} ⌀ ${v}`, (d) => setShape(d, `${key}/h${i}`, { ...h, circle: v }))} />}
+                {kindOf(h) === "rect" && Array.isArray(h.rect) && <>
+                  {/* a rectangular hole's W × H (audit 2026-10-17: only its x / y could be typed) */}
+                  <NumberField path={`hole.${i}.w`} value={h.rect[0]} unit="W" min={0.01} onBad={setBad}
+                    onCommit={(v) => st.editDoc(`${key}: hole ${i} W ${v}`, (d) => setShape(d, `${key}/h${i}`, { ...h, rect: [v, h.rect[1]] }))} />
+                  <NumberField path={`hole.${i}.h`} value={h.rect[1]} unit="H" min={0.01} onBad={setBad}
+                    onCommit={(v) => st.editDoc(`${key}: hole ${i} H ${v}`, (d) => setShape(d, `${key}/h${i}`, { ...h, rect: [h.rect[0], v] }))} />
+                </>}
                 <IconButton icon="close" title="Remove this hole" onClick={() => { st.setShapeSel([`${key}/h${i}`]); st.deleteSel(); }} />
               </span>
             </FieldRow>

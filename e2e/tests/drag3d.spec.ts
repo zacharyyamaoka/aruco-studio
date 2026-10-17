@@ -129,6 +129,11 @@ test("M8b1.7 A, four Shift-clicked faces, Enter: one feature, four tags; Renumbe
   await expect(page.locator("g[data-tag]")).toHaveCount(4);
   const names = (await probe(page)).tags.map((t: any) => t.name).sort();
   expect(names).toEqual(["tag1.back", "tag1.front", "tag1.left", "tag1.right"]);
+  // the 2026-10-17 audit: a new face list takes its own run of ids per face
+  // (marker_ids in the file, still one feature): unique before Renumber
+  expect(readFile(file).features.filter((x: any) => x.aruco)[0].marker_ids).toHaveLength(4);
+  const ids0 = (await probe(page)).tags.flatMap((t: any) => t.ids);
+  expect(new Set(ids0).size).toBe(ids0.length);
   await palette(page, "Renumber all");
   const ids = (await probe(page)).tags.flatMap((t: any) => t.ids);
   expect(new Set(ids).size).toBe(ids.length);

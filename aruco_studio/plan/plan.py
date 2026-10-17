@@ -123,6 +123,9 @@ def route(note: str, refused: bool = False):
 # a label message goes under the row its words name (audit F7): REF's dialog
 # put a cap's refusal under Position when its reason did not match
 LABEL_WORDS = [
+    # label rule 4: a ChArUco square too small for the text is about the
+    # Label itself (fewer columns or Content #id), not the letter height
+    (r"\bno room in a [\d.]+ mm ChArUco square\b", "settings.label"),
     (r"^(label: )?(cap \d|letters \d|.*\beven at [\d.]+ mm letters)", "settings.label.cap_mm"),
     (r"^(label: )?(not )?on the (black|white)\b", "settings.label.place"),
     (r"^(label: )?.*\bnozzle\b.*\bneeds\b", "settings.label.nozzle_mm"),
@@ -169,6 +172,38 @@ def force_issue(ev, s, spec: TagSpec) -> Optional[Issue]:
                  f"{unit}: using {lay.cols} × {lay.rows}")
 
 
+_CELL_MIN = re.compile(r"^cell minimum: a ([\d.]+) mm cell is under the ([\d.]+) mm minimum")
+
+
+def cell_min_fix(note: str, ev, spec: TagSpec) -> str:
+    """The cell-minimum warn of a ChArUco board with what passes (the
+    2026-10-17 audit: "a fresh default should not start with an orange
+    warning" -- the warn now says the fix): the checker that gives cells of
+    the minimum, and the board that fits at it here. Words only: the layout
+    Auto picks is the versioned rule's, unchanged."""
+    m = _CELL_MIN.match(_plain(note))
+    lay = ev.get("layout")
+    if not m or lay is None or getattr(lay, "kind", "") != "charuco" or not lay.square_m:
+        return note
+    cell, need = float(m.group(1)), float(m.group(2))
+    if cell <= 0:
+        return note
+    sq = math.ceil(lay.square_m * 1000.0 * need / cell * 2.0 - 1e-6) / 2.0     # 0.5 mm steps
+    t = spec.target
+    cols, rows = int((t.w_mm + 1e-6) // sq), int((t.h_mm + 1e-6) // sq)
+    lp = t.loops_mm or []
+    boxy = not lp or (len(lp) == 1 and len(lp[0]) == 4)      # the count is the box's
+    if cols < 2 or rows < 2:
+        how = f"no ChArUco board passes here (it needs {sq:g} mm checkers): a single marker or a grid"
+    elif not boxy:                                # holes, curves: the count follows the clear room
+        how = f"a Checker size of {sq:g} mm or more passes"
+    elif not t.is_profile:
+        how = f"a Checker size of {sq:g} mm passes ({cols} × {rows} on this face)"
+    else:
+        how = f"{cols} × {rows} passes (a Checker size of {sq:g} mm)"
+    return f"{note.rstrip('.')}; {how}"
+
+
 def issues_of(ev, s, n, spec: TagSpec) -> List[Issue]:
     """Every message of a built plan, on its field (ARCHITECTURE 5.6). A
     message is shown once: a label note that repeats a label Issue is dropped."""
@@ -184,7 +219,7 @@ def issues_of(ev, s, n, spec: TagSpec) -> List[Issue]:
         if note.startswith(("label", "label warning")):
             continue                                    # the label's own words, below
         f, lv = route(note)
-        add(f, lv, note)
+        add(f, lv, cell_min_fix(note, ev, spec))
     fi = force_issue(ev, s, spec)
     if fi is not None:
         add(fi.field, fi.level, fi.text)
