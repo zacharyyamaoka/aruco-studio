@@ -1,0 +1,22 @@
+{
+ "schema": "arucostudio.scene/2",
+ "name": "Inkjet: the paper and the black inside it",
+ "preset": "Inkjet · Letter vinyl",
+ "sketches": [
+  {
+   "id": "sk",
+   "shapes": [
+    {"id": "vinyl", "rect": [40, 40], "at": [0, 0]},
+    {"id": "thick", "rect": [40, 40], "at": [55, 0]},
+    {"id": "board", "rect": [70, 50], "at": [125, 0]}
+   ]
+  }
+ ],
+ "features": [
+  {"id": "real", "aruco": "vinyl", "layout": "single", "first_id": 0, "name": "vinyl 0.10"},
+  {"id": "shown", "aruco": "thick", "layout": "single", "paper_mm": 2.0, "first_id": 1,
+   "name": "2 mm, to see it"},
+  {"id": "charuco", "aruco": "board", "layout": "charuco", "paper_mm": 2.0, "first_id": 2,
+   "name": "ChArUco, 2 mm"}
+ ]
+}

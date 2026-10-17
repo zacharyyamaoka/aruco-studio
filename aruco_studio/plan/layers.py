@@ -30,6 +30,12 @@ A printed sticker (core.make, M6a) has two parts: `sticker` (the white
 stock, z [0, t], its cut polygon) and `ink` (black, z [t, t + INK]: the
 cells, the corner triangle and the label exactly as the pattern's
 footprint makes them), each a body of its own.
+
+Make rule 2 (2026-10-17, CF-7) has three, REF's flush inlay on paper:
+`sticker` (ONE paper body, z [0, t], the cut polygon), `pocket` (the
+black's footprint, z [t/2, t], cut from the sticker) and `ink` (black, z
+[t/2, t], a body of its own): the black is inside the paper's top half,
+flush, nothing over the paper.
 """
 from __future__ import annotations
 
@@ -105,7 +111,8 @@ def poly(pts, holes=()) -> dict:
 
 PART_OP = {"tile": "add", "pin": "add", "pocket": "cut", "pattern": "add", "recess": "cut",
            "trim": "keep", "sticker": "add", "ink": "add"}
-STICKER_PARTS = ["sticker", "ink"]
+STICKER_PARTS = ["sticker", "ink"]                       # make rule 1
+STICKER_PARTS_INSET = ["sticker", "pocket", "ink"]       # make rule 2 (CF-7)
 
 
 class LayerBuilder:
@@ -251,18 +258,37 @@ class LayerBuilder:
         return self.out
 
 
+def sticker_parts(make) -> List[str]:
+    """Rule 1: the stock and the ink film on it. Rule 2 (CF-7): the paper,
+    the pocket the black takes out of its top half, the black in it."""
+    return list(STICKER_PARTS_INSET if getattr(make, "inset", False) else STICKER_PARTS)
+
+
 def sticker_layers(ev, n, frames, make, cut) -> List[Layer]:
-    """A sticker's layers: the white stock (its cut polygon) and the ink."""
+    """A sticker's layers. Rule 1: the white stock (its cut polygon) [0, t]
+    and the ink film [t, t + INK]. Rule 2: ONE paper body, the cut polygon
+    [0, t]; the pocket (the black's footprint, [t/2, t]) cut from it; the
+    black in the pocket, [t/2, t]: flush with the paper's top (REF's flush
+    inlay: tile, pocket, pattern)."""
     from ..core import make as _MK
     t = float(make.thickness_mm)
     lb = LayerBuilder(ev, n, frames)
     lb.add("sticker", "sticker", lb._next_solid("sticker"), "add", "white", 0.0, t,
            [poly(cut["outer"], cut["holes"])])
+    if getattr(make, "inset", False):
+        lo, hi = make.ink_z
+        lb.footprint("pocket", "pocket", lo, hi)
+        lb.footprint("ink", "ink", lo, hi)
+        return lb.out
     lb.footprint("ink", "ink", t, t + _MK.INK_MM)
     return lb.out
 
 
-def sticker_combines():
+def sticker_combines(make=None):
+    if getattr(make, "inset", False):
+        return [{"part": "sticker", "op": "new", "into": None},
+                {"part": "pocket", "op": "cut", "into": "sticker"},
+                {"part": "ink", "op": "new", "into": None}]
     return [{"part": "sticker", "op": "new", "into": None},
             {"part": "ink", "op": "new", "into": None}]
 

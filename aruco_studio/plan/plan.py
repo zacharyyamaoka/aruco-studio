@@ -16,6 +16,13 @@ How the tag is made (`settings.make`, core.make, M6a) branches once, after
 fit, mark and label on a thin stock (parts `sticker` and `ink`); a tag
 without the key, or 3D printed, takes REF's path untouched. `made_by` and
 `rules.make` say which.
+
+2026-10-17 (the 2D pivot): make rule 2 (the black t/2 inside the paper,
+parts sticker / pocket / ink, the frame on the paper's top) adds
+`data["sticker"]` (`sticker_block`) and the page lint (`sticker_issues`:
+an `error` on `numbers.size` with `ok` still true, CF-6); a shifted
+sticker (`settings.shift`) adds `placement.shift_mm`. A rule-1 or 3D
+plan's dict is exactly what it was.
 """
 from __future__ import annotations
 
@@ -456,6 +463,117 @@ def extra_issues(spec: TagSpec, s: dict, ev: dict, fr: dict, make, guides: dict)
     return out
 
 
+def _box(pts):
+    us = [float(p[0]) for p in pts]
+    vs = [float(p[1]) for p in pts]
+    return (min(us), min(vs), max(us), max(vs))
+
+
+def _inside_area(outer, rect) -> bool:
+    """Does `rect` lie inside the polygon `outer` (by area, 1e-4 mm2)?"""
+    kept = _TR.clip(list(outer), tuple(rect))
+    if len(kept) < 3:
+        return False
+    a = abs(sum(kept[i - 1][0] * kept[i][1] - kept[i][0] * kept[i - 1][1]
+                for i in range(len(kept)))) / 2.0
+    return a >= (rect[2] - rect[0]) * (rect[3] - rect[1]) - 1e-4
+
+
+def sticker_size_mm(guides: dict):
+    """A sticker's size on paper: its cut outline's box (w, h) mm."""
+    cut = guides.get("cut_line") or {}
+    outer = cut.get("outer") or []
+    if len(outer) < 3:
+        u0, v0, u1, v1 = guides["sticker"]
+    else:
+        u0, v0, u1, v1 = _box(outer)
+    return (u1 - u0, v1 - v0)
+
+
+def sticker_block(make, guides: dict) -> dict:
+    """plan.data["sticker"] of a rule-2 sticker (2026-10-17): what the
+    paper and the black are, where the frame sits, and the page it prints
+    on -- what an adapter's sticker node builds from (docs/status/2d-core.md)."""
+    t = float(make.thickness_mm)
+    lo, hi = make.ink_z
+    w, h = sticker_size_mm(guides)
+    fit = _MK.page_fit(w, h, make) or {}
+    return {"rule": make.rule, "thickness_mm": LY._r(t), "paper_z_mm": [0.0, LY._r(t)],
+            "ink_z_mm": [LY._r(lo), LY._r(hi)], "frame_z_mm": LY._r(make.top_mm),
+            "perimeter": make.perimeter,
+            "page": {"page": make.page, "margin_mm": LY._r(make.page_margin_mm),
+                     "size_mm": [LY._r(w), LY._r(h)], "fits": bool(fit.get("fits")),
+                     "how": fit.get("how"), "over_mm": fit.get("over_mm"),
+                     "printable_mm": fit.get("area_mm")}}
+
+
+def sticker_issues(spec: TagSpec, ev: dict, fr: dict, make, guides: dict) -> List[Issue]:
+    """The 2026-10-17 messages: a rule-2 sticker's paper and page (the red
+    page lint, CF-6: built anyway), Auto's cap, and a Shift that runs off
+    the face. Nothing for a tag without rule 2 or a shift."""
+    out: List[Issue] = []
+    raw = spec.settings or {}
+    sh, notes = _MK.shift_of(raw)
+    if "shift" in raw and not (make is not None and make.sticker):
+        if sh != (0.0, 0.0):
+            out.append(Issue("settings.shift", "info",
+                             "Shift moves stickers only: a 3D tag stays where the fit puts it "
+                             "(3D is kept as it is, CF-13)"))
+    if make is None or not make.sticker:
+        return out
+    if make.inset:
+        t = float(make.thickness_mm)
+        out.append(Issue("settings.make.thickness_mm", "info",
+                         f"the black is printed {t / 2.0:g} mm into the {t:g} mm paper (t/2, "
+                         f"make rule 2); the tag frame sits on the paper's top, {t:g} mm over "
+                         "the face"))
+        w, h = sticker_size_mm(guides)
+        fit = _MK.page_fit(w, h, make)
+        cap = ev.get("page_cap")
+        if cap and cap.get("capped"):
+            a, b = cap["from_mm"]
+            c, d = cap["to_mm"]
+            out.append(Issue("numbers.size", "info",
+                             f"Auto size: capped by the page -- the face holds a {a:.1f} × "
+                             f"{b:.1f} mm sticker, {_MK.page_words(make.page)} less "
+                             f"{make.page_margin_mm:g} mm margins prints {c:.1f} × {d:.1f} mm "
+                             f"({cap['how']})"))
+        if fit is not None and not fit["fits"]:
+            fld = "settings.make.perimeter" if make.perimeter == "profile" else "numbers.size"
+            text = _MK.lint_text(fit, w, h)
+            if make.perimeter == "profile":
+                text += " (Perimeter = Profile: the paper is the whole outline; Marker cuts the marker only)"
+            out.append(Issue(fld, "error", text))
+        elif fit is not None and fit["how"] not in (None, "portrait"):
+            out.append(Issue("numbers.size", "info",
+                             f"fits {_MK.page_words(make.page)} {fit['how'].replace('portrait, ', '')}"
+                             " only: the sheet turns it (or print landscape)"))
+    if sh != (0.0, 0.0):
+        loops = guides.get("target") or []
+        if loops:
+            outer = [tuple(p) for p in loops[0]]
+            if make.perimeter == "profile":
+                rect = tuple(guides["sticker"])
+                if not _inside_area(outer, rect):
+                    out.append(Issue("settings.shift", "warn",
+                                     "the shifted marker runs off the outline: the paper is cut "
+                                     "along the outline, the marker with it"))
+            else:
+                cut = guides.get("cut_line") or {}
+                rect = tuple(cut.get("rect") or guides["sticker"])
+                if not _inside_area(outer, rect):
+                    out.append(Issue("settings.shift", "warn",
+                                     "the shifted sticker runs off the face: shift it back, or "
+                                     "Perimeter = Profile cuts the paper along the face"))
+            if raw.get("holes") != "ignore":
+                rect = tuple(guides["sticker"])
+                for k, hl in enumerate(loops[1:], 1):
+                    if _crosses(hl, rect):
+                        out.append(Issue("settings.shift", "warn",
+                                         f"the shifted marker covers hole {k}"))
+    return out
+
+
 def build(spec: TagSpec, s: dict, n: dict, ev: dict, optical=None, issues=(),
           make=None) -> TagPlan:
     """The TagPlan of an evaluate() result (plan/variants.py builds a copy's
@@ -476,6 +594,7 @@ def build(spec: TagSpec, s: dict, n: dict, ev: dict, optical=None, issues=(),
     else:
         lb = LY.LayerBuilder(ev, n, fr)
         layers = lb.build()
+    parts = LY.sticker_parts(make) if sticker else None
     guides["target_ignored"] = (guides["target"][1:] if (spec.settings or {}).get("holes")
                                 == "ignore" else [])
     lab = ev.get("label")
@@ -510,16 +629,17 @@ def build(spec: TagSpec, s: dict, n: dict, ev: dict, optical=None, issues=(),
     if sticker:
         found = [i for i in found if i.field not in STICKER_QUIET]
     found += extra_issues(spec, s, ev, fr, make, guides)
+    found += sticker_issues(spec, ev, fr, make, guides)
     w = writes(s, n, ev)
     if sticker:
-        w["settings"].update(parts=list(LY.STICKER_PARTS), pin="none")
+        w["settings"].update(parts=list(parts), pin="none")
         w["settings"].pop("trim", None)
     data = {"schema": SCHEMA, "ok": True, "errors": [],
             "made_by": make.by,
             "marker": ev["spec"].to_dict(), "layout": _lay(lay), "placement": placement,
-            "parts": list(LY.STICKER_PARTS) if sticker else list(ev["plan"].parts),
+            "parts": list(parts) if sticker else list(ev["plan"].parts),
             "layers": [l.to_dict() for l in layers],
-            "combines": LY.sticker_combines() if sticker else LY.combines(ev["plan"]),
+            "combines": LY.sticker_combines(make) if sticker else LY.combines(ev["plan"]),
             "frames": LY.frames_dict(ev, fr, optical),
             "ids": list(ev["spec"].ids), "labels": labels,
             "mark": R.mark_record(ev), "label": R.label_record(ev), "trim": _trim(ev.get("trim")),
@@ -536,16 +656,85 @@ def build(spec: TagSpec, s: dict, n: dict, ev: dict, optical=None, issues=(),
                       "raise": ev["plan"].layers.raise_, "recess": ev["plan"].layers.recess,
                       "pocket": ev["plan"].pocket, "pin": ev["plan"].pin,
                       "recesses": [[w, list(sl)] for w, sl in ev["plan"].recess]}}
+    if sticker and make.inset:
+        data["sticker"] = sticker_block(make, guides)
+    if ev.get("shift_mm"):
+        data["placement"]["shift_mm"] = [LY._r(v) for v in ev["shift_mm"]]
     data = json.loads(json.dumps(data, allow_nan=False))
     return TagPlan(data, ev=ev, settings=s, numbers=n, request=spec)
 
 
 def _sticker_slabs(make) -> dict:
     t = float(make.thickness_mm)
+    if make.inset:
+        lo, hi = make.ink_z
+        return {"white": [0.0, t], "black": [lo, hi], "pattern": [lo, hi], "surface": hi,
+                "depth": make.ink_mm, "raise": 0.0, "recess": 0.0, "pocket": [lo, hi],
+                "pin": None, "recesses": []}
     top = t + _MK.INK_MM
     return {"white": [0.0, t], "black": [t, top], "pattern": [t, top], "surface": top,
             "depth": _MK.INK_MM, "raise": 0.0, "recess": 0.0, "pocket": None, "pin": None,
             "recesses": []}
+
+
+BODY_ROLES = {"sticker": ("paper", "white"), "pocket": ("pocket", "none"), "ink": ("black", "black")}
+
+
+def plan_sticker(spec_or_plan) -> Optional[dict]:
+    """What a CAD adapter's sticker node builds (2026-10-17; the Fusion
+    sticker node, M7.4): a sticker's TagPlan regrouped by body, in build
+    order, or None for a tag that is not a printed sticker (or not built).
+    `spec_or_plan`: a TagSpec, its dict, or a TagPlan / its dict.
+
+    -> {"rule": 1 | 2, "thickness_mm": t, "bodies": [{"part", "role"
+    ("paper" / "pocket" / "black"), "op" ("new" / "cut"), "into" (None /
+    "sticker"), "colour", "z_mm": [lo, hi], "steps": [{"name", "step"
+    ("add" / "sub"), "z_mm", "polygons": [{"outer", "holes"}]}]}], "frame":
+    {"opencv": 4x4, "opencv_target": 4x4, "pattern_in_target": 4x4, "z_mm"},
+    "cut_line", "page" (rule 2: plan.sticker.page), "lint": [the error
+    Issues, the red rows], "record_make"}. All mm, the pattern frame (the
+    pattern's centre on the face, z out of it).
+
+    Rule 2: `sticker` [0, t] New body (the cut outline), `pocket` [t/2, t]
+    CUT from it (the black's footprint), `ink` [t/2, t] New body, black.
+    Rule 1: `sticker` [0, t], `ink` [t, t + 0.01]. A step "sub" is a cut
+    tool of its own solid (REF part_body's order), made MARK_PAD past the
+    slab."""
+    try:
+        if isinstance(spec_or_plan, TagPlan):
+            d = spec_or_plan.data
+        elif isinstance(spec_or_plan, dict) and "layers" in spec_or_plan and "ok" in spec_or_plan:
+            d = spec_or_plan
+        else:
+            d = plan_tag(spec_or_plan).data
+    except Exception:                              # noqa: BLE001
+        return None
+    if not d.get("ok") or d.get("made_by") != "sticker":
+        return None
+    comb = {c["part"]: c for c in d["combines"]}
+    bodies = []
+    for part in d["parts"]:
+        steps = [{"name": L["name"], "step": L["step"], "z_mm": list(L["z"]),
+                  "polygons": L["polygons"]} for L in d["layers"] if L["part"] == part]
+        adds = [s["z_mm"] for s in steps if s["step"] == "add"]
+        role, colour = BODY_ROLES.get(part, (part, "none"))
+        c = comb.get(part, {})
+        bodies.append({"part": part, "role": role, "op": c.get("op", "new"),
+                       "into": c.get("into"), "colour": colour,
+                       "z_mm": [min(z[0] for z in adds), max(z[1] for z in adds)] if adds else None,
+                       "steps": steps})
+    fr = d["frames"]
+    rec = (d.get("record") or {}).get("fusion") or {}
+    t = (d.get("sticker") or {}).get("thickness_mm")
+    if t is None:
+        t = next((b["z_mm"][1] for b in bodies if b["part"] == "sticker"), None)
+    return {"rule": d["rules"].get("make"), "thickness_mm": t, "bodies": bodies,
+            "frame": {"opencv": fr["opencv"], "opencv_target": fr["opencv_target"],
+                      "pattern_in_target": fr["pattern_in_target"], "z_mm": fr["surface_mm"]},
+            "cut_line": d["guides"].get("cut_line"),
+            "page": (d.get("sticker") or {}).get("page"),
+            "lint": [w for w in d["warnings"] if w["level"] == "error"],
+            "record_make": rec.get("make")}
 
 
 def validate(spec) -> List[dict]:

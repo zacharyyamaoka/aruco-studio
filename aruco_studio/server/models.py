@@ -151,6 +151,8 @@ class TagPlanOut(BaseModel):
     key: str = ""
     body: Optional[Dict[str, Any]] = None
     slabs: Optional[Dict[str, Any]] = None
+    # (2026-10-17: a make-rule-2 sticker also has `sticker`, plan.sticker_block: extra, so
+    # a rule-1 or 3D plan's JSON stays what it was)
     mesh: Optional[List[MeshOut]] = None
 
 

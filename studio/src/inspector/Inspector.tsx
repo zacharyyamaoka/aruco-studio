@@ -153,6 +153,32 @@ function TagInspector({ tag, tags, form, tab, setTab }: {
       return <SegmentedRow disabled={disabled} path={p} value={Number(v ?? 0)} mixed={mixed} options={opts} onChange={(x) => edit(p, Number(x))} />;
     }
     if (p === "settings.cells") return <CellsEditor disabled={disabled} value={v as any} mixed={mixed} f={f} onChange={(x) => edit(p, x)} onBad={local(p)} />;
+    if (p === "settings.shift") {
+      // Shift (2026-10-17, CF-2 / P3): X and Y off where the fit puts the tag,
+      // along the target's own axes; also a drag of the canvas's crosshair
+      const cur = (v as any) ?? null;
+      const x = Number(cur?.x_mm ?? 0), y = Number(cur?.y_mm ?? 0);
+      const put = (nx: number, ny: number) => edit(p, nx || ny ? { rule: f.rule ?? 1, x_mm: nx, y_mm: ny } : null);
+      return (
+        <span className="pair" data-shift={`${x},${y}`}>
+          <NumberField className="narrow" disabled={disabled} path={`${p}.x_mm`} value={mixed ? null : x} mixed={mixed} unit="mm" step={f.step} title="Shift X (the target's x)" onBad={local(p)} onCommit={(nx) => put(nx, y)} />
+          <NumberField className="narrow" disabled={disabled} path={`${p}.y_mm`} value={mixed ? null : y} mixed={mixed} unit="mm" step={f.step} title="Shift Y (the target's y)" onBad={local(p)} onCommit={(ny) => put(x, ny)} />
+          {cur && <IconButton icon="close" title="Back to where the fit puts it (centred)" onClick={() => edit(p, null)} testid="shift-reset" />}
+        </span>
+      );
+    }
+    if (Array.isArray((f as any).suggestions) && (f.type === "mm" || f.type === "number")) {
+      // a number with one-click suggestions (Zach liked them: P5's lists in P3):
+      // a pick fills the value in; it can still be typed
+      const sug = (f as any).suggestions as { value: number; label: string }[];
+      const opts: Opt[] = sug.map((c) => ({ value: c.value, label: c.label }));
+      return (
+        <span className="pair">
+          <NumberField disabled={disabled} path={p} value={v as number} mixed={mixed} step={f.step} unit={f.unit} title={(f as any).hint} onBad={local(p)} onCommit={(x) => edit(p, x)} />
+          <Select disabled={disabled} path={`${p}:suggest`} value={null} placeholder="Stocks" options={opts} onChange={(x) => edit(p, Number(x))} />
+        </span>
+      );
+    }
     if (p === "settings.trim") {
       const cur = v as any;
       const opts: Opt[] = (options?.trim ?? [{ value: "off", label: "Off" }]).map((c: any) => ({ value: c.value, label: c.label }));
@@ -200,6 +226,8 @@ function TagInspector({ tag, tags, form, tab, setTab }: {
     return f.label;
   };
   const rows = useMemo(() => form.fields.filter((f) => f.path !== "settings.make.by"), [form]);
+  // the Make tab named after the method on a sticker (P1 / P3: "Inkjet")
+  const tabs = useMemo(() => form.tabs.map((t) => sticker && (t as any).name_2d ? { ...t, name: (t as any).name_2d } : t), [form, sticker]);
   const errors = plan && !plan.ok ? plan.errors.filter((e) => !issues.some((i) => i.text === e)) : [];
 
   return (
@@ -219,7 +247,7 @@ function TagInspector({ tag, tags, form, tab, setTab }: {
         {m ? `${m.dictionary} · ${m.layout === "single" ? `${(m.marker_length_m * 1000).toFixed(2)} mm` : `${m.cols} × ${m.rows}, marker ${(m.marker_length_m * 1000).toFixed(2)} mm`}` : "not built"}
       </div>
       {tag.locked && <div className="locked-note" data-testid="locked-note"><Icon name="lock" />Locked: a printed tag. Unlock it to change its ink; its name and place can still change.</div>}
-      <Form rows={rows} tabs={form.tabs} ctx={ctx} issues={issues as KitIssue[]} outside={form.outside} tab={tab} onTab={setTab}
+      <Form rows={rows} tabs={tabs} ctx={ctx} issues={issues as KitIssue[]} outside={form.outside} tab={tab} onTab={setTab}
         value={value} onChange={(p, v) => edit(p, v)} control={control} labelOf={labelOf} disabled={dis}
         local={bad} onLocal={(p, msg) => setBad((b) => ({ ...b, [p]: msg }))}
         okText={plan?.ok ? "Ready: the plan is built" : "Not built"} extraErrors={errors}

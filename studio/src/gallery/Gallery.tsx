@@ -115,7 +115,7 @@ export const Thumb = memo(function Thumb({ item }: { item: GalleryItem }) {
   const state = !d ? "loading" : d.error ? "error" : "ready";
   return (
     <div className="gal-thumb" data-thumb={item.name} data-state={state} data-tags={drawn?.tags.length ?? 0}
-      data-errors={d ? d.errors : ""} title={d?.error ?? undefined}>
+      data-errors={d ? d.errors : ""} data-lint={item.lint ?? 0} title={d?.error ?? undefined}>
       {drawn && (
         <svg viewBox={drawn.vb.map(f4).join(" ")} preserveAspectRatio="xMidYMid meet" role="img" aria-label={item.title}>
           <g transform="scale(1 -1)">

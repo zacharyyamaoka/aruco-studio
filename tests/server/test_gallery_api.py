@@ -68,11 +68,18 @@ def test_every_example_plans_with_no_error(client):
         sc, issues = design.compile(loads_design(it["text"]), resolver())
         bad = [f"{i.field}: {i.text}" for i in issues if i.level == "error"]
         assert sc.tags, it["name"]
+        lint = []
         for t in sc.tags:
             p = plan_tag(t.spec).to_dict()
             assert p["ok"], (it["name"], t.name, p["errors"])
-            bad += [f"{t.name} {w['field']}: {w['text']}" for w in p["warnings"] if w["level"] == "error"]
+            for w in p["warnings"]:
+                if w["level"] != "error":
+                    continue
+                # the page lint (2026-10-17, CF-6): red, built anyway -- shown on purpose
+                (lint if w["text"].startswith("Over the page") else bad).append(
+                    f"{t.name} {w['field']}: {w['text']}")
         assert bad == [], it["name"]
+        assert len(lint) == it.get("lint", 0), (it["name"], lint)
 
 
 def test_open_a_copy_afresh(client, tmp_path):

@@ -33,6 +33,11 @@ from .spec import QUIET_LOW, QUIET_MAX, QUIET_MIN
 from .target import KINDS
 
 
+PAGE_WORDS = {"letter": "Letter (216 × 279 mm)", "a4": "A4 (210 × 297 mm)",
+              "legal": "Legal (216 × 356 mm)", "a3": "A3 (297 × 420 mm)",
+              "tabloid": "Tabloid (279 × 432 mm)", "a5": "A5 (148 × 210 mm)"}
+
+
 def _choices(pairs):
     return [{"value": v, "label": t} for t, v in pairs]
 
@@ -113,7 +118,8 @@ def fields() -> List[dict]:
     # -- how it is made (M6a): the preset decides; Made by is a read-only line
     rows += [
         {"path": "settings.make", "group": "Make", "type": "object", "label": "Make rule",
-         "default": None, "rule": _MK.MAKE_RULE, "read_only": True, "intent": "both",
+         "default": None, "rule": _MK.MAKE_RULE, "rules": list(_MK.MAKE_RULES),
+         "new_2d": _MK.INSET_RULE, "read_only": True, "intent": "both",
          "bad": {"rule": 9}, "level": "warn"},
         {"path": "settings.make.by", "group": "Make", "type": "choice", "label": "Made by",
          "default": "print3d", "choices": _choices(_MK.BY_LABELS), "read_only": True,
@@ -121,14 +127,31 @@ def fields() -> List[dict]:
         {"path": "settings.make.perimeter", "group": "Marker", "type": "choice",
          "label": "Perimeter", "default": "marker", "choices": _choices(_MK.PERIMETER_LABELS),
          "intent": "2d", "on_3d": "settings.trim", "bad": "circle", "level": "warn"},
+        # 2026-10-17 (CF-4, CF-7): the inkjet rows -- the paper, its page (the lint)
         {"path": "settings.make.thickness_mm", "group": "Make", "type": "mm",
-         "label": "Sticker thickness", "default": _MK.STOCK_MM, "min": _MK.THICKNESS_MM[0],
-         "max": _MK.THICKNESS_MM[1], "intent": "2d", "bad": -1.0, "level": "warn"},
+         "label": "Paper thickness", "default": _MK.VINYL_MM, "min": _MK.THICKNESS_MM[0],
+         "max": _MK.THICKNESS_MM[1], "intent": "2d", "bad": -1.0, "level": "warn",
+         "suggestions": [dict(c) for c in _MK.PAPER_STOCKS],
+         "hint": "measure yours: a peeled sticker on glass, the calipers zeroed on the glass"},
+        {"path": "settings.make.page", "group": "Make", "type": "choice", "label": "Paper size",
+         "default": "letter", "choices": [{"value": k, "label": PAGE_WORDS[k]} for k in _MK.PAGES],
+         "intent": "2d", "rules": [_MK.INSET_RULE], "bad": "napkin", "level": "warn"},
+        {"path": "settings.make.page_margin_mm", "group": "Make", "type": "mm",
+         "label": "Page margins", "default": _MK.PAGE_MARGIN_MM, "min": _MK.MARGIN_MM[0],
+         "max": _MK.MARGIN_MM[1], "intent": "2d", "rules": [_MK.INSET_RULE], "bad": 75.0,
+         "level": "warn"},
+        # make rule 1's own (a tag made before 2026-10-17); a new tag's are the sheet's (Q7)
         {"path": "settings.make.margin_mm", "group": "Make", "type": "mm",
          "label": "Sticker margin", "default": 0.0, "min": _MK.MARGIN_MM[0],
-         "max": _MK.MARGIN_MM[1], "intent": "2d", "bad": 75.0, "level": "warn"},
+         "max": _MK.MARGIN_MM[1], "intent": "2d", "rules": [_MK.MAKE_RULE], "bad": 75.0,
+         "level": "warn"},
         {"path": "settings.make.cut_line", "group": "Make", "type": "bool", "label": "Cut line",
-         "default": True, "intent": "2d", "bad": "yes", "level": "warn"},
+         "default": True, "intent": "2d", "rules": [_MK.MAKE_RULE], "bad": "yes",
+         "level": "warn"},
+        # Shift (CF-2, P3): the tag moved by hand off where the fit puts it
+        {"path": "settings.shift", "group": "Size", "type": "shift", "label": "Shift X / Y",
+         "default": None, "rule": _MK.SHIFT_RULE, "intent": "2d", "max_mm": _MK.SHIFT_MAX_MM,
+         "bad": {"rule": 7}, "level": "warn"},
         {"path": "settings.holes", "group": "Marker", "type": "choice", "label": "Holes",
          "default": "avoid", "choices": _choices(_MK.HOLES_LABELS), "intent": "both",
          "show_when": "target has holes", "bad": "maybe", "level": "warn"},
@@ -235,7 +258,7 @@ def fields() -> List[dict]:
 
 TABS = [{"id": "marker", "name": "Marker", "icon": "t-marker"},
         {"id": "heights", "name": "Heights", "icon": "t-heights"},
-        {"id": "print", "name": "Print", "icon": "t-print"},
+        {"id": "print", "name": "Print", "name_2d": "Inkjet", "icon": "t-print"},
         {"id": "label", "name": "Label", "icon": "t-label"},
         {"id": "advanced", "name": "Advanced", "icon": "gear"}]
 ROWS_OUTSIDE = ["target", "preset", "name"]       # the inspector's own rows an anchor may name
@@ -264,16 +287,21 @@ _ANCHOR = {"numbers.square": "numbers.size", "settings.force": "numbers.size",
            "settings.make.perimeter": "settings.trim", "settings.origin_v": "settings.turn",
            "settings.make": "preset", "settings.make.by": "preset",
            "settings.make.thickness_mm": "preset", "settings.make.margin_mm": "preset",
-           "settings.make.cut_line": "preset", "settings.mode": "preset", "settings.grow": "preset",
+           "settings.make.cut_line": "preset", "settings.make.page": "preset",
+           "settings.make.page_margin_mm": "preset", "settings.shift": "numbers.size",
+           "settings.shift.x_mm": "settings.shift", "settings.shift.y_mm": "settings.shift",
+           "settings.mode": "preset", "settings.grow": "preset",
            "settings.pin": "preset", "settings.trim": "preset", "name": "name"}
-_DRAG = {"numbers.size": "size-arrow", "numbers.white_height": "height-arrow",
+_DRAG = {"numbers.size": "size-arrow", "settings.shift": "shift-xy",
+         "numbers.white_height": "height-arrow",
          "numbers.black_height": "height-arrow", "settings.label.x_mm": "label-xy",
          "settings.label.y_mm": "label-xy"}
 _STEP = {"numbers.size": 0.5, "numbers.square": 0.5, "settings.quiet_modules": 0.25,
          "settings.label.x_mm": 0.25, "settings.label.y_mm": 0.25,
          "settings.label.offset_x_mm": 0.25, "settings.label.offset_y_mm": 0.25,
          "settings.label.cap_mm": 0.1, "settings.make.margin_mm": 0.5,
-         "settings.make.thickness_mm": 0.01}
+         "settings.make.thickness_mm": 0.01, "settings.make.page_margin_mm": 0.5,
+         "settings.shift": 0.5}
 # core.presets WORDS: what a print preset writes (tag.*, label.*, cells.*)
 _PRESET = {"settings.dictionary", "settings.mode", "settings.op", "settings.quiet_modules",
            "settings.grow", "settings.corner_mark", "settings.pin", "settings.cells",
@@ -317,6 +345,10 @@ def _show_when(r: dict) -> dict:
             out["any_truthy"] = [_LABEL_SUB + "offset_x_mm", _LABEL_SUB + "offset_y_mm"]
     if p == "settings.trim.margin_mm":
         out["values"] = {"settings.trim.rule": [1]}
+    if r.get("rules"):
+        # a make rule's own rows (2026-10-17): rule 2's page, rule 1's margin and cut line
+        if p.startswith("settings.make."):
+            out["values"] = {"settings.make.rule": list(r["rules"])}
     return out
 
 
@@ -337,13 +369,13 @@ def _present(r: dict) -> None:
         r["anchor"] = "settings.mode"
     elif p.startswith("target."):
         r["anchor"] = "target"
-    if r["type"] == "mm":
+    if r["type"] in ("mm", "shift"):
         r["unit"] = "mm"
     elif p == "settings.quiet_modules":
         r["unit"] = "modules"
     elif p == "settings.turn":
         r["unit"] = "deg"
-    if r["type"] in ("mm", "number"):
+    if r["type"] in ("mm", "number", "shift"):
         r["step"] = _STEP.get(p, 0.1)
     if p in _DRAG:
         r["drag"] = _DRAG[p]
@@ -367,4 +399,6 @@ def form() -> dict:
             "layouts": list(_B.LAYOUTS), "rules": {"spec": _S.SPEC_VERSION,
                                                    "cells": _A.CELL_RULE, "label": _L.RULE,
                                                    "label_new": _L.NEW_RULE,
-                                                   "make": _MK.MAKE_RULE, "trim": _TR.RULE}}
+                                                   "make": _MK.MAKE_RULE,
+                                                   "make_new_2d": _MK.INSET_RULE,
+                                                   "shift": _MK.SHIFT_RULE, "trim": _TR.RULE}}

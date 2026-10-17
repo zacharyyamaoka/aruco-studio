@@ -24,6 +24,8 @@ Beyond REF (M6a, both absent = REF's evaluate() exactly):
 | `settings.holes == "ignore"` | the fit and the label's white read the OUTER loop only (`fit_loops`); the trim still reads every loop |
 | label rule 5 (`label.LINE_RULE`) | `label_for` hands `plan_label` the tag's cell line (`cell_line_mm`: the `cells` step when it is of the cell); a label cut out of the black strokes at least that. Rules 1-4 ignore it |
 | `sticker=` a `core.make.Make` | a printed sticker: fitted on the loops like a face (a sketch area too), the tile is the sticker grown by its margin, the label's white is the sticker's cut polygon (Marker: that rectangle; Profile: the outline with its holes), the record's depth is the ink's |
+| make rule 2 (2026-10-17) | the black's depth is t/2 (`Make.ink_mm`); on Auto size a Marker sticker is capped to its page's printable area (`cap_to_page`: the face clipped to a printable-sized box, each way round, the best that fits), `ev["page_cap"]` |
+| `settings.shift` (2026-10-17) | a sticker's origin moved by (x_mm, y_mm) along the base frame's x / y after the fit (`ev["shift_mm"]`); a 3D tag is not moved |
 """
 from __future__ import annotations
 
@@ -107,6 +109,63 @@ def fit_loops(target, s):
     under Holes: ignore (settings.holes; absent = avoid)."""
     lm = target.loops_m()
     return lm[:1] if (s or {}).get("holes") == "ignore" else lm
+
+
+def _score(lay):
+    return (int(lay.count), float(lay.marker_m), float(lay.square_m))
+
+
+def cap_to_page(fit, loops_m, lay, pl, sticker):
+    """NOT REF's (2026-10-17, Zach's Q2 / Q3 and CF-6): a rule-2 sticker on
+    Auto size never comes out bigger than its page prints. When the fit's
+    sticker (the tile: pattern + quiet zone) is over the printable area
+    (core.make.page_fit: portrait or landscape, either way round), the fit
+    runs again on the face clipped to a printable-sized box centred on the
+    clear rectangle the size came from, each way round (the sticker may
+    print turned 90 degrees); the best that fits (most markers, then the
+    largest) is kept. -> (layout, placement, {"capped", "from_mm", "to_mm",
+    "how"}) or the fit as it was and None when it already fits."""
+    if not getattr(lay, "ok", False) or pl is None:
+        return lay, pl, None
+    tw, th = (v * 1000.0 for v in lay.tile_m)
+    f0 = _MK.page_fit(tw, th, sticker)
+    if f0 is None or f0["fits"]:
+        return lay, pl, None
+    opts = _MK.printable_mm(sticker) or {}
+    c = pl.get("clear") or {"cx": pl["cx"], "cy": pl["cy"]}
+    cx, cy = float(c["cx"]), float(c["cy"])
+    boxes = []
+    for aw, ah in opts.values():
+        for bw, bh in ((aw, ah), (ah, aw)):
+            if (bw, bh) not in boxes:
+                boxes.append((bw, bh))
+    best = None
+    for bw, bh in boxes:
+        r = (cx - bw / 2000.0, cy - bh / 2000.0, cx + bw / 2000.0, cy + bh / 2000.0)
+        clipped = []
+        for k, lp in enumerate(loops_m):
+            got = _TR.clip([tuple(p) for p in lp], r)
+            if len(got) >= 3:
+                clipped.append(got)
+            elif k == 0:
+                clipped = []
+                break
+        if not clipped:
+            continue
+        lay2, pl2 = fit(clipped)
+        if not getattr(lay2, "ok", False) or pl2 is None:
+            continue
+        w2, h2 = (v * 1000.0 for v in lay2.tile_m)
+        f2 = _MK.page_fit(w2, h2, sticker)
+        if not f2["fits"]:
+            continue
+        if best is None or _score(lay2) > _score(best[0]):
+            best = (lay2, pl2, f2, (w2, h2))
+    if best is None:
+        return lay, pl, {"capped": False, "from_mm": [tw, th], "fit": f0}
+    lay2, pl2, f2, (w2, h2) = best
+    return lay2, pl2, {"capped": True, "from_mm": [tw, th], "to_mm": [w2, h2],
+                       "how": f2["how"], "fit": f2}
 
 
 def sticker_region(target, s, spec, base, frame, sticker):
@@ -224,9 +283,13 @@ def evaluate(target, s, n, base=None, name="", sticker=None):
             angles_deg=angles, cells=cells)
 
     o, x, y, z, w, h = base_of(target, base)
+    page_cap = None
     if sticker is not None:
         # a sticker sits on the face: fitted on the loops, a sketch area too
         lay, pl = fit(fit_loops(target, s))
+        auto = L <= 0 and (kind != "charuco" or S <= 0)
+        if sticker.inset and auto and sticker.perimeter == "marker":
+            lay, pl, page_cap = cap_to_page(fit, fit_loops(target, s), lay, pl, sticker)
     elif target.is_profile:
         # like Extrude: the closed area, holes included. White + black: the
         # white tile is the profile's box (holes filled), so the whole box is
@@ -245,6 +308,13 @@ def evaluate(target, s, n, base=None, name="", sticker=None):
         o = [o[i] + x[i] * pl["cx"] * 100.0 + y[i] * pl["cy"] * 100.0 for i in range(3)]
         x = _rotz(x, z, float(pl.get("angle_deg", 0.0)))
         y = _cross(z, x)
+    shift = (0.0, 0.0)
+    if sticker is not None:
+        # Shift (settings.shift, not REF's): moved by hand along the target's u / v
+        shift, _sn = _MK.shift_of(s)
+        if shift[0] or shift[1]:
+            bx, by = base[1], base[2]
+            o = [o[i] + bx[i] * shift[0] / 10.0 + by[i] * shift[1] / 10.0 for i in range(3)]
     xr = x_ref_3d(target, base)
     if xr and not target.is_profile and _dot(x, xr) < -1e-6:
         x = [-c for c in x]                         # the same, after the fit (and for
@@ -263,8 +333,9 @@ def evaluate(target, s, n, base=None, name="", sticker=None):
     spec.depth_m, spec.raise_m, spec.recess_m = (L_.depth / 1000.0, L_.raise_ / 1000.0,
                                                  L_.recess / 1000.0)
     if sticker is not None:
-        # the paper: the pattern, its quiet zone and the margin (the Marker cut)
-        spec.depth_m, spec.raise_m, spec.recess_m = _MK.INK_MM / 1000.0, 0.0, 0.0
+        # the paper: the pattern, its quiet zone and the margin (the Marker cut);
+        # the black's depth: rule 1's film, rule 2's half the paper
+        spec.depth_m, spec.raise_m, spec.recess_m = sticker.ink_mm / 1000.0, 0.0, 0.0
         g = 2.0 * sticker.margin_mm / 10.0
         tile_frame = (o, x, y, z, spec.tile_size_m[0] * 100.0 + g, spec.tile_size_m[1] * 100.0 + g)
     if tile_frame is None:
@@ -342,6 +413,10 @@ def evaluate(target, s, n, base=None, name="", sticker=None):
           "pin_tol": float(n.get("pin_tol", SL().PIN_TOL_MM)), "mode": s["mode"],
           "mark": mark, "label": label, "label_white": label_white, "placement": pl,
           "tile_mm": tile_mm, "sticker": sticker}
+    if page_cap is not None:
+        ev["page_cap"] = page_cap
+    if shift[0] or shift[1]:
+        ev["shift_mm"] = shift
     ev["trim"] = None
     if trim_in is not None or trim_err is not None:
         try:

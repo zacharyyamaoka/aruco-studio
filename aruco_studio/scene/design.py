@@ -43,9 +43,9 @@ EXTRUDE_KEYS = ("id", "extrude", "height", "name", "note")
 # an ArUco Extrude: the sugar (typed by a person or an AI; replaced by the
 # exact dicts on the Studio's first write of the feature) ...
 SUGAR = ("preset", "layout", "dictionary", "first_id", "size", "square", "cols", "rows", "turn",
-         "mark", "pins", "holes", "perimeter", "mode", "op", "label")
+         "mark", "pins", "holes", "perimeter", "mode", "op", "label", "shift", "paper_mm")
 SUGAR_SETTINGS = ("layout", "dictionary", "cols", "rows", "turn", "mark", "pins", "holes",
-                  "perimeter", "mode", "op", "label", "size", "square")
+                  "perimeter", "mode", "op", "label", "size", "square", "shift", "paper_mm")
 SUGAR_NUMBERS = ("size", "square")
 # ... and what is kept exactly
 EXACT = ("id", "aruco", "settings", "numbers", "name", "key", "target", "over", "uid", "locked",
@@ -299,6 +299,24 @@ def _sugar(f, s, n, has_body, fp, issues):
                 s["trim"] = _TR.setting("both")
             else:
                 s.pop("trim", None)                 # Profile: the body keeps its outline
+        if "shift" in f:
+            # 2026-10-17 (CF-2): [x, y] mm off where the fit puts it (a sticker's)
+            v = f["shift"]
+            if (not isinstance(v, (list, tuple)) or len(v) != 2
+                    or any(isinstance(c, bool) or not isinstance(c, (int, float))
+                           or not math.isfinite(c) for c in v)):
+                issues.append(Issue(f"{fp}.shift", "error", f"shift: [x, y] in mm, not {v!r}"))
+            else:
+                s["shift"] = {"rule": 1, "x_mm": float(v[0]), "y_mm": float(v[1])}
+        if "paper_mm" in f:
+            # 2026-10-17 (CF-4): an inkjet sticker's paper thickness, this tag's own
+            v = num("paper_mm")
+            mk = s.get("make") or {}
+            if v is not None and mk.get("by") == "sticker":
+                s["make"] = dict(mk, thickness_mm=float(v))
+            elif v is not None:
+                issues.append(Issue(f"{fp}.paper_mm", "warn",
+                                    "paper_mm: an inkjet sticker's (this tag is 3D printed)"))
     if n is not None:
         for k in SUGAR_NUMBERS:
             if k in f:

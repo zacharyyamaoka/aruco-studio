@@ -1,6 +1,6 @@
 // The Library, like Fusion's Machine Library, on the kit's LibraryShell:
 // collections on the left (Recent, This scene, My presets, PrusaSlicer
-// profiles, Built-in, Printers, Sticker printers), cards with the marker
+// profiles, Built-in, Printers, Inkjet printers), cards with the marker
 // thumb, Filters | Info on the right, Select / Cancel. Its state is
 // server/library.py's (REF aruco_preset_library.Library).
 //
@@ -239,7 +239,7 @@ function LibraryWindow({ tag }: { tag?: string }) {
                 ))}
               </>
             )}
-            {card && card.kind !== "printer" && editing && <EditForm card={card} schema={data?.schema ?? []} limits={data?.limits ?? {}} onCancel={() => setEditing(false)}
+            {card && card.kind !== "printer" && editing && <EditForm card={card} schema={(card.edit === "2d" ? data?.schema_2d : data?.schema) ?? data?.schema ?? []} limits={data?.limits ?? {}} onCancel={() => setEditing(false)}
               onStart={() => setStatus({ text: "…" })}
               onSaved={async (name) => { setEditing(false); await load(`user:${name}`); setStatus({ text: `saved '${name}'` }); }} />}
           </div>

@@ -117,7 +117,8 @@ def test_the_forearm_and_the_stickers_equal_the_old_routes(client, tmp_path):
                 s["label"] = {"on": True, "content": {"#id": "id", "#id + name": "id_name"}[f["label"]]}
             if "perimeter" in f:
                 # a PATCH replaces `make` whole: the sticker make /api/new stamps, with the perimeter
-                s["make"] = dict(MK.new_make("sticker", P.sticker_builtins()[0]["profile"]),
+                # (the file's preset: the older Letter one, make rule 1 -- 2026-10-17)
+                s["make"] = dict(MK.new_make("sticker", P.sticker_preset("letter")["profile"]),
                                  perimeter=f["perimeter"])
             if "holes" in f:
                 s["holes"] = f["holes"]

@@ -176,25 +176,37 @@ def sticker_items(scene: Scene, plans: Optional[dict] = None, proofs: bool = Fal
 
 
 def sheet_settings(scene: Scene, page: str = "letter", landscape: bool = False,
-                   mode: str = "spaced", margin_mm: float = 10.0) -> "_SH.SheetSettings":
+                   mode: str = "spaced", margin_mm: float = 10.0, *,
+                   sticker_margin_mm: float = 0.0, cut_lines: bool = True
+                   ) -> "_SH.SheetSettings":
+    """The sheet's settings. 2026-10-17 (Zach's Q7: "Only in export sheet"):
+    `sticker_margin_mm`, white paper round each sticker (its cut line that
+    much out), and `cut_lines` on / off (core.sheet `cut_marks`)."""
     return _SH.SheetSettings(page=page, landscape=bool(landscape), mode=mode,
-                             margin_mm=float(margin_mm), title=scene.name)
+                             margin_mm=float(margin_mm), title=scene.name,
+                             sticker_margin_mm=float(sticker_margin_mm or 0.0),
+                             cut_marks=bool(cut_lines))
 
 
 def sticker_layout(scene: Scene, plans: Optional[dict] = None, page: str = "letter",
                    landscape: bool = False, mode: str = "spaced", margin_mm: float = 10.0,
-                   proofs: bool = False) -> "_SH.StickerLayout":
+                   proofs: bool = False, *, sticker_margin_mm: float = 0.0,
+                   cut_lines: bool = True) -> "_SH.StickerLayout":
     return _SH.layout_stickers(sticker_items(scene, plans, proofs),
-                               sheet_settings(scene, page, landscape, mode, margin_mm))
+                               sheet_settings(scene, page, landscape, mode, margin_mm,
+                                              sticker_margin_mm=sticker_margin_mm,
+                                              cut_lines=cut_lines))
 
 
 def sticker_files(scene: Scene, plans: Optional[dict] = None, page: str = "letter",
                   landscape: bool = False, mode: str = "spaced", margin_mm: float = 10.0,
-                  proofs: bool = False, date: Optional[str] = None) -> dict:
+                  proofs: bool = False, date: Optional[str] = None, *,
+                  sticker_margin_mm: float = 0.0, cut_lines: bool = True) -> dict:
     """{"sheet.pdf", "sheet.svg", "sheet.json"} (bytes) of one layout, and
     the layout itself under "layout"."""
     import json as _json
-    lay = sticker_layout(scene, plans, page, landscape, mode, margin_mm, proofs)
+    lay = sticker_layout(scene, plans, page, landscape, mode, margin_mm, proofs,
+                         sticker_margin_mm=sticker_margin_mm, cut_lines=cut_lines)
     summary = _SH.sticker_summary(lay)
     return {"layout": lay,
             "sheet.pdf": _SH.render_sticker_pdf(lay, date=date),

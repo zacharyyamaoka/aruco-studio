@@ -89,7 +89,11 @@ def test_a_preset_without_a_kind_is_a_3d_printer():
 
 
 def test_the_sticker_built_ins_letter_first():
-    a, b = P.sticker_builtins()
+    va, vb, a, b = P.sticker_builtins()          # 2026-10-17: the vinyl ones first (rule 2)
+    assert va["name"] == "Inkjet · Letter vinyl" and vb["name"] == "Inkjet · A4 vinyl"
+    assert va["profile"]["make_rule"] == 2 and va["profile"]["stock_mm"] == 0.1
+    assert (va["profile"]["page"], vb["profile"]["page"]) == ("letter", "a4")
+    assert "make_rule" not in a["profile"]          # an older preset reads as rule 1
     assert a["name"] == "Sticker · Letter · 600 dpi" and b["name"] == "Sticker · A4 · 600 dpi"
     pr = a["profile"]
     assert (pr["kind"], pr["dpi"], pr["page"], pr["stock_mm"], pr["sheet"]) == \
@@ -120,10 +124,12 @@ def test_catalog_all_lists_both_kinds_and_collections():
     st.text = None
     cat = P.catalog_all(st, None)
     names = [n for n, _p, _k in cat["items"]]
-    assert names[:3] == ["Default", "Sticker · Letter · 600 dpi", "Sticker · A4 · 600 dpi"]
+    assert names[:5] == ["Default", "Inkjet · Letter vinyl", "Inkjet · A4 vinyl",
+                         "Sticker · Letter · 600 dpi", "Sticker · A4 · 600 dpi"]
     cols = {c["id"]: c["names"] for c in P.collections(cat["items"])}
     assert cols["print3d"] == ["Default"]
-    assert cols["sticker"] == ["Sticker · Letter · 600 dpi", "Sticker · A4 · 600 dpi"]
+    assert cols["sticker"] == ["Inkjet · Letter vinyl", "Inkjet · A4 vinyl",
+                               "Sticker · Letter · 600 dpi", "Sticker · A4 · 600 dpi"]
     # REF's own catalog is untouched (its suites pin it)
     assert [n for n, _p, _k in P.catalog(st, None)["items"]] == ["Default"]
 
@@ -178,6 +184,6 @@ def test_a_studio_file_loads_in_ref_and_a_ref_file_here():
 
 def test_the_words():
     m = MK.make_of({"make": {"rule": 1, "by": "sticker"}})[0]
-    assert MK.words(m, 600, "letter") == "Made by: Printed sticker · 600 dpi · Letter"
+    assert MK.words(m, 600, "letter") == "Made by: Inkjet printer · 600 dpi · Letter"
     assert MK.words(MK.Make()) == "Made by: 3D printed"
     assert MK.badge("sticker") == "2D" and MK.badge("print3d") == "3D"

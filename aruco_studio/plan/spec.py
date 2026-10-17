@@ -55,7 +55,8 @@ SETTINGS_TYPES = {"layout": _STR, "dictionary": _STR, "mode": _STR, "op": _STR,
                   "chamfer": (bool,), "size_auto": (bool,), "flip": (bool,),
                   "label": (dict, type(None)), "cells": (dict, type(None)),
                   "force": (list, tuple, type(None)), "origin_v": (int, type(None)),
-                  "make": (dict, type(None)), "holes": (str, type(None))}
+                  "make": (dict, type(None)), "holes": (str, type(None)),
+                  "shift": (dict, type(None))}
 NUMBER_KEYS = _S.PARAMS + _S.LEGACY_PARAMS
 
 
@@ -373,7 +374,7 @@ def check(spec: TagSpec) -> List[Issue]:
                 add("settings.trim.margin_mm", "warn",
                     f"trim margin {m:g} mm: 0 to {_TR.MARGIN_MAX_MM:g} mm (clamped)")
     # -- how it is made (core.make), the holes rule
-    for fld, lv, text in _MK.make_of(raw)[1] + _MK.holes_of(raw)[1]:
+    for fld, lv, text in _MK.make_of(raw)[1] + _MK.holes_of(raw)[1] + _MK.shift_of(raw)[1]:
         add(fld, lv, text)
     # -- target
     if t.kind not in KINDS:

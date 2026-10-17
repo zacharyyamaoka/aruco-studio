@@ -68,7 +68,11 @@ const patch = <T,>(u: string, b: unknown) => call<T>("PATCH", u, b);
 const del = <T,>(u: string) => call<T>("DELETE", u);
 const q = encodeURIComponent;
 
-export interface SheetQuery { page?: string; landscape?: boolean; mode?: "spaced" | "tight"; margin_mm?: number; proofs?: boolean }
+export interface SheetQuery {
+  page?: string; landscape?: boolean; mode?: "spaced" | "tight"; margin_mm?: number; proofs?: boolean;
+  /** 2026-10-17 (Q7): white round each sticker, and the cut lines on / off (the sheet's, not the tag's) */
+  sticker_margin_mm?: number; cut_lines?: boolean;
+}
 function sheetQuery(x: SheetQuery): string {
   const out: string[] = [];
   for (const [k, v] of Object.entries(x)) if (v !== undefined && v !== null) out.push(`${k}=${q(String(v))}`);
@@ -180,6 +184,8 @@ export interface GalleryItem {
   look: string;
   /** the note's buttons: "3d", "sheet", "send", "ids" */
   actions?: string[];
+  /** the error-level messages it shows on purpose (2026-10-17: the page lint's red row) */
+  lint?: number;
   text: string | null;
   group?: string;
 }

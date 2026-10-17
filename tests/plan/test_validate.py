@@ -58,6 +58,10 @@ def test_a_bad_value_is_an_issue_on_its_own_field(row):
     d = base_spec(layout)
     if row["path"] == "settings.trim.margin_mm":
         d["settings"]["trim"] = {"rule": 1, "axes": "both", "margin_mm": row["bad"]}
+    elif row.get("rules") and row["path"].startswith("settings.make."):
+        # a make rule's own row (2026-10-17): a sticker of that rule first
+        d["settings"]["make"] = {"rule": row["rules"][0], "by": "sticker"}
+        put(d, row["path"], row["bad"])
     else:
         put(d, row["path"], row["bad"])
     spec = TagSpec.from_dict(d)

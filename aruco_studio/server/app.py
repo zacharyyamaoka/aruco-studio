@@ -363,13 +363,16 @@ def _prusa():
 @app.get("/api/presets")
 def presets(made_by: Optional[str] = None) -> dict:
     """Built-in presets (read only: Default, PrusaSlicer's "Aruco" profiles
-    and the sticker printers) and the user's (their file under the Studio's
+    and the inkjet printers) and the user's (their file under the Studio's
     home). Each says what it makes (`made_by`: its profile's kind, M6a);
-    `collections`: 3D printers and Sticker printers; `?made_by=` keeps one."""
+    `collections`: 3D printers and Inkjet printers; `?made_by=` keeps one.
+    `legacy`: an older sticker preset (make rule 1, kept for the files that
+    name it; the Studio offers it only to a tag that has it, 2026-10-17)."""
     cat = _P.catalog_all(S.presets_store(), _prusa())
     items = [(n, p, k) for n, p, k in cat["items"]
              if made_by in (None, "") or _P.kind_of(p) == made_by]
-    return {"items": [{"name": n, "kind": k, "made_by": _P.kind_of(p), "preset": p}
+    return {"items": [dict({"name": n, "kind": k, "made_by": _P.kind_of(p), "preset": p},
+                           **({"legacy": True} if k == "builtin" and _P.is_legacy(n) else {}))
                       for n, p, k in items],
             "collections": _P.collections(items), "last": cat["last"], "notes": cat["notes"],
             "file": str(S.presets_path())}
@@ -791,7 +794,7 @@ def preset_of(req: M.PresetOfIn) -> dict:
     p = _NEW.preset_of(req.spec.plain(), req.name)
     match = None
     for n, cp, _k in _P.catalog_all(S.presets_store(), _prusa())["items"]:
-        if _P.same_print(p, cp):
+        if _P.same_print(p, cp) and _P.same_machine(p, cp):
             match = n
             break
     return {"preset": p, "matches": match}
