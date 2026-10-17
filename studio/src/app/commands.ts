@@ -2,6 +2,7 @@
 // it runs. The bottom toolbar, the command palette (S), the key handler and
 // the keys table of docs/STUDIO.md are all this list (the e2e test diffs
 // the palette with the doc's table).
+import { getTheme, setTheme } from "@bam/ui";
 import { useStudio, type ToolId } from "../store";
 
 export interface Command {
@@ -56,6 +57,10 @@ export function commands(): Command[] {
     { id: "view.axes", name: "Frame axes", key: "", group: "View", icon: "axes", run: () => st().setShow("axes", !st().show.axes) },
     { id: "view.outlines", name: "Layer outlines", key: "", group: "View", icon: "outline", run: () => st().setShow("outlines", !st().show.outlines) },
     { id: "view.file", name: "File drawer", key: "", group: "View", icon: "file", run: () => st().setDrawer(st().drawer === "file" ? null : "file") },
+    { id: "view.theme", name: "Light / dark theme", key: "", group: "View", icon: "moon", run: () => setTheme(getTheme() === "dark" ? "light" : "dark") },
+    { id: "view.all", name: "Show every tag", key: "", group: "View", icon: "eye", run: () => st().setFilter("all") },
+    { id: "view.only3d", name: "Show 3D tags only", key: "", group: "View", icon: "cube", run: () => st().setFilter("3d") },
+    { id: "view.only2d", name: "Show 2D tags only", key: "", group: "View", icon: "sticker", run: () => st().setFilter("2d") },
     { id: "tag.verify", name: "Verify", key: "", group: "Tag", icon: "verify", run: () => st().verifySel() },
     { id: "tag.verifysheet", name: "Verify the sheet", key: "", group: "Tag", icon: "sheet", run: () => st().verifyScene() },
     { id: "tag.renumber", name: "Renumber all", key: "", group: "Tag", icon: "renumber", run: () => st().renumber() },
@@ -68,7 +73,9 @@ export function commands(): Command[] {
     { id: "file.saveas", name: "Save as", key: "", group: "File", icon: "save", run: () => st().setDialog({ kind: "save" }) },
     { id: "file.reveal", name: "Reveal the file", key: "", group: "File", icon: "folder", run: () => st().reveal() },
     { id: "export.svg", name: "Export: print sheet SVG", key: "", group: "Export", icon: "sheet", run: () => st().exportScene("svg") },
-    { id: "export.pdf", name: "Export: sticker sheet PDF", key: "", group: "Export", icon: "sheet", run: () => st().exportScene("pdf") },
+    { id: "export.sheet", name: "Sticker sheet…", key: "", group: "Export", icon: "sticker", run: () => st().setDialog({ kind: "sheet" }) },
+    { id: "export.print", name: "Print sticker sheet…", key: "", group: "Export", icon: "print", run: () => st().printSheet() },
+    { id: "export.send", name: "Send to PrusaSlicer…", key: "", group: "Export", icon: "send", run: () => st().setDialog({ kind: "send" }) },
     { id: "export.stl", name: "Export: STL of every tag", key: "", group: "Export", icon: "cube", run: () => st().exportScene("stl") },
   ];
 }

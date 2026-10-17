@@ -14,7 +14,8 @@ import { dump, parse } from "../model/json";
 import { extrude as setHeight, shapesOf, snap, type Doc, type ShapeInfo } from "../model/design";
 import { applyXf, edges, faceNames, holeLoops, inside as insidePt, invert, kindOf, outline, RECT_SIDES, xfOf, type Xf } from "../model/shapes";
 import { idsText } from "../model/scene";
-import { patternIn3d, useStudio } from "../store";
+import { filtered, patternIn3d, useStudio } from "../store";
+import { token, useTheme } from "@bam/ui";
 import { extrudeArrow, SketchGizmo, zOnAxis } from "./Gizmo";
 
 const FOV = 35;
@@ -309,7 +310,10 @@ interface Three {
 export function View3D() {
   const host = useRef<HTMLDivElement>(null);
   const three = useRef<Three | null>(null);
-  const tags = useStudio((s) => s.scene.tags);
+  const allTags = useStudio((s) => s.scene.tags);
+  const filter = useStudio((s) => s.filter);
+  const tags = filtered(allTags, filter);
+  const [theme] = useTheme();
   const doc = useStudio((s) => s.doc);
   const sel = useStudio((s) => s.sel);
   const shapeSel = useStudio((s) => s.shapeSel);
@@ -340,7 +344,7 @@ export function View3D() {
     const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     renderer.setPixelRatio(window.devicePixelRatio || 1);
     renderer.setSize(w, h);
-    renderer.setClearColor(0x2b313c);
+    renderer.setClearColor(new THREE.Color(token("--canvas-3d", "#e4e7ec")));
     renderer.localClippingEnabled = true;
     el.appendChild(renderer.domElement);
     renderer.domElement.dataset.canvas3d = "1";
@@ -561,6 +565,10 @@ export function View3D() {
     if (!st) return;
     const redraw = () => {
       const d = liveDoc.current ?? doc;
+      // the theme's canvas (light by default)
+      st.renderer.setClearColor(new THREE.Color(token("--canvas-3d", "#e4e7ec")));
+      const dark = theme === "dark";
+      const ink = dark ? "#e8edf3" : "#1c222b";
       for (const c of [...st.root.children]) { st.root.remove(c); dispose(c); }
       for (const c of [...st.overlay.children]) { st.overlay.remove(c); dispose(c); }
       st.sketchGroups.clear();
@@ -664,7 +672,7 @@ export function View3D() {
       const size = Math.max(100, Math.ceil((Math.max(box.x1 - box.x0, box.y1 - box.y0) + 80) / (2 * step)) * 2 * step);
       const gx = Math.round((box.x0 + box.x1) / 2 / step) * step, gy = Math.round((box.y0 + box.y1) / 2 / step) * step;
       const zMin = Math.min(0, ...infos.filter((s) => s.body).map((s) => Math.min(0, s.body!.height)));
-      const grid = new THREE.GridHelper(size, size / step, 0x55606e, 0x3a4250);
+      const grid = new THREE.GridHelper(size, size / step, dark ? 0x55606e : 0x9aa3ae, dark ? 0x3a4250 : 0xc4cad2);
       grid.rotation.x = Math.PI / 2;
       grid.position.set(gx, gy, zMin * zScale - 0.01);
       (grid.material as THREE.Material).transparent = true;
@@ -672,10 +680,10 @@ export function View3D() {
       st.ground.add(grid);
       const bx = Math.floor(box.x0 / step) * step, by = Math.floor((box.y0 - 12) / step) * step;
       const bar = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(bx, by, 0.05), new THREE.Vector3(bx + step, by, 0.05)]),
-        new THREE.LineBasicMaterial({ color: 0xe8edf3 }));
+        new THREE.LineBasicMaterial({ color: new THREE.Color(ink) }));
       bar.userData.scaleBarMm = step;
       st.ground.add(bar);
-      const cue = textSprite(`${step} mm · grid ${step} mm`, 3.2, "#e8edf3", "rgba(20,23,28,0.6)");
+      const cue = textSprite(`${step} mm · grid ${step} mm`, 3.2, ink, dark ? "rgba(20,23,28,0.6)" : "rgba(255,255,255,0.75)");
       cue.position.set(bx + step / 2 + 9, by + 3, 0.1);
       cue.userData.sizeCue = true;
       st.ground.add(cue);
@@ -707,7 +715,7 @@ export function View3D() {
     };
     (st as any).redraw = redraw;
     redraw();
-  }, [tags, doc, sel, shapeSel, show.axes, show.ids, zScale, tool, picks]);
+  }, [allTags, filter, theme, doc, sel, shapeSel, show.axes, show.ids, zScale, tool, picks]);
 
   return <div ref={host} className="canvas3d" data-view="3d" data-tool={tool} onContextMenu={(e) => e.preventDefault()} />;
 }

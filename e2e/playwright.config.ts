@@ -38,7 +38,7 @@ export default defineConfig({
       env: {
         ARUCO_STUDIO_HOME: path.join(TMP, "home"),
         ARUCO_STUDIO_SCENES: path.join(TMP, "scenes"),
-        BAM_ARUCO_PRUSASLICER_DIR: path.join(ROOT, "goldens", "prusaslicer"),
+        BAM_ARUCO_PRUSASLICER_DIR: path.join(ROOT, "tests", "fixtures", "prusaslicer_m8c"),   // M8b2: physical printers (placeholder hosts)
         PYTHONDONTWRITEBYTECODE: "1",
       },
     },

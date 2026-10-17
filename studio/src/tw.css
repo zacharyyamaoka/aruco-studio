@@ -1,0 +1,7 @@
+/* Tailwind 4 (theme + utilities, no preflight: the kit's tokens and the
+   app's own base stay). Its sources: the app and the kit. */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@source "./";
+@source "../packages/bam-ui/src";

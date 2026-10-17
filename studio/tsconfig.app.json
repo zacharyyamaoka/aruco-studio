@@ -16,7 +16,8 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "paths": { "@bam/ui": ["./packages/bam-ui/src/index.ts"], "@bam/ui/*": ["./packages/bam-ui/src/*"] }
   },
   "include": ["src"]
 }

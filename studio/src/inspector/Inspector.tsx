@@ -1,67 +1,33 @@
-// The inspector of the selection. Built from /api/form (never a hand-written
-// field list): every field's row, its control by type, and right under it
-// the Issues the plan gives on that key path; one summary line is always
-// shown. Tabs Marker · Heights · Print · Label · Advanced (REF's dialog v2).
+// The inspector of the selection. The tag's form is the kit's Form over
+// GET /api/form (plan/fields.py, bam.form/1): its tabs, rows, icons, which
+// rows show (show_when) and where a hidden row's messages go (anchor) all
+// come from the server; this file holds no field list. What is the
+// Studio's own: the header, the Preset row and its Made-by line, the
+// ArUco Extrude's "On" rows, and the few controls that are more than a
+// type (Size with its Auto, Columns x rows, Cells, Origin's turns, Trim /
+// Perimeter, the Fit candidates). Several tags selected: one form for all,
+// a change goes to every one of them (one undo step), a value that differs
+// shows "—" until it is typed.
+import {
+  common, FieldRow, Form, getPath, Glyph as Icon, IconButton, NumberField, SegmentedRow, Select, Switch, TextField,
+  type Cell, type ControlArgs, type FormCtx, type FormRow, type Issue as KitIssue, type Opt,
+} from "@bam/ui";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "../api/client";
-import type { FormField, Issue, SceneTag } from "../api/types";
-import { getPath, idsText, routeIssues, shortText, summaryLine, worst } from "../model/scene";
-import { useStudio } from "../store";
-import { ButtonRow, Dropdown, Icon, IconButton, NumberInput, TextInput, Toggle, type Opt } from "../ui/controls";
-import { ICONS_OF, shown, TABS, TARGET_EDITOR, tabOf, turnIcons, type Tab } from "./layout";
-import { PresetRow } from "./PresetRow";
-import { ShapeInspector } from "./ShapeInspector";
+import type { FormDoc, FormField, Issue, SceneTag } from "../api/types";
+import { idsText } from "../model/scene";
 import { findShape } from "../model/design";
-
-/** A row's messages: one short line each (the whole text in its tooltip and
- *  data-text), the same line never twice (audit F7). */
-function Msgs({ path, issues, local }: { path: string; issues: Issue[]; local?: string | null }) {
-  if (!issues.length && !local) return null;
-  const seen = new Set<string>();
-  const shown = issues.filter((i) => {
-    const k = `${i.level}|${shortText(i.text)}`;
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  });
-  return (
-    <div className="msgs" data-issues-for={path}>
-      {local && <div className="issue lv-error" data-level="error" data-local="1" data-text={local}>{local}</div>}
-      {shown.map((i, k) => (
-        <div key={k} className={`issue lv-${i.level}`} data-level={i.level} data-field={i.field} data-text={i.text}
-          title={shortText(i.text) !== i.text ? i.text : undefined}>{shortText(i.text)}</div>
-      ))}
-    </div>
-  );
-}
-
-function Row({ f, label, children, issues, local, icon }: {
-  f: { path: string }; label: ReactNode; children: ReactNode; issues: Issue[]; local?: string | null; icon?: string;
-}) {
-  const lv = worst(issues.filter((i) => i.level !== "info"));
-  return (
-    <div className={`row${lv ? " has-" + lv : ""}`} data-row={f.path}>
-      <div className="row-main">
-        <label className="row-label" title={f.path}>{icon && <Icon name={icon} />}{label}</label>
-        <div className="row-ctl">{children}</div>
-      </div>
-      <Msgs path={f.path} issues={issues} local={local} />
-    </div>
-  );
-}
-
-const pathOf = (f: FormField) => f.path;
-/** A row's label without what its control already says ("(0 = Auto size)"). */
-const short = (label: string) => label.replace(/ \(0 = Auto size\)$/, "").replace(/ \(a typed size\)$/, "");
+import { madeBy, useStudio } from "../store";
+import { MadeByLine, PresetRow, StaleRows } from "./PresetRow";
+import { ShapeInspector } from "./ShapeInspector";
 
 export function Inspector() {
   const form = useStudio((s) => s.form);
-  const options = useStudio((s) => s.options);
   const scene = useStudio((s) => s.scene);
   const sel = useStudio((s) => s.sel);
   const shapeSel = useStudio((s) => s.shapeSel);
   const doc = useStudio((s) => s.doc);
-  const [tab, setTab] = useState<Tab>("marker");
+  const [tab, setTab] = useState<string>("marker");
   const tags = scene.tags.filter((t) => sel.includes(t.name));
   const tag: SceneTag | undefined = tags[tags.length - 1];
 
@@ -71,13 +37,43 @@ export function Inspector() {
     if (info) return <ShapeInspector key={info.key} info={info} />;
   }
   if (!tag) return <aside className="inspector" data-testid="inspector"><NewTagDefaults /></aside>;
-  return <TagInspector key={tag.uid} tag={tag} count={tags.length} form={form.fields} options={options} tab={tab} setTab={setTab} />;
+  return <TagInspector key={tag.uid} tag={tag} tags={tags} form={form} tab={tab} setTab={setTab} />;
 }
 
-function TagInspector({ tag, count, form, options, tab, setTab }: {
-  tag: SceneTag; count: number; form: FormField[]; options: Record<string, any> | null; tab: Tab; setTab: (t: Tab) => void;
+/** The facts show_when reads: the layout, how it is made, the target's. */
+export function ctxOf(tag: SceneTag): FormCtx {
+  const t = tag.spec.target;
+  const flags: string[] = [t.kind, t.has_body ? "body" : "free"];
+  if ((t.loops_mm ?? []).length > 1) flags.push("holes");
+  return {
+    get: (p) => getPath(tag.spec, p),
+    layout: String(tag.spec.settings.layout ?? "single"),
+    made_by: madeBy(tag),
+    target: flags,
+  };
+}
+
+/** A choice row's choices for this tag (choices_by_layout, choices_when). */
+export function choicesFor(f: FormField, ctx: FormCtx): { value: string | number; label: string; icon?: string }[] {
+  let out = f.choices ?? [];
+  const byLayout = f.choices_by_layout?.[ctx.layout ?? "single"];
+  if (byLayout) out = byLayout;
+  for (const w of f.choices_when ?? []) {
+    const hold = Object.entries(w.when).every(([p, v]) => {
+      const now = ctx.get(p);
+      if (p === "settings.make.by") return (ctx.made_by ?? "print3d") === v;
+      return String(now ?? (typeof v === "number" ? 0 : "")) === String(v);
+    });
+    if (hold) out = w.choices;
+  }
+  return out;
+}
+
+function TagInspector({ tag, tags, form, tab, setTab }: {
+  tag: SceneTag; tags: SceneTag[]; form: FormDoc; tab: string; setTab: (t: string) => void;
 }) {
   const st = useStudio.getState();
+  const options = useStudio((s) => s.options);
   const s = tag.spec.settings as Record<string, any>;
   const n = tag.spec.numbers as Record<string, any>;
   const plan = tag.plan;
@@ -93,38 +89,27 @@ function TagInspector({ tag, count, form, options, tab, setTab }: {
     return () => { live = false; };
   }, [autoKey]);
   const planIssues: Issue[] = (plan?.warnings as Issue[]) ?? [];
-  const issues: Issue[] = useMemo(() => autoNote ? [...planIssues, { field: "numbers.size", level: "info", text: autoNote } as Issue] : planIssues,
+  const issues = useMemo(() => autoNote ? [...planIssues, { field: "numbers.size", level: "info", text: autoNote } as Issue] : planIssues,
     [planIssues, autoNote]);
   const [bad, setBad] = useState<Record<string, string | null>>({});
-  const fields = useMemo(() => form.filter((f) => !TARGET_EDITOR.has(f.path)), [form]);
-  const visible = fields.filter((f) => shown(f, s, n));
-  const routed = useMemo(() => routeIssues(issues, [...visible.map(pathOf), "target"]), [issues, visible]);
-  const layout = String(s.layout ?? "single");
-  const labelOf = (field: string) => {
-    const f = form.find((x) => x.path === field) ?? form.find((x) => field.startsWith(x.path + "."));
-    if (!f) return field === "tag" ? "Tag" : field;
-    const t = tabOf(f);
-    return t === "root" ? f.label : `${f.label} (${TABS.find((x) => x.id === t)!.name})`;
-  };
-  const summary = summaryLine(issues, labelOf, plan?.ok ? "Ready: the plan is built" : "Not built");
-  const tabWorst = (t: Tab) => worst(visible.filter((f) => tabOf(f) === t).flatMap((f) => routed[f.path] ?? []).filter((i) => i.level !== "info"));
+  const ctx = useMemo(() => ctxOf(tag), [tag]);
+  const sticker = ctx.made_by === "sticker";
+  const layout = ctx.layout ?? "single";
+  const value = (p: string): Cell => tags.length > 1 ? common(tags.map((t) => getPath(t.spec, p))) : { value: getPath(tag.spec, p), mixed: false };
   const edit = (path: string, v: unknown, extra?: Record<string, unknown>) => st.edit(path, v, extra);
-  const setLocal = (path: string) => (m: string | null) => setBad((b) => ({ ...b, [path]: m }));
-
-  // a locked (printed) tag: its ink cannot change, so no ink field takes
-  // input (audit F6); its name, place, lock and visibility stay editable
+  const local = (path: string) => (m: string | null) => setBad((b) => ({ ...b, [path]: m }));
   const dis = Boolean(tag.locked);
-  const control = (f: FormField): ReactNode => {
-    const v = getPath(tag.spec, f.path);
+  const m = plan?.marker as any;
+
+  // the controls that are more than their type
+  const control = ({ row, value: v, mixed, disabled }: ControlArgs): ReactNode | undefined => {
+    const f = row as FormField;
     const p = f.path;
-    if (f.read_only || f.type === "rule") {
-      return <span className="ro" data-path={p}>{v === undefined || v === null ? `absent (rule 1)` : `rule ${String(v)}`}</span>;
-    }
     if (p === "numbers.size" || p === "numbers.square") {
       // ONE Auto for the size and the checker (REF's dialog: values() types
       // both or neither); off, the fields start at what Auto built
-      const auto = !Number(n.size);
-      const m = plan?.marker as any;
+      const autoCell = value("numbers.size");
+      const auto = !autoCell.mixed && !Number(autoCell.value);
       const builtSize = Number(m?.marker_length_m || 0) * 1000;
       const builtSquare = Number(m?.square_length_m || 0) * 1000;
       const built = p === "numbers.size" ? builtSize : builtSquare;
@@ -132,161 +117,153 @@ function TagInspector({ tag, count, form, options, tab, setTab }: {
       return (
         <span className="pair">
           {p === "numbers.size" && (
-            <Toggle disabled={dis} value={auto} label="Auto" path={`${p}:auto`}
+            <Switch disabled={disabled} value={auto} mixed={autoCell.mixed} label="Auto" path={`${p}:auto`}
               onChange={(a) => edit(p, a ? 0 : +(builtSize || 20).toFixed(3), {
                 "settings.size_auto": a,
                 ...(layout === "charuco" ? { "numbers.square": a ? 0 : +(builtSquare || 0).toFixed(3) } : {}),
                 ...(a ? { "settings.force": null } : {}),
               })} />
           )}
-          <NumberInput value={shownV} path={p} unit="mm" disabled={auto || dis} onBad={setLocal(p)}
+          <NumberField value={shownV} path={p} unit="mm" step={f.step} mixed={mixed && !auto} disabled={auto || disabled} onBad={local(p)}
             onCommit={(x) => edit(p, x, p === "numbers.size" ? { "settings.size_auto": x === 0 } : undefined)} />
         </span>
       );
     }
     if (p === "settings.force") {
       const cur = (v as number[] | null) ?? null;
-      const m = plan?.marker as any;
       const cols = cur?.[0] ?? m?.cols ?? 1, rows = cur?.[1] ?? m?.rows ?? 1;
       if (tag.spec.target.kind === "face") {
         // REF evaluate(): on a face the fit lays out as many as fit; only a
         // sketch profile takes a typed count (Advanced > Target kind)
-        return <span className="ro" data-path={p} title="On a face the fit lays out as many as fit; a sketch profile (Advanced › Kind) takes a typed count">{m?.cols ?? "–"} × {m?.rows ?? "–"} (as many as fit on a face)</span>;
+        return <span className="ro" data-path={p} title="On a face the fit lays out as many as fit; a sketch profile (Advanced › Target) takes a typed count">{m?.cols ?? "–"} × {m?.rows ?? "–"} (as many as fit on a face)</span>;
       }
       return (
         <span className="pair">
-          <NumberInput disabled={dis} int value={cols} path={`${p}[0]`} onBad={setLocal(p)} onCommit={(x) => edit(p, [x, rows])} />
+          <NumberField disabled={disabled} int value={cols} path={`${p}[0]`} onBad={local(p)} onCommit={(x) => edit(p, [x, rows])} />
           <span className="x">×</span>
-          <NumberInput disabled={dis} int value={rows} path={`${p}[1]`} onBad={setLocal(p)} onCommit={(x) => edit(p, [cols, x])} />
+          <NumberField disabled={disabled} int value={rows} path={`${p}[1]`} onBad={local(p)} onCommit={(x) => edit(p, [cols, x])} />
           {cur && <IconButton icon="close" title="Back to the fit's count" onClick={() => edit(p, null)} />}
         </span>
       );
     }
     if (p === "settings.turn") {
-      const icons = turnIcons(layout);
+      const icons = f.icons_by_layout?.[layout] ?? {};
       const opts: Opt[] = (options?.origin?.[layout] ?? f.choices ?? []).map((c: any) => ({ value: c.value, label: c.label, hint: c.label, icon: icons[String(c.value)] }));
-      return <ButtonRow disabled={dis} path={p} value={Number(v ?? 0)} options={opts} onChange={(x) => edit(p, Number(x))} />;
+      return <SegmentedRow disabled={disabled} path={p} value={Number(v ?? 0)} mixed={mixed} options={opts} onChange={(x) => edit(p, Number(x))} />;
     }
-    if (p === "settings.cells") return <CellsEditor disabled={dis} value={v as any} f={f} onChange={(x) => edit(p, x)} onBad={setLocal(p)} />;
+    if (p === "settings.cells") return <CellsEditor disabled={disabled} value={v as any} mixed={mixed} f={f} onChange={(x) => edit(p, x)} onBad={local(p)} />;
     if (p === "settings.trim") {
       const cur = v as any;
       const opts: Opt[] = (options?.trim ?? [{ value: "off", label: "Off" }]).map((c: any) => ({ value: c.value, label: c.label }));
       return (
         <span className="pair">
-          <Dropdown disabled={dis} path={p} value={cur && cur.rule === 1 ? cur.axes : "off"} options={opts}
+          <Select disabled={disabled} path={p} value={cur && cur.rule === 1 ? cur.axes : "off"} mixed={mixed} options={opts}
             onChange={(x) => edit(p, x === "off" ? null : { rule: 1, axes: x, margin_mm: cur?.margin_mm ?? 0, force: Boolean(cur?.force) })} />
-          {cur && cur.rule === 1 && <Toggle disabled={dis} value={Boolean(cur.force)} label="Cut anyway" path={`${p}.force`} onChange={(x) => edit(p, { ...cur, force: x })} />}
+          {cur && cur.rule === 1 && <Switch disabled={disabled} value={Boolean(cur.force)} label="Cut anyway" path={`${p}.force`} onChange={(x) => edit(p, { ...cur, force: x })} />}
         </span>
       );
     }
+    if (p === "settings.make.perimeter" && !sticker) {
+      // on a 3D tag Perimeter IS Trim excess (M6 d): Marker = trimmed to
+      // the tag's outline (both axes), Profile = the body keeps its outline
+      const trim = value("settings.trim");
+      const t = trim.value as any;
+      const on = t && t.rule === 1;
+      const val = trim.mixed ? null : !on ? "profile" : t.axes === "both" ? "marker" : `marker-${t.axes}`;
+      const opts: Opt[] = [{ value: "marker", label: "Marker", hint: "the body is trimmed to the tag's outline (Trim excess, both)" },
+        { value: "profile", label: "Profile", hint: "the body keeps its outline (Trim excess off)" }];
+      if (on && t.axes !== "both") opts.push({ value: `marker-${t.axes}`, label: `Marker (${t.axes} only)` });
+      return <Select disabled={disabled} path={p} value={val} mixed={trim.mixed} options={opts}
+        onChange={(x) => edit("settings.trim", x === "profile" ? null : { rule: 1, axes: "both", margin_mm: t?.margin_mm ?? 0, force: Boolean(t?.force) })} />;
+    }
+    if (f.type === "choice" && !f.read_only && (f.choices_by_layout || f.choices_when)) {
+      const opts: Opt[] = choicesFor(f, ctx).map((c: any) => ({ value: c.value, label: c.label, icon: c.icon || undefined }));
+      return <Select disabled={disabled} path={p} value={v as any} mixed={mixed} options={opts} onChange={(x) => edit(p, x)} />;
+    }
     if (p === "settings.mode") {
-      const opts: Opt[] = (f.choices ?? []).map((c) => ({ value: c.value, label: c.label, icon: ICONS_OF[p][String(c.value)] }));
-      return <Dropdown disabled={dis} path={p} value={v as any} options={opts} onChange={(x) => st.setMode(String(x))} />;
+      const opts: Opt[] = (f.choices ?? []).map((c) => ({ value: c.value, label: c.label, icon: c.icon || undefined }));
+      return <Select disabled={disabled} path={p} value={v as any} mixed={mixed} options={opts} onChange={(x) => st.setMode(String(x))} />;
     }
-    switch (f.type) {
-      case "choice": {
-        const icons = ICONS_OF[p] ?? {};
-        const opts: Opt[] = (f.choices ?? []).map((c) => ({ value: c.value, label: c.label, icon: icons[String(c.value)] }));
-        return <Dropdown disabled={dis} path={p} value={v as any} options={opts} onChange={(x) => edit(p, typeof f.default === "number" ? Number(x) : x)} />;
-      }
-      case "bool":
-        return <Toggle disabled={dis} path={p} value={Boolean(v)} onChange={(x) => edit(p, x)} />;
-      case "int":
-        return <NumberInput disabled={dis} int path={p} value={v as number} onBad={setLocal(p)} onCommit={(x) => edit(p, x)} />;
-      case "number":
-        return <NumberInput disabled={dis} path={p} value={v as number} onBad={setLocal(p)} onCommit={(x) => edit(p, x)} />;
-      case "mm":
-        return <NumberInput disabled={dis} path={p} value={v as number} unit="mm" onBad={setLocal(p)} onCommit={(x) => edit(p, x)} />;
-      case "text":
-        return <TextInput disabled={dis} path={p} value={String(v ?? "")} onCommit={(x) => edit(p, x)} />;
-      default:
-        return <span className="ro" data-path={p}>{JSON.stringify(v)}</span>;
-    }
+    if (p === "settings.make.by") return null;          // drawn as the Made-by line under the Preset
+    return undefined;
   };
 
-  const rows = (t: Tab | "root") => visible.filter((f) => tabOf(f) === t).map((f) => (
-    <Row key={f.path} f={f} label={short(f.label)} issues={routed[f.path] ?? []} local={bad[f.path]}>{control(f)}</Row>
-  ));
-  const general = routed["tag"] ?? [];
-  const m = plan?.marker as any;
+  // every row a sticker words otherwise (label_2d); Perimeter on a 3D tag
+  const labelOf = (r: FormRow) => {
+    const f = r as FormField;
+    if (sticker && f.label_2d) return f.label_2d;
+    return f.label;
+  };
+  const rows = useMemo(() => form.fields.filter((f) => f.path !== "settings.make.by"), [form]);
+  const errors = plan && !plan.ok ? plan.errors.filter((e) => !issues.some((i) => i.text === e)) : [];
 
   return (
-    <aside className="inspector" data-testid="inspector" data-tag={tag.name}>
+    <aside className="inspector" data-testid="inspector" data-tag={tag.name} data-made-by={ctx.made_by} data-count={tags.length}>
       <div className="insp-head">
         <Icon name={layout} />
-        <TextInput value={tag.name} path="name" onCommit={(x) => st.rename(tag.name, x)} />
+        {tags.length > 1
+          ? <b className="grow" data-testid="insp-multi">{tags.length} tags</b>
+          : <TextField value={tag.name} path="name" onCommit={(x) => st.rename(tag.name, x)} />}
         <span className="ids" data-testid="insp-ids" title="the ids this tag prints">#{idsText(plan?.ids ?? [])}</span>
         <IconButton icon={tag.locked ? "lock" : "unlock"} title={tag.locked ? "Locked: a printed tag (its ink cannot change)" : "Lock: mark as printed"}
           active={tag.locked} onClick={() => st.setFlag(tag.name, "locked", !tag.locked)} testid="lock" />
         <IconButton icon={tag.hidden ? "eyeoff" : "eye"} title={tag.hidden ? "Hidden" : "Hide"} onClick={() => st.setFlag(tag.name, "hidden", !tag.hidden)} />
       </div>
-      {count > 1 && <div className="multi">{count} tags selected: a change goes to every one of them.</div>}
-      <div className="insp-sub muted">
+      {tags.length > 1 && <div className="multi" data-testid="multi-note">{tags.length} tags selected: a change goes to every one of them; "—" where they differ.</div>}
+      <div className="insp-sub">
         {m ? `${m.dictionary} · ${m.layout === "single" ? `${(m.marker_length_m * 1000).toFixed(2)} mm` : `${m.cols} × ${m.rows}, marker ${(m.marker_length_m * 1000).toFixed(2)} mm`}` : "not built"}
       </div>
       {tag.locked && <div className="locked-note" data-testid="locked-note"><Icon name="lock" />Locked: a printed tag. Unlock it to change its ink; its name and place can still change.</div>}
-      <fieldset className="ink" disabled={dis} data-ink-locked={dis ? "1" : "0"}>
-        <ArucoRows tag={tag} issues={routed["target"] ?? []} />
-        <PresetRow tag={tag} />
-        {rows("root")}
-      </fieldset>
-      <div className="tabs" role="tablist">
-        {TABS.map((t) => {
-          const w = tabWorst(t.id);
-          return (
-            <button key={t.id} role="tab" type="button" aria-selected={tab === t.id} data-tab={t.id}
-              className={`tab${tab === t.id ? " on" : ""}${w ? " has-" + w : ""}`} onClick={() => setTab(t.id)} title={t.name}>
-              <Icon name={t.icon} /><span>{t.name}</span>{w && <i className="dot" />}
-            </button>
-          );
-        })}
-      </div>
-      <fieldset className="ink tab-body" data-tab-body={tab} disabled={dis}>
-        {tab === "marker" && <Candidates tag={tag} />}
-        {rows(tab)}
-        {tab === "print" && <PrintInfo tag={tag} />}
-      </fieldset>
-      {general.length > 0 && <Msgs path="tag" issues={general} />}
-      {plan && !plan.ok && plan.errors.some((e) => !issues.some((i) => i.text === e)) && (
-        <div className="msgs" data-issues-for="errors">
-          {plan.errors.filter((e) => !issues.some((i) => i.text === e)).map((e, i) => <div key={i} className="issue lv-error">{e}</div>)}
-        </div>
-      )}
-      <div className={`summary lv-${summary.level}`} data-testid="summary">{summary.text}</div>
+      <Form rows={rows} tabs={form.tabs} ctx={ctx} issues={issues as KitIssue[]} outside={form.outside} tab={tab} onTab={setTab}
+        value={value} onChange={(p, v) => edit(p, v)} control={control} labelOf={labelOf} disabled={dis}
+        local={bad} onLocal={(p, msg) => setBad((b) => ({ ...b, [p]: msg }))}
+        okText={plan?.ok ? "Ready: the plan is built" : "Not built"} extraErrors={errors}
+        slots={{
+          "root:before": (routed) => (
+            <>
+              <PresetRow tag={tag} issues={routed["preset"] ?? []} />
+              <MadeByLine tag={tag} />
+              <StaleRows names={tags.map((t) => t.name)} />
+              <ArucoRows tag={tag} issues={routed["target"] ?? []} />
+            </>
+          ),
+          "marker:before": () => <Candidates tag={tag} />,
+          "print:after": () => <PrintInfo tag={tag} />,
+        }} />
     </aside>
   );
 }
 
 /** Cells (CELL_RULE): absent = the legacy 0.5 mm marker steps; "marker":
- *  the marker size in mm steps; "cell": every cell a multiple of mm. */
-function CellsEditor({ value, f, onChange, onBad, disabled }: { value: any; f: FormField; onChange: (v: any) => void; onBad: (m: string | null) => void; disabled?: boolean }) {
+ *  the marker size in mm steps; "cell": every cell a multiple of mm. One
+ *  24 px row: the kind, then its mm and its smallest cell. */
+function CellsEditor({ value, f, onChange, onBad, disabled, mixed }: { value: any; f: FormField; onChange: (v: any) => void; onBad: (m: string | null) => void; disabled?: boolean; mixed?: boolean }) {
   const of = value?.of ?? "legacy";
   const opts: Opt[] = [
-    { value: "legacy", label: "Legacy (0.5 mm steps)", icon: "r-mm", hint: "a tag made before cell multiples: absent" },
-    { value: "marker", label: "Marker in mm steps", icon: "r-mm" },
-    { value: "cell", label: "Each cell a multiple", icon: "r-lines" },
+    { value: "legacy", label: "Legacy 0.5 mm", icon: "r-mm", hint: "a tag made before cell multiples: absent" },
+    { value: "marker", label: "Marker in mm", icon: "r-mm", hint: "the marker size in mm steps" },
+    { value: "cell", label: "Cell multiple", icon: "r-lines", hint: "every cell a multiple of a line" },
   ];
   return (
-    <span className="col">
-      <Dropdown disabled={disabled} path={f.path} value={of} options={opts}
+    <span className="pair">
+      <Select disabled={disabled} path={f.path} value={of} mixed={mixed} options={opts}
         onChange={(x) => onChange(x === "legacy" ? null : { rule: f.rule ?? 1, of: x, mm: value?.mm ?? (x === "cell" ? 0.45 : 0.5), min_mm: value?.min_mm ?? 2.0 })} />
-      {value && (
-        <span className="pair">
-          <NumberInput disabled={disabled} path={`${f.path}.mm`} value={value.mm} unit="mm" onBad={onBad}
+      {value && !mixed && (
+        <>
+          <NumberField className="narrow" disabled={disabled} path={`${f.path}.mm`} value={value.mm} title="the step (mm)" onBad={onBad}
             onCommit={(x) => {
               // the form's limits (/api/form: 0.01 to 20 mm): outside them a cell is
               // refused here, never sent to be read as the legacy steps (audit F8)
-              const lo = Number((f as any).min_mm ?? 0.01), hi = Number((f as any).max_mm ?? 20);
+              const lo = Number(f.min_mm ?? 0.01), hi = Number(f.max_mm ?? 20);
               if (!(x >= lo && x <= hi)) { onBad(`cell ${x} mm: ${lo} to ${hi} mm`); return; }
               onChange({ ...value, mm: x });
             }} />
-          <span className="x" title="the smallest cell">min</span>
-          <NumberInput disabled={disabled} path={`${f.path}.min_mm`} value={value.min_mm} unit="mm" onBad={onBad}
+          <NumberField className="narrow" disabled={disabled} path={`${f.path}.min_mm`} value={value.min_mm} title="the smallest cell (mm)" onBad={onBad}
             onCommit={(x) => {
               if (!(x >= 0)) { onBad(`smallest cell ${x} mm: 0 or more`); return; }
               onChange({ ...value, min_mm: x });
             }} />
-        </span>
+        </>
       )}
     </span>
   );
@@ -313,21 +290,16 @@ function Candidates({ tag }: { tag: SceneTag }) {
   }));
   const st = useStudio.getState();
   return (
-    <div className="row" data-row="fit">
-      <div className="row-main">
-        <label className="row-label">Fit</label>
-        <div className="row-ctl">
-          <Dropdown disabled={tag.locked} path="fit" value={null} placeholder={`${list.length} layouts fit`} options={opts}
-            onChange={(i) => {
-              const c = list[Number(i)];
-              const extra: Record<string, unknown> = { "settings.size_auto": false };
-              if (s.layout !== "single") extra["settings.force"] = [c.cols, c.rows];
-              if (s.layout === "charuco") extra["numbers.square"] = +c.square_mm.toFixed(3);
-              st.edit("numbers.size", +c.marker_mm.toFixed(3), extra);
-            }} />
-        </div>
-      </div>
-    </div>
+    <FieldRow path="fit" label="Fit">
+      <Select disabled={tag.locked} path="fit" value={null} placeholder={`${list.length} layouts fit`} options={opts} wide
+        onChange={(i) => {
+          const c = list[Number(i)];
+          const extra: Record<string, unknown> = { "settings.size_auto": false };
+          if (s.layout !== "single") extra["settings.force"] = [c.cols, c.rows];
+          if (s.layout === "charuco") extra["numbers.square"] = +c.square_mm.toFixed(3);
+          st.edit("numbers.size", +c.marker_mm.toFixed(3), extra);
+        }} />
+    </FieldRow>
   );
 }
 
@@ -344,65 +316,48 @@ function PrintInfo({ tag }: { tag: SceneTag }) {
   const pr = info.preset.profile || {};
   return (
     <div className="printinfo" data-testid="printinfo">
-      <div className="row-main"><span className="row-label">Preset</span><span className="row-ctl">{info.matches ?? "This tag (custom)"}</span></div>
-      <div className="row-main"><span className="row-label">Nozzle</span><span className="row-ctl">{pr.nozzle_mm ? `${pr.nozzle_mm} mm` : "–"}{pr.line_mm ? ` · lines ${pr.line_mm} mm` : ""}</span></div>
+      <FieldRow path="printinfo.preset" label="Preset"><span className="ro">{info.matches ?? "This tag (custom)"}</span></FieldRow>
+      <FieldRow path="printinfo.nozzle" label={pr.kind === "sticker" ? "Printer" : "Nozzle"}>
+        <span className="ro">{pr.kind === "sticker" ? `${pr.dpi ?? "?"} dpi · ${String(pr.page ?? "").toUpperCase()}` : `${pr.nozzle_mm ? `${pr.nozzle_mm} mm` : "–"}${pr.line_mm ? ` · lines ${pr.line_mm} mm` : ""}`}</span>
+      </FieldRow>
     </div>
   );
 }
 
 /** ArUco Extrude's first rows: what the tag stands on (its feature's
  *  reference: a shape or a body's face) and the shape, a click away. */
-function ArucoRows({ tag, issues }: { tag: SceneTag; issues: Issue[] }) {
+function ArucoRows({ tag, issues }: { tag: SceneTag; issues: KitIssue[] }) {
   const st = useStudio.getState();
   const src = tag.source;
   const tags = useStudio((s) => s.scene.tags);
   const mates = src ? tags.filter((t) => t.source?.feature === src.feature && t.name !== tag.name) : [];
   return (
     <div className="aruco-rows" data-testid="aruco-rows">
-      <div className="row" data-row="aruco.on">
-        <div className="row-main">
-          <label className="row-label" title="the ArUco Extrude's reference in the file">On</label>
-          <div className="row-ctl">
-            <span className="ro" data-testid="aruco-on">{src?.ref ?? "–"}{src?.face && src.face !== "top" ? ` (${src.face})` : ""}</span>
-            {src?.shape && <button className="link" data-testid="aruco-shape" title="select the shape" onClick={() => st.selectShape(src.shape!)}>{src.shape}</button>}
-          </div>
-        </div>
-      </div>
+      <FieldRow path="target" label="On" title="the ArUco Extrude's reference in the file" issues={issues}>
+        <span className="ro" data-testid="aruco-on">{src?.ref ?? "–"}{src?.face && src.face !== "top" ? ` (${src.face})` : ""}</span>
+        {src?.shape && <button className="link" data-testid="aruco-shape" title="select the shape" onClick={() => st.selectShape(src.shape!)}>{src.shape}</button>}
+      </FieldRow>
       {mates.length > 0 && (
-        <div className="row" data-row="aruco.list">
-          <div className="row-main">
-            <label className="row-label">Face list</label>
-            <div className="row-ctl"><span className="ro" title="one feature, one tag per face: an edit to one face that the others do not share splits the list">
-              with {mates.map((m) => m.name).join(", ")}</span></div>
-          </div>
-        </div>
-      )}
-      {issues.length > 0 && (
-        <div className="msgs" data-issues-for="target">
-          {issues.map((i, k) => <div key={k} className={`issue lv-${i.level}`} data-level={i.level} data-field={i.field}>{i.text}</div>)}
-        </div>
+        <FieldRow path="aruco.list" label="Face list">
+          <span className="ro" title="one feature, one tag per face: an edit to one face that the others do not share splits the list">
+            with {mates.map((m) => m.name).join(", ")}</span>
+        </FieldRow>
       )}
     </div>
   );
 }
 
-/** Nothing selected: how to make a tag, and the preset new tags get. */
+/** Nothing selected: the preset new tags get first (both kinds), what it
+ *  makes, and how to make a tag. */
 function NewTagDefaults() {
-  const newPreset = useStudio((s) => s.newPreset);
-  const presets = useStudio((s) => s.presets);
   const scene = useStudio((s) => s.scene);
-  const st = useStudio.getState();
   return (
     <div className="newtag">
-      <div className="insp-head"><Icon name="plus" /><b>Nothing selected</b></div>
-      <div className="muted pad">Draw a shape (R, C, P, O), then A puts a tag on it; E extrudes it, so a tag can go on a face.
+      <div className="insp-head"><Icon name="plus" /><b>New tag</b></div>
+      <PresetRow tag={null} issues={[]} />
+      <MadeByLine tag={null} />
+      <div className="muted pad">Draw a shape (R, C, P, O), then A puts a tag on it with this preset; E extrudes it, so a tag can go on a face.
         {scene.tags.length ? ` ${scene.tags.length} tag(s) in '${scene.name}'.` : ""}</div>
-      <div className="row"><div className="row-main"><label className="row-label">Preset</label><div className="row-ctl">
-        <span className="pair">
-          <Dropdown path="new.preset" value={newPreset} options={presets.map((p) => ({ value: p.name, label: p.name, icon: p.kind === "user" ? "star" : "cube" }))} onChange={(v) => st.setNew("newPreset", String(v))} />
-          <IconButton icon="library" title="Preset library" onClick={() => st.setLibrary(true)} testid="library-btn" />
-        </span>
-      </div></div></div>
       <div className="keys muted pad">
         Keys: <b>V</b> select · <b>R</b> rectangle · <b>C</b> circle · <b>P</b> polygon · <b>O</b> slot · <b>H</b> hole · <b>E</b> extrude · <b>A</b> ArUco Extrude · <b>S</b> search · <b>?</b> all keys
       </div>

@@ -3,6 +3,7 @@
 // a free object (Dict[str, Any]) the narrower shape the web app reads is
 // written here, next to the generated one, and named after the Python that
 // makes it.
+import type { FormRow, FormTab } from "@bam/ui";
 import type { components } from "./schema";
 
 type Sch = components["schemas"];
@@ -133,32 +134,34 @@ export interface SceneIssue {
   text: string;
 }
 
-/** plan/fields.py: one row of the inspector's contract (GET /api/form). */
-export interface FormField {
-  path: string;
+/** plan/fields.py: one row of the inspector's contract (GET /api/form, bam.form/1). */
+export interface FormField extends FormRow {
   group: string;
-  type: string;
-  label: string;
   default: unknown;
-  choices?: { value: string | number; label: string }[];
-  min?: number;
-  max?: number;
+  intent?: "3d" | "2d" | "both";
+  label_2d?: string;
+  on_3d?: string;
+  choices_by_layout?: Record<string, { value: string | number; label: string }[]>;
+  choices_when?: { when: Record<string, unknown>; choices: { value: string | number; label: string }[] }[];
+  icons_by_layout?: Record<string, Record<string, string>>;
   min_exclusive?: number;
   min_abs?: number | null;
   warn_below?: number;
   layouts?: string[];
-  read_only?: boolean;
   of?: string[];
   axes?: string[];
   min_mm?: number;
   max_mm?: number;
   min_cap?: number;
-  [k: string]: unknown;
+  rule?: number;
 }
 
 export interface FormDoc {
   schema: string;
+  contract?: string;
   fields: FormField[];
+  tabs: FormTab[];
+  outside: string[];
   groups: string[];
   layouts: string[];
   rules: Record<string, number>;
@@ -191,13 +194,18 @@ export interface PresetItem {
   name: string;
   kind: "builtin" | "user";
   preset: Preset;
+  /** its profile's kind (M6a): a 3D printer or a sticker printer */
+  made_by?: "print3d" | "sticker";
 }
+
+/** GET /api/presets' collections (M6a): 3D printers, sticker printers. */
+export interface PresetCollection { id: string; title: string; icon: string; names: string[] }
 
 /** server/library.py's card (REF aruco_preset_library.Library._card). */
 export interface LibraryCard {
   id: string;
   name: string;
-  kind: "builtin" | "user" | "prusa" | "document";
+  kind: "builtin" | "user" | "prusa" | "document" | "printer" | "sticker";
   in: string[];
   editable: boolean;
   subtitle: string;
@@ -216,7 +224,56 @@ export interface LibraryCard {
   differs: string;
   preset: Preset | null;
   unreadable?: boolean;
+  /** a Printers card (M8c): the physical printer, its fitting prints */
+  printer?: Record<string, any>;
+  choices?: PrinterChoice[];
+  default?: string | null;
+  current?: boolean;
+  host_kind?: string;
+  technology?: string;
 }
+
+/** A print preset that fits a physical printer (a Printers card's choice). */
+export interface PrinterChoice { id: string; name: string; fits: string; line: number; layer: number; first_layer: number; nozzle: number; aruco: boolean; current: boolean }
+
+/** GET /api/prusa/printers (server/prusa_api.py). */
+export interface PrusaPrinters {
+  dir: string | null;
+  found: boolean;
+  printers: PrusaPrinter[];
+  current: { physical: string | null; printer: string | null; print: string | null } | null;
+  notes: string[];
+  revision: number;
+}
+export interface PrusaPrinter {
+  name: string;
+  technology: string;
+  host_kind: string;
+  presets: string[];
+  preset: string;
+  printer: { preset: string; nozzle_mm: number; model: string; variant: string; bed_mm: [number, number]; [k: string]: unknown };
+  prints: { name: string; fits: string; user: boolean; aruco: boolean; line_mm: number; layer_mm: number; first_layer_mm: number; nozzle_mm: number; current: boolean }[];
+  current: boolean;
+  current_print: string | null;
+}
+export interface SendBody { printer?: string; print?: string; white_slot?: number; black_slot?: number; open: boolean }
+export interface SendAnswer {
+  project: string; parts: number | any[]; beds: number | any[]; skipped: any[]; rejected: any[]; warnings: string[]; opened: boolean;
+  printer: { physical: string | null; preset: string }; print: string; filament: string; bed_mm: [number, number];
+}
+
+/** GET /api/scene/sheet.json (arucostudio.sheet/1). */
+export interface SheetJson {
+  schema: string; page: string; page_mm: [number, number]; pages: number; mode: string; cuts: number;
+  stickers: { key: string; name: string; made_by: string; ids: number[]; page: number; x_mm: number; y_mm: number; w_mm: number; h_mm: number; rotation: number; caption: string | string[] }[];
+  shelves: { page: number; y_mm: number; h_mm: number; keys: string[] }[];
+  rejected: { key?: string; name?: string; reason?: string; [k: string]: unknown }[];
+  ruler: { mm_bar: number[]; in_bar: number[]; top: number };
+  [k: string]: unknown;
+}
+
+/** GET /api/prusa/stale: a tag whose preset's PrusaSlicer profile changed. */
+export interface StaleInfo { tag: string; preset: string; field: string; level: string; text: string; was: unknown; now: unknown; apply: string }
 
 export interface LibraryState {
   title: string;

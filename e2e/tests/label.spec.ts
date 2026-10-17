@@ -7,11 +7,11 @@ import { choose, fresh, idle, probe, shot, tab, tagOn, type } from "./helpers";
 test("label: on the white, dragged into the quiet ring, refused, built anyway", async ({ page }) => {
   await fresh(page, "e2e-label");
   expect(await tagOn(page, "r", "60 60", 3)).toBe("tag1");             // a 60 mm plate, 3 mm thick
-  await page.locator('.tog:has(input[data-path="numbers.size:auto"])').click();
+  await page.locator('[role="switch"][data-path="numbers.size:auto"]').click();
   await idle(page);
   await type(page, "numbers.size", "20");
   await tab(page, "label");
-  await page.locator('.tog:has(input[data-path="settings.label.on"])').click();
+  await page.locator('[role="switch"][data-path="settings.label.on"]').click();
   await idle(page);
   await choose(page, "settings.label.place", "white");
   await choose(page, "settings.label.side", "below");
@@ -43,7 +43,7 @@ test("label: on the white, dragged into the quiet ring, refused, built anyway", 
   await shot(page, "label_refused");
 
   // Build anyway: built where it was asked for, warned
-  await page.locator('.tog:has(input[data-path="settings.label.build_anyway"])').click();
+  await page.locator('[role="switch"][data-path="settings.label.build_anyway"]').click();
   await idle(page);
   await expect(built.first()).toBeAttached();
   await expect(tag.locator('[data-state="refused"]')).toHaveCount(0);

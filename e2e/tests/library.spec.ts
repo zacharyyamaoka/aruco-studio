@@ -49,7 +49,7 @@ test("the Library: browse, filter, select a preset, make and edit your own", asy
   expect(of.matches).toBe(want.name);
   expect(spec.numbers.white_height).toBe(want.preset.tag.white_height_mm);
   expect(spec.settings.cells.of).toBe(want.preset.cells.of);
-  await expect(page.locator('.dd[data-path="preset"]')).toHaveAttribute("data-value", want.name);
+  await expect(page.locator('.kit-select[data-path="preset"]')).toHaveAttribute("data-value", want.name);
 
   // New: the tag's print settings as a preset of mine (an empty name is refused there)
   await page.getByTestId("library-btn").first().click();

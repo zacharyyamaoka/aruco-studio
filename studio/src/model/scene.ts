@@ -2,6 +2,7 @@
 // the inspector's message routing. No I/O here (store.ts does that), so
 // vitest covers them (scene.test.ts).
 import type { Issue, SceneDoc, SceneTag } from "../api/types";
+import { routeIssues as kitRoute, type Issue as KitIssue } from "@bam/ui";
 import { boxesTouch, snap, tagBox, type Box } from "./geom";
 
 export type View = "2d" | "3d";
@@ -134,54 +135,14 @@ export function issuesFor(path: string, issues: Issue[]): Issue[] {
   return issues.filter((i) => i.field === path || i.field.startsWith(path + "."));
 }
 
-/** Each Issue's home field: the deepest shown field it names (or "tag"). */
+/** Each Issue's home field: the deepest shown field it names (or "tag").
+ *  The kit's routing (anchors and all) over plain paths. */
 export function routeIssues(issues: Issue[], paths: string[]): Record<string, Issue[]> {
-  const out: Record<string, Issue[]> = {};
-  const sorted = [...paths].sort((a, b) => b.length - a.length);
-  for (const i of issues) {
-    const home = sorted.find((p) => i.field === p || i.field.startsWith(p + ".")) ??
-      paths.find((p) => p.startsWith(i.field + ".")) ?? "tag";      // a parent: its first row
-    (out[home] ||= []).push(i);
-  }
-  return out;
+  return kitRoute(issues as KitIssue[], paths.map((path) => ({ path, type: "", label: "" })), paths) as Record<string, Issue[]>;
 }
 
-/** One short line for an Issue (audit F7): what is wrong and, when the
- *  plan's words say it, what to change. The plan's whole text (REF's long
- *  advice) stays in the line's tooltip and in the Messages drawer. */
-export function shortText(text: string): string {
-  let t = text.replace(/^label: /, "").trim();
-  const room = /^Label not built: no room for (.+?) on the black or on the white, even at ([\d.]+) mm letters/.exec(t);
-  if (room) return `No room for ${room[1]}, even at ${room[2]} mm letters: a finer label nozzle or a smaller marker makes room`;
-  const cut = t.search(/ \(|\. |; /);
-  if (cut > 0) t = t.slice(0, cut);
-  t = t.replace(/…$/, "").trim();
-  if (t.length > 150) t = t.slice(0, 147).replace(/\s+\S*$/, "") + "…";
-  return t;
-}
-
-const RANK: Record<string, number> = { error: 0, warn: 1, info: 2 };
-
-export function worst(issues: Issue[]): "error" | "warn" | "info" | null {
-  if (!issues.length) return null;
-  return [...issues].sort((a, b) => RANK[a.level] - RANK[b.level])[0].level;
-}
-
-/** The summary line (REF bam_fusion_ui.summary_text's words): the worst
- *  issue first with where it is, or "OK" when only info lines remain. */
-export function summaryLine(issues: Issue[], where: (field: string) => string, okText = "Ready"): { level: "error" | "warn" | "ok"; text: string } {
-  const counted = issues.filter((i) => i.level !== "info").sort((a, b) => RANK[a.level] - RANK[b.level]);
-  if (!counted.length) return { level: "ok", text: okText };
-  const first = counted[0];
-  const w = where(first.field);
-  // the field and the message's first clause only (audit F7)
-  if (counted.length === 1) return { level: first.level as "error" | "warn", text: `⚠ ${w ? w + ": " : ""}${shortText(first.text)}` };
-  const names = [...new Set(counted.map((i) => where(i.field)).filter(Boolean))];
-  return {
-    level: first.level as "error" | "warn",
-    text: `⚠ ${counted.length} issues: ${names.slice(0, 3).join(" · ")}${names.length > 3 ? " …" : ""}`,
-  };
-}
+// the message words, the worst level and the summary line are the kit's (M8b2)
+export { shortText, summaryLine, worst } from "@bam/ui";
 
 /** '<family>#<id>' -> the visible tags printing it, two or more. */
 export function duplicates(tags: SceneTag[], familyOf: (dict: string) => string): Record<string, string[]> {
@@ -218,10 +179,7 @@ export function idsText(ids: number[]): string {
 
 // ------------------------------------------------------------- key paths
 
-/** A value at a key path of an object ("settings.label.cap_mm"). */
-export function getPath(obj: any, path: string): unknown {
-  return path.split(".").reduce((o, k) => (o == null ? undefined : o[k]), obj);
-}
+export { getPath } from "@bam/ui";
 
 /** The PATCH body for setting one key path of a tag's request. */
 export function patchFor(path: string, value: unknown, spec: { target: any; settings?: any }): Record<string, unknown> {

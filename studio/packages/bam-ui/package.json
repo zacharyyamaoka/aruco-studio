@@ -1,0 +1,24 @@
+{
+  "name": "@bam/ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "BAM's compact UI kit (ArUco Studio M8b2): tokens (light / dark), controls on base-ui, the command palette, and Form, which renders a bam.form/1 field list. Copied into cad-exporter's app/ by M8d.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tokens.css": "./src/tokens.css"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run --root ../.. packages/bam-ui"
+  },
+  "peerDependencies": {
+    "@base-ui/react": "1.8.0",
+    "cmdk": "1.1.1",
+    "lucide-react": "1.42.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  }
+}

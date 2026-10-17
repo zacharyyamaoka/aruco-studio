@@ -2,11 +2,10 @@
 // its size, its holes as rows, its Extrude's height, the tags on it. Enter
 // commits a row (the file is written), Esc reverts it.
 import { useState } from "react";
-import { Field, NumberField, Section } from "../kit";
+import { Field, FieldRow, IconButton, NumberField, Section } from "@bam/ui";
 import { addHole, extrude, findShape, moveShapes, rotateShapes, setShape, type ShapeInfo } from "../model/design";
 import { kindOf, sizeText } from "../model/shapes";
 import { useStudio } from "../store";
-import { IconButton } from "../ui/controls";
 
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 
@@ -85,9 +84,8 @@ export function ShapeInspector({ info }: { info: ShapeInfo }) {
           right={<IconButton icon="plus" title="A round hole at the centre (H, or click with H)" testid="hole-add"
             onClick={() => st.editDoc(`${key}: a hole`, (d) => addHole(d, key, { circle: 5 }) !== null)} />}>
           {holes.map((h: any, i: number) => (
-            <div className="row-main sub hole-row" key={i} data-hole-row={i}>
-              <span className="row-label">{kindOf(h) === "circle" ? "⌀" : kindOf(h)}</span>
-              <span className="row-ctl pair">
+            <FieldRow sub key={i} path={`hole.${i}`} label={kindOf(h) === "circle" ? "⌀" : kindOf(h)} className="hole-row">
+              <span className="pair" data-hole-row={i}>
                 <NumberField path={`hole.${i}.x`} value={h.at?.[0] ?? 0} onBad={setBad}
                   onCommit={(v) => st.editDoc(`${key}: hole ${i} x ${v}`, (d) => setShape(d, `${key}/h${i}`, { ...h, at: [v, h.at?.[1] ?? 0] }))} />
                 <NumberField path={`hole.${i}.y`} value={h.at?.[1] ?? 0} onBad={setBad}
@@ -96,7 +94,7 @@ export function ShapeInspector({ info }: { info: ShapeInfo }) {
                   onCommit={(v) => st.editDoc(`${key}: hole ${i} ⌀ ${v}`, (d) => setShape(d, `${key}/h${i}`, { ...h, circle: v }))} />}
                 <IconButton icon="close" title="Remove this hole" onClick={() => { st.setShapeSel([`${key}/h${i}`]); st.deleteSel(); }} />
               </span>
-            </div>
+            </FieldRow>
           ))}
         </Section>
       )}

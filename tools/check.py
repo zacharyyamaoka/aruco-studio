@@ -155,7 +155,7 @@ def run_e2e():
     api = ui = None
     env = _env()
     env.update({"ARUCO_STUDIO_SCENES": os.path.join(env["ARUCO_STUDIO_HOME"], "scenes"),
-                "BAM_ARUCO_PRUSASLICER_DIR": str(ROOT / "goldens" / "prusaslicer")})
+                "BAM_ARUCO_PRUSASLICER_DIR": str(ROOT / "tests" / "fixtures" / "prusaslicer_m8c")})  # M8b2: the physical printers too
     where = E2E if (E2E / "package.json").exists() else STUDIO
     _npm_install(STUDIO)
     _npm_install(where)

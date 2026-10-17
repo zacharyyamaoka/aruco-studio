@@ -49,10 +49,10 @@ test("F3 F18: Escape closes an open dropdown only; Tab on a focused button moves
   await fresh(page, "e2e-audit-keys");
   await add(page, "single");
   expect((await probe(page)).sel).toEqual(["tag1"]);
-  await page.locator('.dd[data-path="preset"] .dd-btn').click();
-  await expect(page.locator('.dd[data-path="preset"].open')).toHaveCount(1);
+  await page.locator('.kit-select[data-path="preset"] .kit-select-trigger').click();
+  await expect(page.locator('.kit-select[data-path="preset"][data-open="1"]')).toHaveCount(1);
   await page.keyboard.press("Escape");
-  await expect(page.locator('.dd[data-path="preset"].open')).toHaveCount(0);
+  await expect(page.locator('.kit-select[data-path="preset"][data-open="1"]')).toHaveCount(0);
   expect((await probe(page)).sel).toEqual(["tag1"]);                 // still selected
   await page.keyboard.press("Escape");                               // a second Escape: select none
   expect((await probe(page)).sel).toEqual([]);
@@ -90,9 +90,9 @@ test("F4 F6: a verify row goes stale on a change; a locked tag's ink fields take
   await idle(page);
   await expect(page.getByTestId("locked-note")).toBeVisible();
   await expect(id).toBeDisabled();
-  await expect(page.locator('.dd[data-path="settings.dictionary"] .dd-btn')).toBeDisabled();
+  await expect(page.locator('.kit-select[data-path="settings.dictionary"] .kit-select-trigger')).toBeDisabled();
   await tab(page, "label");
-  await expect(page.locator('input[data-path="settings.label.on"]')).toBeDisabled();
+  await expect(page.locator('[role="switch"][data-path="settings.label.on"]')).toBeDisabled();
   await expect(page.locator('.insp-head input[data-path="name"]')).toBeEnabled();
   await expect(page.locator('input[data-path="override:tag1"]')).toBeDisabled();
   await shot(page, "audit_locked");
@@ -102,7 +102,7 @@ test("F7: a label message is one short line, the plan's words in its tooltip", a
   await fresh(page, "e2e-audit-label");
   await add(page, "single");
   await tab(page, "label");
-  await page.locator('.tog:has(input[data-path="settings.label.on"])').click();
+  await page.locator('[role="switch"][data-path="settings.label.on"]').click();
   await idle(page);
   const err = page.locator('[data-tab-body="label"] .issue[data-level="error"]');
   await expect(err).toHaveCount(1);

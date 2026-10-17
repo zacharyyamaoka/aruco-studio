@@ -21,7 +21,7 @@ test("three types on the canvas, ids as planned, read by OpenCV", async ({ page,
   await tab(page, "advanced");
   await choose(page, "target.kind", "profile");
   await tab(page, "marker");
-  await page.locator('.tog:has(input[data-path="numbers.size:auto"])').click();
+  await page.locator('[role="switch"][data-path="numbers.size:auto"]').click();
   await idle(page);
   await type(page, "numbers.size", "14");
   await type(page, "settings.force[0]", "4");
@@ -35,7 +35,7 @@ test("three types on the canvas, ids as planned, read by OpenCV", async ({ page,
   await tab(page, "advanced");
   await choose(page, "target.kind", "profile");
   await tab(page, "marker");
-  await page.locator('.tog:has(input[data-path="numbers.size:auto"])').click();
+  await page.locator('[role="switch"][data-path="numbers.size:auto"]').click();
   await idle(page);
   await type(page, "numbers.size", "12");
   await type(page, "numbers.square", "16");

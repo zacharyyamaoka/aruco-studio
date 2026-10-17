@@ -86,3 +86,21 @@ export const STUDIO_ICONS: Record<string, string> = {
 };
 
 export const ICONS: Record<string, string> = { ...REF_ICONS, ...STUDIO_ICONS };
+
+// M8b2: the Studio's glyphs go into the kit's registry once, the fixed
+// accent and panel colours turned into tokens so they follow the theme.
+import { registerGlyphs, themed } from "@bam/ui";
+
+const TOKENS: Record<string, string> = { "#38a6e8": "var(--accent)", "#3b4453": "var(--field)" };
+export const EXTRA_ICONS: Record<string, string> = {
+  sticker: `<path d="M2.5 2.5h8l3 3v8h-11z" fill="none" ${S}/><path d="M10.5 2.5v3h3" fill="none" ${S}/><path d="M5 6h3v3H5z" fill="currentColor"/>`,
+  printer: `<path d="M4.5 1.5h7v4h-7z" fill="none" ${S}/><path d="M2 5.5h12v6h-2.5M4.5 11.5H2v-6" fill="none" ${S}/><path d="M4.5 9h7v5.5h-7z" fill="none" ${S}/>`,
+  send: `<path d="M1.5 8 14.5 2l-3 12-3.5-4.5z" fill="none" ${S} stroke-linejoin="round"/><path d="M8 9.5l6.5-7.5" ${S}/>`,
+  print: `<path d="M4.5 1.5h7v4h-7zM4.5 10h7v4.5h-7z" fill="none" ${S}/><path d="M4.5 12H2V5.5h12V12h-2.5" fill="none" ${S}/>`,
+};
+
+export function registerStudioGlyphs(): void {
+  const all: Record<string, string> = {};
+  for (const [k, v] of Object.entries({ ...ICONS, ...EXTRA_ICONS })) all[k] = themed(v, TOKENS);
+  registerGlyphs(all);
+}

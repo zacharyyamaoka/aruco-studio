@@ -7,7 +7,7 @@ import { IdsTable } from "../ids/IdsTable";
 import { Inspector } from "../inspector/Inspector";
 import { Library } from "../library/Library";
 import { TYPED_TOOLS, useStudio } from "../store";
-import { Icon } from "../ui/controls";
+import { Glyph as Icon } from "@bam/ui";
 import { View3D } from "../view3d/View3D";
 import { BottomBar } from "./BottomBar";
 import { Dialogs } from "./Dialogs";
@@ -36,6 +36,8 @@ function useKeys() {
     const onKey = (e: KeyboardEvent) => {
       const st = useStudio.getState();
       if (st.libraryOpen || st.dialog || st.palette || typing(e)) return;
+      // an open list, menu or dialog takes its own keys (audit F3)
+      if (document.querySelector("[data-kit-popup][data-open]")) return;
       // what a tool takes typed: 80 50, 18, 5
       if (!e.ctrlKey && !e.metaKey && !e.altKey && TYPED_TOOLS.includes(st.tool) && (/^[0-9.\- ,x]$/.test(e.key) || (e.key === "Backspace" && st.typed))) {
         e.preventDefault();
@@ -43,7 +45,6 @@ function useKeys() {
         return;
       }
       if (e.defaultPrevented) return;                      // an open list's Escape (audit F3)
-      if (e.key === "Escape" && document.querySelector(".dd.open, .menu.open")) return;
       const k = e.key.toLowerCase();
       const ctrl = e.ctrlKey || e.metaKey;
       const go = (fn: () => unknown) => { e.preventDefault(); fn(); };

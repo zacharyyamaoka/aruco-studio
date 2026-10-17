@@ -1,8 +1,8 @@
 // The Studio's API (docs/API.md). Relative URLs: in dev Vite proxies /api to
 // 127.0.0.1:5360; built, the server itself serves this app on 5360.
 import type {
-  DesignInfo, Dictionary, FormDoc, LibraryState, PaletteEntry, Preset, PresetItem, RenumberReport,
-  SceneDoc, SceneTag, TagPlan, TagSpec, Target, VerifyReport,
+  DesignInfo, Dictionary, FormDoc, LibraryState, PaletteEntry, Preset, PresetCollection, PresetItem, PrusaPrinters, RenumberReport,
+  SceneDoc, SceneTag, SendAnswer, SendBody, SheetJson, StaleInfo, TagPlan, TagSpec, Target, VerifyReport,
 } from "./types";
 
 export class ApiError extends Error {
@@ -52,11 +52,28 @@ async function call<T>(method: string, url: string, body?: unknown): Promise<T> 
 }
 
 const get = <T,>(u: string) => call<T>("GET", u);
+async function text(u: string): Promise<string> {
+  const r = await fetch(u);
+  const t = await r.text();
+  if (!r.ok) {
+    let d: unknown = t;
+    try { d = JSON.parse(t); } catch { /* the text as it is */ }
+    throw new ApiError(r.status, d, `${r.status}: ${errorText((d as any)?.detail ?? d)}`);
+  }
+  return t;
+}
 const post = <T,>(u: string, b?: unknown) => call<T>("POST", u, b ?? {});
 const put = <T,>(u: string, b: unknown) => call<T>("PUT", u, b);
 const patch = <T,>(u: string, b: unknown) => call<T>("PATCH", u, b);
 const del = <T,>(u: string) => call<T>("DELETE", u);
 const q = encodeURIComponent;
+
+export interface SheetQuery { page?: string; landscape?: boolean; mode?: "spaced" | "tight"; margin_mm?: number; proofs?: boolean }
+function sheetQuery(x: SheetQuery): string {
+  const out: string[] = [];
+  for (const [k, v] of Object.entries(x)) if (v !== undefined && v !== null) out.push(`${k}=${q(String(v))}`);
+  return out.join("&");
+}
 
 export const api = {
   health: () => get<{ ok: boolean; version: string; ref_commit: string; home: string; scenes: string }>("/api/health"),
@@ -80,7 +97,7 @@ export const api = {
     return r.blob();
   },
   // presets and the library
-  presets: () => get<{ items: PresetItem[]; last: string | null; notes: string[]; file: string }>("/api/presets"),
+  presets: () => get<{ items: PresetItem[]; last: string | null; notes: string[]; file: string; collections?: PresetCollection[] }>("/api/presets"),
   presetSaveAs: (name: string, preset: Preset) => post<{ name: string }>("/api/presets", { name, preset }),
   presetDelete: (name: string) => del<{ deleted: string }>(`/api/presets/${q(name)}`),
   presetApply: (spec: TagSpec, name: string, preset?: Preset) =>
@@ -119,6 +136,21 @@ export const api = {
   designPreview: (text: string, mesh: boolean) =>
     post<{ scene: SceneDoc | null; issues: any[]; error: any }>(`/api/design/preview?top=1${mesh ? "&mesh=1" : ""}`, { text }),
   designReveal: (open: boolean) => post<{ path: string; command: string[]; opened: boolean }>("/api/design/reveal", { open }),
+  // the sticker sheet (M6a, docs/API_sheet.md) and Print (M6c)
+  sheetSvg: (q: SheetQuery) => text(`/api/scene/sheet.svg?${sheetQuery(q)}`),
+  sheetJson: (q: SheetQuery) => get<SheetJson>(`/api/scene/sheet.json?${sheetQuery(q)}`),
+  printUrl: (q: SheetQuery) => `/api/scene/print.pdf?${sheetQuery(q)}`,
+  printBytes: async (q: SheetQuery): Promise<Uint8Array> => {
+    const r = await fetch(`/api/scene/print.pdf?${sheetQuery(q)}`);
+    if (!r.ok) throw new ApiError(r.status, await r.text(), `${r.status}: the sheet's PDF was refused`);
+    return new Uint8Array(await r.arrayBuffer());
+  },
+  exportPrint: (b: SheetQuery & { inline?: boolean }) =>
+    post<{ stickers: number; parts: number; pages: number; rejected: any[]; files: string[]; dir: string; written: string[]; inline?: Record<string, string> }>("/api/scene/export/print", b),
+  // PrusaSlicer (M8c, docs/API_prusa.md)
+  prusaPrinters: () => get<PrusaPrinters>("/api/prusa/printers"),
+  prusaStale: () => get<{ stale: StaleInfo[] }>("/api/prusa/stale"),
+  sendPrusa: (b: SendBody) => post<SendAnswer>("/api/scene/send/prusaslicer", b),
   sceneExport: (fmt: string) =>
     post<{ dir: string; files: string[]; inline: Record<string, string> | null }>(`/api/scene/export/${fmt}?save=1&inline=1`),
 };

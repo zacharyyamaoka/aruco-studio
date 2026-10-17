@@ -34,13 +34,13 @@ First time only: `npm --prefix studio ci` and `npm --prefix e2e ci`. The e2e tes
 
 | Part | What it does |
 |---|---|
-| Top bar | File (New, Open, Save as, Reveal, the File drawer) and the scene's name · Undo, Redo, Rotate, Duplicate, Delete, Arrange · 2D / 3D, quiet zones, frame axes, layer outlines, zoom to fit · Verify · Export |
+| Top bar | File (New, Open, Save as, Reveal, the File drawer) and the scene's name · Undo, Redo, Rotate, Duplicate, Delete, Arrange · 2D / 3D, quiet zones, frame axes, layer outlines, zoom to fit · Verify · Export (Sticker sheet…, Print sticker sheet…, Send to PrusaSlicer…, the files) · the light / dark theme · the keys |
 | Tools (the canvas's foot) | the tools with their keys on badges; the active one is lit. Above them, while a tool runs: what it waits for and what you typed |
-| IDs (left) | one row per tag: type, dictionary, ids, a typed first id, locked and duplicate marks. "Renumber all" makes the ids unique per dictionary family |
-| 2D canvas | the shapes (a body's outline is brighter) and every tag drawn from its plan. A tag on a side face is drawn unfolded about its edge, like the net of a box, with a dashed hinge line (`data-hinge`) |
+| IDs (left) | one row per tag: type, how it is made (`3D` / `2D`), dictionary, ids, a typed first id, locked and duplicate marks. "Renumber all" makes the ids unique per dictionary family: a sticker #3 and a printed #3 are one duplicate |
+| 2D canvas | the shapes (a body's outline is brighter) and every tag drawn from its plan, a `3D` or `2D` badge by its name. A tag on a side face is drawn unfolded about its edge, like the net of a box, with a dashed hinge line (`data-hinge`). A sticker's cut line is dashed grey; a hole that Holes: Ignore leaves out is dashed amber. With both kinds in the scene, "Show All · 3D · 2D" filters the canvas (and the 3D view) |
 | 3D view | each Extrude as a prism, each tag standing on its face by its full pose; the gizmo on the selected shape's sketch (move in X and Y, turn about Z) and the extrude arrow on its body |
-| Inspector (right) | a shape: its place, turn, size, holes, the Extrude's height, the tags on it. A tag: what it stands on (the ArUco Extrude's reference, the shape a click away), the Preset, then the tabs Marker · Heights · Print · Label · Advanced; each message under its field |
-| Library | print presets like Fusion's Machine Library |
+| Inspector (right) | a shape: its place, turn, size, holes, the Extrude's height, the tags on it. A tag: the Preset first (it is the machine), Made by under it (read only: "Printed sticker · 600 dpi · Letter"), what it stands on, then the tabs Marker · Heights · Print · Label · Advanced. The rows, their tabs, icons and when they show all come from `GET /api/form` (`plan/fields.py`): a sticker has no Heights tab and gets Sticker thickness and margin on Print. Each message sits under its row, or under the row it is anchored to while its own row is hidden. Several tags selected: one form, a change goes to all of them (one Undo), "—" where they differ. Nothing selected: the new-tag Preset (3D printers and sticker printers) |
+| Library | presets like Fusion's Machine Library: Recent, This scene, My presets, PrusaSlicer profiles, Built-in, **Printers** (one card per PrusaSlicer physical printer, its fitting print presets to pick, PrusaSlicer's current pair marked; Select makes a preset from the printer's nozzle and the print's line and layers) and Sticker printers |
 | Status bar and drawer | the file's state, the last message; the Verify, Messages (with the keys) and File drawers |
 
 ## Commands and keys
@@ -76,6 +76,10 @@ S opens the command palette: it lists exactly these commands (the e2e test diffs
 | | Frame axes |
 | | Layer outlines |
 | | File drawer |
+| | Light / dark theme |
+| | Show every tag |
+| | Show 3D tags only |
+| | Show 2D tags only |
 | | Verify |
 | | Verify the sheet |
 | | Renumber all |
@@ -88,7 +92,9 @@ S opens the command palette: it lists exactly these commands (the e2e test diffs
 | | Save as |
 | | Reveal the file |
 | | Export: print sheet SVG |
-| | Export: sticker sheet PDF |
+| | Sticker sheet… |
+| | Print sticker sheet… |
+| | Send to PrusaSlicer… |
 | | Export: STL of every tag |
 
 ### The tools
@@ -133,9 +139,25 @@ Several faces make one feature with a face list (one tag per face, named `<id>.<
 | Commands (the toolbar, the palette, the keys, this doc's table) | `studio/src/app/commands.ts` |
 | The events client (server-sent events) | `studio/src/api/events.ts` |
 | The 3D gizmo and the extrude arrow | `studio/src/view3d/Gizmo.ts` |
-| The kit's primitives (Kbd, ToolButton, NumberField, Field, CommandPalette; Tailwind 4, cmdk, lucide) | `studio/src/kit/` |
+| The kit (`@bam/ui`: tokens light and dark, Select, NumberField, Switch, Tabs, Dialog, Menu, Form, the palette, the library shell; docs/KIT.md) | `studio/packages/bam-ui/` |
+| The inspector's form: the kit's `Form` over `/api/form`, plus the Studio's own controls (Size with Auto, Cells, Origin, Trim / Perimeter, Fit) | `studio/src/inspector/Inspector.tsx`, `PresetRow.tsx` |
+| The dialogs: New, Open, Save as, Sticker sheet…, Send to PrusaSlicer…, Print's fallback | `studio/src/app/Dialogs.tsx` |
+| Print: the PDF into a hidden iframe, its print() | `studio/src/app/Print.tsx` |
 | Live re-placement | while a handle drags, the Studio sends the new text to `POST /api/design/preview` (15 times a second at most; nothing written); on release the plans of the last preview are drawn at once and the file is written |
-| Tests' handle | `window.__studio`: `probe()` (the file, the shapes, the tool, the picks, the revision), `idle()`, the store; `window.__studio3d`: the faces' and the gizmo's screen points, the tags' normals |
+| Tests' handle | `window.__studio`: `probe()` (the file, the shapes, the tool, the picks, the revision), `idle()`, the store, `theme`, `printHook` (when set, Print hands it the PDF's bytes instead of the print dialog; false = a browser that cannot print it), `sendOpen` (false: Send never opens PrusaSlicer); `window.__studio3d`: the faces' and the gizmo's screen points, the tags' normals |
+
+## Stickers, the sheet, Print and Send
+
+| | |
+|---|---|
+| A sticker | pick a sticker printer as the Preset (nothing selected: the new-tag Preset; a tag: its Preset row), then A on a shape. The tag is a printed sticker: 0.1 mm stock and the ink on it. Perimeter: Marker (a rectangle) or Profile (the shape's outline, holes included); with Marker and no margin the label goes on the black only |
+| Holes | shown when the shape has holes: Avoid (the marker keeps clear) or Ignore (it may cover them; the plan says when it crosses one) |
+| A ChArUco label | goes in a black square only (Position offers that alone); drag it into any black square |
+| Export › Sticker sheet… | the page, Landscape, Spaced (gaps, a caption and crop marks per sticker) or Tight (shelves that share their cut lines), the margin; the preview is the server's own `sheet.svg`; the stickers that do not fit are listed with the reason. Export writes `sheet.pdf`, `sheet.svg`, `sheet.json` and the rest of the print bundle to `exports/<scene>/`. It starts from the file's `sheet` key |
+| Export › Print sticker sheet… | the sheet's PDF (`/api/scene/print.pdf`) goes to the browser's print dialog through a hidden frame; Chrome and Edge print it at 100 %. Print at Actual size and check the 100 mm bar. Where the browser cannot (Firefox), a dialog offers **Open the PDF** and the Ctrl+P note. Off, with the reason, when the scene has no sticker |
+| Export › Send to PrusaSlicer… | the physical printer (PrusaSlicer's current one first), a print preset that fits it, the white and black extruders, Open PrusaSlicer. Send writes a 3MF project with the colours on their extruders (`exports/<scene>/prusaslicer/`) and opens it in PrusaSlicer. Off, "nothing to slice", when the scene has no 3D tag |
+| A changed PrusaSlicer profile | a tag whose preset came from it shows the change under its Preset with **Apply**; nothing changes without the click |
+| Light / dark | the moon / sun button of the top bar (or S › "Light / dark theme"); light is the default; the browser remembers the choice |
 
 ## Things to know
 

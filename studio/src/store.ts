@@ -7,11 +7,13 @@
 // TEXTS. The server's events (GET /api/events) bring outside changes in.
 // Changes run one at a time (a queue).
 import { create } from "zustand";
-import { api, errorText, ApiError } from "./api/client";
+import { api, errorText, ApiError, type SheetQuery } from "./api/client";
 import { connectEvents, type Events } from "./api/events";
 import type {
-  DesignInfo, Dictionary, FormDoc, PaletteEntry, PresetItem, RenumberReport, SceneDoc, SceneTag, VerifyReport, Pt,
+  DesignInfo, Dictionary, FormDoc, PaletteEntry, PresetCollection, PresetItem, PrusaPrinters, RenumberReport, SceneDoc, SceneTag,
+  SendAnswer, SendBody, StaleInfo, VerifyReport, Pt,
 } from "./api/types";
+import { printPdf, type PrintOutcome } from "./app/Print";
 import { matMul, poseOf, sceneZ, tagBox, unionBox } from "./model/geom";
 import { dump, parse, type Span } from "./model/json";
 import {
@@ -27,6 +29,26 @@ export interface Show { quiet: boolean; axes: boolean; outlines: boolean; ids: b
 export type Drawer = null | "verify" | "messages" | "file";
 export interface LogLine { t: string; level: "info" | "warn" | "error"; text: string }
 export type ToolId = "select" | "rect" | "circle" | "polygon" | "slot" | "hole" | "rhole" | "extrude" | "aruco";
+/** the canvas's filter (M6b): every tag, the 3D printed ones, the stickers */
+export type KindFilter = "all" | "3d" | "2d";
+export type DialogState = null
+  | { kind: "save" | "open" | "new" }
+  | { kind: "sheet" }
+  | { kind: "send" }
+  | { kind: "print"; url: string; why: string };
+
+/** How a tag is made: its plan's word, else its settings' (absent = 3D printed). */
+export function madeBy(t: SceneTag): "print3d" | "sticker" {
+  const p = (t.plan as any)?.made_by;
+  if (p === "sticker" || p === "print3d") return p;
+  return (t.spec.settings as any)?.make?.by === "sticker" ? "sticker" : "print3d";
+}
+
+/** The tags the filter lets through. */
+export function filtered(tags: SceneTag[], f: KindFilter): SceneTag[] {
+  if (f === "all") return tags;
+  return tags.filter((t) => (madeBy(t) === "sticker") === (f === "2d"));
+}
 /** tools that take typed numbers */
 export const TYPED_TOOLS: ToolId[] = ["rect", "circle", "slot", "hole", "rhole", "extrude"];
 
@@ -37,7 +59,15 @@ export interface StudioState {
   dictionaries: Dictionary[];
   targets: PaletteEntry[];
   presets: PresetItem[];
+  presetCollections: PresetCollection[];
   recent: string[];
+  /** tags whose PrusaSlicer profile changed (GET /api/prusa/stale) */
+  stale: StaleInfo[];
+  printers: PrusaPrinters | null;
+  filter: KindFilter;
+  /** the sheet dialog's choices (from the file's `sheet`, then as set) */
+  sheet: Required<Pick<SheetQuery, "page" | "landscape" | "mode" | "margin_mm">>;
+  lastSend: SendAnswer | null;
   /** the open design file (GET /api/design) */
   design: DesignInfo;
   /** its text parsed (the last text that parsed) */
@@ -68,7 +98,7 @@ export interface StudioState {
   renumberReport: RenumberReport | null;
   newPreset: string;
   libraryOpen: boolean;
-  dialog: null | { kind: "save" | "open" | "new" };
+  dialog: DialogState;
   palette: boolean;
   tool: ToolId;
   typed: string;
@@ -144,6 +174,13 @@ export interface StudioState {
   setLibrary(open: boolean): void;
   setDialog(d: StudioState["dialog"]): void;
   setPalette(open: boolean): void;
+  setFilter(f: KindFilter): void;
+  setSheet(q: Partial<StudioState["sheet"]>): void;
+  loadStale(): Promise<void>;
+  loadPrinters(): Promise<PrusaPrinters | null>;
+  printSheet(q?: SheetQuery): Promise<PrintOutcome>;
+  exportSheet(q?: SheetQuery): Promise<string[]>;
+  sendPrusa(b: SendBody): Promise<SendAnswer | null>;
   idle(): Promise<void>;
 }
 
@@ -369,7 +406,13 @@ export const useStudio = create<StudioState>((set, get) => {
     dictionaries: [],
     targets: [],
     presets: [],
+    presetCollections: [],
     recent: [],
+    stale: [],
+    printers: null,
+    filter: "all",
+    sheet: { page: "letter", landscape: false, mode: "spaced", margin_mm: 10 },
+    lastSend: null,
     design: NO_DESIGN,
     doc: null,
     spans: new Map(),
@@ -415,7 +458,13 @@ export const useStudio = create<StudioState>((set, get) => {
       set({ ready: true });
       if (get().scene.tags.length || shapesOf(get().doc).length) get().zoomToFit();
       events?.close();
+      void get().loadStale();
       events = connectEvents((kind, data) => {
+        if (kind === "prusa") {
+          void get().loadStale();
+          if (get().printers) void get().loadPrinters();
+          return;
+        }
         if (kind === "scene" || kind === "file" || kind === "hello") {
           // an outside change: the text before it goes on the Undo stack too
           queue = queue.then(async () => {
@@ -443,9 +492,17 @@ export const useStudio = create<StudioState>((set, get) => {
     async refresh() {
       ++previewSeq;                                   // the file's scene wins over a preview in flight
       const [d, scene] = await Promise.all([api.design(), api.scene(get().view === "3d")]);
+      const fresh = d.path !== get().design.path || !get().doc;
       setDesign(d);
       setScene(scene);
       set({ previewing: false });
+      // a newly opened file: the sheet dialog starts from its `sheet` key
+      const sh = (get().doc as any)?.sheet;
+      if (fresh && sh && typeof sh === "object") {
+        set((s) => ({ sheet: { ...s.sheet, ...(typeof sh.page === "string" ? { page: sh.page } : {}),
+          ...(sh.mode === "tight" || sh.mode === "spaced" ? { mode: sh.mode } : {}),
+          ...(typeof sh.landscape === "boolean" ? { landscape: sh.landscape } : {}) } }));
+      }
     },
 
     say(text, level = "info") {
@@ -701,7 +758,12 @@ export const useStudio = create<StudioState>((set, get) => {
       set({ tool: "select", typed: "", shapeSel: [info.key], sel: [] });
     },
     async arucoOn(refs, extra = {}, base = "tag") {
-      await writeAruco(`ArUco Extrude on ${refs.join(", ")}`, (d) => arucoNamed(d, refs, extra, base));
+      // the preset first (M6 a): a new tag is made by the new-tag preset when
+      // it is not the file's own
+      const np = get().newPreset;
+      const filePreset = String((get().doc as any)?.preset ?? "Default");
+      const more = !("preset" in extra) && np && np !== filePreset ? { preset: np } : {};
+      await writeAruco(`ArUco Extrude on ${refs.join(", ")}`, (d) => arucoNamed(d, refs, { ...more, ...extra }, base));
     },
     async addTag(layout) {
       // the palette's "ArUco: single / grid / ChArUco": on the selected shapes,
@@ -709,7 +771,8 @@ export const useStudio = create<StudioState>((set, get) => {
       const keys = get().shapeSel.filter((k) => !k.includes("/"));
       const base = layout === "single" ? "tag" : layout === "grid" ? "board" : "charuco";
       const extra: Record<string, unknown> = { layout };
-      if (get().newPreset && get().newPreset !== "Default") extra.preset = get().newPreset;
+      const filePreset = String((get().doc as any)?.preset ?? "Default");
+      if (get().newPreset && get().newPreset !== filePreset) extra.preset = get().newPreset;
       if (keys.length) {
         const d = JSON.parse(JSON.stringify(get().doc));
         const refs = keys.map((k) => refOfShape(d, k)).filter(Boolean) as string[];
@@ -1025,7 +1088,7 @@ export const useStudio = create<StudioState>((set, get) => {
     },
     async loadPresets() {
       const [p, r] = await Promise.all([api.presets(), api.recent()]);
-      set({ presets: p.items, recent: r.recent });
+      set({ presets: p.items, presetCollections: p.collections ?? [], recent: r.recent });
     },
     setNew(k, v) {
       set({ [k]: v } as any);
@@ -1041,6 +1104,57 @@ export const useStudio = create<StudioState>((set, get) => {
     },
     setPalette(open) {
       set({ palette: open });
+    },
+    setFilter(f) {
+      set((s) => ({ filter: f, sel: s.sel.filter((n) => filtered(s.scene.tags.filter((t) => t.name === n), f).length) }));
+    },
+    setSheet(q) {
+      set((s) => ({ sheet: { ...s.sheet, ...q } }));
+    },
+    async loadStale() {
+      try { set({ stale: (await api.prusaStale()).stale }); } catch { set({ stale: [] }); }
+    },
+    async loadPrinters() {
+      try {
+        const p = await api.prusaPrinters();
+        set({ printers: p });
+        return p;
+      } catch (e) {
+        get().say(`PrusaSlicer's printers: ${msgOf(e)}`, "error");
+        return null;
+      }
+    },
+    async printSheet(q) {
+      // M6c: the sheet's PDF printed from the page, at 100 %
+      const query = { ...get().sheet, ...(q ?? {}) };
+      let out: PrintOutcome = "fallback";
+      await run("", async () => {
+        out = await printPdf(query);
+        if (out === "fallback") set({ dialog: { kind: "print", url: api.printUrl(query), why: "This browser cannot print the PDF from the page." } });
+        get().say(out === "fallback" ? "Print: open the PDF, then Ctrl+P at Actual size (100 %)"
+          : "Print: the sheet went to the print dialog; print at 100 % (Actual size) and check the 100 mm bar");
+      }, { history: false });
+      return out;
+    },
+    async exportSheet(q) {
+      const query = { ...get().sheet, ...(q ?? {}) };
+      let files: string[] = [];
+      await run("", async () => {
+        const r = await api.exportPrint({ ...query, inline: false });
+        files = r.written ?? r.files;
+        get().say(`sticker sheet: ${r.stickers} sticker${r.stickers === 1 ? "" : "s"} on ${r.pages} page${r.pages === 1 ? "" : "s"}, written to ${r.dir}`);
+      }, { history: false });
+      return files;
+    },
+    async sendPrusa(b) {
+      let ans: SendAnswer | null = null;
+      await run("", async () => {
+        ans = await api.sendPrusa(b);
+        set({ lastSend: ans });
+        const a = ans as SendAnswer;
+        get().say(`Send to PrusaSlicer: ${a.project}${a.opened ? " (opened in PrusaSlicer)" : ""}`);
+      }, { history: false });
+      return ans;
     },
     async idle() {
       // settled: nothing queued since the last change ended, nothing busy

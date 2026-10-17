@@ -23,7 +23,7 @@ test("the size line is the plan's Issue; cells change the pattern; every tab", a
   await expectIssues(page, "numbers.size", want);
   // a typed 28 mm on a 40 mm box, 3 mm thick (R, 40 40, E 3, A): tag2
   expect(await tagOn(page, "r", "40 40", 3)).toBe("tag2");
-  await page.locator('.tog:has(input[data-path="numbers.size:auto"])').click();
+  await page.locator('[role="switch"][data-path="numbers.size:auto"]').click();
   await idle(page);
   await type(page, "numbers.size", "28");
   const spec28 = await specOf(page, "tag2");
@@ -56,7 +56,7 @@ test("the size line is the plan's Issue; cells change the pattern; every tab", a
   await shot(page, "inspector_heights");
 
   await tab(page, "label");
-  await page.locator('.tog:has(input[data-path="settings.label.on"])').click();
+  await page.locator('[role="switch"][data-path="settings.label.on"]').click();
   await idle(page);
   await expect(page.locator('[data-row="settings.label.content"]')).toBeVisible();
   await expect(page.locator('g[data-tag="tag2"] [data-layer^="label_"]').first()).toBeAttached();
@@ -76,7 +76,7 @@ test("validation: each error under its field, one summary line, typed text check
   const q = page.locator('[data-issues-for="settings.quiet_modules"] .issue[data-level="error"]');
   await expect(q).toHaveCount(1);
   await expect(page.locator('[data-row="settings.quiet_modules"]')).toHaveClass(/has-error/);
-  await expect(page.locator('.tab[data-tab="print"]')).toHaveClass(/has-error/);
+  await expect(page.locator('[role="tab"][data-tab="print"]')).toHaveClass(/has-error/);
   await expect(page.getByTestId("summary")).toHaveClass(/lv-error/);
   await expect(page.getByTestId("summary")).toContainText("Quiet zone");
   await tab(page, "marker");

@@ -12,7 +12,8 @@ import { bodyFaces, canvasLoops, findShape, moveShapes, setShape, shapesOf, snap
 import { applyXf, compose, faceNet, inside, outline, rectAt, sizeText } from "../model/shapes";
 import { idsText, marqueeSelect } from "../model/scene";
 import { addVertex, dragHandle, handlesOf, removeVertex, shapeFromDrag } from "../sketch/handles";
-import { patternToScene, TYPED_TOOLS, useStudio } from "../store";
+import { filtered, madeBy, patternToScene, TYPED_TOOLS, useStudio } from "../store";
+import { SegmentedRow } from "@bam/ui";
 import { TagSvg } from "./TagSvg";
 
 const RULER = 20;
@@ -74,6 +75,7 @@ export function Canvas2D() {
   const tool = useStudio((s) => s.tool);
   const picks = useStudio((s) => s.picks);
   const draft = useStudio((s) => s.draft);
+  const filter = useStudio((s) => s.filter);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [hover, setHover] = useState<Pt | null>(null);
   /** the document during a handle drag (the shapes drawn from it) */
@@ -365,7 +367,8 @@ export function Canvas2D() {
   };
 
   const world = `translate(${w / 2 - camera.cx * z} ${h / 2 + camera.cy * z}) scale(${z} ${-z})`;
-  const visible = scene.tags.filter((t) => !t.hidden);
+  const visible = filtered(scene.tags.filter((t) => !t.hidden), filter);
+  const nKinds = new Set(scene.tags.map((t) => madeBy(t))).size;
   const boxes = useMemo(() => Object.fromEntries(visible.map((t) => [t.name, tagBox(t)])), [visible]);
 
   const step = niceStep(z);
@@ -550,11 +553,18 @@ export function Canvas2D() {
             const off = offsetOf(t.source?.shape) ?? [0, 0];
             const [x0, y0] = toScreen(b.x0 + off[0], b.y1 + off[1]);
             const ids = t.plan?.ids ?? [];
+            const kind = madeBy(t) === "sticker" ? "2D" : "3D";
             return (
-              <text key={`l${t.uid}`} data-label-for={t.name} x={x0} y={y0 - 7} className={`taglabel${t.plan && !t.plan.ok ? " bad" : ""}`}>
-                {t.locked ? "🔒 " : ""}{t.name}
-                <tspan className="ids"> {t.plan?.ok ? `#${idsText(ids)}` : "not built"}</tspan>
-              </text>
+              <g key={`l${t.uid}`}>
+                <g className={`kindbadge k-${kind.toLowerCase()}`} data-badge-for={t.name} data-badge={kind}>
+                  <rect x={x0} y={y0 - 18} width={19} height={13} rx={3} />
+                  <text x={x0 + 9.5} y={y0 - 8.5} textAnchor="middle">{kind}</text>
+                </g>
+                <text data-label-for={t.name} x={x0 + 23} y={y0 - 7} className={`taglabel${t.plan && !t.plan.ok ? " bad" : ""}`}>
+                  {t.locked ? "🔒 " : ""}{t.name}
+                  <tspan className="ids"> {t.plan?.ok ? `#${idsText(ids)}` : "not built"}</tspan>
+                </text>
+              </g>
             );
           })}
           {handleEls}
@@ -576,6 +586,14 @@ export function Canvas2D() {
           <text x={3} y={13} className="unit">mm</text>
         </g>
       </svg>
+      {(nKinds > 1 || filter !== "all") && (
+        <div className="canvas-bar" data-testid="kind-filter-bar" onPointerDown={(e) => e.stopPropagation()}>
+          <span className="muted">Show</span>
+          <SegmentedRow compact path="filter" testid="kind-filter" value={filter} onChange={(v) => useStudio.getState().setFilter(v as "all" | "3d" | "2d")}
+            options={[{ value: "all", label: "All", hint: "every tag" }, { value: "3d", label: "3D", hint: "the 3D printed tags only" },
+              { value: "2d", label: "2D", hint: "the stickers only" }]} />
+        </div>
+      )}
       {sceneIssues.length > 0 && (
         <div className="scene-issues" data-testid="scene-issues">
           {sceneIssues.map((i, k) => <div key={k} className={`issue lv-${i.level}`} data-kind={i.kind} data-tags={i.tags.join(",")}>{i.text}</div>)}

@@ -4,7 +4,7 @@ import { Command } from "cmdk";
 import type { ReactNode } from "react";
 import { Kbd } from "./Kbd";
 
-export interface PaletteItem { id: string; name: string; key: string; group: string; icon?: ReactNode; hint?: string; run: () => unknown }
+export interface PaletteItem { id: string; name: string; key: string; group: string; icon?: ReactNode; hint?: string; disabled?: boolean; run: () => unknown }
 
 export function CommandPalette({ items, onClose, placeholder = "Type a commandâ€¦" }: { items: PaletteItem[]; onClose: () => void; placeholder?: string }) {
   const groups = [...new Set(items.map((i) => i.group))];
@@ -19,7 +19,7 @@ export function CommandPalette({ items, onClose, placeholder = "Type a commandâ€
             <Command.Group key={g} heading={g}>
               {items.filter((i) => i.group === g).map((i) => (
                 <Command.Item key={i.id} value={`${i.name} ${i.id}`} keywords={[i.group]} data-command={i.name} data-command-id={i.id}
-                  onSelect={() => { onClose(); i.run(); }}>
+                  disabled={i.disabled} onSelect={() => { onClose(); i.run(); }}>
                   {i.icon}
                   <span className="kit-palette-name">{i.name}</span>
                   {i.hint && <span className="kit-palette-hint">{i.hint}</span>}

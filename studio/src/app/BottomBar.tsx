@@ -3,7 +3,7 @@
 // the command palette.
 import { ArrowUpFromLine, Circle, CircleDot, MousePointer2, Pentagon, Pill, QrCode, RectangleHorizontal, Search, SquareDot } from "lucide-react";
 import type { ReactNode } from "react";
-import { Kbd, ToolButton } from "../kit";
+import { Kbd, ToolButton } from "@bam/ui";
 import { useStudio, TYPED_TOOLS, type ToolId } from "../store";
 import { TOOLS } from "./commands";
 

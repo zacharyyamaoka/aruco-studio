@@ -1,6 +1,9 @@
 // One scene tag on the 2D canvas, drawn from its TagPlan only: the target's
 // outline, the plan's top view (what prints, seen from above), every layer
 // as an outline path (data-layer), the guides, the OpenCV frame's axes.
+// M6b: a sticker's cut line (guides.cut_line: the rectangle for Perimeter =
+// Marker, the outline with every hole for Profile) dashed, and the holes
+// Holes: ignore leaves out (guides.target_ignored) dashed.
 import { memo } from "react";
 import type { SceneTag } from "../api/types";
 import { boxOf, layerD, loopD, loopsD, poseOf, rectLoop, svgMatrix, targetLoops, topD } from "../model/geom";
@@ -70,6 +73,14 @@ export const TagSvg = memo(function TagSvg({ tag, show, selected, labelShift, pa
                   d={(g.label_preview || []).map((b) => loopD(b as any)).join("")} />
               )}
               {g.trim && (g.trim as any).outline && <path data-guide="trim" className="g-trim" d={loopD(rectLoop((g.trim as any).outline))} />}
+              {(g as any).cut_line && (
+                <path data-guide="cut_line" data-kind={(g as any).cut_line.kind} data-points={((g as any).cut_line.outer ?? []).length}
+                  data-holes={((g as any).cut_line.holes ?? []).length} className="g-cut" fillRule="evenodd"
+                  d={loopD((g as any).cut_line.outer ?? []) + ((g as any).cut_line.holes ?? []).map((h: any) => loopD(h)).join("")} />
+              )}
+              {(((g as any).target_ignored ?? []) as any[]).map((l, i) => (
+                <path key={`ig${i}`} data-guide="target_ignored" data-points={l.length} className="g-ignored" d={loopD(l)} />
+              ))}
             </g>
           )}
           {selected && labelHits(p).map((r, i) => (

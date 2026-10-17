@@ -1,7 +1,7 @@
 // S: the command palette. Every command of commands.ts by name, with its
 // key; typing filters, Enter runs it.
-import { CommandPalette } from "../kit";
-import { Icon } from "../ui/controls";
+import { CommandPalette } from "@bam/ui";
+import { Glyph as Icon } from "@bam/ui";
 import { useStudio } from "../store";
 import { TOOL_ICONS } from "./BottomBar";
 import { commands } from "./commands";

@@ -1,13 +1,19 @@
-// The print preset Library, like Fusion's Machine Library: collections on
-// the left (Recent, This scene, My presets, PrusaSlicer profiles, Built-in),
-// cards with the marker thumb, Filters | Info on the right, Select / Cancel.
-// A React port of REF ArucoMarkers/resources/preset_library (library.js);
-// its state is server/library.py's (REF aruco_preset_library.Library).
+// The Library, like Fusion's Machine Library, on the kit's LibraryShell:
+// collections on the left (Recent, This scene, My presets, PrusaSlicer
+// profiles, Built-in, Printers, Sticker printers), cards with the marker
+// thumb, Filters | Info on the right, Select / Cancel. Its state is
+// server/library.py's (REF aruco_preset_library.Library).
+//
+// Printers (M8c, M8b2.4): one card per PrusaSlicer physical printer, its
+// fitting print presets as the card's choices (the "Aruco" ones first,
+// PrusaSlicer's current pair marked). Select makes an ArUco preset from the
+// printer and the chosen print: the printer's nozzle, the print's line and
+// layers (saved as one of yours).
+import { Button, Glyph as Icon, LibraryShell, Select, type LibCard } from "@bam/ui";
 import { useEffect, useMemo, useState } from "react";
 import { ApiError, api, errorText } from "../api/client";
 import type { LibraryCard, LibraryState } from "../api/types";
 import { useStudio } from "../store";
-import { Dropdown, Icon } from "../ui/controls";
 
 /** A message for the Library's status line: the server's words, never its
  *  HTTP status code (audit F16). */
@@ -23,7 +29,7 @@ function dictionaryChange(differs: string | null | undefined): string | null {
 }
 
 const FILTERS: [string, string, (c: LibraryCard) => unknown, (v: any) => string][] = [
-  ["nozzle", "Nozzle", (c) => c.nozzle, (v) => `${v} mm`],
+  ["nozzle", "Nozzle", (c) => c.nozzle ?? c.printer?.nozzle_mm, (v) => `${v} mm`],
   ["layer", "Layer", (c) => c.layer, (v) => `${v} mm`],
   ["dictionary", "Dictionary", (c) => c.dictionary, (v) => String(v).replace("DICT_", "")],
   ["mode", "Extrude", (c) => c.mode_words, (v) => String(v)],
@@ -31,6 +37,14 @@ const FILTERS: [string, string, (c: LibraryCard) => unknown, (v: any) => string]
 
 function home(c: LibraryCard) {
   return c.in.filter((x) => x !== "recent")[0] || c.in[0];
+}
+
+const HOME_ICON: Record<string, string> = { prusa: "import", mine: "star", document: "doc", printers: "printer", stickers: "sticker" };
+
+/** A printer card's thumb: the printer glyph, its nozzle. */
+function printerThumb(c: LibraryCard): string {
+  const nz = c.printer?.nozzle_mm ? `${c.printer.nozzle_mm}` : "?";
+  return `<svg viewBox="0 0 64 56" width="96" height="84"><rect x="10" y="4" width="44" height="30" rx="3" fill="none" stroke="#5b6573" stroke-width="2"/><path d="M18 34h28v5H18z" fill="#5b6573"/><path d="M28 11h8v8l-4 5-4-5z" fill="#2f6fed"/><text x="32" y="52" font-size="8" text-anchor="middle" fill="#3b4350" font-family="sans-serif">nozzle ${nz} mm</text></svg>`;
 }
 
 export function Library() {
@@ -45,6 +59,7 @@ function LibraryWindow({ tag }: { tag?: string }) {
   const [data, setData] = useState<LibraryState | null>(null);
   const [coll, setColl] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
+  const [choice, setChoice] = useState<Record<string, string>>({});
   const [q, setQ] = useState("");
   const [side, setSide] = useState<"filters" | "info">("filters");
   const [filters, setFilters] = useState<Record<string, Set<string>>>({ nozzle: new Set(), layer: new Set(), dictionary: new Set(), mode: new Set() });
@@ -88,8 +103,11 @@ function LibraryWindow({ tag }: { tag?: string }) {
     }
   };
   const close = () => st.setLibrary(false);
+  /** The id Select sends: a printer card's chosen print, else the card. */
+  const selectId = (c: LibraryCard) => c.kind === "printer" ? (choice[c.id] ?? c.default ?? c.choices?.[0]?.id ?? c.id) : c.id;
   const doSelect = async (confirmed = false) => {
     if (!card || card.unreadable) return;
+    if (card.kind === "printer" && !(card.choices ?? []).length) { setStatus({ text: `no print preset fits '${card.name}'`, kind: "bad" }); return; }
     // a print preset that also changes the tag's ink (its dictionary) says so
     // before it is applied (audit F10)
     const dict = tag ? dictionaryChange(card.differs) : null;
@@ -99,10 +117,11 @@ function LibraryWindow({ tag }: { tag?: string }) {
       return;
     }
     try {
-      const r = await api.librarySelect(card.id);
+      const r = await api.librarySelect(selectId(card));
       if (tag) await st.applyPreset(r.name, r.preset);
       else st.setNew("newPreset", r.name);
       await st.loadPresets();
+      st.say(`preset '${r.name}'${card.kind === "printer" ? ` (from the printer ${card.name})` : ""}`);
       close();
     } catch (e) {
       setStatus({ text: msgOf(e), kind: "bad" });
@@ -114,7 +133,7 @@ function LibraryWindow({ tag }: { tag?: string }) {
       if (ask) return;
       const tagName = (e.target as HTMLElement)?.tagName ?? "";
       if (["INPUT", "SELECT", "TEXTAREA"].includes(tagName)) return;
-      if (e.key === "Escape" && document.querySelector(".library .dd.open")) return;   // its list closes first (audit F3)
+      if (document.querySelector("[data-kit-popup][data-open]")) return;   // its list closes first (audit F3)
       if (e.key === "Escape") { e.stopPropagation(); close(); }
       if (e.key === "Enter") void doSelect();
       if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
@@ -138,133 +157,147 @@ function LibraryWindow({ tag }: { tag?: string }) {
     setAsk(null);
   };
   const anyFilter = Object.values(filters).some((s) => s.size) || q;
+  const shellCards: LibCard[] = visible.map((c) => {
+    const h = home(c);
+    return {
+      id: c.id, name: c.name, subtitle: c.subtitle, title: c.cells || c.subtitle,
+      thumb: c.kind === "printer" ? printerThumb(c) : c.thumb, disabled: c.unreadable,
+      mark: c.kind === "printer" && c.current ? "current" : undefined,
+      badge: c.used > 0 ? <span className="badge" title={`used by ${c.used} tag(s) in this scene`}>{c.used}</span> : undefined,
+      where: <><Icon name={HOME_ICON[h] ?? "cube"} />{collName(h)}</>,
+    };
+  });
 
   return (
-    <div className="modal-back" data-testid="library" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div className="library" role="dialog" aria-label="Print presets">
-        <div className="lib-title"><Icon name="library" /> Print presets {tag ? <span className="muted">· for {tag}</span> : <span className="muted">· for new tags</span>}
-          <button className="ib close" title="Close" onClick={close}><Icon name="close" /></button></div>
-        <aside className="lib-nav">
-          <label className="search"><Icon name="search" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search presets" data-testid="lib-search" /></label>
-          <ul className="colls">
-            {(data?.collections ?? []).map((c) => (
-              <li key={c.id} className={c.id === coll ? "on" : ""} data-coll={c.id} onClick={() => setColl(c.id)}>
-                <Icon name={c.icon} /><span>{c.name}</span><span className="n">{c.count}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="notes">{(data?.notes ?? []).join(" · ")}</div>
-        </aside>
-        <main className="lib-main">
-          <div className="lib-tools">
-            <button className="tb" disabled={!tag} title="New: the tag's print settings as a preset of yours" data-testid="lib-new"
-              onClick={() => setAsk({ text: "A name for a new preset made of the tag's print settings:", value: "My preset", ok: (name) => act(`saved '${name}'`, async () => {
-                const t = st.scene.tags.find((x) => x.name === tag)!;
-                const p = await api.presetOf(t.spec as any);
-                const r = await api.presetSaveAs(name, p.preset);
-                return `user:${r.name}`;
-              }) })}><Icon name="plus" /><span>New</span></button>
-            <button className="tb" disabled={!card?.preset} title="Duplicate the selected preset as one of yours" data-testid="lib-dup"
-              onClick={() => card && setAsk({ text: "A name for the copy:", value: `${card.name} copy`, ok: (name) => act(`saved '${name}'`, async () => {
-                const r = await api.presetSaveAs(name, card.preset!);
-                return `user:${r.name}`;
-              }) })}><Icon name="dup" /><span>Duplicate</span></button>
-            <button className="tb" disabled={!card?.editable} title="Edit the selected preset (yours only)" data-testid="lib-edit"
-              onClick={() => { setEditing(true); setSide("info"); }}><Icon name="pencil" /><span>Edit</span></button>
-            <button className="tb" disabled={!card || card.kind !== "prusa" || card.unreadable} title="Import the selected PrusaSlicer profile as a preset of yours" data-testid="lib-import"
-              onClick={() => card && act(`imported '${card.name}'`, async () => `user:${(await api.librarySelect(card.id)).name}`)}><Icon name="import" /><span>Import</span></button>
-            <button className="tb" disabled={!card?.editable} title="Delete the selected preset (yours only)" data-testid="lib-delete"
-              onClick={() => card && setAsk({ text: `Delete the preset '${card.name}'?`, value: "", confirm: true, ok: () => act(`deleted '${card.name}'`, async () => { await api.presetDelete(card.name); return null; }) })}>
-              <Icon name="trash" /><span>Delete</span></button>
-            <span className="sep" />
-            <button className="link" disabled={!anyFilter} onClick={() => { setFilters({ nozzle: new Set(), layer: new Set(), dictionary: new Set(), mode: new Set() }); setQ(""); }}>Clear filters</button>
-            <span className="grow" />
-            <span className="muted" data-testid="lib-count" data-scope={q.trim() ? "all" : "collection"}>{visible.length} of {cards.length}{q.trim() ? " · every collection" : ""}</span>
-          </div>
-          <div className="cards" role="listbox" aria-label="Presets">
-            {!visible.length && <div className="empty">{cards.length ? "No preset here matches." : "No presets yet."}</div>}
-            {visible.map((c) => {
-              const h = home(c);
+    <LibraryShell
+      title={<><Icon name="library" /> Presets {tag ? <span className="muted">· for {tag}</span> : <span className="muted">· for new tags</span>}</>}
+      collections={data?.collections ?? []} coll={coll} onColl={setColl} search={q} onSearch={setQ}
+      cards={shellCards} picked={picked} empty={cards.length ? "No preset here matches." : "No presets yet."}
+      onPick={(id) => { setPicked(id); setSide("info"); setEditing(false); }}
+      onOpen={(id) => { setPicked(id); setTimeout(() => void doSelect(), 0); }}
+      onClose={close}
+      notes={(data?.notes ?? []).join(" · ")}
+      count={<span className="muted" data-testid="lib-count" data-scope={q.trim() ? "all" : "collection"}>{visible.length} of {cards.length}{q.trim() ? " · every collection" : ""}</span>}
+      tools={<>
+        <Button variant="ghost" icon="plus" disabled={!tag} title="New: the tag's print settings as a preset of yours" testid="lib-new"
+          onClick={() => setAsk({ text: "A name for a new preset made of the tag's print settings:", value: "My preset", ok: (name) => act(`saved '${name}'`, async () => {
+            const t = st.scene.tags.find((x) => x.name === tag)!;
+            const p = await api.presetOf(t.spec as any);
+            const r = await api.presetSaveAs(name, p.preset);
+            return `user:${r.name}`;
+          }) })}>New</Button>
+        <Button variant="ghost" icon="dup" disabled={!card?.preset} title="Duplicate the selected preset as one of yours" testid="lib-dup"
+          onClick={() => card && setAsk({ text: "A name for the copy:", value: `${card.name} copy`, ok: (name) => act(`saved '${name}'`, async () => {
+            const r = await api.presetSaveAs(name, card.preset!);
+            return `user:${r.name}`;
+          }) })}>Duplicate</Button>
+        <Button variant="ghost" icon="pencil" disabled={!card?.editable} title="Edit the selected preset (yours only)" testid="lib-edit"
+          onClick={() => { setEditing(true); setSide("info"); }}>Edit</Button>
+        <Button variant="ghost" icon="import" disabled={!card || card.kind !== "prusa" || card.unreadable} title="Import the selected PrusaSlicer profile as a preset of yours" testid="lib-import"
+          onClick={() => card && act(`imported '${card.name}'`, async () => `user:${(await api.librarySelect(card.id)).name}`)}>Import</Button>
+        <Button variant="ghost" icon="trash" disabled={!card?.editable} title="Delete the selected preset (yours only)" testid="lib-delete"
+          onClick={() => card && setAsk({ text: `Delete the preset '${card.name}'?`, value: "", confirm: true, ok: () => act(`deleted '${card.name}'`, async () => { await api.presetDelete(card.name); return null; }) })}>Delete</Button>
+        <span className="sep" />
+        <button className="link" disabled={!anyFilter} onClick={() => { setFilters({ nozzle: new Set(), layer: new Set(), dictionary: new Set(), mode: new Set() }); setQ(""); }}>Clear filters</button>
+      </>}
+      side={<>
+        <div className="tabs2" role="tablist">
+          <button className={`tab2${side === "filters" ? " on" : ""}`} onClick={() => setSide("filters")} data-side="filters">Filters</button>
+          <button className={`tab2${side === "info" ? " on" : ""}`} onClick={() => setSide("info")} data-side="info">Info</button>
+        </div>
+        {side === "filters" && (
+          <div className="panel">
+            {FILTERS.map(([k, title, get, words]) => {
+              const vals = [...new Set(cards.map((c) => get(c)).filter((v) => v !== null && v !== undefined && v !== ""))].sort((a: any, b: any) => (a > b ? 1 : a < b ? -1 : 0));
+              if (!vals.length) return null;
               return (
-                <div key={c.id} className={`card${c.id === picked ? " on" : ""}${c.unreadable ? " bad" : ""}`} role="option" aria-selected={c.id === picked}
-                  data-card={c.id} title={c.cells || ""}
-                  onClick={() => { setPicked(c.id); setSide("info"); setEditing(false); }}
-                  onDoubleClick={() => { setPicked(c.id); setTimeout(() => void doSelect(), 0); }}>
-                  {c.used > 0 && <span className="badge" title={`used by ${c.used} tag(s) in this scene`}>{c.used}</span>}
-                  <div className="thumb" dangerouslySetInnerHTML={{ __html: c.thumb || "" }} />
-                  <div className="name">{c.name}</div>
-                  <div className="sub">{c.subtitle}</div>
-                  <div className="where"><Icon name={h === "prusa" ? "import" : h === "mine" ? "star" : h === "document" ? "doc" : "cube"} />{collName(h)}</div>
-                </div>
+                <div className="fgroup" key={k}><h4>{title}</h4><div className="chips">
+                  {vals.map((v) => (
+                    <button key={String(v)} className={`chip${filters[k].has(String(v)) ? " on" : ""}`} data-filter={`${k}:${v}`}
+                      onClick={() => setFilters((f) => { const s = new Set(f[k]); if (s.has(String(v))) s.delete(String(v)); else s.add(String(v)); return { ...f, [k]: s }; })}>
+                      {words(v)}
+                    </button>
+                  ))}
+                </div></div>
               );
             })}
           </div>
-        </main>
-        <aside className="lib-side">
-          <div className="tabs2" role="tablist">
-            <button className={`tab${side === "filters" ? " on" : ""}`} onClick={() => setSide("filters")} data-side="filters">Filters</button>
-            <button className={`tab${side === "info" ? " on" : ""}`} onClick={() => setSide("info")} data-side="info">Info</button>
-          </div>
-          {side === "filters" && (
-            <div className="panel">
-              {FILTERS.map(([k, title, get, words]) => {
-                const vals = [...new Set(cards.map((c) => get(c)).filter((v) => v !== null && v !== undefined && v !== ""))].sort((a: any, b: any) => (a > b ? 1 : a < b ? -1 : 0));
-                if (!vals.length) return null;
-                return (
-                  <div className="fgroup" key={k}><h4>{title}</h4><div className="chips">
-                    {vals.map((v) => (
-                      <button key={String(v)} className={`chip${filters[k].has(String(v)) ? " on" : ""}`} data-filter={`${k}:${v}`}
-                        onClick={() => setFilters((f) => { const s = new Set(f[k]); if (s.has(String(v))) s.delete(String(v)); else s.add(String(v)); return { ...f, [k]: s }; })}>
-                        {words(v)}
-                      </button>
-                    ))}
-                  </div></div>
-                );
-              })}
-            </div>
-          )}
-          {side === "info" && (
-            <div className="panel" data-testid="lib-info">
-              {!card && <div className="muted">Select a preset to see its values.</div>}
-              {card && !editing && (
-                <>
-                  <div className="isect"><h4 className="title">{card.name}</h4><div className="muted">{card.cells}</div></div>
-                  {data?.dialog && <div className="differs">{card.differs ? `Changes the tag: ${card.differs}` : "The same as the tag's settings."}</div>}
-                  {data?.dialog && dictionaryChange(card.differs) && <div className="issue lv-warn" data-testid="lib-ink-warn">A print preset that changes the {dictionaryChange(card.differs)}: the tag's markers change too.</div>}
-                  {card.info.map(([title, rows]) => (
-                    <div className="isect" key={title}><h4>{title}</h4>
-                      {rows.map(([k, v]) => <div className="irow" key={k}><span className="k">{k}</span><span className="v">{v}</span></div>)}
-                    </div>
-                  ))}
-                </>
-              )}
-              {card && editing && <EditForm card={card} schema={data?.schema ?? []} limits={data?.limits ?? {}} onCancel={() => setEditing(false)}
-                onStart={() => setStatus({ text: "…" })}
-                onSaved={async (name) => { setEditing(false); await load(`user:${name}`); setStatus({ text: `saved '${name}'` }); }} />}
-            </div>
-          )}
-        </aside>
-        <footer className="lib-foot">
-          <span className={`status ${status.kind ?? ""}`} role="status" data-testid="lib-status">{status.text}</span>
-          <span className="grow" />
-          <button className="btn" onClick={close} data-testid="lib-cancel">Cancel</button>
-          <button className="btn primary" disabled={!card || card.unreadable} onClick={() => void doSelect()} data-testid="lib-select">Select</button>
-        </footer>
-        {ask && (
-          <div className="prompt">
-            <div className="prompt-box">
-              <div>{ask.text}</div>
-              {!ask.confirm && <input autoFocus value={ask.value} data-testid="prompt-input" onChange={(e) => setAsk({ ...ask, value: e.target.value })}
-                onKeyDown={(e) => { if (e.key === "Enter") okAsk(); if (e.key === "Escape") setAsk(null); e.stopPropagation(); }} />}
-              {askErr && <div className="lib-form-err" data-testid="prompt-error">{askErr}</div>}
-              <div className="prompt-buttons">
-                <button className="btn" onClick={() => setAsk(null)}>Cancel</button>
-                <button className="btn primary" data-testid="prompt-ok" onClick={okAsk}>OK</button>
-              </div>
-            </div>
+        )}
+        {side === "info" && (
+          <div className="panel" data-testid="lib-info">
+            {!card && <div className="muted">Select a card to see its values.</div>}
+            {card && card.kind === "printer" && <PrinterInfo card={card} chosen={selectId(card)} onChoose={(id) => setChoice((c) => ({ ...c, [card.id]: id }))} />}
+            {card && card.kind !== "printer" && !editing && (
+              <>
+                <div className="isect"><h4 className="title">{card.name}</h4><div className="muted">{card.cells}</div></div>
+                {data?.dialog && <div className="differs">{card.differs ? `Changes the tag: ${card.differs}` : "The same as the tag's settings."}</div>}
+                {data?.dialog && dictionaryChange(card.differs) && <div className="issue lv-warn" data-testid="lib-ink-warn">A print preset that changes the {dictionaryChange(card.differs)}: the tag's markers change too.</div>}
+                {card.info.map(([title, rows]) => (
+                  <div className="isect" key={title}><h4>{title}</h4>
+                    {rows.map(([k, v]) => <div className="irow" key={k}><span className="k">{k}</span><span className="v">{v}</span></div>)}
+                  </div>
+                ))}
+              </>
+            )}
+            {card && card.kind !== "printer" && editing && <EditForm card={card} schema={data?.schema ?? []} limits={data?.limits ?? {}} onCancel={() => setEditing(false)}
+              onStart={() => setStatus({ text: "…" })}
+              onSaved={async (name) => { setEditing(false); await load(`user:${name}`); setStatus({ text: `saved '${name}'` }); }} />}
           </div>
         )}
+      </>}
+      foot={<>
+        <span className={`status ${status.kind ?? ""}`} role="status" data-testid="lib-status">{status.text}</span>
+        <span className="grow" />
+        <Button onClick={close} testid="lib-cancel">Cancel</Button>
+        <Button variant="primary" disabled={!card || card.unreadable} onClick={() => void doSelect()} testid="lib-select">Select</Button>
+      </>}
+      overlay={ask && (
+        <div className="prompt">
+          <div className="prompt-box">
+            <div>{ask.text}</div>
+            {!ask.confirm && <input autoFocus className="kit-text" value={ask.value} data-testid="prompt-input" onChange={(e) => setAsk({ ...ask, value: e.target.value })}
+              onKeyDown={(e) => { if (e.key === "Enter") okAsk(); if (e.key === "Escape") setAsk(null); e.stopPropagation(); }} />}
+            {askErr && <div className="lib-form-err" data-testid="prompt-error">{askErr}</div>}
+            <div className="prompt-buttons">
+              <Button onClick={() => setAsk(null)}>Cancel</Button>
+              <Button variant="primary" testid="prompt-ok" onClick={okAsk}>OK</Button>
+            </div>
+          </div>
+        </div>
+      )}
+    />
+  );
+}
+
+/** A Printers card's Info: the printer, then its fitting prints to choose. */
+function PrinterInfo({ card, chosen, onChoose }: { card: LibraryCard; chosen: string; onChoose: (id: string) => void }) {
+  const p = card.printer ?? {};
+  const rows: [string, string][] = [
+    ["Printer preset", String(p.preset ?? "–")], ["Model", `${p.model ?? "–"} ${p.variant ?? ""}`],
+    ["Nozzle", p.nozzle_mm ? `${p.nozzle_mm} mm` : "–"], ["Bed", Array.isArray(p.bed_mm) ? `${p.bed_mm.join(" × ")} mm` : "–"],
+    ["Extruders", String(p.extruders ?? "–")], ["From", p.source === "user" ? "your printer preset" : "PrusaSlicer's bundle"],
+  ];
+  return (
+    <div data-testid="printer-info" data-printer={card.name}>
+      <div className="isect"><h4 className="title">{card.name}{card.current && <span className="muted"> · PrusaSlicer's current printer</span>}</h4>
+        <div className="muted">{card.subtitle}</div></div>
+      <div className="isect"><h4>Printer</h4>
+        {rows.map(([k, v]) => <div className="irow" key={k}><span className="k">{k}</span><span className="v">{v}</span></div>)}
       </div>
+      <div className="isect"><h4>Print presets that fit ({(card.choices ?? []).length})</h4>
+        {!(card.choices ?? []).length && <div className="muted">None of your print presets fits this printer.</div>}
+        <div className="choice-list" role="radiogroup">
+          {(card.choices ?? []).map((c) => (
+            <div key={c.id} role="radio" aria-checked={c.id === chosen} className={`choice${c.id === chosen ? " on" : ""}`} data-choice={c.id}
+              data-current={c.current ? "1" : "0"} title={`layer ${c.layer} mm · line ${c.line} mm · first layer ${c.first_layer} mm`} onClick={() => onChoose(c.id)}>
+              <Icon name={c.aruco ? "star" : "t-print"} /><span className="nm">{c.name}</span>
+              {c.current && <span className="kit-pill t-ok">current</span>}
+              {c.fits === "maybe" && <span className="kit-pill t-warn" title="its condition could not be read: the nozzle fits">maybe</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="muted" style={{ marginTop: 6 }}>Select makes an ArUco preset of yours: this printer's nozzle, the print's line and layers.</div>
     </div>
   );
 }
@@ -317,30 +350,32 @@ function EditForm({ card, schema, limits, onCancel, onStart, onSaved }: {
   };
   return (
     <div className="form" data-testid="lib-form">
-      <label><span>Name</span><input value={name} onChange={(e) => setName(e.target.value)} data-path="name" /></label>
+      <div className="kit-field row" data-row="name"><div className="kit-row row-main"><label className="row-label">Name</label>
+        <div className="row-ctl"><input className="kit-text" value={name} onChange={(e) => setName(e.target.value)} data-path="name" /></div></div></div>
       {errs.name && <div className="lib-form-err" data-error-for="name">{errs.name}</div>}
       {schema.map(([path, label, kind, options]) => (
         <div key={path} className="form-row">
-          <label><span>{label}</span>
-            {kind === "select" ? (
-              <Dropdown path={`lib:${path}`} value={String(vals[path] ?? "")} wide
-                options={(options ?? []).map(([v, w]) => ({ value: v, label: w }))}
-                onChange={(v) => setVals({ ...vals, [path]: String(v) })} />
-            ) : kind === "bool" ? (
-              <input type="checkbox" data-path={path} checked={Boolean(vals[path])} onChange={(e) => setVals({ ...vals, [path]: e.target.checked })} />
-            ) : (
-              <input data-path={path} value={String(vals[path] ?? "")} className={errs[path] ? "bad" : ""}
-                title={limits[path] ? `${limits[path][0]} to ${limits[path][1]}` : undefined}
-                onChange={(e) => setVals({ ...vals, [path]: e.target.value })} />
-            )}
-          </label>
+          <div className="kit-field row" data-row={path}><div className="kit-row row-main"><label className="row-label" title={label}><span className="row-text">{label}</span></label>
+            <div className="row-ctl">
+              {kind === "select" ? (
+                <Select path={`lib:${path}`} value={String(vals[path] ?? "")} wide
+                  options={(options ?? []).map(([v, w]) => ({ value: v, label: w }))}
+                  onChange={(v) => setVals({ ...vals, [path]: String(v) })} />
+              ) : kind === "bool" ? (
+                <input type="checkbox" data-path={path} checked={Boolean(vals[path])} onChange={(e) => setVals({ ...vals, [path]: e.target.checked })} />
+              ) : (
+                <input className={`kit-text${errs[path] ? " bad" : ""}`} data-path={path} value={String(vals[path] ?? "")}
+                  title={limits[path] ? `${limits[path][0]} to ${limits[path][1]}` : undefined}
+                  onChange={(e) => setVals({ ...vals, [path]: e.target.value })} />
+              )}
+            </div></div></div>
           {errs[path] && <div className="lib-form-err" data-error-for={path}>{errs[path]}</div>}
         </div>
       ))}
       {errs.form && <div className="lib-form-err" data-error-for="form">{errs.form}</div>}
       <div className="row-btns">
-        <button className="btn" onClick={onCancel}>Cancel</button>
-        <button className="btn primary" data-testid="lib-save" disabled={busy} onClick={save}>Save</button>
+        <Button onClick={onCancel}>Cancel</Button>
+        <Button variant="primary" testid="lib-save" disabled={busy} onClick={save}>Save</Button>
       </div>
     </div>
   );

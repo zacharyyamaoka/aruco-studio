@@ -1,9 +1,8 @@
 // The bottom drawer: Verify (OpenCV's read of each tag, and of the sheet),
 // Messages (every status line, errors included) and the keyboard map. The
 // status bar above it always shows the last line.
-import { Kbd } from "../kit";
+import { Glyph as Icon, IconButton, Kbd } from "@bam/ui";
 import { isStale, useStudio } from "../store";
-import { Icon, IconButton } from "../ui/controls";
 import { commands } from "./commands";
 import { FileDrawer } from "./FileDrawer";
 

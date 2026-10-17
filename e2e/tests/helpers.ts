@@ -70,6 +70,11 @@ export async function freshFile(page: Page, name: string, text?: string): Promis
   return file;
 }
 
+/** An example of ROOT/examples copied to a fresh file and opened. */
+export async function openExample(page: Page, name: string, file: string): Promise<string> {
+  return freshFile(page, name, fs.readFileSync(path.join(ROOT, "examples", file), "utf-8"));
+}
+
 export function readFile(file: string): any {
   return JSON.parse(fs.readFileSync(file, "utf-8"));
 }
@@ -103,11 +108,37 @@ export async function sceneTags(request: APIRequestContext): Promise<any[]> {
   return (await r.json()).tags;
 }
 
-/** Pick a value of an inspector dropdown by its key path. */
+/** Pick a value of a kit Select by its key path (the list is a popup:
+ *  `.kit-select-popup[data-for=<path>]`). */
 export async function choose(page: Page, path: string, value: string | number) {
-  const dd = page.locator(`.dd[data-path="${path}"]`).first();
-  await dd.locator(".dd-btn").click();
-  await dd.locator(`.dd-opt[data-value="${value}"]`).click();
+  const dd = page.locator(`.kit-select[data-path="${path}"]`).first();
+  await dd.locator(".kit-select-trigger").click();
+  await page.locator(`.kit-select-popup[data-for="${path}"][data-open] [role="option"][data-value="${value}"]`).click();
+  await expect(page.locator(`.kit-select-popup[data-for="${path}"][data-open]`)).toHaveCount(0);
+  await idle(page);
+}
+
+/** The options a kit Select offers now (opens it, reads, closes it). */
+export async function options(page: Page, path: string): Promise<string[]> {
+  const dd = page.locator(`.kit-select[data-path="${path}"]`).first();
+  await dd.locator(".kit-select-trigger").click();
+  const pop = page.locator(`.kit-select-popup[data-for="${path}"][data-open]`);
+  await expect(pop).toBeVisible();
+  const vals = await pop.locator('[role="option"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-value") || ""));
+  await page.keyboard.press("Escape");
+  await expect(pop).toHaveCount(0);
+  return vals;
+}
+
+/** Click a kit Switch by its key path. */
+export async function toggle(page: Page, path: string) {
+  await page.locator(`[role="switch"][data-path="${path}"]`).first().click();
+  await idle(page);
+}
+
+/** Pick one button of a kit SegmentedRow by its key path. */
+export async function segment(page: Page, path: string, value: string | number) {
+  await page.locator(`.kit-seg[data-path="${path}"] [data-value="${value}"]`).first().click();
   await idle(page);
 }
 
@@ -121,7 +152,7 @@ export async function type(page: Page, path: string, value: string) {
 }
 
 export async function tab(page: Page, id: string) {
-  await page.locator(`.tab[data-tab="${id}"]`).click();
+  await page.locator(`[role="tab"][data-tab="${id}"]`).click();
 }
 
 /** OpenCV (ROOT/.venv) reads a PNG: the ids it finds. */
