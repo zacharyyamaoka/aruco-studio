@@ -94,13 +94,15 @@ function skinDepth(t: SceneTag): number {
 function tagObject(t: SceneTag, selected: boolean, clip: THREE.Plane | null): THREE.Group | null {
   const p = t.plan;
   const M = patternIn3d(t);
-  if (!p || !p.ok || !M || !p.mesh) return null;
+  if (!p || !p.ok || !M || (!p.mesh && !p.top)) return null;
   const g = new THREE.Group();
   g.name = t.name;
   g.userData.tag = t.name;
   g.matrixAutoUpdate = false;
   g.matrix.copy(rowMajor(M));
-  for (const b of p.mesh) {
+  g.userData.drawn = p.mesh ? "mesh" : "light";
+  if (!p.mesh) lightSlab(t, g);                   // a drag: the top view as a slab, meshes on release
+  for (const b of p.mesh ?? []) {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.Float32BufferAttribute(b.positions, 3));
     geo.setIndex(b.indices);
@@ -138,6 +140,37 @@ function tagObject(t: SceneTag, selected: boolean, clip: THREE.Plane | null): TH
     g.add(helper);
   }
   return g;
+}
+
+/** The light preview of a tag during a drag (lane speed): its top view
+ *  ({colour: polygons}, what the 2D view fills) as a flat slab from its
+ *  skin up to its highest z, each colour its own piece. The server sends
+ *  no meshes while the pointer is down; the release brings them. */
+function lightSlab(t: SceneTag, g: THREE.Group) {
+  const top = t.plan?.top;
+  if (!top) return;
+  const zr = planZ(t.plan) ?? [0, 0];
+  const lo = -skinDepth(t), hi = Math.max(zr[1], 0.05);
+  const loop = (pts: number[][]) => pts.map(([x, y]) => new THREE.Vector2(x, y));
+  for (const colour of ["body", "white", "black"] as const) {
+    const polys = top[colour];
+    if (!polys?.length) continue;
+    const shapes = polys.map((poly) => {
+      const sh = new THREE.Shape(loop(poly[0] as unknown as number[][]));
+      for (const h of poly.slice(1)) sh.holes.push(new THREE.Path(loop(h as unknown as number[][])));
+      return sh;
+    });
+    const geo = new THREE.ExtrudeGeometry(shapes, { depth: hi - lo, bevelEnabled: false });
+    geo.translate(0, 0, lo);
+    const mat = new THREE.MeshStandardMaterial({
+      color: COLOURS[colour], roughness: colour === "black" ? 0.55 : 0.8, metalness: 0,
+      flatShading: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.userData.tag = t.name;
+    mesh.userData.what = `light:${colour}`;
+    g.add(mesh);
+  }
 }
 
 /** The outer loop moved in on the sides that carry a tag (their skins
@@ -605,6 +638,7 @@ export function View3D() {
       }
       const sketchIdx = new Map<string, number>();
       infos.forEach((s) => { if (s.sketch?.id) sketchIdx.set(String(s.sketch.id), s.si); });
+      const drawn: Record<string, string> = {};
       for (const t of tags) {
         if (t.hidden) continue;
         const si = t.source?.sketch ? sketchIdx.get(t.source.sketch) : undefined;
@@ -615,6 +649,7 @@ export function View3D() {
         }
         const g = tagObject(t, sel.includes(t.name), clip);
         if (g) (si !== undefined ? groupOf(si) : st.root).add(g);
+        if (g) drawn[t.name] = g.userData.drawn;
         if (show.axes) {
           const a = axesObject(t, zScale);
           if (a) st.overlay.add(a);
@@ -708,6 +743,7 @@ export function View3D() {
         gridMm: size, stepMm: step, box,
         scaleBarMm: step,
         normals,
+        drawn,                                       // tag -> "mesh" | "light" (a drag's preview)
         bodies: infos.filter((s) => s.body).map((s) => ({ shape: s.key, body: s.body!.id, height: s.body!.height })),
         gizmoOn: st.gizmo.attached ? st.gizmoSketch?.id ?? null : null,
         arrowOn: st.arrow.visible ? st.arrow.userData.body : null,

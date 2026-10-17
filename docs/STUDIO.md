@@ -144,7 +144,7 @@ Several faces make one feature with a face list (one tag per face, named `<id>.<
 | The inspector's form: the kit's `Form` over `/api/form`, plus the Studio's own controls (Size with Auto, Cells, Origin, Trim / Perimeter, Fit) | `studio/src/inspector/Inspector.tsx`, `PresetRow.tsx` |
 | The dialogs: New, Open, Save as, Sticker sheet…, Send to PrusaSlicer…, Print's fallback | `studio/src/app/Dialogs.tsx` |
 | Print: the PDF into a hidden iframe, its print() | `studio/src/app/Print.tsx` |
-| Live re-placement | while a handle drags, the Studio sends the new text to `POST /api/design/preview` (15 times a second at most; nothing written); on release the plans of the last preview are drawn at once and the file is written |
+| Live re-placement | while a handle (or the 3D arrow or gizmo) drags, the Studio sends the new text to `POST /api/design/preview?top=1` (15 times a second at most; nothing written): the plans and top views only, the light preview. The 2D view draws it as always; the 3D view stands each tag as a flat slab of its top view. On release the plans of the last preview are drawn at once (in 3D one more request brings the meshes) and the file is written. The forearm: about 75 ms a drag step, 270 ms for the 3D release (`docs/status/speed.md`) |
 | Tests' handle | `window.__studio`: `probe()` (the file, the shapes, the tool, the picks, the revision), `idle()`, the store, `theme`, `printHook` (when set, Print hands it the PDF's bytes instead of the print dialog; false = a browser that cannot print it), `sendOpen` (false: Send never opens PrusaSlicer); `window.__studio3d`: the faces' and the gizmo's screen points, the tags' normals |
 
 ## Stickers, the sheet, Print and Send

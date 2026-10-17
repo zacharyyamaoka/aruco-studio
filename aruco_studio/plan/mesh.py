@@ -110,7 +110,9 @@ class _Model:
         return None
 
 
-def bodies(plan) -> List[dict]:
+def bodies(plan, polygons: bool = True) -> List[dict]:
+    """polygons=False leaves out each body's "polygons" (mesh() and stl()
+    use only the trapezoids; lane speed)."""
     d = _d(plan)
     m = _Model(d)
     out = []
@@ -118,25 +120,38 @@ def bodies(plan) -> List[dict]:
     for k, (a, b) in enumerate(m.slabs):
         sig = tuple(m.active[k]) + (("body",) if m.body is not None and
                                      m.body_z[0] < (a + b) / 2.0 < m.body_z[1] else ())
-        for what, idx in (("body", 0), ("white", 1), ("pattern", 2)):
-            if prev.get(what, (None,))[0] == sig:
+        whats = (("body", 0), ("white", 1), ("pattern", 2))
+        if all(prev.get(what, (None,))[0] == sig for what, _i in whats):
+            for what, _i in whats:
                 prev[what][1]["z"][1] = b             # the same region: one taller prism
-                continue
-            idxs = list(m.active[k]) + ([m.body] if m.body is not None else [])
-            n = len(m.groups)
+            continue
+        # the three bodies of a slab share one sweep and one materials() per
+        # set of flags (lane speed); each is what its own boolean gave
+        idxs = list(m.active[k]) + ([m.body] if m.body is not None else [])
+        n = len(m.groups)
+        seen = {}
 
-            def expr(fs, k=k, idx=idx, idxs=idxs, n=n):
+        def mat(fs, k=k, idxs=idxs, n=n, seen=seen):
+            v = seen.get(fs)
+            if v is None:
                 f = [False] * n
                 for j, i in enumerate(idxs):
                     f[i] = fs[j]
-                return m.materials(k, f)[idx]
-            traps = RG.boolean([m.groups[i] for i in idxs], expr)
+                v = seen[fs] = m.materials(k, f)
+            return v
+        found = RG.booleans([m.groups[i] for i in idxs],
+                            [lambda fs, idx=idx: mat(fs)[idx] for _w, idx in whats])
+        for (what, idx), traps in zip(whats, found):
+            if prev.get(what, (None,))[0] == sig:      # never: the three move together
+                prev[what][1]["z"][1] = b
+                continue
             if not traps:
                 prev[what] = (sig, {"z": [a, b]})
                 continue
             colour = {"body": "body", "white": "white", "pattern": m.pattern_colour}[what]
-            rec = {"what": what, "colour": colour, "z": [a, b], "polygons": RG.polygons(traps),
-                   "_traps": traps}
+            rec = {"what": what, "colour": colour, "z": [a, b], "_traps": traps}
+            if polygons:
+                rec["polygons"] = RG.polygons(traps)
             out.append(rec)
             prev[what] = (sig, rec)
     return out
@@ -202,8 +217,16 @@ def top(plan) -> Dict[str, list]:
     d = _d(plan)
     m = _Model(d)
     out = {}
-    for c in ("body", "white", "black"):
-        traps = RG.boolean(m.groups, lambda f, c=c: m.top(f) == c)
+    seen = {}
+
+    def colour(f):                    # m.top once per set of flags (lane speed)
+        v = seen.get(f, 0)
+        if v == 0:
+            v = seen[f] = m.top(f)
+        return v
+    cs = ("body", "white", "black")
+    found = RG.booleans(m.groups, [lambda f, c=c: colour(f) == c for c in cs])
+    for c, traps in zip(cs, found):
         if traps:
             out[c] = RG.polygons(traps)
     return out
@@ -250,8 +273,21 @@ def _split_pinches(pos, tris):
             inc[v].append(t)
     tris = [list(t) for t in tris]
     pos = list(pos)
+    # lane speed: the triangles of each edge, so a vertex whose triangles
+    # walk round one cycle (_one_cycle) skips the search below, which would
+    # find one fan there and leave it as it is
+    m0 = len(pos)
+    of_edge: Dict[int, list] = defaultdict(list)
+    flat = all(a != b and b != c and a != c for a, b, c in tris)
+    if flat:
+        for t, (a, b, c) in enumerate(tris):
+            of_edge[a * m0 + b if a < b else b * m0 + a].append(t)
+            of_edge[b * m0 + c if b < c else c * m0 + b].append(t)
+            of_edge[c * m0 + a if c < a else a * m0 + c].append(t)
     for v, ts in inc.items():
         if len(ts) < 3:
+            continue
+        if flat and _one_cycle(v, ts, tris, of_edge, m0):
             continue
         # triangles around v connected through an edge (v, w)
         by_w = defaultdict(list)
@@ -286,13 +322,52 @@ def _split_pinches(pos, tris):
     return pos, tris
 
 
+def _one_cycle(v, ts, tris, of_edge, m0) -> bool:
+    """True when the triangles `ts` round vertex v walk round one closed
+    cycle, each step through an edge (v, w) that the triangles hold NOW
+    (an earlier split may have renamed w in some) exactly twice: then the
+    union-find of _split_pinches makes them one fan. False means "not
+    shown", and the union-find decides. Every triangle has three distinct
+    vertices (the caller checks)."""
+    t0 = ts[0]
+    a, b, c = tris[t0]
+    w_from = b if a == v else a
+    t = t0
+    n = len(ts)
+    seen = 1
+    while True:
+        a, b, c = tris[t]
+        if a == v:
+            x, y = b, c
+        elif b == v:
+            x, y = c, a
+        else:
+            x, y = a, b
+        w = y if x == w_from else x
+        if w >= m0 or v >= m0:                 # a copy made by a split: not in of_edge
+            return False
+        e = of_edge.get(v * m0 + w if v < w else w * m0 + v)
+        if e is None or len(e) != 2:
+            return False
+        u = e[1] if e[0] == t else e[0]
+        if u == t or w not in tris[u]:          # renamed since, or not this edge
+            return False
+        t = u
+        if t == t0:
+            return seen == n
+        seen += 1
+        if seen > n:
+            return False
+        w_from = w
+
+
 def _public(b):
     return {k: v for k, v in b.items() if not k.startswith("_")}
 
 
 def mesh(plan, what: Optional[Sequence[str]] = None) -> List[dict]:
     out = []
-    for b in bodies(plan):
+    for b in bodies(plan, polygons=False):
         if what and b["what"] not in what:
             continue
         pos, tri = prism(b["_traps"], b["z"][0], b["z"][1])
@@ -305,7 +380,7 @@ def mesh(plan, what: Optional[Sequence[str]] = None) -> List[dict]:
 def stl(plan, what: Optional[Sequence[str]] = None, name: str = "arucostudio") -> bytes:
     """Binary STL (mm) of the plan's bodies."""
     tris = []
-    for b in bodies(plan):
+    for b in bodies(plan, polygons=False):
         if what and b["what"] not in what:
             continue
         pos, tri = prism(b["_traps"], b["z"][0], b["z"][1])

@@ -371,10 +371,11 @@ export const useStudio = create<StudioState>((set, get) => {
   }
 
   /** The compiled, planned scene of a text (POST /api/design/preview):
-   *  cached by text; one request per text at a time. */
-  function fetchPreview(t: string): Promise<SceneDoc | null> {
-    const mesh = get().view === "3d";
-    const key = (mesh ? "3d|" : "2d|") + t;              // 3D needs the meshes too
+   *  cached by text; one request per text at a time. `mesh`: the solids
+   *  too (the 3D view's release); a drag asks only the top views (the
+   *  light preview, lane speed: the meshes cost 3-4x the rest). */
+  function fetchPreview(t: string, mesh: boolean): Promise<SceneDoc | null> {
+    const key = (mesh ? "3d|" : "2d|") + t;
     const hit = previews.get(key);
     if (hit) return Promise.resolve(hit);
     let p = inflight.get(key);
@@ -720,7 +721,7 @@ export const useStudio = create<StudioState>((set, get) => {
           previewBusy = true;
           const seq = ++previewSeq;
           const t0 = performance.now();
-          const sc = await fetchPreview(t);
+          const sc = await fetchPreview(t, false);   // the light preview: no meshes
           // drawn only while it is still the newest (a release may have come)
           if (sc && seq === previewSeq) { setScene(sc); set({ previewing: true }); }
           const wait = 1000 / 15 - (performance.now() - t0);
@@ -740,7 +741,7 @@ export const useStudio = create<StudioState>((set, get) => {
       liveBusy++;                                     // idle() waits for the write too
       let sc: SceneDoc | null = null;
       try {
-        sc = await fetchPreview(text);
+        sc = await fetchPreview(text, get().view === "3d");
         if (sc) {
           setScene(sc);
           set({ lastLive: performance.now() - start });
