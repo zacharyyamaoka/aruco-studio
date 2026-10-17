@@ -65,7 +65,7 @@ A test holds the line: `tests/adapters/test_api_surface.py` checks that the adap
 
 | | |
 |---|---|
-| `api.SURFACE` | the 26 `adsk.core` / `adsk.fusion` names the adapter may name (`Point3D`, `TemporaryBRepManager`, `CustomFeature`, `JointGeometry`, ...) |
+| `api.SURFACE` | the 27 `adsk.core` / `adsk.fusion` names the adapter may name (`Point3D`, `TemporaryBRepManager`, `CustomFeature`, `JointGeometry`, ...) |
 | `api.METHODS` | the methods and attributes it may call, by Fusion class |
 | `fake_adsk.py` | implements exactly that: TBM boxes, cylinders and booleans as a CSG tree a point probe answers exactly; REF's timeline model (items, the marker, roll before / after, insert at the marker); base features, combines and extrudes replayed in timeline order; the custom feature (parameters, named values, dependencies, the compute event); Joint Origins with Fusion's measured composition; appearances reset by `add()` and `updateBody()`; attributes; occurrences; an edit command whose failure takes everything back |
 | the import guard | `import aruco_studio.adapters.fusion` raises `RuntimeError` when `adsk` is not in `sys.modules`; `fake_adsk.install()` puts the stand-in there |
