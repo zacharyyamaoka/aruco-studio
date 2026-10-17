@@ -91,6 +91,12 @@ def test_open_a_copy_afresh(client, tmp_path):
     assert p == tmp_path / "home" / "gallery" / "basics_single.arucostudio.json"
     assert got["state"] == "ok" and got["item"]["name"] == "basics_single" and got["item"]["group"] == "basics"
     assert client.get("/api/design?text=0").json()["path"] == str(p)
+    # the copy is the example, its sugar's presets frozen in at the end (FILE_FORMAT 2)
+    fresh = p.read_text(encoding="utf-8")
+    example = json.loads((GAL / "basics_single.arucostudio.json").read_text(encoding="utf-8"))
+    copied = json.loads(fresh)
+    assert set(copied.pop("frozen_presets", {})) <= {example.get("preset")}
+    assert copied == example
     # a change goes to the copy; opening the card again starts from the example
     doc = json.loads(client.get("/api/design").json()["text"])
     doc["name"] = "changed"
@@ -98,7 +104,7 @@ def test_open_a_copy_afresh(client, tmp_path):
     assert client.put("/api/design", json={"text": json.dumps(doc), "hash": h}).status_code == 200
     assert json.loads(p.read_text(encoding="utf-8"))["name"] == "changed"
     client.post("/api/gallery/open", json={"name": "basics_single"})
-    assert p.read_text(encoding="utf-8") == (GAL / "basics_single.arucostudio.json").read_text(encoding="utf-8")
+    assert p.read_text(encoding="utf-8") == fresh
     for bad in ("nope", "../forearm", "gallery"):
         assert client.post("/api/gallery/open", json={"name": bad}).status_code == 404, bad
     assert _files() == before

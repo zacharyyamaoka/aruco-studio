@@ -2,7 +2,7 @@
 // ids; a second Renumber changes nothing; a typed first id is kept; a locked
 // (printed) tag keeps its ids.
 import { expect, test } from "@playwright/test";
-import { add, fresh, idle, probe, shot } from "./helpers";
+import { add, fresh, idle, openExample, probe, readFile, shot } from "./helpers";
 
 async function idsOf(page: any): Promise<Record<string, string>> {
   const rows = page.locator("[data-ids-row]");
@@ -68,4 +68,32 @@ test("Renumber all: unique, stable, typed ids kept", async ({ page }) => {
   expect(c.tag2).toBe(kept);
   expect((await probe(page)).tags.find((t: any) => t.name === "tag2").locked).toBe(true);
   await shot(page, "ids_renumbered");
+});
+
+// lane/scene-fixes (the gallery's finding 1): the sticker sheet types its ids
+// (first_id 0, 1, 2, 8). Renumber all keeps them on the canvas, in the IDs
+// table's First column and in the file it writes; a reload plans them again
+// (the write used to send every tag to #0).
+test("Renumber all keeps a file's typed ids (the sticker sheet)", async ({ page }) => {
+  const file = await openExample(page, "e2e-ids-typed", "sticker_sheet.arucostudio.json");
+  await expect(page.locator("[data-ids-row]")).toHaveCount(4);
+  const before = await idsOf(page);
+  expect([before.t1, before.t2, before.t3.split(",")[0], before.t4.split(",")[0]]).toEqual(["0", "1", "2", "8"]);
+  await expect(page.getByTestId("dup-count")).toHaveAttribute("data-dups", "0");
+
+  await page.getByTestId("renumber").click();
+  await idle(page);
+  expect(await idsOf(page)).toEqual(before);
+  await expect(page.getByTestId("dup-count")).toHaveAttribute("data-dups", "0");
+  for (const [name, id] of Object.entries({ t1: "0", t2: "1", t3: "2", t4: "8" }))
+    await expect(page.locator(`input[data-path="override:${name}"]`)).toHaveValue(id);
+  const doc = readFile(file);
+  expect(doc.overrides).toEqual({ t1: 0, t2: 1, t3: 2, t4: 8 });
+  expect(doc.features.filter((f: any) => f.aruco).map((f: any) => f.numbers.marker_id)).toEqual([0, 1, 2, 8]);
+
+  await page.reload();
+  await expect(page.locator('.app[data-ready="1"]')).toBeVisible();
+  await idle(page);
+  expect(await idsOf(page)).toEqual(before);
+  await shot(page, "ids_typed_kept");
 });

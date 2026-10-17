@@ -157,10 +157,11 @@ test("N-3.3 a copy takes changes, Start over brings the example back, the button
   const after = (await probe(page)).file;
   expect(after.features[1].numbers.size).toBe(40);
   await expect(page.locator('.canvas2d g[data-tag="tag"]')).toHaveAttribute("data-ok", "1");
-  // Start over: a fresh copy, the example's number again
+  // Start over: a fresh copy, the example's number again (typed as the sugar `size`)
   await page.getByTestId("example-reset").click();
   await idle(page);
-  expect((await probe(page)).file.features[1].numbers.size).toBe(30);
+  expect((await probe(page)).file.features[1].size).toBe(30);
+  expect((await probe(page)).file.features[1].numbers).toBeUndefined();
   // the note's buttons: 3D, the sticker sheet, Send, Renumber
   await page.getByTestId("example-act-3d").click();
   await idle(page);

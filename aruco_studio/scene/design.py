@@ -6,7 +6,7 @@ only; never opens a file (server/ reads and writes them).
 |---|---|
 | `compile(doc, presets)` | -> `(Scene, [Issue])`: today's Scene (scene/model.py), so the plan, the numbering, the sheet and the exports run unchanged. An Issue's `field` is its JSON path (`features[1].aruco`) |
 | `doc_from_scene(scene)` | a Scene as a design document: each tag a sketch at its place holding one shape (its target's loops; a box target writes `rect`), an Extrude when the target had a body, an ArUco Extrude with the exact `settings` / `numbers` (the `/1` migration and the old routes' new tags) |
-| `write_back(doc, scene, presets)` | a Scene changed through the Scene API (add, delete, rename, move, edit, renumber, overrides) written back into the document: changed features get exact `settings` / `numbers` and lose their sugar; a multi-face list stays one feature while its faces agree and splits when one differs |
+| `write_back(doc, scene, presets)` | a Scene changed through the Scene API (add, delete, rename, move, edit, renumber, overrides) written back into the document: changed features, and those whose typed `first_id` moves into `overrides`, get exact `settings` / `numbers` and lose their sugar; a multi-face list stays one feature while its faces agree and splits when one differs (a face that does not compile stays, as typed) |
 | `add_tag`, `delete_tag`, `rename_tag`, `move_tag` | the single edits `write_back` is made of |
 | `shapes_2d(doc)` | every shape's loops on the canvas (mm), for drawings |
 | `freeze(doc, presets)` | the presets a sugar feature names, copied into `frozen_presets` (once; unused ones dropped): sugar expands against the copy, so a changed PrusaSlicer profile never changes a typed tag by itself (the server calls it on open and on every write) |
@@ -24,6 +24,8 @@ import re
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from ..core import form as _F
+from ..core import make as _MK
+from ..core import trim as _TR
 from ..plan import newtag as _NEW
 from ..plan import shapes as _SH
 from ..plan.spec import Issue, TagSpec
@@ -286,13 +288,17 @@ def _sugar(f, s, n, has_body, fp, issues):
                 s["label"] = dict(s.get("label") or {}, **lab)
         if "perimeter" in f:
             v = f["perimeter"]
-            if v not in ("marker", "profile"):
+            if v not in _MK.PERIMETERS:
                 issues.append(Issue(f"{fp}.perimeter", "error",
                                     f"perimeter: \"marker\" or \"profile\", not {v!r}"))
-            elif has_body:
-                s["trim"] = "both" if v == "profile" else "off"    # a 3D tag's Perimeter IS Trim
-            else:
+            elif _MK.make_of(s)[0].sticker:
                 s["make"] = dict(s.get("make") or {}, perimeter=v)
+            elif v == "marker":
+                # a 3D tag's Perimeter IS Trim excess (M6 d), as the Inspector's
+                # row writes it: Marker = the body trimmed to the tag's outline
+                s["trim"] = _TR.setting("both")
+            else:
+                s.pop("trim", None)                 # Profile: the body keeps its outline
         if "shift" in f:
             # 2026-10-17 (CF-2): [x, y] mm off where the fit puts it (a sticker's)
             v = f["shift"]
@@ -371,6 +377,11 @@ def _tag_spec(f, fp, target: Target, tag_name: str, k: int, single: bool, doc_pr
                                     "one whole number per face of the list"))
         else:
             n["marker_id"] = int(mids[k])
+    elif exact_n is None and overrides.get(tag_name, -1) >= 0:
+        # numbers still sugar: the file's typed id (`overrides`) is the tag's
+        # first id, as a typed `first_id` (below) or the IDs table's First
+        # (audit F1: used at once). Exact numbers keep their own marker_id.
+        n["marker_id"] = int(overrides[tag_name])
     fid = f.get("first_id")
     if fid is not None:
         bad = object()
@@ -1048,6 +1059,15 @@ def _rewrite(doc, fi: int, cur: List[SceneTag], want: Dict[str, SceneTag]) -> Li
         k = t.source["entry"]
         g = _single_of(f, k, f["aruco"][k].split(".")[-1], t.name)
         out.append(_exact(g, w.spec, t.name, w.locked, w.hidden))
+    done = {t.source["entry"] for t in cur}
+    left = [k for k in range(len(f["aruco"])) if k not in done]
+    if left:                     # the faces that did not compile stay, as typed
+        g = copy.deepcopy(f)
+        g["aruco"] = [f["aruco"][k] for k in left]
+        for key in ("marker_ids", "first_id"):
+            if isinstance(f.get(key), list):
+                g[key] = [f[key][k] for k in left if k < len(f[key])]
+        out.append(g)
     doc["features"][fi:fi + 1] = out
     return redo
 
@@ -1078,6 +1098,16 @@ def write_back(doc, scene: Scene, presets: Presets = None) -> dict:
     for t in compile(doc, presets)[0].tags:                     # deletions
         if t.name not in matched:
             delete_tag(doc, t.name, presets)
+    # the ids as they will stand, before the states are compared: a tag
+    # still in sugar takes its first id from `overrides`
+    if scene.overrides:
+        doc["overrides"] = dict(scene.overrides)
+    else:
+        doc.pop("overrides", None)
+    if scene.ledger is not None:
+        doc["ledger"] = copy.deepcopy(scene.ledger)
+    else:
+        doc.pop("ledger", None)
     cur, _ = compile(doc, presets)                              # settings, numbers, flags
     by_feature: Dict[int, List[SceneTag]] = {}
     for t in cur.tags:
@@ -1085,7 +1115,10 @@ def write_back(doc, scene: Scene, presets: Presets = None) -> dict:
     redo: List[str] = []
     for fi in sorted(by_feature, reverse=True):
         ts = by_feature[fi]
-        if any(_state(t) != _state(matched[t.name]) for t in ts):
+        # a typed first_id moves into `overrides`: its feature is written
+        # exact, so its numbers keep the id (else the tag fell back to #0)
+        if "first_id" in doc["features"][fi] or any(_state(t) != _state(matched[t.name])
+                                                     for t in ts):
             redo += _rewrite(doc, fi, ts, matched)
     for name in redo:                                           # a new target: new parts
         w = matched[name]
@@ -1102,17 +1135,9 @@ def write_back(doc, scene: Scene, presets: Presets = None) -> dict:
         if id(w) not in used:
             add_tag(doc, w.spec, w.x_mm, w.y_mm, w.rotation_deg, name=w.name, locked=w.locked,
                     hidden=w.hidden, uid=w.uid, exact=True)
-    for f in doc.get("features") or []:                         # typed first ids: overrides now
-        if isinstance(f, dict):
-            f.pop("first_id", None)
-    if scene.overrides:
-        doc["overrides"] = dict(scene.overrides)
-    else:
-        doc.pop("overrides", None)
-    if scene.ledger is not None:
-        doc["ledger"] = copy.deepcopy(scene.ledger)
-    else:
-        doc.pop("ledger", None)
+    # every feature that held a `first_id` and compiled was written exact
+    # above (its ids are in `overrides` and its numbers); one that did not
+    # compile keeps what was typed
     doc["name"] = scene.name
     if compile(doc, presets)[0].presets_used != list(scene.presets_used):
         doc["presets_used"] = list(scene.presets_used)

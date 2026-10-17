@@ -169,8 +169,10 @@ def test_sugar_keys_one_by_one():
     assert s.numbers["size"] == 20.0 and s.settings["size_auto"] is False
     s, _ = spec_of(label="Arm 3")
     assert s.settings["label"]["content"] == "custom" and s.settings["label"]["text"] == "Arm 3"
+    s, _ = spec_of(perimeter="marker")            # a 3D tag: Perimeter IS Trim excess (M6 d)
+    assert s.settings["trim"] == {"rule": 1, "axes": "both", "margin_mm": 0.0, "force": False}
     s, _ = spec_of(perimeter="profile")
-    assert s.settings["trim"] == "both"
+    assert "trim" not in s.settings
     s, sc = spec_of(first_id=7, name="arm")
     assert sc.overrides == {"t": 7} and s.numbers["marker_id"] == 7 and s.name == "arm"
     s, _ = spec_of(settings={"layout": "single", "mode": "both", "op": "new"}, layout="grid")

@@ -28,7 +28,7 @@ A `"note"` key is allowed anywhere and kept. Any other key the Studio does not k
 | `sheet` | the sticker sheet's defaults, e.g. `{"page": "letter", "mode": "tight"}` (kept for M6); since 2026-10-17 also `sticker_margin_mm` (white round each sticker) and `cut_lines` (true / false): the sheet's, not the tag's (Zach's Q7) |
 | `sketches` | `[sketch]` |
 | `features` | `[feature]`, in order |
-| `overrides` | `{tag name: first id}`: typed ids (as `/1`) |
+| `overrides` | `{tag name: first id}`: typed ids (as `/1`). Renumber all keeps each as typed; a tag whose `numbers` are still sugar takes it as its first id too (as `first_id`), exact `numbers` keep their own `marker_id` |
 | `ledger` | the numbering's ledger: printed ids never move (as `/1`) |
 | `presets_used` | the presets named, as `/1` kept them (written only when it is not what the file names) |
 | `frozen_presets` | `{preset name: the preset}`: a copy of each preset a sugar feature expands with, taken the first time the Studio opens or writes the file. Sugar expands against the copy, so a changed PrusaSlicer profile never changes a typed tag by itself; the tag's Preset row offers **Apply**. The Studio adds it at the end of the text and keeps the rest as typed; a copy no sugar feature names is dropped (audit 2026-10-17) |
@@ -93,7 +93,7 @@ Sugar expands through the new-tag rule (`plan/newtag.new_spec`: what POST /api/n
 | `mark` | `settings.corner_mark` | `none`, `cut`, `triangle` |
 | `pins` | `settings.pin` | |
 | `holes` | `settings.holes` | M6's `avoid` / `ignore` |
-| `perimeter` | on a tag with a body, `settings.trim` (`profile` = `both`, `marker` = `off`); else `settings.make.perimeter` | M6's Perimeter |
+| `perimeter` | on a 3D printed tag, Trim excess (M6 d, the Inspector's Perimeter row): `marker` = `settings.trim` `{"rule": 1, "axes": "both", "margin_mm": 0, "force": false}`, `profile` = no trim; on a sticker, `settings.make.perimeter` | M6's Perimeter. A 3D tag on a bare shape has no body to trim |
 | `shift` | `settings.shift` `{"rule": 1, "x_mm", "y_mm"}` | `[x, y]` mm off where the fit puts a sticker (2026-10-17, CF-2) |
 | `paper_mm` | `settings.make.thickness_mm` | an inkjet sticker's own paper thickness (2026-10-17); on a 3D tag a `warn` |
 | `mode`, `op` | `settings.mode` (Auto resolved), `settings.op` | |
@@ -114,7 +114,7 @@ Sugar expands through the new-tag rule (`plan/newtag.new_spec`: what POST /api/n
 
 **A typed file is frozen when the Studio opens it:** the presets its sugar names are copied into `frozen_presets` (section 2), so the tags stay what they were made with.
 
-**On its first write the Studio replaces the sugar with the exact `settings` and `numbers`.** A hand-typed file stays short until the Studio touches that feature; after that it is exact and round-trips bit for bit. A typed `first_id` moves into `overrides`.
+**On its first write the Studio replaces the sugar with the exact `settings` and `numbers`.** A hand-typed file stays short until the Studio touches that feature; after that it is exact and round-trips bit for bit. A typed `first_id` moves into `overrides`, and that feature is written exact then, so its numbers keep the id (a list keeps one per face, `marker_ids`); a feature that does not compile keeps its `first_id` as typed.
 
 A list stays one feature while its faces agree (their ids aside: `marker_ids`). The moment one face differs (another mark, another size), the list splits into one feature per face, each named as its tag was (`tag.right`).
 
@@ -128,7 +128,7 @@ They are in `examples/`, as the design note has them.
 | `forearm.arucostudio.json` | a box 120 x 40 x 40 with one ChArUco on each of its four sides, the label `#id`, each face its own ids (`marker_ids` 0, 6, 10, 16) |
 | `sticker_sheet.arucostudio.json` | four stickers on bare shapes: two singles, a grid, a ChArUco on a disc with a hole; each its own ids (`first_id`) |
 
-The gallery's examples (N-3, 2026-10-17) are design files too, in `examples/gallery/` with their manifest `gallery.json` (group, title, one line, what to look at): eighteen files, markers first (2026-10-17: twenty-three, with the Inkjet group: the paper and the black inside it, the vinyl presets, the page lint, Shift; and the sheet's margin and cut lines). They use the sugar wherever it says what they show; a 3D tag with Trim excess carries its exact `settings` / `numbers`, because the sugar has no trim key (`perimeter` on a tag with a body writes a string the plan does not read: reported to the orchestrator, 2026-10-17).
+The gallery's examples (N-3, 2026-10-17) are design files too, in `examples/gallery/` with their manifest `gallery.json` (group, title, one line, what to look at): eighteen files, markers first (2026-10-17: twenty-three, with the Inkjet group: the paper and the black inside it, the vinyl presets, the page lint, Shift; and the sheet's margin and cut lines). They use the sugar wherever it says what they show; a 3D tag's Trim excess is its `perimeter` (`basics_*`, `trim`; until lane/scene-fixes, 2026-10-17, they carried exact `settings` because the key wrote a string the plan did not read).
 
 The forearm and sticker files open renumbered (audit 2026-10-17); on the forearm only the front's `#0-5` fits its square at a 0.6 mm nozzle, the other faces say "no room in a … mm square". Open › Examples opens a copy in the scenes folder, so the files here are never written.
 
