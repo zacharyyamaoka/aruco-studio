@@ -269,3 +269,35 @@ def test_the_older_examples_plan_rule1():
     rules = {t.name: plan_tag(t.spec).data["rules"]["make"] for t in sc.tags}
     assert rules and set(rules.values()) == {1}, rules
     assert json.loads(text)["preset"] == "Sticker · Letter · 600 dpi"
+
+
+# ------------------------------------------------------------ plan_sticker: what a CAD node builds
+
+def test_plan_sticker_gives_the_bodies_in_build_order():
+    from aruco_studio.plan import plan_sticker
+    s = {"layout": "single", "corner_mark": "triangle", "label": dict(LAB)}
+    tg = T.box(60, 60, 0).to_dict()
+    spec = {"settings": dict(s, make=dict(R2)), "target": tg}
+    got = plan_sticker(spec)
+    assert got["rule"] == 2 and got["thickness_mm"] == 0.1
+    assert [(b["part"], b["role"], b["op"], b["into"], b["colour"], b["z_mm"]) for b in got["bodies"]] == [
+        ("sticker", "paper", "new", None, "white", [0.0, 0.1]),
+        ("pocket", "pocket", "cut", "sticker", "none", [0.05, 0.1]),
+        ("ink", "black", "new", None, "black", [0.05, 0.1])]
+    ink = got["bodies"][2]["steps"]
+    assert ink[0]["name"] == "ink" and ink[0]["step"] == "add"
+    assert {x["name"] for x in ink} >= {"ink", "mark_triangle", "label_join"} or \
+        {x["name"] for x in ink} >= {"ink", "mark_triangle", "label_cut"}
+    assert got["frame"]["z_mm"] == 0.1 and got["frame"]["opencv"][11] == pytest.approx(0.1)
+    assert got["page"]["fits"] and got["lint"] == [] and got["record_make"] == dict(R2)
+    assert got["cut_line"]["kind"] == "marker"
+    # the same from the plan; a 3D tag and a refused one: None; rule 1: two bodies
+    p = plan_tag(spec)
+    assert plan_sticker(p) == got == plan_sticker(p.to_dict())
+    assert plan_sticker({"settings": dict(s), "target": T.box(60, 60, 3).to_dict()}) is None
+    r1 = plan_sticker({"settings": dict(s, make=dict(R1)), "target": tg})
+    assert [(b["part"], b["z_mm"]) for b in r1["bodies"]] == [("sticker", [0.0, 0.1]),
+                                                             ("ink", [0.1, 0.11])]
+    big = plan_sticker({"settings": {"layout": "single", "make": dict(R2)}, "numbers": {"size": 200},
+                        "target": T.box(280, 280, 0).to_dict()})
+    assert big["page"]["fits"] is False and big["lint"][0]["field"] == "numbers.size"

@@ -103,12 +103,12 @@ Every id read; the disc's four holes found. Cut lines off: every check passes wi
 
 | File | Checks |
 |---|---|
-| `tests/plan/test_make_rule2.py` (110) | every layout × turn × mark × label: parts, combines, z ranges, nothing over the paper, the frame z = t, white + black = cut area × t, black = ink area × t/2, the top view = rule 1's, closed meshes; t 0.05 / 0.1 / 0.18 / 2 mm × Marker / Profile; OpenCV + PnP within 0.1 mm / 0.1°; the reading (margin / cut line ignored, a junk page, clamped margins, rule 2 on a 3D tag = rule 1); the label's white; which presets stamp rule 2, a frozen copy without the key rule 1; a preset pick; the `sticker_sheet` example still rule 1 |
+| `tests/plan/test_make_rule2.py` (111) | every layout × turn × mark × label: parts, combines, z ranges, nothing over the paper, the frame z = t, white + black = cut area × t, black = ink area × t/2, the top view = rule 1's, closed meshes; t 0.05 / 0.1 / 0.18 / 2 mm × Marker / Profile; OpenCV + PnP within 0.1 mm / 0.1°; the reading (margin / cut line ignored, a junk page, clamped margins, rule 2 on a 3D tag = rule 1); the label's white; which presets stamp rule 2, a frozen copy without the key rule 1; a preset pick; the `sticker_sheet` example still rule 1; `plan_sticker` (the bodies in build order) |
 | `tests/plan/test_page_lint.py` (15) | the printable area = what the sheet places, each page each way; turned / landscape; a typed size red and still built, A3 clears it; Profile's lint on the perimeter; no lint on rule 1 / 3D; Auto capped; a long board turned; Auto unchanged where it fits; a property over 72 random faces × pages × margins × layouts: Auto never over the page |
 | `tests/plan/test_shift.py` (62) | the frame and OpenCV's move by exactly (x, y) for every layout × turn × shift × rule, the ink unchanged; absent = 0 bit for bit; OpenCV + PnP; a 3D tag unmoved with an info; off the face, off the outline, over a hole; junk |
 | `tests/core/test_sheet_options.py` (12) | margin 0 / cut lines on = the sheet as before (summary and PDF bytes); every outline grown by m, the holes kept, the ink unmoved; a 96-point disc grown; cut lines off draw no cut line or crop mark, the same places and ink; a margin can turn or reject a sticker |
 | `tests/verify/test_sheet_rule2.py` (8) | the WYSIWYG table above |
-| `tests/server/test_2d_api.py` (6) | the form's rows; `/api/new` under each preset; the Preset match; a pick; the Library (collection, Info, `schema_2d`, a 1200 dpi save); every sheet route's margin / cut lines; the sugar |
+| `tests/server/test_2d_api.py` (7) | the form's rows; `/api/new` under each preset; the Preset match; a pick; the Library (collection, Info, `schema_2d`, a 1200 dpi save; its limits against normalise); every sheet route's margin / cut lines; the sugar |
 | `e2e/tests/inkjet.spec.ts` (3) | the inspector's Inkjet rows, a Stocks pick, the red lint (row, summary, cut line), Auto's capped info, a bigger page clearing it; Shift typed, dragged, reset; the Print dialog's Sticker margin / Cut lines and its preview |
 | Changed on purpose | words (Inkjet printer / Paper thickness), the built-in lists (vinyl first), M6b.1 (`stickers.spec.ts`: a new sticker is rule 2: z 0.1, no margin row, Profile gives the white), Open's examples (`audit2.spec.ts`), the gallery's `lint` |
 
@@ -127,18 +127,35 @@ CHECK_TABLE
 
 ## 4. For the Fusion sticker node (M7.4): the API to call
 
-All pure, stdlib only, under the vendored `aruco_studio` (core + plan):
+All pure, stdlib only, in `aruco_studio.core` / `aruco_studio.plan` (re-vendor the add-in's copy from this lane once merged; nothing in `adapters/` changed).
 
-| Step | Call | Gives |
-|---|---|---|
-| a new node's `make` | `core.make.new_make("sticker", preset["profile"])` (or `core.form.new_tag_settings(s, has_body, preset=preset)`) | rule 2 under the vinyl presets: `{rule 2, by sticker, thickness_mm, perimeter, page, page_margin_mm}` |
-| read a node's | `core.make.make_of(settings)` -> `Make` (`.inset`, `.paper_z`, `.ink_z`, `.top_mm`) and notes | |
-| the plan | `plan.plan_tag(spec)` (`TagSpec` from `adapters/fusion/records.spec_of_node` / `plan.spec.from_record`) | `parts` `["sticker", "pocket", "ink"]`; `layers` (polygons with holes, mm, the pattern frame; `z` [lo, hi]; `step` add / sub per solid); `combines`: build `sticker` as a New body (the cut outline extruded [0, t]), build `pocket` (the ink footprint [t/2, t]) and CUT it from the sticker, build `ink` (the same footprint) as a New body painted black; `frames.opencv` / `pattern_in_target` (the Joint Origin, z = t); `sticker` (the z ranges, `frame_z_mm`, the page fit); `warnings` (the red lint on `numbers.size`, the info lines); `record` with `fusion.make` |
-| the dialog's red row | `core.make.page_fit(w_mm, h_mm, make)` (or the plan's `sticker.page`) and `core.make.lint_text` | `fits`, `how`, `over_mm`, the words |
-| Shift | `settings.shift`, `core.make.shift_of(settings)`; the plan already moves the frame | the dialog's Shift X / Y arrows write it |
-| the PDF | `scene.sheet.sticker_item` / `core.sheet.layout_stickers(items, SheetSettings(..., sticker_margin_mm, cut_marks))` | the sheet's margin and cut lines are Export's rows now, not the tag's |
+**The bodies: `aruco_studio.plan.plan_sticker(spec)`** (new, `plan/plan.py`; a TagSpec, its dict, or a TagPlan): None for a tag that is not a built sticker, else
 
-The volumes to gate on (F-M7.5, with t = 0.1): paper + black = the cut outline's area × t; black = the ink's area × t/2; one Joint Origin at t.
+```text
+{"rule": 2, "thickness_mm": t,
+ "bodies": [  # in build order
+   {"part": "sticker", "role": "paper",  "op": "new", "into": None,      "colour": "white", "z_mm": [0, t],   "steps": [...]},
+   {"part": "pocket",  "role": "pocket", "op": "cut", "into": "sticker", "colour": "none",  "z_mm": [t/2, t], "steps": [...]},
+   {"part": "ink",     "role": "black",  "op": "new", "into": None,      "colour": "black", "z_mm": [t/2, t], "steps": [...]}],
+ "frame": {"opencv": 4x4, "opencv_target": 4x4, "pattern_in_target": 4x4, "z_mm": t},
+ "cut_line": {"kind": "marker" | "profile", "outer", "holes", "rect"?},
+ "page": {"page", "margin_mm", "size_mm", "fits", "how", "over_mm", "printable_mm"},
+ "lint": [the error Issues: the red page row],
+ "record_make": settings.make as stored}
+```
+
+Each step: `{"name", "step": "add" | "sub", "z_mm": [lo, hi], "polygons": [{"outer", "holes"}]}` (mm, the pattern frame: the pattern's centre on the face, u = image right, v = image up, z out of the face; a "sub" step is a cut tool of its own body, already padded past the slab, REF `part_body`'s order). So the node: extrude the paper's polygon [0, t] as a New body; build the pocket's footprint (its add / sub steps) [t/2, t] and Combine-Cut it from the paper; build the same footprint as a New body, black; one Joint Origin at `frame.opencv` (z = t, on the paper's top). Rule 1 (an older tag) gives two bodies: `sticker` [0, t], `ink` [t, t + 0.01]. Under it `plan_tag(spec).data` has the same in `parts`, `layers`, `combines`, `frames`, `sticker`.
+
+| What | Call / field |
+|---|---|
+| a new node's `make` | `core.make.new_make("sticker", preset["profile"])` or `core.form.new_tag_settings(s, has_body, preset=preset)` -> `{"rule": 2, "by": "sticker", "thickness_mm", "perimeter", "page", "page_margin_mm"}` |
+| a stored node's | `core.make.make_of(settings)` -> `(Make, notes)`; `Make.inset` (rule 2), `.paper_z` (0, t), `.ink_z` (t/2, t), `.top_mm` (t: the frame), `.ink_mm` (t/2) |
+| the inkjet preset fields | `preset["profile"]`: `kind` "sticker" (shown "Inkjet printer"), `page` (letter / a4 / legal / a3 / tabloid / a5), `stock_mm` (the paper thickness, 0.05-2.0), `margin_mm` (the page margins, 0-50), `dpi` (`line_mm` = 25.4 / dpi), `make_rule` (2; absent = 1); built-ins `core.presets.vinyl_preset("letter" / "a4")`; `core.presets.inkjet_schema()` the Edit rows; `core.presets.same_machine(a, b)` with `same_print` for the Preset row's match; `core.make.PAPER_STOCKS` the thickness suggestions |
+| the page-lint rows | the plan's `warnings`: `{"field": "numbers.size", "level": "error", "text": "Over the page by ..."}` (Profile: field `settings.make.perimeter`), `ok` stays true; `info` on `numbers.size` "Auto size: capped by the page ..." / "fits Letter turned only ..."; `info` on `settings.make.thickness_mm` "the black is printed t/2 into ..."; directly: `core.make.page_fit(w_mm, h_mm, make)` -> `{fits, how, over_mm, worst_mm, area_mm, page, margin_mm}`, `core.make.lint_text(fit, w, h)`, `core.sheet.printable_options(page, margin_mm)`, `plan.plan.sticker_size_mm(guides)` (the cut outline's box) |
+| Shift | `settings.shift = {"rule": 1, "x_mm", "y_mm"}` (the target's u / v), `core.make.shift_of(settings)`; the plan moves the frame (`placement.shift_mm`) and warns on `settings.shift` |
+| the sheet options | `core.sheet.SheetSettings(sticker_margin_mm=..., cut_marks=...)` into `core.sheet.layout_stickers(items, settings)` (items: `scene.sheet.sticker_item(tag, plan)`, the cut outline and the plan's black); or `scene.sheet.sticker_files(scene, plans, page, landscape, mode, margin_mm, proofs, date, sticker_margin_mm=, cut_lines=)` -> sheet.pdf / .svg / .json; `core.sheet.grown_outline(outline, d)` |
+
+The volumes to gate on (F-M7.5, t = 0.1): paper + black = the cut outline's area × t; black = the ink's area × t/2; one Joint Origin at t (`tests/plan/test_make_rule2.py` checks the same on the plan's own meshes).
 
 ## 5. Questions for Zach
 

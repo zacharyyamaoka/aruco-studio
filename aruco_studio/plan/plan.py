@@ -677,6 +677,66 @@ def _sticker_slabs(make) -> dict:
             "recesses": []}
 
 
+BODY_ROLES = {"sticker": ("paper", "white"), "pocket": ("pocket", "none"), "ink": ("black", "black")}
+
+
+def plan_sticker(spec_or_plan) -> Optional[dict]:
+    """What a CAD adapter's sticker node builds (2026-10-17; the Fusion
+    sticker node, M7.4): a sticker's TagPlan regrouped by body, in build
+    order, or None for a tag that is not a printed sticker (or not built).
+    `spec_or_plan`: a TagSpec, its dict, or a TagPlan / its dict.
+
+    -> {"rule": 1 | 2, "thickness_mm": t, "bodies": [{"part", "role"
+    ("paper" / "pocket" / "black"), "op" ("new" / "cut"), "into" (None /
+    "sticker"), "colour", "z_mm": [lo, hi], "steps": [{"name", "step"
+    ("add" / "sub"), "z_mm", "polygons": [{"outer", "holes"}]}]}], "frame":
+    {"opencv": 4x4, "opencv_target": 4x4, "pattern_in_target": 4x4, "z_mm"},
+    "cut_line", "page" (rule 2: plan.sticker.page), "lint": [the error
+    Issues, the red rows], "record_make"}. All mm, the pattern frame (the
+    pattern's centre on the face, z out of it).
+
+    Rule 2: `sticker` [0, t] New body (the cut outline), `pocket` [t/2, t]
+    CUT from it (the black's footprint), `ink` [t/2, t] New body, black.
+    Rule 1: `sticker` [0, t], `ink` [t, t + 0.01]. A step "sub" is a cut
+    tool of its own solid (REF part_body's order), made MARK_PAD past the
+    slab."""
+    try:
+        if isinstance(spec_or_plan, TagPlan):
+            d = spec_or_plan.data
+        elif isinstance(spec_or_plan, dict) and "layers" in spec_or_plan and "ok" in spec_or_plan:
+            d = spec_or_plan
+        else:
+            d = plan_tag(spec_or_plan).data
+    except Exception:                              # noqa: BLE001
+        return None
+    if not d.get("ok") or d.get("made_by") != "sticker":
+        return None
+    comb = {c["part"]: c for c in d["combines"]}
+    bodies = []
+    for part in d["parts"]:
+        steps = [{"name": L["name"], "step": L["step"], "z_mm": list(L["z"]),
+                  "polygons": L["polygons"]} for L in d["layers"] if L["part"] == part]
+        adds = [s["z_mm"] for s in steps if s["step"] == "add"]
+        role, colour = BODY_ROLES.get(part, (part, "none"))
+        c = comb.get(part, {})
+        bodies.append({"part": part, "role": role, "op": c.get("op", "new"),
+                       "into": c.get("into"), "colour": colour,
+                       "z_mm": [min(z[0] for z in adds), max(z[1] for z in adds)] if adds else None,
+                       "steps": steps})
+    fr = d["frames"]
+    rec = (d.get("record") or {}).get("fusion") or {}
+    t = (d.get("sticker") or {}).get("thickness_mm")
+    if t is None:
+        t = next((b["z_mm"][1] for b in bodies if b["part"] == "sticker"), None)
+    return {"rule": d["rules"].get("make"), "thickness_mm": t, "bodies": bodies,
+            "frame": {"opencv": fr["opencv"], "opencv_target": fr["opencv_target"],
+                      "pattern_in_target": fr["pattern_in_target"], "z_mm": fr["surface_mm"]},
+            "cut_line": d["guides"].get("cut_line"),
+            "page": (d.get("sticker") or {}).get("page"),
+            "lint": [w for w in d["warnings"] if w["level"] == "error"],
+            "record_make": rec.get("make")}
+
+
 def validate(spec) -> List[dict]:
     """/api/validate: the checks and the plan's own Issues."""
     p = plan_tag(spec)
