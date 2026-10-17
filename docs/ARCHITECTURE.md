@@ -6,7 +6,7 @@ A functional core with thin shells. The core plans a tag from numbers. Every she
 |---|---|
 | Written | 2026-10-16, from `docs/BRIEF.md` and `docs/inventory/*.md` |
 | REF | `cad-exporter` worktree `aruco-fusion-plugin-0e9bcb` at `c8216ff`, read only |
-| Status | the plan. Nothing in `aruco_studio/` or `studio/` exists yet. |
+| Status | M1 (core) and M2 (plan, scene, verify, exports, server) are built. Where the built contract differs from this text (Target fields, Layer steps, combines, frames, levels): `docs/PLAN.md` section 8 and `docs/API.md` |
 
 ## 1. The idea in one picture
 

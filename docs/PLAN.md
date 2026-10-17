@@ -496,16 +496,16 @@ REF has 43 `tests/test_aruco_*.py` suites at c8216ff. Ported: the 17 Fusion-free
 | `test_aruco_arrow_typing` | typing at a canvas arrow (Fusion custom graphics, the v2 dialog) | M4 (adapter UI) |
 | `test_aruco_chamfer_bodies` | the mark on CSG stand-in bodies (`part_body`, TBM) | M4 (M4.3) |
 | `test_aruco_collect` | the CAD Exporter's `_collect_aruco` on fake Fusion objects | not planned (CAD Exporter) |
-| `test_aruco_disc_fit` | `evaluate()` on the GIM43 discs | M2 (`plan_tag`) |
+| `test_aruco_disc_fit` | `evaluate()` on the GIM43 discs | ported in M2: tests/plan/test_ref_frame_evaluate.py |
 | `test_aruco_edit_roundtrip` | Edit -> OK on a stand-in node, the timeline marker, the frame sketch, orphan Joint Origins | M4 (the pure edit model is in goldens/settings.json) |
 | `test_aruco_export_dialog` | the Export dialog on stand-in inputs (its progress-bar section is ported) | M4 |
 | `test_aruco_extrude_dialog` | the Extrude dialog on stand-in inputs | M4 (its words are in goldens/form.json) |
 | `test_aruco_extrude_fixes` | `paint()`, a mode change on a stand-in node | M4 |
 | `test_aruco_extrude_sync` | after-compute hooks on fake Fusion (section 4, `restructure_plan`, is ported) | M4 |
 | `test_aruco_frame` (`evaluate()` and URDF halves) | `evaluate()` x Origin; the URDF needs yourdfpy | M2; skipped: venv |
-| `test_aruco_frame_pnp` | `evaluate()` + OpenCV PnP on a stand-in | skipped: venv; M2b `verify/` |
+| `test_aruco_frame_pnp` | `evaluate()` + OpenCV PnP on a stand-in | ported in M2: tests/verify/test_verify_plans.py |
 | `test_aruco_ids_dialog` | the IDs dialog on the shared table | M4 |
-| `test_aruco_ids_label_warning` | `label_warning` on a stand-in part | M2 (`plan/variants.py`) |
+| `test_aruco_ids_label_warning` | `label_warning` on a stand-in part | ported in M2: tests/plan/test_variants.py |
 | `test_aruco_ids_ledger_fusion` | stamps and the ledger read / written on fake Fusion objects (`plan_design` itself is in core/ids_design.py) | M4 |
 | `test_aruco_ids_upstream` | the rebuild hooks' control flow on fake Fusion (the pure digests are core/numbering's) | M4 |
 | `test_aruco_jo_one_per_tag` | one Joint Origin per tag through 12 edits on a stand-in design | M4 (M4.5) |
@@ -516,7 +516,78 @@ REF has 43 `tests/test_aruco_*.py` suites at c8216ff. Ported: the 17 Fusion-free
 | `test_aruco_presets_dialog` | presets in the Fusion dialog | M4 |
 | `test_aruco_refresh_hook` | the v2 dialog's refresh hook | M4 |
 | `test_aruco_restructure_sim` | the in-place `restructure()` on a stand-in timeline | M4 (M4.6) |
-| `test_aruco_settings` | the remembered dialog options and their file; `snapshot` / `apply` read Fusion inputs | deferred: M2b (`server/store.py`) |
+| `test_aruco_settings` | the remembered dialog options and their file; `snapshot` / `apply` read Fusion inputs | ported in M2: `server/remembered.py`, tests/server/test_ref_settings.py |
 | `test_aruco_trim_dialog` | Trim excess in the Fusion dialog | M4 (`trim_issues` / `trim_lines` are in goldens/form.json) |
 | `test_aruco_trim_feature` | Trim excess in `evaluate()` and compute on a stand-in | M2 / M4 |
 | `test_aruco_ui_v2` | the v2 dialog on stand-ins (classify and the Issue model are in goldens/form.json) | M4 |
+
+## 8. Builder notes (M2)
+
+Written by the M2 builder, 2026-10-16. The work order asked for PLAN's M2 **and** M2b (plan, scene, verify, exports, server) in one run, on `main`. So there was no M2b worktree and no parallel M4. The numbers are in `docs/status/M2.md`.
+
+### Names and places
+
+| PLAN / ARCHITECTURE said | Built as | Why |
+|---|---|---|
+| M2b in a worktree `aruco-studio-M2b` | on `main`, after M2 | one agent, one run; nothing ran beside it |
+| the Studio's store in `ROOT/.data/` | `ROOT/.studio_data/` (`ARUCO_STUDIO_HOME` overrides) | the work order names it |
+| scenes under `ROOT/.data/scenes/` | `ROOT/scenes/` (`ARUCO_STUDIO_SCENES` overrides) | the work order names it; both are git-ignored |
+| `tests/plan/test_golden_evaluate_ref.py` (spec ST-T-PLAN-1) | inside `tests/plan/test_golden_evaluate.py` | one file replays both REF goldens and the new matrix |
+| `plan/plan.py` holds evaluate() | `plan/evaluate.py` (REF's evaluate, line for line) + `plan/plan.py` (plan_tag, the TagPlan) | the port stays readable next to REF |
+| new modules | `plan/region.py` (2D booleans), `plan/fields.py` (the form contract), `scene/sheet.py` (the 1:1 sheet), `verify/scene_check.py`, `server/remembered.py`, `server/models.py` | each holds one job the plan named no home for |
+| `to_png` in `plan/exports.py` | PNG in the server (`verify/render.py` + cv2) | plan/ is stdlib only; a raster needs numpy |
+| STL via trimesh | `plan/mesh.py`, stdlib | the exact solids were needed anyway (a closed mesh needs the CSG done); no new dependency |
+
+### The evaluate() goldens
+
+| Choice | Why |
+|---|---|
+| `tools/make_evaluate_goldens.py` serves REF's modules from the PINNED blobs (a meta-path finder, compiled from memory) | REF's working tree moves all day (aruco_feature.py did); a blob is c8216ff exactly, and no bytecode is written |
+| REF's own stand-in adsk: `tests/aruco_trim_fixtures.py`, its plate too | PLAN M2 step 2 |
+| stubbed: `profile_rect`, `_profile_loops_m`, `aruco_tags.face_frame`, `_face_loops_m`, `label_name`; the plate's `_trim_face_body`, `face_loops_2d`, `_body_extent_mm`, `_trim_measure` | exactly the reads of an entity; REF's own makers stub the same |
+| settings and numbers go through REF's `settings_of` / `numbers_of` on a fake node | a node's compute sees them that way; the legacy shapes (chamfer, no origin_v, rotate_deg, frame, legacy numbers, label scope, junk trim, no label rule) come in as a stored node has them |
+| 786 matrix cases + REF's 12 + 26, re-run at c8216ff with every output | M2.2's bar is 600; each legacy shape 14 times |
+| replay is EXACT (floats and the sign of zeros), not 1e-6 | the port is line for line, so it can be; a 1e-6 bar would hide a reordered sum |
+
+### The contract as built (ARCHITECTURE 5.1 - 5.3)
+
+| Item | Built as | Why |
+|---|---|---|
+| Target frame | REF's base frame AFTER `face_frame` + `keep_x` (a face) or `profile_rect` (a sketch: x_sketch, z_sign, flip) and the legacy `rotate_deg` | those are entity reads (the adapter's); the plan reads `rotate_deg` only for the fit's angles, as evaluate() does |
+| `plan_tag(spec, base=None)` | `base` = the base frame in the host's space (cm); default the target's own frame at the origin | an adapter that passes Fusion's frame gets REF's 3D frames bit for bit |
+| Target extra fields | `face_loops_mm` (the face under a sketch area, for the trim), `body_loops_mm` (a prism body's footprint), `body_mm.measured`, `body_mm.depth`, `name` | the trim needs the face under a profile and how much body there is; fixed `volumes_mm3` cannot say what a column removes |
+| trim volumes | a box body: REF's plate rule (extent rect along the tag's axes x depth); a prism body (`body_loops_mm`): its exact area x depth | REF measured Fusion bodies; the box rule replays REF's fixture exactly |
+| `Layer` | `name, part, solid, step (add / sub), op (add / cut / keep), colour, z, polygons, circles` | the layers ARE REF's temporary bodies, step by step, so Fusion can rebuild today's tags identically; a part = the union of its solids, a solid = its steps in order |
+| `TagPlan.combines` | `[{part, op: join / new / cut / intersect, into: body / tile}]` | REF `_combines`, as data |
+| flattened solids | `plan/mesh.bodies` / `top` (exact, per z slab, `plan/region.py`) | the 3D view, STL and SVG need the result of the CSG; the layers keep the recipe |
+| `frames` | `opencv` (pattern frame), `opencv_target`, `pattern_in_target`, `detector_z_mm`, `surface_mm` | the scene and the views need the frame in the target too |
+| more fields | `placement.fit`, `slabs`, `body`, `writes`, `record`, `digest`, `notes`, `node_warning`, `name`, `key` | what an adapter and the views need without a second evaluate() |
+| `writes` | what REF settle() changes (parts, v, pin, size_auto, trim; size / square), without `jo_v` | `jo_v` follows the adapter's own key; with it in, deleting adapter keys would change the plan (M2.5) |
+| `key` | the label's {key} is `TagSpec.key`, never `settings.key` | `settings.key` is an adapter key (M2.5) |
+| `ok` | false only when the tag is not built; an `error` Issue with `ok: true` is a PART not built (a refused label) | REF builds the tag without the label |
+| levels | a value REF tolerates and reads a defined way (junk trim / cells / corner mark, a turn that is not a quarter, an unknown origin rule) is `warn`, not `error` | an `error` would refuse a tag REF builds: existing tags must not change |
+| the `settings.cols, rows` row of 5.6 | `settings.force` (REF's typed cols x rows) | settings have no cols / rows; the fit makes them |
+| a label without `rule` | rule 1, as REF reads a stored label | the form's default (`/api/form`) carries rule 2 for a new one |
+| the locked rule | refuse an edit that changes `plan/record.ink_digest` (board, frame, mark, label strokes and texts) | `record_digest` alone misses the label and the mark |
+
+### Scene, verify, server
+
+| Choice | Why |
+|---|---|
+| a SceneTag keeps `x_mm, y_mm, rotation_deg` (the canvas) and derives `pose` | the work order's "x, y, rotation"; the 4x4 is in the file for other readers |
+| renumbering: each scene tag is a component of its name holding one tag (key "tag") and one occurrence; its `uid` is its stamp chain; a locked tag is `fixed` | `core.numbering.plan_stable` unchanged; a renamed or moved tag stays the same copy for the ledger |
+| verify renders by pixel CSG of the layers (`verify/render.py`), independent of `plan/region.py` | two implementations of the same CSG check each other (M2b.4) |
+| PnP: REF's `tools/verify_aruco_jo_pnp.solve` copied into `verify/pnp.py` | REF's own oracle |
+| `server/remembered.py` = REF `aruco_settings.py` verbatim; the server passes its own path | REF's suite runs on it unchanged (tests/server/test_ref_settings.py); `settings_path()` (REF's file under CADExporter) is never called |
+| FastAPI 0.115.12 with pydantic 2.11.7 and anyio 4.9.0 | the newest pydantic warns inside this FastAPI; these are the versions it was made with |
+| numbers in the API are strict floats | `"28"` for a size is a 422, as ARCHITECTURE 5.6 asks |
+| M1's `test_golden_provenance.py` accepts both makers | PLAN names `tools/make_evaluate_goldens.py` for M2's goldens |
+
+### Not built in this run
+
+| Item | Why | Next |
+|---|---|---|
+| the PDF sheet (ST-EXP-PDF, the PDF half of ST-T-EXP-1) | the work order asked for SVG sheets | `core.sheet` (REF print_sheet) takes the scene's items |
+| 3MF beds (ST-EXP-3MF, ST-T-EXP-2) | not in the work order | `core.beds` (REF print_beds) |
+| STL per printed part, face down | the STL is per body (white, pattern, body) as modelled | an orientation step in the export |
+| the Library's recent list (ST-STORE) | M5 | `server/store.py` |
