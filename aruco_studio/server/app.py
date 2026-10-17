@@ -179,6 +179,18 @@ def verify(req: M.VerifyIn) -> dict:
     return verify_plan(p, px_per_mm=float(req.px_per_mm), pose=req.pose)
 
 
+def png_true_size(png: bytes, px_per_mm: float) -> bytes:
+    """A PNG with its pHYs chunk (pixels per metre): it prints at true size."""
+    import struct
+    import zlib
+    ppm = int(round(px_per_mm * 1000.0))
+    data = struct.pack(">IIB", ppm, ppm, 1)
+    chunk = struct.pack(">I", len(data)) + b"pHYs" + data +         struct.pack(">I", zlib.crc32(b"pHYs" + data) & 0xFFFFFFFF)
+    # after IHDR: 8 (signature) + 4 + 4 + 13 + 4
+    cut = 8 + 25
+    return png[:cut] + chunk + png[cut:]
+
+
 def _export_tag(fmt: str, p) -> Response:
     if not p.ok:
         raise HTTPException(status_code=400, detail={"errors": p.data["errors"]})
@@ -198,7 +210,7 @@ def _export_tag(fmt: str, p) -> Response:
         from ..verify.render import top_view
         r = top_view(p, px_per_mm=20.0)
         ok, buf = cv2.imencode(".png", r.img)
-        return Response(buf.tobytes(), media_type="image/png",
+        return Response(png_true_size(buf.tobytes(), 20.0), media_type="image/png",
                         headers={"Content-Disposition": f'attachment; filename="{stem}.png"'})
     raise HTTPException(status_code=404, detail=f"no export {fmt!r}: svg, png, stl or json")
 
@@ -456,7 +468,7 @@ def scene_export(fmt: str, save: int = Query(1)) -> dict:
         import cv2
         from ..verify.scene_check import scene_raster
         r = scene_raster(sc, px_per_mm=10.0)
-        files.append(("sheet.png", cv2.imencode(".png", r.img)[1].tobytes()))
+        files.append(("sheet.png", png_true_size(cv2.imencode(".png", r.img)[1].tobytes(), 10.0)))
     else:
         raise HTTPException(status_code=404, detail=f"no export {fmt!r}: svg, png, json, stl, plan")
     written = []

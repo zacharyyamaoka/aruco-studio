@@ -97,6 +97,17 @@ def test_candidates_verify_exports(client):
         r = client.post(f"/api/export/{fmt}", json=spec("charuco"))
         assert r.status_code == 200 and r.headers["content-type"].startswith(ctype)
         assert len(r.content) > 100
+    # the PNG: true size (pHYs 20 px / mm) and OpenCV reads every id off it
+    import cv2
+    import numpy as np
+    from aruco_studio.plan import plan_tag
+    from aruco_studio.verify import detect as D
+    for layout in ("single", "grid", "charuco"):
+        png = client.post("/api/export/png", json=spec(layout)).content
+        assert png[37:41] == b"pHYs" and int.from_bytes(png[41:45], "big") == 20000
+        img = cv2.imdecode(np.frombuffer(png, np.uint8), cv2.IMREAD_GRAYSCALE)
+        p = plan_tag(spec(layout))
+        assert D.detect(img, p.data)["ids"] == sorted(p.data["ids"])
     assert client.post("/api/export/pdf", json=spec()).status_code == 404
     bad = spec()
     bad["target"]["w_mm"] = 4.0

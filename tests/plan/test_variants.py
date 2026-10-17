@@ -105,3 +105,45 @@ def test_id_regions_and_warning():
     assert reg["changed"] and set(map(tuple, reg["old"])) != set(map(tuple, reg["new"]))
     assert V.label_slots(t, 5)
     assert V.label_warning(t, 5) in ("",) or isinstance(V.label_warning(t, 5), str)
+
+
+# ------------------------------------------- REF tests/test_aruco_ids_label_warning.py
+
+def _disc_tag(label, r=20.0):
+    """REF's disc: 40 mm (no room on the white at 0.6); r=26.5: Zach's 53 mm
+    one, where REF's 28 mm marker fits (REF planned the label on that marker)."""
+    import math
+    from aruco_studio.plan import target as T
+    disc = [[(r * math.cos(2 * math.pi * k / 96), r * math.sin(2 * math.pi * k / 96))
+             for k in range(96)]]
+    t = T.Target(kind="face", w_mm=2 * r, h_mm=2 * r, loops_mm=disc, has_body=True)
+    s = {"layout": "single", "mode": "black"}
+    if label is not None:
+        s["label"] = dict(label, rule=2)
+    return plan_tag(TagSpec(settings=s, numbers={"size": 28.0}, target=t, key="top2"))
+
+
+@pytest.mark.ref("tests/test_aruco_ids_label_warning.py", "label_warning")
+def test_ref_ids_label_warning():
+    """A copy never drops its label silently (REF: the GIM43 disc's part)."""
+    assert V.label_warning(_disc_tag(None), 21) == ""
+    ok = _disc_tag({"on": True, "content": "id", "place": "black", "nozzle_mm": 0.4}, r=26.5)
+    assert abs(ok.data["marker"]["marker_length_m"] - 0.028) < 1e-12
+    assert ok.data["label"]["kind"] != "none"
+    assert V.label_warning(ok, 21) == ""
+    # REF refused its label with a 28 mm marker on the 40 mm disc; through the plan
+    # that marker is clamped to fit (and leaves white), so here: a 30 mm marker whose
+    # sticker IS its 40 mm face -- no white around it for a label
+    from aruco_studio.plan import target as T
+
+    def box_tag(anyway):
+        lab = {"on": True, "content": "id", "place": "white", "nozzle_mm": 0.6, "rule": 2,
+               "build_anyway": anyway}
+        return plan_tag(TagSpec(settings={"layout": "single", "mode": "black", "label": lab},
+                                numbers={"size": 30.0}, target=T.box(40, 40, 3), key="top2"))
+    bad = box_tag(False)
+    assert bad.data["label"]["kind"] == "none"
+    w = V.label_warning(bad, 21)
+    assert "not built" in w and len(w) > 30, w
+    forced = box_tag(True)
+    assert "anyway" in V.label_warning(forced, 21)
