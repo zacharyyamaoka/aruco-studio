@@ -164,6 +164,21 @@ def validate(spec: M.TagSpecIn) -> List[dict]:
     return plan_tag(_spec(spec)).data["warnings"]
 
 
+@app.post("/api/auto_check")
+def auto_check(spec: M.TagSpecIn) -> dict:
+    """Auto size at creation (plan.auto.auto_still_fits, REF _check_auto):
+    a tag stored with Auto and a number (made before 2026-10-13) shows Auto
+    ON only if Auto builds that same tag; else `note` says what it would build."""
+    from ..plan.auto import auto_still_fits
+    sp = _spec(spec)
+    n = sp.numbers or {}
+    size = float(n.get("size") or 0.0)
+    if not (sp.settings or {}).get("size_auto", True) or size <= 0.0:
+        return {"auto": size <= 0.0, "note": ""}
+    keep, note = auto_still_fits(sp, size, float(n.get("square") or 0.0))
+    return {"auto": keep, "note": note}
+
+
 @app.post("/api/candidates")
 def candidates(req: M.CandidatesIn) -> List[dict]:
     """The ranked Layout list for a target (core.autosize)."""

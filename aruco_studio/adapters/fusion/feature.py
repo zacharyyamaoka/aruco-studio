@@ -31,6 +31,7 @@ from ...core import form as F
 from ...core import restructure as CR
 from ...core import settings as S
 from ...core import edits as E
+from ...plan import auto as AU
 from ...plan import plan as PL
 from ...plan import record as R
 from ...plan.spec import TagSpec
@@ -179,11 +180,37 @@ def node_parts(cf, s):
     return dict(zip(list(s.get("parts") or []), bfs))
 
 
-def plan_for(entity, s, n, key, name="", body_under=None):
-    """Read the target, plan the tag. -> (TagPlan, Target, base, creation keys)."""
+def spec_for(entity, s, n, key, name="", body_under=None):
+    """Read the target. -> (TagSpec, Target, base, creation keys)."""
     t, base, keys = TG.read(entity, s, body_under)
     spec = TagSpec(settings=dict(s, **keys), numbers=dict(n), target=t, name=name, key=key)
+    return spec, t, base, keys
+
+
+def plan_for(entity, s, n, key, name="", body_under=None):
+    """Read the target, plan the tag. -> (TagPlan, Target, base, creation keys)."""
+    spec, t, base, keys = spec_for(entity, s, n, key, name, body_under)
     return PL.plan_tag(spec, base=base), t, base, keys
+
+
+def edit_open(cf):
+    """What the Edit dialog opens with (REF _check_auto at its first
+    refresh): the node's settings and numbers, and whether Auto size shows
+    ON. A node made with Auto stores the number Auto picked then; Auto stays
+    ON only if it builds that same tag here now (plan.auto.auto_still_fits),
+    else OFF at its number with `note`. -> {"settings", "numbers", "auto",
+    "note"}."""
+    s = REC.settings_of(cf)
+    n = REC.numbers_of(cf)
+    out = {"settings": s, "numbers": n, "auto": bool(s.get("size_auto", True)), "note": ""}
+    if not out["auto"] or not float(n.get("size") or 0.0) > 0.0:
+        return out
+    entity = cf.dependencies.itemById("target").entity
+    spec, _t, base, _k = spec_for(entity, s, n, s.get("key") or "tag", "", _body_under(entity))
+    keep, note = AU.auto_still_fits(spec, float(n["size"]), float(n.get("square") or 0.0),
+                                    base=base)
+    out.update(auto=keep, note=note)
+    return out
 
 
 def _body_under(entity):

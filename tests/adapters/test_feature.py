@@ -151,3 +151,22 @@ def test_an_upstream_change_queues_and_refreshes_the_record():
     assert R.record_digest(new) == plan.data["digest"]
     assert SY.after_compute(cf, s, plan) is None          # up to date now
     assert [j.name for j in comp.jointOrigins] == ["aruco t1"]
+
+
+def test_edit_open_keeps_auto_only_when_it_builds_the_stored_tag():
+    """REF _check_auto (plan.auto.auto_still_fits): a node made with Auto
+    stores the number Auto picked; Edit shows Auto ON while Auto still
+    builds that tag, else OFF at its number with REF's note."""
+    out, _body, _face = _tag()
+    cf = out["node"]
+    assert FT.edit_open(cf)["auto"] is True            # today's node: Auto stores size 0
+    built = out["plan"].data["marker"]["marker_length_m"] * 1000.0
+    p = REC.param(cf, "size")
+    p.expression = FT.mm_expr(built)                   # a node made before 2026-10-13
+    first = FT.edit_open(cf)
+    assert first["settings"]["size_auto"] and first["numbers"]["size"] > 0
+    assert first["auto"] is True and first["note"] == ""
+    p.expression = FT.mm_expr(round(built * 0.8, 3))
+    later = FT.edit_open(cf)
+    assert later["auto"] is False
+    assert "(Auto size at creation)" in later["note"]
