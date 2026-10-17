@@ -318,12 +318,18 @@ def _prusa():
 
 
 @app.get("/api/presets")
-def presets() -> dict:
-    """Built-in presets (read only: Default and PrusaSlicer's "Aruco"
-    profiles) and the user's (their file under the Studio's home)."""
-    cat = _P.catalog(S.presets_store(), _prusa())
-    return {"items": [{"name": n, "kind": k, "preset": p} for n, p, k in cat["items"]],
-            "last": cat["last"], "notes": cat["notes"], "file": str(S.presets_path())}
+def presets(made_by: Optional[str] = None) -> dict:
+    """Built-in presets (read only: Default, PrusaSlicer's "Aruco" profiles
+    and the sticker printers) and the user's (their file under the Studio's
+    home). Each says what it makes (`made_by`: its profile's kind, M6a);
+    `collections`: 3D printers and Sticker printers; `?made_by=` keeps one."""
+    cat = _P.catalog_all(S.presets_store(), _prusa())
+    items = [(n, p, k) for n, p, k in cat["items"]
+             if made_by in (None, "") or _P.kind_of(p) == made_by]
+    return {"items": [{"name": n, "kind": k, "made_by": _P.kind_of(p), "preset": p}
+                      for n, p, k in items],
+            "collections": _P.collections(items), "last": cat["last"], "notes": cat["notes"],
+            "file": str(S.presets_path())}
 
 
 @app.post("/api/presets")
@@ -608,11 +614,17 @@ def new_tag(req: M.NewTagIn) -> dict:
         tgt = pal[key]
     preset = None
     if req.preset:
-        preset, _kind = _P.find(_P.catalog(S.presets_store(), _prusa()), req.preset)
+        preset, _kind = _P.find(_P.catalog_all(S.presets_store(), _prusa()), req.preset)
         if preset is None:
             raise HTTPException(status_code=404, detail=f"no preset {req.preset!r}")
-    return _NEW.new_spec(req.layout, tgt, preset, marker_id=req.marker_id, name=req.name,
-                         key=req.key)
+    sp = _NEW.new_spec(req.layout, tgt, preset, marker_id=req.marker_id, name=req.name,
+                       key=req.key)
+    # M6a: the preset is the machine -- its kind says how the tag is made
+    # (`made_by` overrides it, for scripts); core.form keeps the rule
+    sp["settings"] = _F.new_tag_settings(sp["settings"], bool(tgt.get("has_body", False)),
+                                         preset=preset or _P.default_preset(),
+                                         made_by=req.made_by)
+    return sp
 
 
 @app.post("/api/target")

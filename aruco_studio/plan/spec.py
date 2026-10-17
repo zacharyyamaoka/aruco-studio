@@ -29,6 +29,7 @@ from ..core import chamfer as _CH
 from ..core import dictionary as _D
 from ..core import form as _F
 from ..core import label as _L
+from ..core import make as _MK
 from ..core import origin as _OR
 from ..core import settings as _S
 from ..core import slabs as _SL
@@ -53,7 +54,8 @@ SETTINGS_TYPES = {"layout": _STR, "dictionary": _STR, "mode": _STR, "op": _STR,
                   "corner_mark": _STR, "pin": _STR, "grow": (bool,), "legacy": (bool,),
                   "chamfer": (bool,), "size_auto": (bool,), "flip": (bool,),
                   "label": (dict, type(None)), "cells": (dict, type(None)),
-                  "force": (list, tuple, type(None)), "origin_v": (int, type(None))}
+                  "force": (list, tuple, type(None)), "origin_v": (int, type(None)),
+                  "make": (dict, type(None)), "holes": (str, type(None))}
 NUMBER_KEYS = _S.PARAMS + _S.LEGACY_PARAMS
 
 
@@ -368,6 +370,9 @@ def check(spec: TagSpec) -> List[Issue]:
             if _finite(m) and not 0.0 <= m <= _TR.MARGIN_MAX_MM:
                 add("settings.trim.margin_mm", "warn",
                     f"trim margin {m:g} mm: 0 to {_TR.MARGIN_MAX_MM:g} mm (clamped)")
+    # -- how it is made (core.make), the holes rule
+    for fld, lv, text in _MK.make_of(raw)[1] + _MK.holes_of(raw)[1]:
+        add(fld, lv, text)
     # -- target
     if t.kind not in KINDS:
         add("target.kind", "error", f"unknown target kind {t.kind!r}: one of {', '.join(KINDS)}")
@@ -385,8 +390,23 @@ def check(spec: TagSpec) -> List[Issue]:
     if len(t.loops_mm) > 1 and len(t.loops_mm[0]) >= 3:
         outer = t.loops_mm[0]
         for i, h in enumerate(t.loops_mm[1:], 1):
-            if len(h) >= 3 and not all(_inside(outer, p) for p in h):
+            if len(h) < 3:
+                continue
+            inside = [_inside(outer, p) for p in h]
+            if not any(inside):
+                # read even-odd it would be a second island (M6 note b)
+                add("target.loops_mm", "error",
+                    f"loop {i + 1} lies outside the outline: one target per face; pick the "
+                    "faces one by one or together")
+            elif not all(inside):
                 add("target.loops_mm", "error", f"hole {i} is not inside the outer loop")
+            else:
+                for j, g in enumerate(t.loops_mm[1:i], 1):
+                    if len(g) >= 3 and all(_inside(g, p) for p in h):
+                        add("target.loops_mm", "error",
+                            f"loop {i + 1} lies inside hole {j}: an island is a face of its "
+                            "own (one target per face)")
+                        break
     if t.body_mm is not None and not t.body_mm["z1"] > t.body_mm["z0"]:
         add("target.body_mm", "error", "the body's z1 must be above its z0")
     if t.x_ref is not None and math.hypot(*t.x_ref) < 1e-9:

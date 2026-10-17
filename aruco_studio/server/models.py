@@ -228,6 +228,7 @@ class NewTagIn(BaseModel):
     marker_id: StrictInt = 0
     name: StrictStr = ""
     key: StrictStr = ""
+    made_by: Optional[Literal["print3d", "sticker"]] = None    # M6a: overrides the preset's kind
 
 
 class PresetApplyIn(BaseModel):

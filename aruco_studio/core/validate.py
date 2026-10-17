@@ -391,6 +391,11 @@ ANCHOR_FIELD = {
     "label_dx": "settings.label.x_mm", "label_dy": "settings.label.y_mm",
     "label_pos_auto": "settings.label.position", "label_force": "settings.label.build_anyway",
     "preset_row": "tag",
+    # M6a (manufacturing intent, holes): the new rows
+    "made_by": "settings.make.by", "make": "settings.make",
+    "make_thickness": "settings.make.thickness_mm", "make_margin": "settings.make.margin_mm",
+    "make_cut": "settings.make.cut_line", "perimeter": "settings.make.perimeter",
+    "holes": "settings.holes",
 }
 
 

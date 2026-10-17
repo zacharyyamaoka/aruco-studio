@@ -245,7 +245,7 @@ def mode_for(mode, has_body):
     return resolve_mode({"mode": mode}, has_body)["mode"]
 
 
-def new_tag_settings(s, has_body):
+def new_tag_settings(s, has_body, preset=None, made_by=None):
     """A NEW tag's settings as today's dialog stores them on OK (REF
     aruco_feature.create): the Origin rule stamped (`origin_v` =
     aruco_origin.ORIGIN_RULE) and Extrude Auto resolved (resolve_mode).
@@ -253,9 +253,39 @@ def new_tag_settings(s, has_body):
     caller's. Not REF's: the one home of this rule, called by the Studio's
     new tag (server/newtag.py) and the Fusion adapter's create() (audit C4).
     An EXISTING node never goes through here: one without `origin_v`
-    keeps the old Origin rule."""
+    keeps the old Origin rule.
+
+    M6a (2026-10-16) adds three stamps, each a versioned key a stored tag
+    without it reads exactly as before: `make` (core.make, rule 1: how the
+    tag is made -- `made_by`, else the preset's kind, else a `make` already
+    there, else 3D printed; a sticker takes the preset's stock), `holes`
+    ("avoid" unless one is given) and the label's rule (label.NEW_RULE: a
+    ChArUco label by hand in any black square). A sticker is White + black,
+    New body, no pins, no trim."""
+    from . import make as _MK
+    from . import presets as _PS
     s = dict(s)
     s["origin_v"] = OR().ORIGIN_RULE
+    kind = made_by if made_by in _MK.BY else None
+    if kind is None and isinstance(preset, dict):
+        kind = _PS.kind_of(preset)
+    have, _notes = _MK.make_of(s)
+    if kind is None:
+        kind = have.by if not have.legacy else "print3d"
+    if have.legacy or have.by != kind or preset is not None:
+        s["make"] = _MK.new_make(kind, (preset or {}).get("profile"))
+    else:
+        s["make"] = have.to_dict()
+    if s.get("holes") not in _MK.HOLES:
+        s["holes"] = "avoid"
+    lab = s.get("label")
+    lab = dict(lab) if isinstance(lab, dict) else AL().LabelSettings().to_dict()
+    lab["rule"] = AL().NEW_RULE
+    s["label"] = lab
+    if kind == "sticker":
+        s.update(mode="both", op="new", pin="none", grow=False)
+        s.pop("trim", None)
+        return s
     return resolve_mode(s, has_body)
 
 

@@ -79,13 +79,13 @@ class _Model:
             r = parts.get(part)
             if r is None:
                 continue
-            if part in ("tile", "pin"):
+            if part in ("tile", "pin", "sticker"):        # sticker: core.make (M6a)
                 W = W or r
             elif part == "pocket":
                 W = W and not r
                 if self.comb.get("pocket", {}).get("into") == "body":
                     B = B and not r
-            elif part == "pattern":
+            elif part in ("pattern", "ink"):
                 P = P or r
             elif part == "recess":
                 B = B and not r

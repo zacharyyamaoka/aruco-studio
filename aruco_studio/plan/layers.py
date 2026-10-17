@@ -25,6 +25,11 @@ builds them in order rebuilds today's bodies exactly:
 the body under (Join) or new, the pins joined to the tile, the pocket cut
 from the tile / the joined body, the pattern a body of its own, the recess
 cut from the body under, the trim intersected with it.
+
+A printed sticker (core.make, M6a) has two parts: `sticker` (the white
+stock, z [0, t], its cut polygon) and `ink` (black, z [t, t + INK]: the
+cells, the corner triangle and the label exactly as the pattern's
+footprint makes them), each a body of its own.
 """
 from __future__ import annotations
 
@@ -99,7 +104,8 @@ def poly(pts, holes=()) -> dict:
 
 
 PART_OP = {"tile": "add", "pin": "add", "pocket": "cut", "pattern": "add", "recess": "cut",
-           "trim": "keep"}
+           "trim": "keep", "sticker": "add", "ink": "add"}
+STICKER_PARTS = ["sticker", "ink"]
 
 
 class LayerBuilder:
@@ -243,6 +249,49 @@ class LayerBuilder:
                 self.add("trim_keep", "trim", k, "add", "none", zr[0] - tp.pad, zr[1] + tp.pad,
                          [poly(rect_pts(tp.column()))])
         return self.out
+
+
+def sticker_layers(ev, n, frames, make, cut) -> List[Layer]:
+    """A sticker's layers: the white stock (its cut polygon) and the ink."""
+    from ..core import make as _MK
+    t = float(make.thickness_mm)
+    lb = LayerBuilder(ev, n, frames)
+    lb.add("sticker", "sticker", lb._next_solid("sticker"), "add", "white", 0.0, t,
+           [poly(cut["outer"], cut["holes"])])
+    lb.footprint("ink", "ink", t, t + _MK.INK_MM)
+    return lb.out
+
+
+def sticker_combines():
+    return [{"part": "sticker", "op": "new", "into": None},
+            {"part": "ink", "op": "new", "into": None}]
+
+
+def _minus(outer, tool):
+    """`outer` (ccw) less the polygon `tool`, as one ccw loop (plan/region)."""
+    from . import region as RG
+    traps = RG.boolean([[[list(outer)]], [[list(tool)]]], lambda f: f[0] and not f[1])
+    polys = RG.polygons(traps) if traps else []
+    if not polys:
+        return list(outer)
+    best = max(polys, key=lambda p: abs(_area2(p[0])))
+    return ccw(best[0])
+
+
+def cut_line(ev, fr, target, make) -> dict:
+    """guides.cut_line: the sticker's cut polygon (mm, pattern frame).
+    Marker: the sticker grown by its margin (`rect`), a corner cut when the
+    mark is one; Profile: the target's outline with every hole."""
+    if make.perimeter == "profile":
+        loops = guides_target(ev, fr, target)
+        return {"kind": "profile", "outer": loops[0] if loops else [],
+                "holes": [list(h) for h in loops[1:]]}
+    r = fr["tile_rect"] or tuple(_AL.sticker_rect(ev["spec"]))
+    outer = rect_pts(r)
+    mark = ev.get("mark")
+    if mark is not None and mark.kind == "tile_cut" and mark.tool:
+        outer = _minus(outer, mark.tool)
+    return {"kind": "marker", "rect": [_r(v) for v in r], "outer": _pts(ccw(outer)), "holes": []}
 
 
 def _label_of(label):

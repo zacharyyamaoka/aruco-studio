@@ -108,6 +108,8 @@ class MarkerRow:
     tone: str = ""
     part: str = ""                  # Export: the part (tick) it prints with
     tip: str = ""
+    made_by: str = ""               # M6a (not REF's): "print3d" / "sticker" (the IDs table's
+                                    # Made by column); "" = not said
 
     @property
     def where(self) -> str:

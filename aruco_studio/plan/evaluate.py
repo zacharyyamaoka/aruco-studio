@@ -16,6 +16,13 @@ entity comes from the `Target` (plan/target.py):
 
 Frames are REF's: cm, in the base frame's space (the host component's in
 REF). `host_xform` is the adapter's. The caches are gone (a pure call).
+
+Beyond REF (M6a, both absent = REF's evaluate() exactly):
+
+| | |
+|---|---|
+| `settings.holes == "ignore"` | the fit and the label's white read the OUTER loop only (`fit_loops`); the trim still reads every loop |
+| `sticker=` a `core.make.Make` | a printed sticker: fitted on the loops like a face (a sketch area too), the tile is the sticker grown by its margin, the label's white is the sticker's cut polygon (Marker: that rectangle; Profile: the outline with its holes), the record's depth is the ink's |
 """
 from __future__ import annotations
 
@@ -24,6 +31,7 @@ import dataclasses
 from ..core import autosize as _A
 from ..core import chamfer as _CH
 from ..core import label as _AL
+from ..core import make as _MK
 from ..core import markers as _M
 from ..core import origin as _OR
 from ..core import settings as _S
@@ -93,13 +101,45 @@ def _layout_rect(kind, w_m, h_m, s, n):
     return lay
 
 
-def label_for(target, s, n, spec, plan, mark, tile_mm, base, frame, name=""):
+def fit_loops(target, s):
+    """The loops the fit reads (metres): every loop, or the outer one only
+    under Holes: ignore (settings.holes; absent = avoid)."""
+    lm = target.loops_m()
+    return lm[:1] if (s or {}).get("holes") == "ignore" else lm
+
+
+def sticker_region(target, s, spec, base, frame, sticker):
+    """A sticker's label white (mm, pattern frame): its cut polygon. Marker:
+    the sticker grown by the margin; Profile: the outline with its holes
+    (the paper is cut there whatever the Holes rule)."""
+    al = AL()
+    if sticker.perimeter == "profile":
+        o, x, y, _z = frame
+        try:
+            return _loops_mm(target.loops_m(), base, o, x, y)
+        except Exception:                          # noqa: BLE001
+            return None
+    u0, v0, u1, v1 = al.sticker_rect(spec)
+    m = sticker.margin_mm
+    return [al.rect_loop((u0 - m, v0 - m, u1 + m, v1 + m))]
+
+
+def label_for(target, s, n, spec, plan, mark, tile_mm, base, frame, name="", sticker=None):
     """REF label_for: the tag's label (aruco_label.plan_label), its white
-    from where this mode has it, the corner mark and pins kept clear of."""
+    from where this mode has it, the corner mark and pins kept clear of.
+    `sticker`: the white is the sticker's cut polygon (not REF's)."""
     al = AL()
     ls = al.LabelSettings.from_dict(s.get("label") if isinstance(s.get("label"), dict) else None)
     if not ls.on:
         return al.Label(settings=ls)
+    if sticker is not None:
+        tile = None
+        if tile_mm is not None:
+            tile = (-tile_mm[0] / 2.0, -tile_mm[1] / 2.0, tile_mm[0] / 2.0, tile_mm[1] / 2.0)
+        region = sticker_region(target, s, spec, base, frame, sticker)
+        return al.plan_label(spec, ls, mode="both", op=plan.op, name=name, key=s.get("key", ""),
+                             region=region, grow=False, bounds=None, tile=tile, mark=mark,
+                             pins=None, slab=tuple(plan.layers.pattern))
     mode = s["mode"]
     op = plan.op
     has_body = bool(s.get("has_body"))
@@ -116,7 +156,7 @@ def label_for(target, s, n, spec, plan, mark, tile_mm, base, frame, name=""):
     want_bounds = room["bounds"] == "face" and not (is_profile and mode == "both")
     if room["region"] == "face" or want_bounds:
         try:
-            lm = target.loops_m()
+            lm = fit_loops(target, s)
             loops = _loops_mm(lm, base, o, x, y)
         except Exception:                          # noqa: BLE001
             loops = None
@@ -146,7 +186,7 @@ def x_ref_3d(target, base):
     return [bx[i] * u + by[i] * v for i in range(3)]
 
 
-def evaluate(target, s, n, base=None, name=""):
+def evaluate(target, s, n, base=None, name="", sticker=None):
     """Everything the geometry needs (REF evaluate(): cm frames in the base
     frame's space). Raises ValueError("no marker fits here: ...") as REF.
 
@@ -172,19 +212,22 @@ def evaluate(target, s, n, base=None, name=""):
             angles_deg=angles, cells=cells)
 
     o, x, y, z, w, h = base_of(target, base)
-    if target.is_profile:
+    if sticker is not None:
+        # a sticker sits on the face: fitted on the loops, a sketch area too
+        lay, pl = fit(fit_loops(target, s))
+    elif target.is_profile:
         # like Extrude: the closed area, holes included. White + black: the
         # white tile is the profile's box (holes filled), so the whole box is
         # the marker's.
         tile_frame = (o, x, y, z, w, h)
-        loops = None if s.get("mode") == "both" else target.loops_m()
+        loops = None if s.get("mode") == "both" else fit_loops(target, s)
         if loops is None or _is_box(loops, w, h):
             lay = _layout_rect(kind, w / 100.0, h / 100.0, s, n)     # honours the Layout pick
         else:
             lay, pl = fit(loops)
     else:
         # face_frame + keep_x happened in the adapter: `base` is their frame
-        lay, pl = fit(target.loops_m())
+        lay, pl = fit(fit_loops(target, s))
     base = (o, x, y, z, w, h)
     if pl:
         o = [o[i] + x[i] * pl["cx"] * 100.0 + y[i] * pl["cy"] * 100.0 for i in range(3)]
@@ -207,6 +250,11 @@ def evaluate(target, s, n, base=None, name=""):
     L_ = pl_.layers
     spec.depth_m, spec.raise_m, spec.recess_m = (L_.depth / 1000.0, L_.raise_ / 1000.0,
                                                  L_.recess / 1000.0)
+    if sticker is not None:
+        # the paper: the pattern, its quiet zone and the margin (the Marker cut)
+        spec.depth_m, spec.raise_m, spec.recess_m = _MK.INK_MM / 1000.0, 0.0, 0.0
+        g = 2.0 * sticker.margin_mm / 10.0
+        tile_frame = (o, x, y, z, spec.tile_size_m[0] * 100.0 + g, spec.tile_size_m[1] * 100.0 + g)
     if tile_frame is None:
         tile_frame = (o, x, y, z, spec.tile_size_m[0] * 100.0, spec.tile_size_m[1] * 100.0)
     # Origin (aruco_origin): the pattern turned on its own footprint
@@ -240,7 +288,8 @@ def evaluate(target, s, n, base=None, name=""):
     label, label_white = None, None
     ls = s.get("label")
     if isinstance(ls, dict) and ls.get("on"):
-        label = label_for(target, s, n, spec, pl_, mark, tile_mm, base, (o, x, y, z), name)
+        label = label_for(target, s, n, spec, pl_, mark, tile_mm, base, (o, x, y, z), name,
+                          sticker=sticker)
         notes += [t for t in label.notes if t not in notes]
         if label.kind == "none" and label.preview is not None:
             notes.append("label warning: not built -- " + "; ".join(label.preview.violations)
@@ -280,7 +329,7 @@ def evaluate(target, s, n, base=None, name=""):
           "pin_frame": pin_frame, "turn": turn, "x_fit": x_fit,
           "pin_tol": float(n.get("pin_tol", SL().PIN_TOL_MM)), "mode": s["mode"],
           "mark": mark, "label": label, "label_white": label_white, "placement": pl,
-          "tile_mm": tile_mm}
+          "tile_mm": tile_mm, "sticker": sticker}
     ev["trim"] = None
     if trim_in is not None or trim_err is not None:
         try:
