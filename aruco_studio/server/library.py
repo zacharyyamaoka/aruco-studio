@@ -7,6 +7,7 @@
 | `Library.nodes()`: the Fusion design's tags | the open scene's tags (`newtag.preset_of` of each) |
 | `Library.dialog()`: the open dialog's print settings | the selected tag's (`dialog` argument) |
 | `Library.prints()`: PrusaSlicer's print profiles | `core.prusa.user_prints` over `store.prusa_sources()` |
+| (M8c, not REF's) | a **Printers** collection: one card per PrusaSlicer physical printer, its fitting print presets as the card's `choices` (the "Aruco" ones first, the current pair marked); Select on a choice (`printer:<name>|<print>`, or the card for its default) makes the preset from the pair (`core.presets.from_pair`: the printer's nozzle, the print's line and layers) and imports it as one of yours. And a **Sticker printers** collection (M6a's sticker built-ins and yours): the catalog is `catalog_all` |
 
 The words, thumbs, Info sections and the Edit form are core.presets'
 (`subtitle`, `cells_words`, `thumb_svg`, `info`, `edit_schema`,
@@ -99,12 +100,15 @@ def build(nodes: List[Tuple[str, dict]], dialog: Optional[dict] = None):
         prusa = S.prusa_sources()
     except Exception as exc:                       # noqa: BLE001
         notes.append(f"PrusaSlicer's folder could not be read ({type(exc).__name__})")
-    cat = _P.catalog(S.presets_store(), prusa)
+    cat = _P.catalog_all(S.presets_store(), prusa)
     notes += list(cat.get("notes") or [])
     cards, names = {}, {}
     for name, p, kind in cat["items"]:
         cid = f"{'user' if kind == 'user' else 'builtin'}:{name}"
-        cards[cid] = _card(cid, name, p, kind, ["mine" if kind == "user" else "builtin"], dialog)
+        where = ["mine" if kind == "user" else "builtin"]
+        if _P.kind_of(p) == "sticker":
+            where.append("stickers")
+        cards[cid] = _card(cid, name, p, kind, where, dialog)
         names[name] = cid
     prints = []
     if prusa is not None:
@@ -148,10 +152,92 @@ def build(nodes: List[Tuple[str, dict]], dialog: Optional[dict] = None):
         if cid in cards:
             cards[cid]["in"].append("recent")
             cards[cid]["recent"] = i
+    if prusa is not None:
+        try:
+            for c in printer_cards(prusa, dialog):
+                cards[c["id"]] = c
+        except Exception as exc:                   # noqa: BLE001
+            notes.append(f"PrusaSlicer's physical printers could not be read ({exc})"[:200])
     return cards, notes, prusa
 
 
-COLLECTIONS = [(c, "This scene" if c == "document" else n, i) for c, n, i in _P.COLLECTIONS]
+COLLECTIONS = ([(c, "This scene" if c == "document" else n, i) for c, n, i in _P.COLLECTIONS]
+               + [("printers", "Printers", "printer"), ("stickers", "Sticker printers", "sticker")])
+
+
+# ------------------------------------------------------------------ the Printers (M8c)
+
+PRINTER_PREFIX = "printer:"
+
+
+def _choice_id(physical: str, print_name: str) -> str:
+    return f"{PRINTER_PREFIX}{physical}|{print_name}"
+
+
+def printer_cards(prusa, dialog=None) -> List[dict]:
+    """One card per physical printer: its printer preset's numbers and its
+    fitting print presets as `choices` (Aruco first; `current` the pair
+    PrusaSlicer has selected). `preset` is the default choice's preset
+    (made on Select, not stored)."""
+    out = []
+    for e in _PR.physical_printers(prusa):
+        pr = e["printer"]
+        cid = f"{PRINTER_PREFIX}{e['name']}"
+        choices = [{"id": _choice_id(e["name"], p["name"]), "name": p["name"],
+                    "fits": p["fits"], "line": p["line_mm"], "layer": p["layer_mm"],
+                    "first_layer": p["first_layer_mm"], "nozzle": p["nozzle_mm"],
+                    "aruco": p["aruco"], "current": p.get("current", False)}
+                   for p in e["prints"]]
+        default = next((c for c in choices if c["current"]), None) or             next((c for c in choices if c["fits"] == "yes"), None) or             (choices[0] if choices else None)
+        sub = (f"{pr['model']} {pr['variant']} · nozzle {pr['nozzle_mm']:g} · "
+               f"{len(choices)} print preset{'' if len(choices) == 1 else 's'}"
+               if pr else f"its printer preset {e['preset']!r} was not found")
+        card = {"id": cid, "name": e["name"], "kind": "printer", "in": ["printers"],
+                "editable": False, "subtitle": sub, "thumb": "", "used": 0, "info": [],
+                "recent": None, "differs": "", "current": e["current"],
+                "printer": pr, "technology": e["technology"], "host_kind": e["host_kind"],
+                "choices": choices, "default": default["id"] if default else None,
+                "nozzle": pr["nozzle_mm"] if pr else None, "preset": None}
+        if pr is None or default is None:
+            card["unreadable"] = True
+        else:
+            p = _pair_preset(prusa, e["name"], default["name"])
+            card.update(preset=p, line=p["profile"]["line_mm"],
+                        layer=p["profile"]["layer_mm"] or None, differs=_differs(dialog, p))
+        out.append(card)
+    return out
+
+
+def _pair_preset(prusa, physical: str, print_name: str) -> dict:
+    """The preset Select makes from (physical printer, print preset)."""
+    e = next((x for x in _PR.physical_printers(prusa) if x["name"] == physical), None)
+    if e is None or e["printer"] is None:
+        raise KeyError(f"{PRINTER_PREFIX}{physical}")
+    pr = _PR.printer_of(e["preset"], prusa)
+    pp = _PR.pair_profile(print_name, dict(pr, physical=physical), prusa)
+    if pp is None or not pp.get("line_mm"):
+        raise ValueError(f"'{print_name}' cannot be read as a print profile")
+    return _P.from_pair(pp, f"{physical} · {print_name}")
+
+
+def _select_printer(card_id: str, prusa) -> Tuple[str, dict]:
+    body = card_id[len(PRINTER_PREFIX):]
+    physical, sep, print_name = body.partition("|")
+    if not sep:
+        card = next((c for c in printer_cards(prusa) if c["id"] == card_id), None)
+        if card is None:
+            raise KeyError(card_id)
+        if not card["default"]:
+            raise ValueError(f"'{physical}' has no print preset that fits")
+        print_name = card["default"].partition("|")[2]
+    elif physical not in prusa.physical:
+        raise KeyError(card_id)
+    p = _pair_preset(prusa, physical, print_name)
+    st = S.presets_store()
+    got = _P.save_as(p["name"], p, st, prusa)
+    st.flush()
+    add_recent(got)
+    return got, _P.normalise(p, got)
 
 
 def state(nodes, dialog=None, selected=None) -> dict:
@@ -172,6 +258,11 @@ def state(nodes, dialog=None, selected=None) -> dict:
 def select(card_id: str, nodes) -> Tuple[str, dict]:
     """Select: (name, preset) to apply. A PrusaSlicer card is imported first,
     so the Preset row names a real preset (REF Library.select)."""
+    if card_id.startswith(PRINTER_PREFIX):
+        prusa = S.prusa_sources()
+        if prusa is None:
+            raise KeyError(card_id)
+        return _select_printer(card_id, prusa)
     cards, _notes, prusa = build(nodes)
     c = cards.get(card_id)
     if c is None:

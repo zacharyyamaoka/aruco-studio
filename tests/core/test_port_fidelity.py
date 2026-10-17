@@ -129,6 +129,9 @@ def test_shared_names_are_refs_text(module, ref, adapted):
 
 # print_beds' file I/O lives outside the core (audit C7): REF's text there
 BEDS_IO = ROOT / "aruco_studio" / "server" / "beds_io.py"
+# M8c: Send to PrusaSlicer's file half, new (not REF's): REF's twelve stay verbatim
+BEDS_IO_M8C = {"chain_profile", "filament_for", "write_project", "single_instance_ok",
+               "open_in_prusaslicer"}
 
 
 def test_beds_io_is_refs_text():
@@ -136,7 +139,8 @@ def test_beds_io_is_refs_text():
     core's beds no longer holds any of them."""
     mine = defs(BEDS_IO.read_text(encoding="utf-8"))
     theirs = defs(renamed(ref_path.show(B + "print_beds.py").decode("utf-8")))
-    funcs = {n for n in mine if mine[n].lstrip().startswith("def ")}
+    funcs = {n for n in mine if mine[n].lstrip().startswith("def ")} - BEDS_IO_M8C
+    assert BEDS_IO_M8C <= set(mine) and not (BEDS_IO_M8C & set(theirs))
     assert len(funcs) == 12, sorted(funcs)
     assert funcs <= set(theirs), sorted(funcs - set(theirs))
     differ = [n for n in sorted(funcs) if mine[n] != theirs[n]]

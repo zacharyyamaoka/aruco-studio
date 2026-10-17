@@ -142,6 +142,61 @@ def bodies(plan) -> List[dict]:
     return out
 
 
+def removed(plan) -> List[dict]:
+    """M8c: the material the tag removes from the body under it, per run of
+    slabs: [{what: "removed", z, polygons}] in the pattern frame. Where the
+    body was (its loops, its z) and is not any more (the pocket into it, the
+    recess, the trim's complement, a mark cut), minus whatever the tag adds
+    back there (white or pattern): so as a PrusaSlicer negative volume it
+    never cuts a colour. [] when the tag has no body or removes nothing."""
+    d = _d(plan)
+    m = _Model(d)
+    if m.body is None:
+        return []
+    out = []
+    prev = None
+    for k, (a, b) in enumerate(m.slabs):
+        zm = (a + b) / 2.0
+        if not (m.body_z[0] < zm < m.body_z[1]):
+            prev = None
+            continue
+        sig = tuple(m.active[k])
+        if prev is not None and prev[0] == sig:
+            prev[1]["z"][1] = b
+            continue
+        idxs = list(m.active[k]) + [m.body]
+        n = len(m.groups)
+
+        def expr(fs, k=k, idxs=idxs, n=n):
+            f = [False] * n
+            for j, i in enumerate(idxs):
+                f[i] = fs[j]
+            if not f[m.body]:
+                return False
+            B, W, P = m.materials(k, f)
+            return not (B or W or P)
+        traps = RG.boolean([m.groups[i] for i in idxs], expr)
+        if not traps:
+            prev = (sig, {"z": [a, b]})
+            continue
+        rec = {"what": "removed", "colour": "none", "z": [a, b],
+               "polygons": RG.polygons(traps), "_traps": traps}
+        out.append(rec)
+        prev = (sig, rec)
+    return out
+
+
+def removed_mesh(plan) -> List[dict]:
+    """removed(plan) as closed prisms: [{what, z, positions, indices}]."""
+    out = []
+    for r in removed(plan):
+        pos, tri = prism(r["_traps"], r["z"][0], r["z"][1])
+        out.append({"what": "removed", "colour": "none", "z": r["z"],
+                    "positions": [round(c, 6) + 0.0 for p in pos for c in p],
+                    "indices": [i for t in tri for i in t]})
+    return out
+
+
 def top(plan) -> Dict[str, list]:
     """{colour: polygons} of the top view."""
     d = _d(plan)

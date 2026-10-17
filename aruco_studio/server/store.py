@@ -54,6 +54,8 @@ def _prusa_owned(p: Path) -> bool:
     appdata = os.environ.get("APPDATA")
     bases = [Path(appdata) / "PrusaSlicer"] if appdata else []
     bases.append(Path(os.path.expanduser("~")) / "AppData" / "Roaming" / "PrusaSlicer")
+    if os.environ.get("BAM_ARUCO_PRUSASLICER_DIR"):     # M8c: the folder read, wherever it is
+        bases.append(Path(os.environ["BAM_ARUCO_PRUSASLICER_DIR"]))
     for base in bases:
         try:
             Path(p).resolve().relative_to(base.resolve())
@@ -173,25 +175,143 @@ def prusa_dir() -> Optional[Path]:
     return None
 
 
-def prusa_sources():
+def prusa_sources(files: Optional[Dict[str, str]] = None):
     """core.prusa.PrusaSources from PrusaSlicer's config folder (read only):
-    its print/*.ini and vendor/*.ini texts. None when there is no folder."""
+    its print/*.ini and vendor/*.ini texts; M8c: also physical_printer/*.ini
+    (through the allow-list), printer/*.ini and PrusaSlicer.ini (its
+    [presets] and [vendor:...] only), every private key dropped as the file
+    is read. `files`: {relpath: text} already read (prusa_read). None when
+    there is no folder."""
+    if files is None:
+        d = prusa_dir()
+        if d is None or not d.is_dir():
+            return None
+        # a file that does not parse (half written) is left out
+        files = {rel: t for rel, (t, ok) in prusa_read(d).items() if ok}
+    groups: Dict[str, Dict[str, str]] = {"print": {}, "vendor": {}, "printer": {},
+                                         "physical_printer": {}}
+    ini = None
+    for rel in sorted(files):
+        if rel == PRUSA_INI:
+            ini = files[rel]
+            continue
+        sub, _sep, name = rel.partition("/")
+        if sub in groups and name.endswith(".ini"):
+            groups[sub][name[:-4]] = files[rel]
+    return _PR.sources_from_texts(groups["print"], [groups["vendor"][k] for k in
+                                                    sorted(groups["vendor"])],
+                                  printer_texts=groups["printer"],
+                                  physical_texts=groups["physical_printer"], ini_text=ini)
+
+
+# M8c: what is read of PrusaSlicer's folder, and how (never written)
+PRUSA_INI = "PrusaSlicer.ini"
+PRUSA_KINDS = {"physical_printer": "physical", "printer": "printer", "print": "print",
+               "vendor": "vendor"}
+
+
+def prusa_paths(d: Optional[Path] = None) -> List[Path]:
+    """The files watched and read: PrusaSlicer.ini, physical_printer/,
+    printer/, print/ and vendor/ *.ini (about twenty on Zach's box)."""
+    d = d if d is not None else prusa_dir()
+    if d is None or not Path(d).is_dir():
+        return []
+    d = Path(d)
+    out = [d / PRUSA_INI] if (d / PRUSA_INI).is_file() else []
+    for sub in PRUSA_KINDS:
+        if (d / sub).is_dir():
+            out += sorted((d / sub).glob("*.ini"))
+    return out
+
+
+def prusa_rel(d: Path, path: Path) -> str:
+    return Path(path).resolve().relative_to(Path(d).resolve()).as_posix()
+
+
+def prusa_kind(rel: str) -> str:
+    if rel == PRUSA_INI:
+        return "ini"
+    return PRUSA_KINDS.get(rel.partition("/")[0], "")
+
+
+def read_prusa_file(path: Path, kind: str):
+    """One file of PrusaSlicer's folder, read line by line and filtered as
+    it is read -> (the kept text, complete?). A physical printer keeps only
+    core.prusa.PHYSICAL_KEYS; every other file drops each private key
+    (core.prusa.private_key); PrusaSlicer.ini keeps [presets] and
+    [vendor:...]. `complete`: every line a key = value, a comment or a
+    section head, a newline at the end, and the kind's own key (a
+    half-written file is not). (None, False) when it cannot be read."""
+    if kind in ("print", "printer", "vendor"):    # the big files: one pass, by regex
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                raw = fh.read()
+        except OSError:
+            return None, False
+        text = _PR.drop_private(raw)
+        return text, _PR.ini_complete(text, kind)
+    keep: List[str] = []
+    ok = True
+    last = ""
+    section = None
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace", newline="") as fh:
+            for line in fh:
+                last = line
+                s = line.strip()
+                if not s or s[0] in "#;":
+                    continue
+                if s[0] == "[" and s.endswith("]"):
+                    section = s[1:-1]
+                    if kind != "ini" or section == "presets" or section.startswith("vendor:"):
+                        keep.append(s + "\n")
+                    continue
+                if "=" not in s:
+                    ok = False
+                    continue
+                k = s.split("=", 1)[0].strip()
+                if kind == "physical":
+                    if k in _PR.PHYSICAL_KEYS:
+                        keep.append(s + "\n")
+                elif _PR.private_key(k):
+                    continue
+                elif kind == "ini":
+                    if section == "presets" or (section or "").startswith("vendor:"):
+                        keep.append(s + "\n")
+                else:
+                    keep.append(s + "\n")
+    except OSError:
+        return None, False
+    text = "".join(keep)
+    ok = ok and (kind == "vendor" or last.endswith(("\n", "\r")))
+    if ok:
+        ok = _PR.ini_complete(text, kind)
+    return text, ok
+
+
+def prusa_read(d: Optional[Path] = None) -> Dict[str, tuple]:
+    """{relpath: (kept text, complete?)} of every watched file."""
+    d = d if d is not None else prusa_dir()
+    out = {}
+    for p in prusa_paths(d):
+        rel = prusa_rel(d, p)
+        text, ok = read_prusa_file(p, prusa_kind(rel))
+        if text is not None:
+            out[rel] = (text, ok)
+    return out
+
+
+def prusa_bundle_text(name: str = "PrusaResearch") -> Optional[str]:
+    """A vendor bundle's kept text (private keys dropped): for a project's
+    filament chain on Send."""
     d = prusa_dir()
-    if d is None or not d.is_dir():
+    if d is None:
         return None
-    users = {}
-    for f in sorted((d / "print").glob("*.ini")) if (d / "print").is_dir() else []:
-        try:
-            users[f.stem] = f.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
-    bundles = []
-    for f in sorted((d / "vendor").glob("*.ini")) if (d / "vendor").is_dir() else []:
-        try:
-            bundles.append(f.read_text(encoding="utf-8", errors="replace"))
-        except OSError:
-            continue
-    return _PR.sources_from_texts(users, bundles)
+    p = Path(d) / "vendor" / f"{name}.ini"
+    if not p.is_file():
+        return None
+    text, _ok = read_prusa_file(p, "vendor")
+    return text
 
 
 # ------------------------------------------------------------- scenes
