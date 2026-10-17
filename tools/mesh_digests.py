@@ -25,6 +25,11 @@ for p in (ROOT, ROOT / "tools", ROOT / "tests" / "plan"):
         sys.path.insert(0, str(p))
 
 OUT = ROOT / "tests" / "fixtures" / "mesh_digests.json"
+# The plan digests lane polish changed on purpose (merge-polish, 2026-10-17):
+# label rule 5 for sugar tags, the rule list "1, 2, 3, 4, 5", the size
+# error's words and the cell-minimum warn's dash (audit C2). Only "plan"
+# digests may be here; every solid, top view and STL still matches OUT.
+MERGE = ROOT / "tests" / "fixtures" / "mesh_digests_merge.json"
 FUZZ_SEED, FUZZ_N = 1017, 120
 
 
@@ -119,6 +124,8 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--write", action="store_true")
     ap.add_argument("--check", action="store_true")
+    ap.add_argument("--write-merge", action="store_true",
+                    help="record the plan digests that differ from OUT (refused if any solid differs)")
     ap.add_argument("-j", type=int, default=8)
     a = ap.parse_args(argv)
     items = corpus()
@@ -129,8 +136,27 @@ def main(argv=None) -> int:
         OUT.write_text(json.dumps({"made_at": "46f2bac", "cases": got}, indent=0, sort_keys=True)
                        + "\n", encoding="utf-8")
         print(f"wrote {len(got)} cases to {OUT}")
+    if a.write_merge:
+        want = json.loads(OUT.read_text(encoding="utf-8"))["cases"]
+        plan, solid = {}, []
+        for k, w in want.items():
+            g = got.get(k, {})
+            if any(g.get(x) != w.get(x) for x in w if x != "plan") or set(g) != set(w):
+                solid.append(k)
+            elif g.get("plan") != w.get("plan"):
+                plan[k] = g["plan"]
+        if solid:
+            print(f"refused: {len(solid)} cases differ beyond the plan", solid[:10])
+            return 1
+        MERGE.write_text(json.dumps({"base": "46f2bac", "after": "lane/polish merged",
+                                     "plan": plan}, indent=0, sort_keys=True) + "\n",
+                         encoding="utf-8")
+        print(f"wrote {len(plan)} plan digests to {MERGE}")
     if a.check:
         want = json.loads(OUT.read_text(encoding="utf-8"))["cases"]
+        over = json.loads(MERGE.read_text(encoding="utf-8"))["plan"] if MERGE.exists() else {}
+        for k, h in over.items():
+            want[k] = dict(want[k], plan=h)
         bad = [k for k in want if want[k] != got.get(k)]
         print(f"{len(want)} cases, {len(bad)} differ", bad[:10])
         return 1 if bad else 0

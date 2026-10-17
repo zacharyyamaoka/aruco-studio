@@ -31,6 +31,8 @@ Two questions wait for you (section 4): a sticker's ChArUco Auto size, and the f
 | e2e | 47 Playwright passed (3.9 m) in 236 s |
 | **all** | **OK in 523 s**, exit 0 |
 
+After the merge of lane/polish and lane/speed (later the same morning): **OK in 562 s**, every group, e2e 52 (`docs/status/merge-polish.md`, `reports/merge_polish_check_2026-10-17.log`).
+
 `tools/check.py --trace`: 233 REF sections, ported 212, not ported (Fusion / UI) 17, skipped (other venvs) 4, **missing 0**. The 4 core skips are the parked `evaluate()` sections of two legacy goldens (`tests/plan/test_golden_evaluate.py` covers them). The verify skip was M8c's strict xfail (section 4, Q1); lane polish turned it into a pass under label rule 5.
 
 ### The morning screenshots
@@ -159,10 +161,10 @@ The 15-point Definition of Done of `docs/PLAN.md` section 4 was verified on 2026
 
 | What | State |
 |---|---|
-| Live re-placement on the forearm is slow: 2D preview 245 ms, 3D 715 ms median (the top view and the mesh, 20-100 ms per tag) | needs a design change: plan faces in a process pool, or a light drag preview with the meshes on release (audit B1) |
+| Live re-placement on the forearm (audit B1) | mostly fixed by lane speed (`docs/status/speed.md`): a drag step is about 75 ms in 2D and 3D on a quiet box (was 245 ms and 715 ms), the 3D release 210-280 ms; the results are bit-identical. Still open: on a busy box a drag step takes 120-155 ms; the next step is a process pool (about 2.5x in a trial, not built). In 3D the drag shows flat slabs; the relief comes on release |
 | A typed Columns x rows on a face is explained, not honoured | a new fit rule (audit B10) |
 | Send… does not preselect the printer the tags were planned for; it names the matching printers and a click picks one | as M8b2.3 requires (audit B2) |
-| The nits of the final audit (A5-A10, C1-C4) | lane polish fixed A5 (`/api/health` names the file's `/2`), A6 (spaced `cuts()` is a guillotine count: 10, not 16), A7 (the trivially true assertion is gone; the watcher's event and route are scanned), A10 (renumber rows carry `made_by`) and the server's half of C2 (the size error and the cell-minimum warn read whole in the short line). Left, with reasons in `docs/status/polish.md`: A9 (the "Old sticker sheet" entry), C1 (key paths in the status bar), the Studio half of C2, C3 (floats and exact keys), C4 (drawing slips): all in `studio/`, which the drag-preview lane owned this run |
+| The nits of the final audit (A5-A10, C1-C4) | lane polish fixed A5 (`/api/health` names the file's `/2`), A6 (spaced `cuts()` is a guillotine count: 10, not 16), A7 (the trivially true assertion is gone; the watcher's event and route are scanned), A10 (renumber rows carry `made_by`) and the server's half of C2 (the size error and the cell-minimum warn read whole in the short line). Left, with reasons in `docs/status/polish.md`: A9 (the "Old sticker sheet" entry), C1 (key paths in the status bar), the Studio half of C2, C3 (floats and exact keys), C4 (drawing slips): all in `studio/`, which the drag-preview lane owned this run. Both lanes are merged now (`docs/status/merge-polish.md`), so these can be done next |
 | The e2e suite's screenshots are rewritten on every full check (`reports/screens/`) | committed as they come |
 | Another session's worktree `C:\Users\BAM\Documents\aruco-studio-preview` (detached) | left alone; `git worktree remove` it when it is not needed |
 

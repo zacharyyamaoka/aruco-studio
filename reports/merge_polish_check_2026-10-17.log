@@ -1,0 +1,9 @@
+adapters: 97 passed in 40 s
+core: 7,387 passed, 4 skipped in 36 s
+plan: 544 passed in 109 s
+scene: 43 passed in 12 s
+server: 97 passed in 18 s
+verify: 120 passed in 87 s
+studio: build + vitest passed in 9 s
+e2e: 52 passed (4.1m) in 250 s
+OK in 562 s

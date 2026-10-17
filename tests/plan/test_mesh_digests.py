@@ -25,11 +25,40 @@ from aruco_studio.plan import region as RG  # noqa: E402
 
 CHUNKS = 8
 WANT = json.loads(MD.OUT.read_text(encoding="utf-8"))["cases"]
+# merge-polish: the plan digests lane polish changed on purpose. Only the
+# "plan" digest may differ; the solids, top views and STLs stay 46f2bac's.
+MERGE = json.loads(MD.MERGE.read_text(encoding="utf-8"))["plan"]
+
+
+def _want(cid):
+    w = WANT[cid]
+    return dict(w, plan=MERGE[cid]) if cid in MERGE else w
 
 
 def test_the_fixture_was_made_before_the_lane():
     assert json.loads(MD.OUT.read_text(encoding="utf-8"))["made_at"] == "46f2bac"
     assert len(WANT) == 947
+
+
+# what lane polish changed in a plan, by case: each kind leaves a mark in the plan
+_POLISH_MARKS = (
+    '"label":5',                      # label rule 5: sugar expands as a new tag
+    "1, 2, 3, 4, 5",                  # an unknown rule's warn lists rule 5
+    "size -",                         # C2: "Marker size -2 mm: 0 for Auto, ..."
+    "it may print poorly —",     # C2: the cell-minimum warn's dash
+)
+
+
+def test_the_merge_overlay_is_only_lane_polish():
+    """Every case in mesh_digests_merge.json is a plan lane polish changed on
+    purpose, and its plan carries one of the marks above."""
+    from aruco_studio.plan import plan_tag
+    assert 0 < len(MERGE) <= 60 and set(MERGE) <= set(WANT)
+    specs = dict(MD.corpus())
+    for cid in MERGE:
+        assert MERGE[cid] != WANT[cid]["plan"], cid
+        text = json.dumps(plan_tag(specs[cid]).to_dict(), separators=(",", ":"), ensure_ascii=False)
+        assert any(m in text for m in _POLISH_MARKS), cid
 
 
 @pytest.mark.parametrize("chunk", range(CHUNKS))
@@ -39,7 +68,7 @@ def test_every_output_is_bit_identical(chunk):
     bad = []
     for cid, spec in items[chunk::CHUNKS]:
         got = MD._one((cid, spec))[1]
-        if got != WANT[cid]:
+        if got != _want(cid):
             bad.append((cid, sorted(k for k in WANT[cid] if WANT[cid].get(k) != got.get(k))))
     assert not bad, bad[:5]
 
