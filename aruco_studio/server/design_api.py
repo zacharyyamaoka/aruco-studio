@@ -71,7 +71,7 @@ def resolver():
                 src = S.prusa_sources()
             except Exception:                      # noqa: BLE001
                 src = None
-            cat["cat"] = _P.catalog(S.presets_store(), src)
+            cat["cat"] = _P.catalog_all(S.presets_store(), src)   # the sticker printers too (M6a)
         p, _kind = _P.find(cat["cat"], name)
         return p
     return get

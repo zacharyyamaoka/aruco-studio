@@ -214,6 +214,19 @@ def cells_of(cells):
     return (of, float(step), float(mn))
 
 
+_R7_HALF_M = 5.0001e-8        # half of _r7's 0.1 um, and a hair
+
+
+def _snap(step: float) -> Tuple[float, float]:
+    """(k epsilon, metres tolerance) for snapping onto `step`: _K_EPS and
+    EPS_M themselves when the step is a whole number of 0.1 um (every REF
+    step), else widened by half that quantum (Merge 1, a dot of 25.4/dpi)."""
+    q = step * 1e7
+    if abs(q - round(q)) < 1e-6:
+        return _K_EPS, EPS_M
+    return _K_EPS + _R7_HALF_M / step, EPS_M + _R7_HALF_M
+
+
 class _Grid:
     """The steps one tag is sized on: the marker L as k Ls, the ChArUco
     square S as j m. Legacy (cells None): Ls = m = STEP_M, every method the
@@ -227,27 +240,35 @@ class _Grid:
         self.m = c[1] if c is not None else STEP_M
         self.min_m = c[2] if c is not None else 0.0
         self.Ls = n * self.m if self.cell else self.m
+        # Sizes are kept to 0.1 um (_r7). A step that is not a whole number
+        # of 0.1 um (a sticker printer's dot, 25.4 / 600 mm) puts k Ls and
+        # j m up to 0.05 um off the grid, more than _K_EPS / EPS_M allow:
+        # S_next then returned the same square for ever (Merge 1). Such a
+        # grid snaps with that half quantum too; any other grid uses the
+        # constants exactly as before (bit for bit).
+        self.ke_L, self.tol_L = _snap(self.Ls)
+        self.ke_m, self.tol_m = _snap(self.m)
 
     # -- the marker
     def L_of(self, k: int) -> float:
         return _r7(k * self.Ls) if k > 0 else 0.0
 
     def L_k(self, x: float) -> int:
-        return int(math.floor(x / self.Ls + _K_EPS))
+        return int(math.floor(x / self.Ls + self.ke_L))
 
     def L_down(self, x: float) -> float:
         return self.L_of(self.L_k(x))
 
     def L_nearest(self, x: float) -> float:
-        return self.L_of(int(math.floor(x / self.Ls + 0.5 + _K_EPS)))
+        return self.L_of(int(math.floor(x / self.Ls + 0.5 + self.ke_L)))
 
     def L_up(self, x: float) -> float:
-        return self.L_of(int(math.ceil(x / self.Ls - _K_EPS)))
+        return self.L_of(int(math.ceil(x / self.Ls - self.ke_L)))
 
     def L_next(self, x: float) -> float:
         """The step below x on the grid (x on it), else the one just below x."""
         k = self.L_k(x)
-        if abs(x - k * self.Ls) <= EPS_M:
+        if abs(x - k * self.Ls) <= self.tol_L:
             k -= 1
         return self.L_of(k)
 
@@ -261,7 +282,7 @@ class _Grid:
         return _r7(j * self.m) if j > 0 else 0.0
 
     def S_j(self, x: float) -> int:
-        return int(math.floor(x / self.m + _K_EPS))
+        return int(math.floor(x / self.m + self.ke_m))
 
     def kmax(self, j: int) -> int:
         """cell: the largest k whose marker (n k m) sits in a j m square with a
@@ -284,10 +305,10 @@ class _Grid:
         return self._valid_down(self.S_j(x))
 
     def S_nearest(self, x: float) -> float:
-        return self._valid_down(int(math.floor(x / self.m + 0.5 + _K_EPS)))
+        return self._valid_down(int(math.floor(x / self.m + 0.5 + self.ke_m)))
 
     def S_up(self, x: float) -> float:
-        j = int(math.ceil(x / self.m - _K_EPS))
+        j = int(math.ceil(x / self.m - self.ke_m))
         if self.cell:
             j = max(j, self.n + 2)
             while not self.S_ok(j):
@@ -296,7 +317,7 @@ class _Grid:
 
     def S_next(self, x: float) -> float:
         j = self.S_j(x)
-        if abs(x - j * self.m) <= EPS_M:
+        if abs(x - j * self.m) <= self.tol_m:
             j -= 1
         return self._valid_down(j)
 
@@ -335,7 +356,7 @@ class _Grid:
         s = max(gap_ratio * L, L / self.n)
         if not self.cell:
             return _r7(s)
-        return _r7(math.ceil(s / self.m - _K_EPS) * self.m)
+        return _r7(math.ceil(s / self.m - self.ke_m) * self.m)
 
     def pair_ok(self, L: float, S: float) -> bool:
         """cell: L and S on the grid, whole white around the marker."""

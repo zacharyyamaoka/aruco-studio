@@ -71,7 +71,7 @@ def test_check_a_bad_file_exits_1_with_the_path(env, tmp_path):
     r = cli(env, "check", str(broken))
     assert r.returncode == 1 and f"{broken}:4:1: error:" in r.stdout
     r = cli(env, "check", "--strict", str(ROOT / "examples" / "sticker_sheet.arucostudio.json"))
-    assert r.returncode == 1 and "t4 not built" in r.stdout      # Default can't print the disc's board
+    assert r.returncode == 0, r.stdout   # Merge 1: the sticker preset exists, the hole is off the board
 
 
 def _paths(svg: str):

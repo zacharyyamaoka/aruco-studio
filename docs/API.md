@@ -133,3 +133,5 @@ The rules: the server's own writes are atomic, and their sha256 is remembered be
 | Issue | `{field, level: error / warn / info, text}` | `plan/spec.py`; ARCHITECTURE 5.6 |
 | Scene (compiled) | `arucostudio.scene/1` (the shape `GET /api/scene` gives; a `/1` file is migrated on read) | `scene/model.py`; ARCHITECTURE 5.5 |
 | The design file | `arucostudio.scene/2` | `scene/design.py`, `scene/file.py`, `plan/shapes.py`; docs/FILE_FORMAT.md |
+
+The sticker sheet, the print bundle and the presets as machines (M6a): docs/API_sheet.md.

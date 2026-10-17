@@ -27,11 +27,14 @@ from fastapi.testclient import TestClient
 
 from aruco_studio.plan import plan_tag
 from aruco_studio.plan import shapes as SH
+from aruco_studio.core import make as MK
+from aruco_studio.core import presets as P
 from aruco_studio.plan.record import record_digest
 
 ROOT = Path(__file__).resolve().parents[2]
 EX = ROOT / "examples"
 PRESET = "0.32mm SPEED @MK4IS 0.6 - Aruco"
+STICKER = "Sticker · Letter · 600 dpi"   # the sticker example's preset (M6a; Merge 1)
 
 
 @pytest.fixture()
@@ -113,7 +116,9 @@ def test_the_forearm_and_the_stickers_equal_the_old_routes(client, tmp_path):
             if "label" in f:
                 s["label"] = {"on": True, "content": {"#id": "id", "#id + name": "id_name"}[f["label"]]}
             if "perimeter" in f:
-                s["make"] = {"perimeter": f["perimeter"]}
+                # a PATCH replaces `make` whole: the sticker make /api/new stamps, with the perimeter
+                s["make"] = dict(MK.new_make("sticker", P.sticker_builtins()[0]["profile"]),
+                                 perimeter=f["perimeter"])
             if "holes" in f:
                 s["holes"] = f["holes"]
             if s:
@@ -127,10 +132,10 @@ def test_the_forearm_and_the_stickers_equal_the_old_routes(client, tmp_path):
                                                               "thickness_mm": 0}).json()
                 else:
                     target = client.post("/api/target", json={"shape": "disc", "r_mm": 25,
-                                                              "holes": [[0, 0, 6]],
+                                                              "holes": [[0, 18, 6]],
                                                               "thickness_mm": 0}).json()
             ref = via_old_routes(client, target, f["layout"], f.get("name", ""), edits, t["name"],
-                                 preset=None if name == "sticker_sheet" else PRESET)
+                                 preset=STICKER if name == "sticker_sheet" else PRESET)
             same(t["spec"], ref["spec"])
             assert digest(t["plan"]) == digest(ref["plan"]), t["name"]
             client.post("/api/design/open", json={"path": str(p)})

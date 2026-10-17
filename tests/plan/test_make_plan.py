@@ -259,10 +259,17 @@ def test_a_96_point_disc_with_3_holes_plans_under_50_ms():
                               "target": t.to_dict()})
     assert plan_tag(spec).ok
     best = math.inf
-    for _ in range(20):                  # the best of twenty: the other test workers
-        t0 = time.perf_counter()         # share the machine
-        plan_tag(spec)
-        best = min(best, time.perf_counter() - t0)
+    # the best of twenty, in up to six rounds: the other test workers share
+    # the machine (Merge 1: one round under the full check's load read 64 ms,
+    # 22 ms alone)
+    for _round in range(6):
+        for _ in range(20):
+            t0 = time.perf_counter()
+            plan_tag(spec)
+            best = min(best, time.perf_counter() - t0)
+        if best < 0.050:
+            break
+        time.sleep(0.5)
     print(f"\nM6a.10: plan_tag of a 96-point disc with 3 holes: {best * 1000:.1f} ms")
     assert best < 0.050, best
 

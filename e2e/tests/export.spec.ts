@@ -87,8 +87,8 @@ test("verify every tag and the sheet; export SVG, STL, plan JSON, the scene", as
   }
   const file = await exportVia(page, "export-json");
   const doc = JSON.parse(fs.readFileSync(path.join(file.dir, `${scene}.arucostudio.json`), "utf-8"));
-  expect(doc.schema).toBe("arucostudio.scene/1");
-  expect(doc.tags.map((t: any) => t.name)).toEqual(tags.map((t: any) => t.name));
+  expect(doc.schema).toBe("arucostudio.scene/2");   // M8a: the design file (Merge 1)
+  expect(doc.features.filter((f: any) => "aruco" in f).map((f: any) => f.id)).toEqual(tags.map((t: any) => t.name));
 
   // one tag alone
   await page.locator('[data-ids-row="board1"]').click();

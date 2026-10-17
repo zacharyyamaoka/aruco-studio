@@ -27,7 +27,8 @@ PORTS = {
     "origin": [(B + "aruco_origin.py", set())],
     "slabs": [(B + "aruco_slabs.py", set())],
     "chamfer": [(B + "aruco_chamfer.py", set())],
-    "autosize": [(B + "aruco_autosize.py", {"_rect_inside"})],   # M6a: a skip, same answers
+    "autosize": [(B + "aruco_autosize.py", {"_rect_inside",    # M6a: a skip, same answers
+                                            "_Grid"})],        # Merge 1: snapping on a dot grid (_snap)
     # M6a: label rule 3 (a ChArUco label by hand in any black square)
     "label": [(B + "aruco_label.py", {"RULES", "_offset_label", "label_violations",
                                       "check_label", "describe"})],

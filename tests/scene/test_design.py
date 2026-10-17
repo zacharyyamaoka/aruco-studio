@@ -134,7 +134,9 @@ def test_sugar_expands_to_what_api_new_stores():
     for k in ("origin_v", "cells", "label"):
         assert k in s.settings
     from aruco_studio.core import label as L
-    assert s.settings["label"]["rule"] == L.RULE and s.settings["cells"] == P.cell_setting(_preset())
+    # a new tag stores label rule 3 (M6a, label.NEW_RULE; Merge 1), a 3D make and Holes avoid
+    assert s.settings["label"]["rule"] == L.NEW_RULE and s.settings["cells"] == P.cell_setting(_preset())
+    assert s.settings["make"]["by"] == "print3d" and s.settings["holes"] == "avoid"
     # one write (a size typed through the Scene API): exact settings / numbers, no sugar
     sc.edit("t", numbers={"size": 6.0})
     DS.write_back(doc, sc)

@@ -815,3 +815,5 @@ def library_recent_add(req: M.RecentIn) -> dict:
 if DIST.is_dir():
     from fastapi.staticfiles import StaticFiles
     app.mount("/", StaticFiles(directory=str(DIST), html=True), name="studio")
+
+from . import sheet_api  # noqa: E402,F401  (M6a: the sticker sheet routes)

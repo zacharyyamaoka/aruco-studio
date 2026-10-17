@@ -32,7 +32,7 @@ from ..core import faces as _faces
 from . import target as _T
 from .target import Target
 
-CHORD_MM = _faces.CHORD_TOL_MM          # 0.05 mm, until plan.target.CHORD_MM lands (M6a)
+CHORD_MM = _T.CHORD_MM                  # 0.05 mm, plan.target's (M6a; unified at Merge 1)
 KINDS = ("rect", "circle", "polygon", "slot", "loops")
 RECT_SIDES = ("front", "right", "back", "left")   # -y, +x, +y, -x: edges 0..3 of the rectangle
 Pt = Tuple[float, float]

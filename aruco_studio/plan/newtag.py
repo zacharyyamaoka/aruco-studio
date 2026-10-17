@@ -68,7 +68,7 @@ def new_spec(layout: str, target: dict, preset: Optional[dict] = None, marker_id
     n.update(marker_id=int(marker_id), size=0.0, square=0.0)
     has_body = bool(target.get("has_body", False))
     _print_into(s, n, preset or _P.default_preset(), has_body)
-    s = _F.new_tag_settings(s, has_body)            # origin_v, Extrude Auto (core.form)
+    s = _F.new_tag_settings(s, has_body, preset=preset)  # origin_v, Extrude Auto, make from the preset (core.form)
     return {"schema": "arucostudio.tagspec/1", "settings": s, "numbers": n,
             "target": copy.deepcopy(target), "name": name, "key": key}
 
