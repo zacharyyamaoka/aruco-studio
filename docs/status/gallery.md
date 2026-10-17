@@ -73,12 +73,11 @@ New tests: `tests/server/test_gallery_api.py` (3), `studio/src/gallery/model.tes
 | CF-8, flush-only and Flip | not built |
 | CF-12, a sketch from another program (a DXF from Fusion) | no importer; a `loops` shape is what one would write |
 | A typed Columns × rows on a face | REF's fit lays out as many as fit (audit B10); the basics use a sketch profile (`over`), which keeps the count |
-| Trim excess through the file's sugar | `perimeter` on a 3D tag writes `"both"` / `"off"` strings the plan does not read (warn "not a trim this version knows", trim off); `basics_*` and `trim` carry exact `settings` instead |
 
-## Found on the way (not fixed: outside this lane)
+## Found on the way (fixed on lane/scene-fixes, 2026-10-17)
 
-1. **Renumber all resets typed ids to 0.** Open `examples/sticker_sheet` (typed `first_id`s), Renumber all: `overrides` keeps `{t1: 0, t2: 1, t3: 2, t4: 8}` but the tags plan as #0, #0, #0-5, #0-3. The write-back drops each `first_id` (it moves into `overrides`) and leaves the feature as sugar without `numbers`, and the compile does not apply `overrides` to `marker_id`. The `ids` example avoids typed ids for this reason. (`aruco_studio/scene/design.py`.)
-2. **`perimeter` sugar on a 3D tag** (above): `_sugar` writes `s["trim"] = "both" if profile else "off"`; the plan reads neither, and the mapping is the M6 note's inverse (Marker = Trim both).
+1. **Renumber all resets typed ids to 0.** Open `examples/sticker_sheet` (typed `first_id`s), Renumber all: `overrides` keeps `{t1: 0, t2: 1, t3: 2, t4: 8}` but the tags plan as #0, #0, #0-5, #0-3. The write-back drops each `first_id` (it moves into `overrides`) and leaves the feature as sugar without `numbers`, and the compile does not apply `overrides` to `marker_id`. The `ids` example avoids typed ids for this reason. (`aruco_studio/scene/design.py`.) **Fixed:** the write-back writes a feature exact when its `first_id` moves into `overrides`, and a tag whose numbers are still sugar takes its first id from `overrides` (so a file the old write-back left plans its ids again); tests `tests/scene/test_typed_ids.py`, `tests/server/test_scene_fixes_api.py`, e2e `ids.spec.ts`.
+2. **`perimeter` sugar on a 3D tag had no effect** (`basics_*` and `trim` carried exact `settings` instead): `_sugar` writes `s["trim"] = "both" if profile else "off"`; the plan reads neither, and the mapping is the M6 note's inverse (Marker = Trim both). **Fixed:** on a 3D printed tag `marker` writes the Inspector's Trim excess `{rule 1, axes both, margin 0, force false}` and `profile` none; a sticker keeps `make.perimeter`. `basics_*` and `trim` type `perimeter` again, their plans unchanged; tests `tests/scene/test_perimeter_sugar.py`, `tests/server/test_scene_fixes_api.py`.
 
 ## Questions for Zach
 
