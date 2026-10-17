@@ -1,4 +1,4 @@
-# Ported from REF CADExporter/bam_cad_core/markers.py at c8216ff:
+# Ported from REF CADExporter/bam_cad_core/markers.py at c8216ff, brought up to f5ebf4e (N-1, 2026-10-17):
 # copied verbatim, only the package-relative imports renamed.
 """ArUco tags as modelled CAD: definitions, per-copy overrides, resolution.
 
@@ -1266,26 +1266,138 @@ def short_part_name(path: str) -> str:
     return "/".join(parts[-2:]) if parts else "(root)"
 
 
-def print_items(res: Resolution, *, include_hidden: bool = False):
-    """One PrintItem per distinct physical tag, labelled with where it goes."""
+def charuco_label_line(spec: "TagSpec") -> str:
+    """The line under a printed ChArUco board: everything a detector is
+    configured with -- squares, both lengths, dictionary, the id block."""
+    def mm(v):
+        return f"{v * 1000.0:.2f}".rstrip("0").rstrip(".")
+    return (f"ChArUco {spec.cols}x{spec.rows} {spec.dictionary} "
+            f"#{spec.ids[0]}-{spec.ids[-1]} · square {mm(spec.square_length_m)} mm, "
+            f"marker {mm(spec.marker_length_m)} mm" + (" (legacy)" if spec.legacy else ""))
+
+
+def cad_print_ink(spec: "TagSpec", label=None, mark=None) -> dict:
+    """A tag's own label and corner mark (as its CAD builds them) as paper
+    ink for print_sheet (PrintItem.ink / outline_mm, mm, centre frame):
+
+        label   an aruco_label.Label or its record dict (fusion.label, or a
+                copy's relabelled one); none / refused -> nothing. Text cut
+                out of the black (role "cut") is WHITE ink, text added on
+                the white (role "add") BLACK; a label strip grows the tile
+        mark    the record's corner mark dict (fusion.mark, aruco_chamfer):
+                "black_cut" -> the white corner taken out of the top-left
+                black square; "triangle" -> the black triangle; "tile_cut"
+                -> the tile's cut corner (the outline)
+
+    -> {"ink": [(colour, polygon)], "outline_mm": polygon or None}. Pure;
+    the pattern itself is never touched (no grow, trim or inset: paper
+    prints the nominal board)."""
+    from . import chamfer as aruco_chamfer, label as aruco_label
+    ink, outline = [], None
+    mk = aruco_chamfer.from_dict(mark) if isinstance(mark, dict) else mark
+    kind = getattr(mk, "kind", "none") if mk is not None else "none"
+    lab = aruco_label.from_dict(label) if isinstance(label, dict) else label
+    if lab is not None and (lab.kind == "none" or not lab.parts):
+        lab = None
+    if kind == "black_cut" and len(mk.cut) >= 3:
+        ink.append(("white", [tuple(p) for p in mk.cut]))
+    elif kind == "triangle" and len(mk.solid) >= 3:
+        ink.append(("black", [tuple(p) for p in mk.solid]))
+    if lab is not None:
+        colour = "white" if lab.role == "cut" else "black"
+        ink += [(colour, [tuple(p) for p in poly]) for poly in lab.polygons()]
+    if kind == "tile_cut":
+        # a tile cut is re-made on a grown tile (aruco_label.mark_on_tile)
+        outline = (aruco_chamfer.cut_rect(lab.white, mk.leg)
+                   if lab is not None and lab.white is not None
+                   else [tuple(p) for p in mk.outline] or None)
+    elif lab is not None and lab.white is not None:
+        u0, v0, u1, v1 = lab.white
+        outline = [(u0, v0), (u1, v0), (u1, v1), (u0, v1)]
+    return {"ink": ink, "outline_mm": outline}
+
+
+def print_items(res: Resolution, *, include_hidden: bool = False,
+                only: Optional[Iterable[str]] = None,
+                cad_ink: Optional[Dict[str, dict]] = None):
+    """One PrintItem per distinct physical tag, labelled with where it goes.
+
+    `only`: the instance names to print (None: every one). A ChArUco board
+    prints as its CAD has it (marks="cad"): its own label and corner mark
+    from `cad_ink` ({instance name: cad_print_ink(...)}), else nothing on
+    it; the line under it names both lengths."""
     from .sheet import PrintItem  # lazy: only the export path needs it
+    keep = None if only is None else set(only)
     items = []
     for inst in res.instances:
         if inst.hidden and not include_hidden:
             continue
+        if keep is not None and inst.name not in keep:
+            continue
         where = inst.path or "(root)"
         sp = inst.spec
         kw = {}
+        first = sp.label()
         if sp.layout != "single":
             kw = dict(layout=sp.layout, rows=sp.rows, cols=sp.cols,
                       separation_m=sp.separation_m,
                       square_length_m=sp.square_length_m, legacy=sp.legacy)
+        if sp.layout == "charuco":
+            extra = (cad_ink or {}).get(inst.name) or {}
+            kw.update(marks="cad", ink=list(extra.get("ink") or ()),
+                      outline_mm=extra.get("outline_mm"))
+            first = charuco_label_line(sp)
         items.append(PrintItem(
             key=inst.name, dictionary=sp.dictionary, marker_id=sp.marker_id,
             marker_length_m=sp.marker_length_m, quiet_modules=sp.quiet_modules,
-            label_lines=[sp.label(), f"{where} · {inst.tag.key}"],
+            label_lines=[first, f"{where} · {inst.tag.key}"],
             top_label=short_part_name(inst.path), **kw))
     return items
+
+
+def sheet_layout(res: Resolution, *, design_name: str = "Design", page: str = "letter",
+                 landscape: bool = False, margin_mm: float = 10.0,
+                 only: Optional[Iterable[str]] = None,
+                 cad_ink: Optional[Dict[str, dict]] = None):
+    """The PDF sheet's layout (print_sheet.layout_sheet) of the visible tags
+    -- of `only` (instance names) when given -- exactly as sidecar_files
+    writes it."""
+    from . import sheet as print_sheet
+    # margin_mm: nothing is drawn closer than this to the paper edge -- the
+    # printer's unprintable border (Zach: "a lot of printers cut off the edges")
+    settings = print_sheet.SheetSettings(page=page, landscape=landscape,
+                                         margin_mm=max(0.0, float(margin_mm)),
+                                         title=f"{design_name} — ArUco tags")
+    return print_sheet.layout_sheet(print_items(res, only=only, cad_ink=cad_ink), settings)
+
+
+def sheet_check(res: Resolution, *, page: str = "letter", landscape: bool = False,
+                margin_mm: float = 10.0, only: Optional[Iterable[str]] = None,
+                cad_ink: Optional[Dict[str, dict]] = None, pages=None) -> dict:
+    """What the PDF type puts on paper, before anything is written (ArUco
+    Export's info line and OK): {"placed", "boards" (ChArUco placed),
+    "pages", "printable_mm" (w, h), "rejected": [{"key", "layout",
+    "size_mm" (the sticker, w x h), "reason", "fits": [(page, landscape)]}],
+    "warnings"}. `pages`: where to look for a page a rejected one fits."""
+    from . import sheet as print_sheet
+    layout = sheet_layout(res, page=page, landscape=landscape, margin_mm=margin_mm,
+                          only=only, cad_ink=cad_ink)
+    rejected = []
+    for r in layout.rejected:
+        try:
+            x0, y0, x1, y1 = print_sheet.sticker_box_mm(r.item)
+            size = (round(x1 - x0, 1), round(y1 - y0, 1))
+        except (ValueError, TypeError):
+            size = None
+        rejected.append({"key": r.item.key, "layout": r.item.layout, "size_mm": size,
+                         "reason": r.reason,
+                         "fits": print_sheet.fit_pages(r.item, layout.settings, pages)
+                         if size else []})
+    return {"placed": len(layout.placed),
+            "boards": sum(1 for p in layout.placed if p.item.layout == "charuco"),
+            "pages": layout.page_count,
+            "printable_mm": (round(layout.printable_mm[2], 1), round(layout.printable_mm[3], 1)),
+            "rejected": rejected, "warnings": list(layout.warnings)}
 
 
 # ------------------------------------------------------------------ sidecar
@@ -1321,7 +1433,9 @@ def _image_stem(spec: "TagSpec") -> str:
 
 def sidecar_files(res: Resolution, *, design_name: str = "Design",
                   page: str = "letter", landscape: bool = False,
-                  exported_at: str = "", margin_mm: float = 10.0) -> Dict[str, bytes]:
+                  exported_at: str = "", margin_mm: float = 10.0,
+                  only: Optional[Iterable[str]] = None,
+                  cad_ink: Optional[Dict[str, dict]] = None) -> Dict[str, bytes]:
     """Everything the export writes beside the URDF, as {relpath: bytes}.
 
     Zach: "in the side car we also want to keep the image as well, with that
@@ -1336,6 +1450,10 @@ def sidecar_files(res: Resolution, *, design_name: str = "Design",
 
     Pure: a caller writes the bytes. Hidden copies are left out of the sheet
     and the images, because nobody needs to print a tag that is not there.
+    `only` (instance names): the sheet prints those (ArUco Export's ticks /
+    "ChArUco boards only"); markers.json and the images still cover every
+    visible tag. `cad_ink`: each ChArUco board's own label / corner mark
+    (print_items).
     """
     from . import dictionary as aruco_dict, sheet as print_sheet  # lazy: tables + PDF only on export
     out: Dict[str, bytes] = {}
@@ -1368,16 +1486,13 @@ def sidecar_files(res: Resolution, *, design_name: str = "Design",
                 board_spec(sp), quiet_m=quiet).encode("utf-8")
     for row, inst in zip(doc["instances"], res.instances):
         row["image"] = None if inst.hidden else f"images/{_image_stem(inst.spec)}.png"
-    # margin_mm: nothing is drawn closer than this to the paper edge -- the
-    # printer's unprintable border (Zach: "a lot of printers cut off the edges")
-    settings = print_sheet.SheetSettings(page=page, landscape=landscape,
-                                         margin_mm=max(0.0, float(margin_mm)),
-                                         title=f"{design_name} — ArUco tags")
-    items = print_items(res)
-    layout = print_sheet.layout_sheet(items, settings)
+    layout = sheet_layout(res, design_name=design_name, page=page, landscape=landscape,
+                          margin_mm=margin_mm, only=only, cad_ink=cad_ink)
     doc["print_sheet"] = print_sheet.layout_summary(layout)
+    if only is not None:
+        doc["print_sheet"]["only"] = sorted(set(only))
     out[f"aruco/print_{page}{'_landscape' if landscape else ''}.pdf"] = \
-        print_sheet.render_pdf(items, settings)
+        print_sheet.render_layout_pdf(layout)
     out["aruco/markers.json"] = (json.dumps(doc, indent=2, sort_keys=True,
                                             default=str) + "\n").encode("utf-8")
     return out

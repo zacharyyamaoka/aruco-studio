@@ -1136,6 +1136,43 @@ def record_digest(records: Iterable[dict]) -> str:
     return hashlib.sha1(text.encode("utf-8")).hexdigest()[:16]
 
 
+def _rounded(v, nd: int):
+    if isinstance(v, float):
+        r = round(v, nd)
+        return 0.0 if r == 0 else r             # -0.0 and 0.0 alike
+    if isinstance(v, dict):
+        return {k: _rounded(x, nd) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_rounded(x, nd) for x in v]
+    return v
+
+
+def record_digest_r(records: Iterable[dict], nd: int = 6) -> str:
+    """record_digest with every number rounded to `nd` decimals (cm: 1e-6 is
+    0.01 um): two records that say the same tag compare equal whichever way
+    they were written -- the IDs node's own evaluation of a lagging tag
+    (collect_design) and ArUco Extrude's refresh that writes it afterwards
+    (2026-10-16 night: one plate change rebuilt the parts twice)."""
+    import hashlib
+    clean = sorted((_rounded(_clean_record(r), nd) for r in records or () if isinstance(r, dict)),
+                   key=lambda r: str(r.get("key")))
+    text = json.dumps(clean, sort_keys=True, default=str, separators=(",", ":"))
+    return hashlib.sha1(text.encode("utf-8")).hexdigest()[:16]
+
+
+def records_same(x: Optional[dict], y: Optional[dict]) -> bool:
+    """A template's tag records unchanged between the inputs a node was built
+    from (`x`) and the design's now (`y`): the exact digest as before; or,
+    rounded, the records as they were (`records_r`) or as the node EVALUATED
+    them when it was built (`records_eval_r`: a record that lagged its
+    ArUco Extrude node -- the refresh writing it later is no edit)."""
+    x, y = x or {}, y or {}
+    if x.get("records") == y.get("records"):
+        return True
+    now = y.get("records_r")
+    return now is not None and now in {x.get("records_r"), x.get("records_eval_r")} - {None}
+
+
 def _close(a, b, tol) -> bool:
     try:
         return abs(float(a) - float(b)) <= tol
@@ -1212,7 +1249,7 @@ def inputs_diff(old: Optional[dict], new: Optional[dict]) -> List[str]:
             out.append(f"'{name}': {'no longer' if y is None else 'now'} a template with parts")
             continue
         why: List[str] = []
-        if x.get("records") != y.get("records"):
+        if not records_same(x, y):
             why.append("its tag was edited")
         why += body_changes(x.get("bodies") or [], y.get("bodies") or [])
         kx = {k.get("path"): k for k in x.get("children") or []}

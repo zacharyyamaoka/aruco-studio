@@ -15,6 +15,12 @@ REF = Path(os.environ.get(
     "ARUCO_STUDIO_REF",
     r"C:\Users\BAM\Documents\cad-exporter\.claude\worktrees\aruco-fusion-plugin-0e9bcb"))
 REF_COMMIT = "c8216ff"
+# N-1 (2026-10-17): the add-in at the commit the Studio core was brought up to
+# (lane/fusion-core): numbering (4c8810b), markers + print_sheet (da6e622) and
+# the add-in's pure changes since c8216ff. The port-fidelity test reads REF's
+# text here; the goldens made before keep REF_COMMIT, the N-1 goldens
+# (goldens/ref_head/) this one.
+REF_HEAD = "f5ebf4e"
 ROOT = Path(__file__).resolve().parents[1]
 
 

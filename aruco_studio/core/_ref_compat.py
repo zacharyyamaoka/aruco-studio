@@ -23,7 +23,9 @@ NAMES = {"aruco_dict": "dictionary", "aruco_board": "board", "aruco_origin": "or
 
 def module(name: str):
     """REF `aruco_core.module(name)`: the core module of that REF name."""
-    return importlib.import_module("aruco_studio.core." + NAMES.get(name, name))
+    # package-relative (N-1): the core also runs vendored in the Fusion add-in
+    # under a private alias, where "aruco_studio" is not its name
+    return importlib.import_module("." + NAMES.get(name, name), __package__)
 
 
 class _AliasCore:

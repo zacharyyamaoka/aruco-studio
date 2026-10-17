@@ -63,8 +63,26 @@ def _dup_rows(rows):
     return {n for names in T.duplicates(rows).values() for n in names}
 
 
-def _export_status(row, on, info, dup=False):
-    """The Status words of an Export row -> (text, tone)."""
+def _export_status(row, on, info, dup=False, sheet=None):
+    """The Status words of an Export row -> (text, tone). `sheet`: the PDF
+    type's {"prints": {row name: on the sheet}, "only": ChArUco boards only}
+    (None: a 3D type)."""
+    if sheet is not None:
+        if row.hidden:
+            text, tone = "hidden — not printed", "muted"
+        elif (sheet.get("prints") or {}).get(row.name, on):
+            text = "on the sheet · " + ("root component" if info.get("root") else row.part)
+            tone = ""
+        elif sheet.get("only") and row.layout != "charuco":
+            text, tone = "not a ChArUco board — not on the sheet", "muted"
+        else:
+            text, tone = f"not ticked · {row.part}", "muted"
+        if row.linked:
+            text += " · linked"
+        if dup and not row.hidden:
+            text += " · ⚠ the same marker as another copy"
+            tone = "warn"
+        return text, tone
     if info.get("root"):
         return "root component — not a part (PDF only)", "muted"
     if row.hidden:
