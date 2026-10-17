@@ -504,3 +504,101 @@ def write_selection_project(objects: Sequence[dict], out_path: str,
         "prusaslicer_exe": find_prusaslicer_gui(),
         "layout": summary,
     }
+
+
+# ============================================ M8c (not REF's): Send to PrusaSlicer
+# The project's config from the CHOSEN printer's chain (a physical printer, or
+# a printer preset by name) instead of last_selected_presets; the 3MF itself
+# (one object per part, `volume_type` per volume) is scene/print3d.render.
+# Every value comes through core.prusa, which drops the private keys on read.
+
+def chain_profile(src, printer: str, print_: str, filament: str, bundle_text: str,
+                  physical: str = "") -> PrusaProfile:
+    """A PrusaProfile of (printer preset, print preset, filament): the
+    printer's chain (the user's preset over its system parents), the
+    print's, the filament's from the bundle, every key of the three (later
+    wins) but the meta keys. Raises ValueError naming what is missing."""
+    from ..core import prusa as _PR
+    pcfg, _chain, _kind = _PR.resolve_printer(printer, src)
+    if pcfg is None:
+        raise ValueError("no printer preset %r in PrusaSlicer's folder" % printer)
+    rcfg, _rchain = _PR.resolve(print_, src)
+    if not rcfg:
+        raise ValueError("no print preset %r in PrusaSlicer's folder" % print_)
+    fils = _PR.parse_bundle(bundle_text or "", kinds=("filament",))["filament"]
+    fcfg = _PR._system(filament, [fils], {filament}) if filament else None
+    if not fcfg:
+        raise ValueError("no filament preset %r in the vendor bundle" % filament)
+    values: Dict[str, str] = {}
+    for cfg in (pcfg, rcfg, fcfg):
+        for k, v in cfg.items():
+            if k not in _META_KEYS and not _PR.private_key(k):
+                values[k] = v
+    vendor = (src.vendors[0] if src.vendors else {}) if src else {}
+    return PrusaProfile(printer, print_, filament,
+                        "%s %s" % (vendor.get("name", "?"), vendor.get("config_version", "?")),
+                        values, "", filaments=[filament], physical_printer=physical)
+
+
+def filament_for(printer: dict, src, bundle_text: str) -> Optional[str]:
+    """The filament a project for `printer` (core.prusa.printer_of) carries:
+    PrusaSlicer's selected one when this printer is selected, else the
+    printer's default that the bundle has, else the first Prusament / Generic
+    PLA whose condition fits it."""
+    from ..core import prusa as _PR
+    fils = _PR.parse_bundle(bundle_text or "", kinds=("filament",))["filament"]
+    sel = (src.selection or {}) if src else {}
+    if sel.get("printer") == printer.get("preset"):
+        for f in sel.get("filaments") or []:
+            if f in fils and not _temporary(f):
+                return f
+    for f in printer.get("default_filaments") or []:
+        if f in fils:
+            return f
+    for word in ("Prusament PLA", "Generic PLA"):
+        for name in sorted(fils):
+            if name.startswith(word) and not name.startswith("*"):
+                cfg = _PR._system(name, [fils], {name}) or {}
+                if _PR.condition(cfg.get("compatible_printers_condition", ""),
+                                 printer.get("config") or {}) is True:
+                    return name
+    return None
+
+
+def write_project(path: str, data: bytes) -> str:
+    """The project's bytes at `path` (atomic, through the store's rules:
+    never under PrusaSlicer's folder or CADExporter)."""
+    from . import store as _S
+    return str(_S.write_atomic(path, data, binary=True))
+
+
+def single_instance_ok(console: Optional[str]) -> Optional[bool]:
+    """Does this PrusaSlicer take --single-instance? Read from the console
+    program's --help (headless, a scratch --datadir): None without one."""
+    import subprocess
+    import tempfile
+    if not console or not os.path.isfile(console):
+        return None
+    with tempfile.TemporaryDirectory(prefix="aruco_ps_help_") as tmp:
+        try:
+            p = subprocess.run([console, "--datadir", tmp, "--help"], capture_output=True,
+                               text=True, encoding="utf-8", errors="replace", timeout=60)
+        except (OSError, subprocess.SubprocessError):
+            return None
+    return "--single-instance" in ((p.stdout or "") + (p.stderr or ""))
+
+
+def open_in_prusaslicer(project: str, single_instance: bool = True) -> dict:
+    """Open a written project in PrusaSlicer's GUI (as a project, so its
+    beds and config are kept). Only ever on a user's action: the route's
+    `open`, never a test. -> {"opened", "command", "error"}."""
+    import subprocess
+    exe = find_prusaslicer_gui()
+    if exe is None:
+        return {"opened": False, "command": None, "error": "PrusaSlicer was not found"}
+    cmd = [exe] + (["--single-instance"] if single_instance else []) + [project]
+    try:
+        subprocess.Popen(cmd, close_fds=True)
+    except OSError as exc:
+        return {"opened": False, "command": cmd, "error": str(exc)}
+    return {"opened": True, "command": cmd, "error": None}

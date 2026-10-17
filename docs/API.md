@@ -103,7 +103,7 @@ Since M8a the open scene is a design file (`arucostudio.scene/2`, docs/FILE_FORM
 | `POST /api/design/save_as` | `{path}`: write the open design there and follow that file |
 | `POST /api/design/preview` | `{text}` (`?mesh=1&top=1`): `{scene (with plans), issues, error}`; nothing written or kept (a drag's preview) |
 | `POST /api/design/reveal` | `{open: true}`: the OS file browser on the file; `open: false` only answers the command |
-| `GET /api/events` | server-sent events (`text/event-stream`): `hello {revisions, file}` on connect; `scene {revision, path, why}` when the file changed on disk; `file {state, path, error}` when it breaks, goes, or parses again. `prusa` and `presets` are reserved (M8c). Each event's data has `t` (the server's clock). `?max_events=N&timeout=S` end the stream (tests, one-shot pollers) |
+| `GET /api/events` | server-sent events (`text/event-stream`): `hello {revisions, file}` on connect; `scene {revision, path, why}` when the file changed on disk; `file {state, path, error}` when it breaks, goes, or parses again. `prusa {revision, added, removed, changed, files, ms, stale}` when PrusaSlicer's folder changed (M8c, docs/API_prusa.md); `presets` is reserved. Each event's data has `t` (the server's clock). `?max_events=N&timeout=S` end the stream (tests, one-shot pollers) |
 
 The rules: the server's own writes are atomic, and their sha256 is remembered before they land, so they are never read back as a change. A rewrite of the same text (an editor's touch, a cloud sync) is no change. While the file does not parse, the last good scene stays and every write is refused. Before a write the server checks the file still holds what it last read; if not, it reloads, pushes the change and drops the action (409).
 
@@ -135,3 +135,5 @@ The rules: the server's own writes are atomic, and their sha256 is remembered be
 | The design file | `arucostudio.scene/2` | `scene/design.py`, `scene/file.py`, `plan/shapes.py`; docs/FILE_FORMAT.md |
 
 The sticker sheet, the print bundle and the presets as machines (M6a): docs/API_sheet.md.
+
+PrusaSlicer's physical printers, the folder's watcher and Send to PrusaSlicer (M8c): docs/API_prusa.md.

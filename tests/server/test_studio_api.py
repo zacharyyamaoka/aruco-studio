@@ -82,7 +82,7 @@ def test_library_state_select_edit_recent(client):
     ids = {c["id"]: c for c in st["cards"]}
     assert "builtin:Default" in ids and st["dialog"] is True
     assert {c["id"] for c in st["collections"]} == {"recent", "document", "mine", "prusa",
-                                                     "builtin"}
+                                                     "builtin", "printers", "stickers"}  # M8c
     assert ids["builtin:Default"]["used"] == 1 and "document" in ids["builtin:Default"]["in"]
     assert ids["builtin:Default"]["thumb"].startswith("<svg")
     assert ids["builtin:Default"]["differs"] == ""          # the tag is Default's

@@ -1,0 +1,31 @@
+{
+ "schema": "arucostudio.fixture/1",
+ "name": "prusaslicer_m8c",
+ "made_by": "tests/fixtures/make_prusaslicer_m8c.py",
+ "from": "PrusaSlicer 2.9.6's config folder on Zach's box, read only",
+ "date": "2026-10-17",
+ "placeholders": "every host key is a placeholder (print_host = <host>, printhost_apikey = <apikey>, ...): no host, key or password",
+ "vendor_sections": 102,
+ "private_lines_dropped_from_vendor": 2,
+ "sha256": {
+  "PrusaSlicer.ini": "9d5dc1d21e38926b9cd2b00d79f504f3f129f97795c1b203f574fd3a5c78e050",
+  "physical_printer/Haribo.ini": "129ad04de672f6c043cbcec50e464256c91988dd6c777376314d16890b044270",
+  "physical_printer/Le Mis.ini": "129ad04de672f6c043cbcec50e464256c91988dd6c777376314d16890b044270",
+  "physical_printer/aburi.ini": "99163659a6ea2877affdb7efc979847c2cf5dac1b31230dc297b105ac83709b3",
+  "physical_printer/kappa.ini": "6e92d9052656db44221cac777caf95685305500862367e74258a0cfd41ef3fec",
+  "physical_printer/ontario.ini": "a7c12f14d26a0000f49c22822362397e16a8fb9ae2b88c4b55d6f58a5cfc529d",
+  "print/0.15mm SPEED @MK4IS 0.25 - Aruco Black.ini": "88dfbcff8bd98aff9e2547614bc2a071aceb61f84c5f6195997fc4b2b93b6015",
+  "print/0.20mm DETAIL @0.6 nozzle MK3 - BAM.ini": "38789afe093f900392d4577f87e040dc865d01c2955f03a63e13dabfff085042",
+  "print/0.30mm QUALITY @0.6 nozzle - GEARS.ini": "34273b257132659d8157898498ad86a657fecddc54bc0621c929b9b8e40da7da",
+  "print/0.30mm QUALITY @0.6 nozzle MK3 - Ergo Adapter.ini": "c474dd30d02f7b8636d382bc1cd55b6beb4940b71071b5356b615fc517461bc7",
+  "print/0.30mm QUALITY @0.6 nozzle MK3 - No Loops.ini": "e683b0f77a2e76491de6aa1a34347d561428c9e7676a3f15ece3a410016835cd",
+  "print/0.32mm ERGO @COREONE 0.6.ini": "1311f7c4c400b8b1e061c1f017ce8aa65080de1fe0b10e9729de356d2146753e",
+  "print/0.32mm SPEED @MK3.5 0.6 - Main.ini": "787108417063fd70c518a9ea5c84caa3cff819f3044c789a4cd9c1b19d4fd4c7",
+  "print/0.32mm SPEED @MK4IS 0.6 - Aruco.ini": "a26437e7908ed60adf8019d8fac968431538b0124fae4c86253f077fceb39c8a",
+  "print/0.32mm SPEED @MK4IS 0.6 - Main.ini": "832ed5ef31bf50de58b997b09532cd5924e4c12b5e4518550cc45381651956b0",
+  "print/0.40mm DRAFT @0.6 nozzle MK3 - BAM PROTOTYPE.ini": "ec4e2d218ccf6a5858e11b5729def502cefb43f3e77f205bebb473a78a5538a1",
+  "printer/Original Prusa MK4 MMU3 0.4 nozzle - (Black, Clear, White).ini": "a2cb723f958a304182a760b9d38ccfcea7482698e407f32a65649cad779f79c4",
+  "printer/Original Prusa MK4 MMU3 0.6 nozzle - (Black, Clear, White).ini": "b3c17d5b9d17c4f8f45a62753d69692a9a2f1fb6e0438ca0324e516847222199",
+  "vendor/PrusaResearch.ini": "20cb3450324bf5944b6016e9efd69a9a4f3f6d984904170ffa4f7f11706d5c80"
+ }
+}

@@ -219,6 +219,7 @@ def normalise(p, name=None):
         _pick(src, pr, k, lambda v, lo=lo: _num(v, lo, 5.0))
     _pick(src, pr, "source", _text(40))
     _kind_keys(src, pr)
+    _printer_block(src, pr)
     c, src = out["cells"], p.get("cells")
     _pick(src, c, "of", _choice(("cell", "marker")))
     _pick(src, c, "step", _choice(("line", "mm")))
@@ -471,6 +472,35 @@ def _kind_keys(src, pr):
     _pick(src, pr, "margin_mm", lambda v: _num(v, 0.0, 50.0))
     _pick(src, pr, "stock_mm", lambda v: _num(v, 0.05, 2.0))
     _pick(src, pr, "sheet", _choice(SHEET_MODES))
+
+
+PRINTER_KEYS = ("physical", "preset", "model", "variant")
+
+
+def _printer_block(src, pr):
+    """M8c (not REF's): the printer a preset was made for, `profile.printer
+    = {physical, preset, model, variant}` (strings): kept when given (a
+    preset made from a Printers card, from_pair), absent otherwise. Never a
+    host: core.prusa reads a physical printer through its allow-list."""
+    blk = src.get("printer") if isinstance(src, dict) else None
+    if not isinstance(blk, dict):
+        return
+    out = {}
+    for k in PRINTER_KEYS:
+        v = blk.get(k)
+        out[k] = v[:MAX_NAME] if isinstance(v, str) else ""
+    if any(out.values()):
+        pr["printer"] = out
+
+
+def from_pair(profile, name=None):
+    """A preset made from a (physical printer, print preset) pair
+    (core.prusa.pair_profile: the printer's nozzle, the print's line and
+    layers): from_profile's preset with the printer block."""
+    p = from_profile(profile, name)
+    if isinstance(profile.get("printer"), dict):
+        p["profile"]["printer"] = dict(profile["printer"])
+    return normalise(p)
 
 
 def kind_of(p):
