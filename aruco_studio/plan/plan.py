@@ -81,6 +81,7 @@ NOTE_ROUTES = [
     (r"^trim: cut anyway", "settings.trim", "warn"),
     (r"^trim", "settings.trim", "info"),
     (r"^(no marker fits here|nothing printable fits)", "numbers.size", "error"),
+    (r"^cell multiple: ", "numbers.size", None),      # the size the cells round (audit F9)
 ]
 LEVEL_OF_ROUTE = {"block": "error", "error": "error", "warn": "warn", "info": "info",
                   "note": "info"}
@@ -112,8 +113,58 @@ def route(note: str, refused: bool = False):
     return "tag", ("info" if _S.is_info(text) else ("error" if refused else "warn"))
 
 
+# a label message goes under the row its words name (audit F7): REF's dialog
+# put a cap's refusal under Position when its reason did not match
+LABEL_WORDS = [
+    (r"^(label: )?(cap \d|letters \d|.*\beven at [\d.]+ mm letters)", "settings.label.cap_mm"),
+    (r"^(label: )?(not )?on the (black|white)\b", "settings.label.place"),
+    (r"^(label: )?.*\bnozzle\b.*\bneeds\b", "settings.label.nozzle_mm"),
+]
+
+
+def label_field(text: str, default: str) -> str:
+    """The label row a label message is about, by its first clause."""
+    head = re.split(r" -- |; |\. ", _plain(text), maxsplit=1)[0]
+    for rx, fld in LABEL_WORDS:
+        if re.search(rx, head):
+            return fld
+    return default
+
+
+def _same_words(a: str, b: str, n: int = 48) -> bool:
+    """Two messages that say the same thing: one starts with the other's
+    first `n` characters ("label: " and case aside)."""
+    na = re.sub(r"^label: ", "", a).strip().lower()
+    nb = re.sub(r"^label: ", "", b).strip().lower()
+    k = min(n, len(na), len(nb))
+    return k > 0 and (na[:k] == nb[:k] or na in nb or nb in na)
+
+
+def force_issue(ev, s, spec: TagSpec) -> Optional[Issue]:
+    """A typed cols x rows the plan did not build (audit F2): the fit drops a
+    count that does not fit (REF evaluate's _layout_rect), and on a face it
+    lays out as many as fit. Said under Columns x rows, never silent."""
+    f = (spec.settings or {}).get("force")
+    lay = ev["layout"]
+    if not f or s.get("layout") == "single" or not isinstance(f, (list, tuple)) or len(f) != 2:
+        return None
+    if (lay.cols, lay.rows) == (int(f[0]), int(f[1])):
+        return None
+    t = spec.target
+    if not t.is_profile:
+        return Issue("settings.force", "info",
+                     f"{f[0]} × {f[1]} typed: a face lays out as many as fit, "
+                     f"{lay.cols} × {lay.rows} here (a sketch profile takes a typed count)")
+    unit = (f"{lay.square_m * 1000.0:.1f} mm checkers" if s.get("layout") == "charuco"
+            else f"{lay.marker_m * 1000.0:.1f} mm markers")
+    return Issue("settings.force", "warn",
+                 f"{f[0]} × {f[1]} does not fit the {t.w_mm:g} × {t.h_mm:g} mm target at "
+                 f"{unit}: using {lay.cols} × {lay.rows}")
+
+
 def issues_of(ev, s, n, spec: TagSpec) -> List[Issue]:
-    """Every message of a built plan, on its field (ARCHITECTURE 5.6)."""
+    """Every message of a built plan, on its field (ARCHITECTURE 5.6). A
+    message is shown once: a label note that repeats a label Issue is dropped."""
     out: List[Issue] = []
     seen = set()
 
@@ -127,14 +178,20 @@ def issues_of(ev, s, n, spec: TagSpec) -> List[Issue]:
             continue                                    # the label's own words, below
         f, lv = route(note)
         add(f, lv, note)
+    fi = force_issue(ev, s, spec)
+    if fi is not None:
+        add(fi.field, fi.level, fi.text)
     lab = ev.get("label")
     if lab is not None and lab.settings.on:
+        said = []
         for i in _V.label_issues(lab, ev["mode"], True):
-            add(_V.field_of(i.anchor), "error" if i.level in ("error", "block") else "warn",
-                i.text)
+            fld = label_field(i.text, _V.field_of(i.anchor))
+            add(fld, "error" if i.level in ("error", "block") else "warn", i.text)
+            said.append(i.text)
         for t in lab.notes:
-            if t.startswith("label: "):
-                add("settings.label", "info", t)
+            if t.startswith("label: ") and not any(_same_words(t, x) for x in said):
+                add(label_field(t, "settings.label"), "info", t)
+                said.append(t)
     spec_m = ev["spec"]
     # the dialog's info lines (REF info_rows): each on its field
     add("numbers.size", "info", _F.size_line(spec_m))

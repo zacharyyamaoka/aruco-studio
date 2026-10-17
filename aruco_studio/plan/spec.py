@@ -250,11 +250,22 @@ def check(spec: TagSpec) -> List[Issue]:
         c = raw["cells"]
         good = (isinstance(c, dict) and c.get("rule", _A.CELL_RULE) == _A.CELL_RULE
                 and _A.cells_of(c) is not None)
-        if not good:
+        lo, hi = _A.MIN_STEP_M * 1000, _A.MAX_STEP_M * 1000
+        legacy = "read as the legacy 0.5 mm steps"
+        if not good and (isinstance(c, dict) and c.get("rule", _A.CELL_RULE) == _A.CELL_RULE
+                         and c.get("of") in _A.CELL_OF):
+            # the rule and its kind are known: the step is what is wrong (audit F8)
+            mm = c.get("mm")
+            shown = f"{mm:g}" if _finite(mm) else repr(mm)
+            add("settings.cells.mm", "warn",
+                f"cell {shown} mm: {lo:g} to {hi:g} mm ({legacy})")
+        elif not good:
+            rule = c.get("rule") if isinstance(c, dict) else None
+            what = (f"rule {rule!r}" if isinstance(c, dict) and rule != _A.CELL_RULE else
+                    f"kind {c.get('of')!r}" if isinstance(c, dict) else "not an object")
             add("settings.cells", "warn",
-                f"cells {c!r} is not a size grid this version knows (rule {_A.CELL_RULE}, "
-                f"of {' / '.join(_A.CELL_OF)}, {_A.MIN_STEP_M * 1000:g}.."
-                f"{_A.MAX_STEP_M * 1000:g} mm): read as the legacy 0.5 mm steps")
+                f"cells: {what} is not a size grid this version knows (rule {_A.CELL_RULE}, "
+                f"{' / '.join(_A.CELL_OF)}, {lo:g} to {hi:g} mm): {legacy}")
         elif isinstance(c.get("min_mm", 0.0), (int, float)) and c.get("min_mm", 0.0) < 0:
             add("settings.cells.min_mm", "warn", "a minimum below 0 reads as 0")
     # -- mode, op
