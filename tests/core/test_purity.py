@@ -4,7 +4,12 @@
   process, so nothing the test runner loaded counts);
 * no core file IMPORTS adsk, numpy or cv2 (by `ast`, so REF's docstrings,
   which name cv2 where they say what was measured with it, do not count);
-* every import inside core/ is the standard library or core/ itself.
+* every import inside core/ is the standard library or core/ itself;
+* no core function opens, lists, writes or deletes a file, or reads the
+  environment (audit C7; spec ST-T-PURE-1): the server does the files.
+  One read is allowed: `dictionary._load` reads the dictionary table that
+  ships inside the package (REF's text verbatim; package data, never a
+  user's file).
 """
 import ast
 import subprocess
@@ -57,3 +62,35 @@ def test_every_module_of_the_module_map_exists():
             "validate", "presets", "prusa", "restructure", "faces", "export_rows", "marker_table",
             "ids_design"}
     assert want <= set(MODULES), sorted(want - set(MODULES))
+
+
+FILE_CALLS = {"open", "read_text", "write_text", "read_bytes", "write_bytes", "unlink", "mkdir",
+              "makedirs", "listdir", "remove", "rmtree", "isfile", "isdir", "exists",
+              "expanduser", "which", "scandir", "glob", "iterdir", "rename"}
+PACKAGE_DATA = {("dictionary.py", "_load")}           # the table inside the package
+
+
+def test_no_file_io_in_core():
+    bad = []
+    for p in sorted(CORE.glob("*.py")):
+        tree = ast.parse(p.read_text(encoding="utf-8"))
+        owner = {}
+        for top in tree.body:
+            for node in ast.walk(top):
+                owner[id(node)] = getattr(top, "name", "<module>")
+        for node in ast.walk(tree):
+            hit = None
+            if isinstance(node, ast.Call):
+                f = node.func
+                name = f.id if isinstance(f, ast.Name) else (f.attr if isinstance(f, ast.Attribute)
+                                                             else "")
+                if name in FILE_CALLS:
+                    hit = f"{name}()"
+                if (name == "replace" and isinstance(f, ast.Attribute)
+                        and isinstance(f.value, ast.Name) and f.value.id == "os"):
+                    hit = "os.replace()"
+            elif isinstance(node, ast.Attribute) and node.attr == "environ":
+                hit = "os.environ"
+            if hit and (p.name, owner.get(id(node))) not in PACKAGE_DATA:
+                bad.append(f"{p.name}:{node.lineno} {owner.get(id(node))}: {hit}")
+    assert not bad, bad

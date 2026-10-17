@@ -11,7 +11,7 @@ Every copy is REF's file at the pinned commit with ONLY these changes:
 | `sys.path.insert(... "CADExporter" / "tools" / "ArucoMarkers")` -> a no-op | nothing is imported from REF |
 | `HERE / "fixtures" / "<golden>.json"` -> the copy under goldens/ref/ (its "golden" field) | goldens live in ROOT |
 | the golden makers' pure halves -> `ref_make_*.py` copies (no `main`, no stand-in adsk) | the suites call `G.run(...)` / `G.shape(...)` |
-| per-suite patches listed in PATCHES below (each an exact string, asserted present) | the few lines that loaded the add-in |
+| per-suite patches listed in PATCHES below (each an exact string, asserted present) | the few lines that loaded the add-in; print_beds' suites import `aruco_studio.server.beds_io` (the core's beds with REF's file I/O) |
 
 tests/core/test_ref_*.py runs each copy in its own process and compares its
 checks, section by section, with REF's own run (tests/ref_sections.json).
@@ -49,7 +49,13 @@ def golden_loader(var, fname):
     return f'{var} = json.loads(({GOLD} / "{fname}").read_text(encoding="utf-8"))["golden"]'
 
 
+BEDS_IO = ("from aruco_studio.core import beds as P  # noqa: E402",
+           "from aruco_studio.server import beds_io as P  # noqa: E402  (core.beds + its file I/O, audit C7)")
+
 PATCHES = {
+    # the core never opens a file: print_beds' I/O half is server/beds_io.py
+    "test_print_beds": [BEDS_IO],
+    "test_print_beds_slicer": [BEDS_IO],
     "test_aruco_autosize": [
         ('    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ArucoMarkers"))\n'
          '    import aruco_autosize_gallery as G\n',

@@ -123,15 +123,38 @@ def test_shared_names_are_refs_text(module, ref, adapted):
     assert not differ, f"{module} differs from {ref} in: {differ}"
 
 
+# print_beds' file I/O lives outside the core (audit C7): REF's text there
+BEDS_IO = ROOT / "aruco_studio" / "server" / "beds_io.py"
+
+
+def test_beds_io_is_refs_text():
+    """server/beds_io.py: each function is print_beds' own text, and the
+    core's beds no longer holds any of them."""
+    mine = defs(BEDS_IO.read_text(encoding="utf-8"))
+    theirs = defs(renamed(ref_path.show(B + "print_beds.py").decode("utf-8")))
+    funcs = {n for n in mine if mine[n].lstrip().startswith("def ")}
+    assert len(funcs) == 12, sorted(funcs)
+    assert funcs <= set(theirs), sorted(funcs - set(theirs))
+    differ = [n for n in sorted(funcs) if mine[n] != theirs[n]]
+    assert not differ, differ
+    core = set(defs((CORE / "beds.py").read_text(encoding="utf-8")))
+    assert not (funcs & core), sorted(funcs & core)
+
+
 def test_whole_core_copies_keep_every_ref_name():
     """A copied bam_cad_core module keeps every one of REF's top-level names
-    (markers.py: but instance_fiducials, the CAD Exporter's URDF bridge)."""
+    (markers.py: but instance_fiducials, the CAD Exporter's URDF bridge;
+    beds.py: but its file I/O, which is server/beds_io.py)."""
     not_ported = {"instance_fiducials"}
+    beds_io = {n for n, t in defs(BEDS_IO.read_text(encoding="utf-8")).items()
+               if t.lstrip().startswith("def ")}
     for module, refs in PORTS.items():
         ref = refs[0][0]
         if not ref.startswith(B) or ref.endswith("fiducials.py"):
             continue
         mine = set(defs((CORE / f"{module}.py").read_text(encoding="utf-8")))
+        if module == "beds":
+            mine |= beds_io
         theirs = set(defs(ref_path.show(ref).decode("utf-8")))
         missing = theirs - mine - (not_ported if module == "markers" else set())
         assert not missing, (module, sorted(missing))

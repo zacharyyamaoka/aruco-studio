@@ -22,7 +22,7 @@ from pathlib import Path
 
 pass  # REF put its own tree on sys.path here (ported: not needed)
 
-from aruco_studio.core import beds as P  # noqa: E402
+from aruco_studio.server import beds_io as P  # noqa: E402  (core.beds + its file I/O, audit C7)
 
 PASS = 0
 FAIL = []
