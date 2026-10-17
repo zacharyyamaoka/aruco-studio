@@ -1,30 +1,25 @@
 // The bottom drawer: Verify (OpenCV's read of each tag, and of the sheet),
 // Messages (every status line, errors included) and the keyboard map. The
 // status bar above it always shows the last line.
+import { Kbd } from "../kit";
 import { isStale, useStudio } from "../store";
 import { Icon, IconButton } from "../ui/controls";
+import { commands } from "./commands";
+import { FileDrawer } from "./FileDrawer";
 
 const fmt = (v: unknown, d = 3) => (typeof v === "number" ? v.toFixed(d) : "–");
 
-export const KEYS: [string, string][] = [
-  ["S / G / C", "add a single marker / a grid board / a ChArUco board"],
+/** The keys table (the commands, then the mouse): docs/STUDIO.md has the same. */
+export const MOUSE: [string, string][] = [
   ["Click, Shift+click", "select, add to the selection"],
   ["Drag on empty canvas", "marquee select (Shift adds)"],
-  ["Drag a tag", "move (0.5 mm snap)"],
+  ["Drag a shape or a tag", "move it (0.5 mm snap; Alt: no snap)"],
+  ["Drag a handle", "resize or turn the shape (0.5 mm / 15°); the markers re-place live"],
+  ["Alt+click a polygon edge", "a new point there (Del removes the point just dragged)"],
+  ["Drag a selected tag's label", "place the label by hand (0.25 mm steps)"],
   ["Arrows (Shift)", "nudge 0.5 mm (5 mm)"],
   ["Wheel", "zoom at the cursor (Shift+wheel pans)"],
   ["Space+drag, middle or right drag", "pan"],
-  ["R / Shift+R", "rotate 90° clockwise / counter-clockwise"],
-  ["Ctrl+D", "duplicate"],
-  ["Shift+A", "arrange in a row, 10 mm apart"],
-  ["Del / Backspace", "delete"],
-  ["Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y", "undo, redo"],
-  ["Ctrl+A / Esc", "select all / none (Esc on an open list closes it only)"],
-  ["Tab (on the canvas)", "2D / 3D"],
-  ["F", "zoom to fit (the selection, or everything)"],
-  ["Q / A / L", "quiet zones / frame axes / layer outlines"],
-  ["V", "verify the selection with OpenCV"],
-  ["Ctrl+S / Ctrl+O", "save / open"],
   ["Double-click a tag or an IDs row", "zoom to it"],
 ];
 
@@ -34,14 +29,21 @@ export function StatusBar() {
   const n = useStudio((s) => s.scene.tags.length);
   const sel = useStudio((s) => s.sel.length);
   const camera = useStudio((s) => s.camera);
+  const design = useStudio((s) => s.design);
   const st = useStudio.getState();
+  const e = design.error;
+  const fileText = design.state === "broken" ? `line ${e?.line} col ${e?.col}: ${e?.message} (writes wait until it parses)`
+    : design.state === "missing" ? "the file is gone (Save as… writes it again)"
+    : design.state === "memory" ? "in memory (Save as… gives it a file)" : (design.path ?? "").split(/[\/]/).pop();
   return (
     <div className="statusbar">
+      <span className={`filebar st-${design.state}`} data-testid="file-bar" data-state={design.state} title={design.path ?? ""}
+        onClick={() => st.setDrawer(drawer === "file" ? null : "file")}><Icon name="file" />{fileText}</span>
       <span className={`status lv-${status.level}`} data-testid="status" onClick={() => st.setDrawer(drawer === "messages" ? null : "messages")}>{status.text || "Ready"}</span>
-      <span className="grow" />
       <span className="muted">{n} tag{n === 1 ? "" : "s"}{sel ? ` · ${sel} selected` : ""} · {camera.zoom.toFixed(2)} px/mm · centre {camera.cx.toFixed(1)}, {camera.cy.toFixed(1)} mm</span>
       <button className={`tb small${drawer === "verify" ? " on" : ""}`} onClick={() => st.setDrawer(drawer === "verify" ? null : "verify")} data-testid="sb-verify"><Icon name="verify" />Verify</button>
       <button className={`tb small${drawer === "messages" ? " on" : ""}`} onClick={() => st.setDrawer(drawer === "messages" ? null : "messages")} data-testid="sb-messages"><Icon name="doc" />Messages</button>
+      <button className={`tb small${drawer === "file" ? " on" : ""}`} onClick={() => st.setDrawer(drawer === "file" ? null : "file")} data-testid="sb-file"><Icon name="file" />File</button>
     </div>
   );
 }
@@ -62,7 +64,7 @@ export function Drawer() {
   return (
     <section className="drawer" data-testid={`drawer-${drawer}`}>
       <div className="drawer-head">
-        <b>{drawer === "verify" ? "Verify: OpenCV reads the plans" : "Messages and keys"}</b>
+        <b>{drawer === "verify" ? "Verify: OpenCV reads the plans" : drawer === "file" ? "File: the design file as it is on disk" : "Messages and keys"}</b>
         <span className="grow" />
         <IconButton icon="close" title="Close" onClick={() => st.setDrawer(null)} />
       </div>
@@ -125,9 +127,15 @@ export function Drawer() {
             {!log.length && <div className="muted">Nothing yet.</div>}
             {[...log].reverse().map((l, i) => <div key={i} className={`logline lv-${l.level}`}><span className="t">{l.t}</span>{l.text}</div>)}
           </div>
-          <table className="keys"><tbody>{KEYS.map(([k, v]) => <tr key={k}><td><kbd>{k}</kbd></td><td>{v}</td></tr>)}</tbody></table>
+          <div className="keymap" data-testid="keymap">
+            <table className="keys"><tbody>
+              {commands().map((c) => <tr key={c.id} data-key-row={c.name}><td>{c.key ? <Kbd keys={c.key} /> : <span className="muted">S</span>}</td><td>{c.name}</td></tr>)}
+              {MOUSE.map(([k, v]) => <tr key={k}><td><kbd>{k}</kbd></td><td>{v}</td></tr>)}
+            </tbody></table>
+          </div>
         </div>
       )}
+      {drawer === "file" && <FileDrawer />}
     </section>
   );
 }

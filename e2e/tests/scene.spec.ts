@@ -1,9 +1,12 @@
 // M3.8 / ST-T-UI-6 and the canvas's editing: select, shift-select, marquee,
-// drag (0.5 mm snap), rotate 90, duplicate, delete, undo / redo, keys, pan
-// and zoom; then save the scene, reload the page, open it: the same tags at
+// drag (0.5 mm snap), rotate 90 (] since M8b1), duplicate, delete, undo /
+// redo (the text history), keys, pan and zoom; then a scene is a file: New
+// makes it, every change is in it, a reload and Open give the same tags at
 // the same poses.
 import { expect, test } from "@playwright/test";
 import { add, fresh, idle, probe, shot } from "./helpers";
+
+const turn = (deg: number) => ((deg % 360) + 360) % 360;
 
 async function centreOf(page: any, name: string) {
   const b = (await page.locator(`g[data-tag="${name}"] [data-layer="target"]`).boundingBox())!;
@@ -57,11 +60,11 @@ test("edit on the canvas: select, marquee, drag, rotate, duplicate, delete, undo
   expect((t1.x_mm * 2) % 1).toBe(0);
   await shot(page, "edit_dragged");
 
-  // rotate 90 (R), arrows nudge, duplicate (Ctrl+D), delete (Del)
-  await page.keyboard.press("r");
+  // rotate 90 (]), arrows nudge, duplicate (Ctrl+D), delete (Del)
+  await page.keyboard.press("]");
   await idle(page);
   t1 = (await probe(page)).tags.find((t: any) => t.name === "tag1");
-  expect(t1.rotation_deg).toBe(270);
+  expect(turn(t1.rotation_deg)).toBe(270);
   await page.keyboard.press("ArrowLeft");
   await idle(page);
   expect((await probe(page)).tags.find((t: any) => t.name === "tag1").x_mm).toBeCloseTo(t1.x_mm - 0.5, 6);
@@ -90,13 +93,13 @@ test("edit on the canvas: select, marquee, drag, rotate, duplicate, delete, undo
   // redo the turn
   await page.keyboard.press("Control+Shift+z");
   await idle(page);
-  expect((await probe(page)).tags.find((t: any) => t.name === "tag1").rotation_deg).toBe(270);
+  expect(turn((await probe(page)).tags.find((t: any) => t.name === "tag1").rotation_deg)).toBe(270);
 
   // the toolbar's own buttons
   await page.locator('[data-ids-row="tag2"]').click();
   await page.getByTestId("rotate").click();
   await idle(page);
-  expect((await probe(page)).tags.find((t: any) => t.name === "tag2").rotation_deg).toBe(270);
+  expect(turn((await probe(page)).tags.find((t: any) => t.name === "tag2").rotation_deg)).toBe(270);
   await page.getByTestId("duplicate").click();
   await idle(page);
   await page.getByTestId("delete").click();
@@ -120,32 +123,33 @@ test("edit on the canvas: select, marquee, drag, rotate, duplicate, delete, undo
   expect(c1[1]).toBeCloseTo(c0[1] + 40 / z1, 3);
 });
 
-test("save, reload, open: the same tags at the same poses", async ({ page }) => {
+test("a scene is a file: New makes it, every change is in it; reload, Open: the same tags at the same poses", async ({ page }) => {
   const name = `e2e-scene-${Date.now()}`;
   await fresh(page, "e2e-save");
+  await page.getByTestId("menu-file").click();
+  await page.getByTestId("file-new").click();
+  await page.getByTestId("dialog-name").fill(name);
+  await page.getByTestId("dialog-ok").click();
+  await idle(page);
+  await expect(page.getByTestId("scene-name")).toHaveText(name);
+  await expect(page.getByTestId("file-bar")).toHaveAttribute("data-state", "ok");
   await add(page, "single");
   await add(page, "grid");
   await add(page, "charuco");
   await page.locator('[data-ids-row="board1"]').click();
-  await page.keyboard.press("r");
+  await page.keyboard.press("]");
   await page.keyboard.press("ArrowUp");
   await idle(page);
   await page.getByTestId("renumber").click();
   await idle(page);
   const before = (await probe(page)).tags;
+  await page.keyboard.press("Control+s");                 // no Save: it says so
+  await expect(page.getByTestId("status")).toContainText("saved as you typed");
 
-  await page.getByTestId("menu-file").click();
-  await page.getByTestId("file-saveas").click();
-  await page.getByTestId("dialog-name").fill(name);
-  await page.getByTestId("dialog-ok").click();
-  await idle(page);
-  await expect(page.getByTestId("status")).toContainText(`${name}.arucostudio.json`);
-  await expect(page.getByTestId("scene-name")).toHaveText(name);
-
-  // a new scene, a reload: nothing on the canvas
+  // another new scene, a reload: nothing on the canvas
   await page.getByTestId("menu-file").click();
   await page.getByTestId("file-new").click();
-  await page.getByTestId("dialog-name").fill("empty");
+  await page.getByTestId("dialog-name").fill(`${name}-empty`);
   await page.getByTestId("dialog-ok").click();
   await idle(page);
   await page.reload();

@@ -1,14 +1,33 @@
-// ST-T-UI-11: the target editor. Zach's disc (four holes): Auto size reads
-// what /api/validate says; a 2 mm thickness and round pins on a New tile
-// give pin and hole layers; Trim excess gives a trim_keep layer; a typed
-// box with a hole draws the hole.
+// ST-T-UI-11, rewritten for M8b1 (the target editor is gone: a tag's target
+// is the shape or the face it stands on). A disc with four holes (C, H
+// clicks), 2 mm thick (E): Auto size reads what /api/validate says; round
+// pins on a New tile give pin and hole layers; Trim excess gives a trim_keep
+// layer; a box with a hole typed in the shape's rows draws the hole.
 import { expect, test } from "@playwright/test";
-import { API, add, choose, expectIssues, fresh, idle, probe, shot, tab, type } from "./helpers";
+import { API, choose, expectIssues, freshFile, idle, palette, probe, screenOf, shapeOfTag, shot, tab, tagOn, type } from "./helpers";
 
-test("target editor: a palette face, a thickness, pins, trim, a typed hole", async ({ page, request }) => {
-  await fresh(page, "e2e-target");
-  await add(page, "single");
-  await choose(page, "target", "disc4");
+test("shapes as targets: a disc with four holes, 2 mm thick, pins, trim; a box with a typed hole", async ({ page, request }) => {
+  await freshFile(page, "e2e-target");
+  await page.keyboard.press("c");
+  await page.keyboard.type("40");
+  await page.keyboard.press("Enter");
+  await idle(page);
+  for (const [x, y] of [[12, 0], [-12, 0], [0, 12], [0, -12]]) {
+    await page.keyboard.press("h");
+    await page.keyboard.type("5");
+    await page.mouse.click(...(await screenOf(page, x, y)));
+    await idle(page);
+  }
+  await expect(page.locator("[data-hole]")).toHaveCount(4);
+  await page.keyboard.press("e");
+  await page.keyboard.type("2");
+  await page.keyboard.press("Enter");
+  await idle(page);
+  await page.getByTestId("view-2d").click();
+  await idle(page);
+  await page.keyboard.press("a");
+  await page.keyboard.press("Enter");
+  await idle(page);
   let spec = (await probe(page)).doc.tags[0].spec;
   expect(spec.target.loops_mm.length).toBe(5);
   const issues = await (await request.post(`${API}/api/validate`, { data: spec })).json();
@@ -16,11 +35,9 @@ test("target editor: a palette face, a thickness, pins, trim, a typed hole", asy
   await expectIssues(page, "numbers.size", size);
   const tag = page.locator('g[data-tag="tag1"]');
   expect(((await tag.locator('[data-layer="target"]').getAttribute("d")) || "").match(/M/g)!.length).toBe(5);
-
-  // White + black, New body, round pins, a 2 mm plate
-  await type(page, "target.thickness", "2");
-  spec = (await probe(page)).doc.tags[0].spec;
   expect(spec.target.body_mm.z0).toBe(-2);
+
+  // White + black, New body, round pins
   await tab(page, "heights");
   await choose(page, "settings.mode", "both");
   await choose(page, "settings.op", "new");
@@ -33,15 +50,13 @@ test("target editor: a palette face, a thickness, pins, trim, a typed hole", asy
   await choose(page, "settings.trim", "both");
   await expect(tag.locator('[data-layer="trim_keep"]')).toHaveCount(1);
   await expect(tag.locator('[data-guide="trim"]')).toHaveCount(1);
-  await page.keyboard.press("l");                  // layer outlines on
+  await palette(page, "Layer outlines");
   await shot(page, "target_disc_pins_trim");
-  await page.keyboard.press("l");
+  await palette(page, "Layer outlines");
 
-  // a typed box with a round hole
-  await add(page, "single");
-  await choose(page, "target", "box");
-  await type(page, "target.w_mm", "70");
-  await type(page, "target.h_mm", "45");
+  // a box 70 x 45 with a round hole typed in its shape's rows
+  expect(await tagOn(page, "r", "70 45", 3)).toBe("tag2");
+  await shapeOfTag(page);
   await page.getByTestId("hole-add").click();
   await idle(page);
   await type(page, "hole.0.x", "25");

@@ -10,7 +10,8 @@ import { useStudio } from "../store";
 import { ButtonRow, Dropdown, Icon, IconButton, NumberInput, TextInput, Toggle, type Opt } from "../ui/controls";
 import { ICONS_OF, shown, TABS, TARGET_EDITOR, tabOf, turnIcons, type Tab } from "./layout";
 import { PresetRow } from "./PresetRow";
-import { TargetEditor } from "./TargetEditor";
+import { ShapeInspector } from "./ShapeInspector";
+import { findShape } from "../model/design";
 
 /** A row's messages: one short line each (the whole text in its tooltip and
  *  data-text), the same line never twice (audit F7). */
@@ -58,11 +59,17 @@ export function Inspector() {
   const options = useStudio((s) => s.options);
   const scene = useStudio((s) => s.scene);
   const sel = useStudio((s) => s.sel);
+  const shapeSel = useStudio((s) => s.shapeSel);
+  const doc = useStudio((s) => s.doc);
   const [tab, setTab] = useState<Tab>("marker");
   const tags = scene.tags.filter((t) => sel.includes(t.name));
   const tag: SceneTag | undefined = tags[tags.length - 1];
 
   if (!form) return <aside className="inspector"><div className="muted pad">Loading…</div></aside>;
+  if (!tag && shapeSel.length) {
+    const info = findShape(doc, shapeSel[shapeSel.length - 1]);
+    if (info) return <ShapeInspector key={info.key} info={info} />;
+  }
   if (!tag) return <aside className="inspector" data-testid="inspector"><NewTagDefaults /></aside>;
   return <TagInspector key={tag.uid} tag={tag} count={tags.length} form={form.fields} options={options} tab={tab} setTab={setTab} />;
 }
@@ -219,8 +226,8 @@ function TagInspector({ tag, count, form, options, tab, setTab }: {
       </div>
       {tag.locked && <div className="locked-note" data-testid="locked-note"><Icon name="lock" />Locked: a printed tag. Unlock it to change its ink; its name and place can still change.</div>}
       <fieldset className="ink" disabled={dis} data-ink-locked={dis ? "1" : "0"}>
+        <ArucoRows tag={tag} issues={routed["target"] ?? []} />
         <PresetRow tag={tag} />
-        <TargetEditor tag={tag} issues={routed["target"] ?? []} />
         {rows("root")}
       </fieldset>
       <div className="tabs" role="tablist">
@@ -343,25 +350,53 @@ function PrintInfo({ tag }: { tag: SceneTag }) {
   );
 }
 
-/** Nothing selected: what a new tag gets (the toolbar adds it). */
+/** ArUco Extrude's first rows: what the tag stands on (its feature's
+ *  reference: a shape or a body's face) and the shape, a click away. */
+function ArucoRows({ tag, issues }: { tag: SceneTag; issues: Issue[] }) {
+  const st = useStudio.getState();
+  const src = tag.source;
+  const tags = useStudio((s) => s.scene.tags);
+  const mates = src ? tags.filter((t) => t.source?.feature === src.feature && t.name !== tag.name) : [];
+  return (
+    <div className="aruco-rows" data-testid="aruco-rows">
+      <div className="row" data-row="aruco.on">
+        <div className="row-main">
+          <label className="row-label" title="the ArUco Extrude's reference in the file">On</label>
+          <div className="row-ctl">
+            <span className="ro" data-testid="aruco-on">{src?.ref ?? "–"}{src?.face && src.face !== "top" ? ` (${src.face})` : ""}</span>
+            {src?.shape && <button className="link" data-testid="aruco-shape" title="select the shape" onClick={() => st.selectShape(src.shape!)}>{src.shape}</button>}
+          </div>
+        </div>
+      </div>
+      {mates.length > 0 && (
+        <div className="row" data-row="aruco.list">
+          <div className="row-main">
+            <label className="row-label">Face list</label>
+            <div className="row-ctl"><span className="ro" title="one feature, one tag per face: an edit to one face that the others do not share splits the list">
+              with {mates.map((m) => m.name).join(", ")}</span></div>
+          </div>
+        </div>
+      )}
+      {issues.length > 0 && (
+        <div className="msgs" data-issues-for="target">
+          {issues.map((i, k) => <div key={k} className={`issue lv-${i.level}`} data-level={i.level} data-field={i.field}>{i.text}</div>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Nothing selected: how to make a tag, and the preset new tags get. */
 function NewTagDefaults() {
-  const targets = useStudio((s) => s.targets);
-  const newTarget = useStudio((s) => s.newTarget);
-  const newThickness = useStudio((s) => s.newThickness);
   const newPreset = useStudio((s) => s.newPreset);
   const presets = useStudio((s) => s.presets);
   const scene = useStudio((s) => s.scene);
   const st = useStudio.getState();
   return (
     <div className="newtag">
-      <div className="insp-head"><Icon name="plus" /><b>New tags</b></div>
-      <div className="muted pad">Nothing selected. A tag added from the toolbar gets these. {scene.tags.length ? `${scene.tags.length} tag(s) in '${scene.name}'.` : ""}</div>
-      <div className="row"><div className="row-main"><label className="row-label">Target</label><div className="row-ctl">
-        <Dropdown path="new.target" value={newTarget} options={targets.map((t) => ({ value: t.key, label: t.title, icon: "target" }))} onChange={(v) => st.setNew("newTarget", String(v))} />
-      </div></div></div>
-      <div className="row"><div className="row-main"><label className="row-label">Thickness</label><div className="row-ctl">
-        <NumberInput path="new.thickness" value={newThickness} unit="mm" onCommit={(v) => st.setNew("newThickness", Math.max(0, v))} />
-      </div></div></div>
+      <div className="insp-head"><Icon name="plus" /><b>Nothing selected</b></div>
+      <div className="muted pad">Draw a shape (R, C, P, O), then A puts a tag on it; E extrudes it, so a tag can go on a face.
+        {scene.tags.length ? ` ${scene.tags.length} tag(s) in '${scene.name}'.` : ""}</div>
       <div className="row"><div className="row-main"><label className="row-label">Preset</label><div className="row-ctl">
         <span className="pair">
           <Dropdown path="new.preset" value={newPreset} options={presets.map((p) => ({ value: p.name, label: p.name, icon: p.kind === "user" ? "star" : "cube" }))} onChange={(v) => st.setNew("newPreset", String(v))} />
@@ -369,7 +404,7 @@ function NewTagDefaults() {
         </span>
       </div></div></div>
       <div className="keys muted pad">
-        Keys: <b>S</b> single · <b>G</b> grid · <b>C</b> ChArUco · <b>R</b> rotate · <b>Ctrl+D</b> duplicate · <b>Del</b> delete · <b>Ctrl+Z</b> undo · <b>Tab</b> 2D / 3D · <b>F</b> fit · <b>?</b> all keys
+        Keys: <b>V</b> select · <b>R</b> rectangle · <b>C</b> circle · <b>P</b> polygon · <b>O</b> slot · <b>H</b> hole · <b>E</b> extrude · <b>A</b> ArUco Extrude · <b>S</b> search · <b>?</b> all keys
       </div>
     </div>
   );

@@ -2,14 +2,11 @@
 // the detector's clear zone it is refused: an Issue under a Label field, its
 // preview in orange (data-state="refused"); Build anyway builds it (label_*).
 import { expect, test } from "@playwright/test";
-import { add, choose, fresh, idle, probe, shot, tab, type } from "./helpers";
+import { choose, fresh, idle, probe, shot, tab, tagOn, type } from "./helpers";
 
 test("label: on the white, dragged into the quiet ring, refused, built anyway", async ({ page }) => {
   await fresh(page, "e2e-label");
-  await add(page, "single");
-  await choose(page, "target", "box");
-  await type(page, "target.w_mm", "60");
-  await type(page, "target.h_mm", "60");
+  expect(await tagOn(page, "r", "60 60", 3)).toBe("tag1");             // a 60 mm plate, 3 mm thick
   await page.locator('.tog:has(input[data-path="numbers.size:auto"])').click();
   await idle(page);
   await type(page, "numbers.size", "20");

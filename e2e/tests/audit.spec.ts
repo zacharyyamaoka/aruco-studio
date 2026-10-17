@@ -2,7 +2,8 @@
 // DOM, the store (window.__studio) or the 3D view's own numbers
 // (window.__studio3d), never a picture.
 import { expect, test } from "@playwright/test";
-import { API, add, fresh, idle, probe, shot, tab } from "./helpers";
+import fs from "node:fs";
+import { API, add, fresh, freshFile, idle, palette, probe, readFile, shot, tab } from "./helpers";
 
 async function ids(page: any, name: string): Promise<number[]> {
   return (await probe(page)).tags.find((t: any) => t.name === name).ids;
@@ -69,8 +70,7 @@ test("F3 F18: Escape closes an open dropdown only; Tab on a focused button moves
 test("F4 F6: a verify row goes stale on a change; a locked tag's ink fields take no input", async ({ page }) => {
   await fresh(page, "e2e-audit-verify");
   await add(page, "single");
-  await page.keyboard.press("v");
-  await idle(page);
+  await palette(page, "Verify");                                     // V is the Select tool since M8b1
   const row = page.locator('[data-verify-row="tag1"]');
   await expect(row).toHaveAttribute("data-stale", "0");
   await expect(row.locator("td[data-ok]")).toHaveAttribute("data-ok", "1");
@@ -115,15 +115,14 @@ test("F7: a label message is one short line, the plan's words in its tooltip", a
   await shot(page, "audit_label_short");
 });
 
-test("F12 F13: unsaved changes are marked and asked about; overlapping tags are a scene issue", async ({ page, request }) => {
-  await fresh(page, "e2e-audit-dirty");
-  await expect(page.getByTestId("scene-name")).toHaveAttribute("data-dirty", "0");
+test("F12 F13 (M8b1): no unsaved changes, every change is in the file; overlapping tags are a scene issue", async ({ page, request }) => {
+  const file = await freshFile(page, "e2e-audit-file");
   await add(page, "single");
   await add(page, "single");
-  await expect(page.getByTestId("scene-name")).toHaveAttribute("data-dirty", "1");
+  // nothing waits to be saved: the file on disk has both tags already
+  expect(readFile(file).features.filter((f: any) => f.aruco).map((f: any) => f.id)).toEqual(["tag1", "tag2"]);
   await page.keyboard.press("Control+s");
-  await idle(page);
-  await expect(page.getByTestId("scene-name")).toHaveAttribute("data-dirty", "0");
+  await expect(page.getByTestId("status")).toContainText("saved as you typed");
 
   // tag2 moved 2 mm onto tag1
   const t1 = (await probe(page)).tags.find((t: any) => t.name === "tag1");
@@ -139,25 +138,20 @@ test("F12 F13: unsaved changes are marked and asked about; overlapping tags are 
   await expect(page.getByTestId("verify-overlaps")).toContainText("tag2 overlaps tag1");
   await shot(page, "audit_overlap");
 
-  // a change, then File > New: asked first; Cancel keeps the scene
+  // a change is in the file at once; New asks nothing (the old scene is its file)
+  const was = fs.readFileSync(file, "utf-8");
   await page.locator('[data-ids-row="tag1"]').click();
   await page.keyboard.press("ArrowUp");
   await idle(page);
-  await expect(page.getByTestId("scene-name")).toHaveAttribute("data-dirty", "1");
+  expect(fs.readFileSync(file, "utf-8")).not.toBe(was);
   await page.getByTestId("menu-file").click();
   await page.getByTestId("file-new").click();
-  await expect(page.getByTestId("dialog-unsaved")).toBeVisible();
-  await page.getByTestId("unsaved-cancel").click();
-  expect((await probe(page)).tags.length).toBe(2);
-  await page.getByTestId("menu-file").click();
-  await page.getByTestId("file-new").click();
-  await page.getByTestId("unsaved-discard").click();
   await expect(page.getByTestId("dialog-new")).toBeVisible();
-  await page.getByTestId("dialog-name").fill("e2e-audit-empty");
+  await page.getByTestId("dialog-name").fill(`e2e-audit-empty-${Date.now()}`);
   await page.getByTestId("dialog-ok").click();
   await idle(page);
   expect((await probe(page)).tags.length).toBe(0);
-  await expect(page.getByTestId("scene-name")).toHaveAttribute("data-dirty", "0");
+  expect(readFile(file).features.filter((f: any) => f.aruco)).toHaveLength(2);
 });
 
 test("F16: the Library's search looks in every collection", async ({ page }) => {

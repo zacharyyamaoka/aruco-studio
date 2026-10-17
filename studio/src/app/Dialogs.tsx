@@ -1,59 +1,48 @@
-// New scene / Open / Save as: small dialogs over the canvas. Scenes live in
-// the server's scenes folder as <name>.arucostudio.json.
+// New scene / Open / Save as: small dialogs over the canvas. There is no
+// Save: the open file is written on every change. A new scene is a new file
+// in the scenes folder (<name>.arucostudio.json); Open takes a scene of the
+// folder or a file anywhere (a path); Save as copies the design to a name or
+// a path and follows that file from then on.
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
-import { isDirty, useStudio } from "../store";
+import { useStudio } from "../store";
 import { Icon } from "../ui/controls";
 
 export function Dialogs() {
   const d = useStudio((s) => s.dialog);
   const name = useStudio((s) => s.scene.name);
-  const dirty = useStudio((s) => isDirty(s));
   const st = useStudio.getState();
   const [text, setText] = useState("");
+  const [path, setPath] = useState("");
   const [list, setList] = useState<{ name: string; modified: string; bytes: number }[] | null>(null);
-  // New / Open over unsaved changes ask first (audit F12)
-  const [asked, setAsked] = useState(false);
   useEffect(() => {
     if (!d) return;
-    setAsked(false);
     setText(d.kind === "new" ? "scene" : name);
+    setPath("");
     if (d.kind === "open") api.scenes().then(setList).catch(() => setList([]));
   }, [d]);
   if (!d) return null;
   const close = () => st.setDialog(null);
-  if (d.kind !== "save" && dirty && !asked) {
-    return (
-      <div className="modal-back" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-        <div className="dialog" role="dialog" data-testid="dialog-unsaved">
-          <div className="lib-title"><Icon name="save" />Save changes to '{name}'?</div>
-          <div className="pad muted">The scene has changes that are not saved. {d.kind === "new" ? "A new scene" : "Opening another scene"} closes it.</div>
-          <div className="prompt-buttons pad">
-            <button className="btn" onClick={close} data-testid="unsaved-cancel">Cancel</button>
-            <button className="btn" onClick={() => setAsked(true)} data-testid="unsaved-discard">Don't save</button>
-            <button className="btn primary" data-testid="unsaved-save" onClick={async () => { await st.saveScene(); setAsked(true); }}>Save</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
   const ok = async () => {
-    const v = text.trim();
+    const v = (d.kind === "open" ? path : text).trim();
     if (!v) return;
     close();
     if (d.kind === "new") await st.newScene(v);
-    if (d.kind === "save") await st.saveScene(v);
+    if (d.kind === "save") await st.saveAs(v);
+    if (d.kind === "open") await st.openPath(v);
   };
+  const keys = (e: React.KeyboardEvent) => { if (e.key === "Enter") ok(); if (e.key === "Escape") close(); e.stopPropagation(); };
   return (
     <div className="modal-back" onMouseDown={(e) => e.target === e.currentTarget && close()}>
       <div className="dialog" role="dialog" data-testid={`dialog-${d.kind}`}>
         <div className="lib-title"><Icon name={d.kind === "open" ? "open" : d.kind === "new" ? "newdoc" : "save"} />
-          {d.kind === "open" ? "Open a scene" : d.kind === "new" ? "New scene" : "Save the scene as"}</div>
+          {d.kind === "open" ? "Open a design file" : d.kind === "new" ? "New scene (a new file)" : "Save the scene as"}</div>
         {d.kind !== "open" && (
           <div className="pad">
-            <input autoFocus className="txt" value={text} data-testid="dialog-name" onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") ok(); if (e.key === "Escape") close(); e.stopPropagation(); }} />
-            {d.kind === "new" && <div className="muted">The open scene is closed{dirty ? "" : " (it has no unsaved changes)"}.</div>}
+            <input autoFocus className="txt" value={text} data-testid="dialog-name" onChange={(e) => setText(e.target.value)} onKeyDown={keys} />
+            <div className="muted">{d.kind === "new"
+              ? "A name makes scenes/<name>.arucostudio.json; every change is written to it."
+              : "A name (the scenes folder) or a whole path. The Studio then follows that file."}</div>
           </div>
         )}
         {d.kind === "open" && (
@@ -65,11 +54,13 @@ export function Dialogs() {
                 <Icon name="file" /><span>{x.name}</span><span className="muted">{x.modified.replace("T", " ")} · {(x.bytes / 1024).toFixed(1)} kB</span>
               </button>
             ))}
+            <input className="txt" placeholder="or a file's path: C:\…\name.arucostudio.json" value={path} data-testid="dialog-path"
+              onChange={(e) => setPath(e.target.value)} onKeyDown={keys} />
           </div>
         )}
         <div className="prompt-buttons pad">
           <button className="btn" onClick={close}>Cancel</button>
-          {d.kind !== "open" && <button className="btn primary" onClick={ok} data-testid="dialog-ok">{d.kind === "new" ? "Create" : "Save"}</button>}
+          <button className="btn primary" onClick={ok} data-testid="dialog-ok">{d.kind === "new" ? "Create" : d.kind === "open" ? "Open" : "Save as"}</button>
         </div>
       </div>
     </div>

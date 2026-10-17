@@ -29,7 +29,9 @@ function labelHits(p: NonNullable<SceneTag["plan"]>): number[][] {
   return b ? [[b.x0, b.y0, b.x1, b.y1]] : [];
 }
 
-export const TagSvg = memo(function TagSvg({ tag, show, selected, labelShift }: { tag: SceneTag; show: Show; selected: boolean; labelShift?: [number, number] }) {
+/** `passive`: the tag stands on a shape's top: its target is the shape's
+ *  face, so a click there (outside the marker) reaches the shape. */
+export const TagSvg = memo(function TagSvg({ tag, show, selected, labelShift, passive }: { tag: SceneTag; show: Show; selected: boolean; labelShift?: [number, number]; passive?: boolean }) {
   const p = tag.plan;
   const pose = poseOf(tag.x_mm, tag.y_mm, tag.rotation_deg);
   const t = tag.spec.target;
@@ -40,10 +42,11 @@ export const TagSvg = memo(function TagSvg({ tag, show, selected, labelShift }: 
   const labelOn = Boolean((tag.spec.settings.label as any)?.on);
   return (
     <g data-tag={tag.name} data-uid={tag.uid} data-ok={p?.ok ? "1" : "0"} data-locked={tag.locked ? "1" : "0"}
-      transform={svgMatrix(pose)} className={`tag${selected ? " sel" : ""}${tag.locked ? " locked" : ""}`}>
+      transform={svgMatrix(pose)} className={`tag${selected ? " sel" : ""}${tag.locked ? " locked" : ""}${passive ? " passive" : ""}`}>
       <path data-layer="target" className={t.has_body ? "target body" : "target free"} fillRule="evenodd" d={loopsD(tl)} />
       {p && p.ok && p.frames && (
         <g data-frame="pattern" transform={svgMatrix(p.frames.pattern_in_target)}>
+          {passive && g && <path data-hit="marker" className="tag-hit" d={loopD(rectLoop((g as any).tile ?? g.quiet_ring))} />}
           <g data-view="top">
             {p.top?.body && <path data-top="body" className="top-body" fillRule="evenodd" d={topD(p.top, "body")} />}
             {p.top?.white && <path data-top="white" className="top-white" fillRule="evenodd" d={topD(p.top, "white")} />}

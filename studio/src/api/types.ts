@@ -80,6 +80,37 @@ export interface SceneTag {
   locked: boolean;
   hidden: boolean;
   plan: TagPlan | null;
+  /** where it is in the design file (scene/design.compile, M8a) */
+  source?: TagSource;
+  /** its full pose (a row-major 4x4, mm) when it is not z-up at z 0 */
+  pose_3d?: number[];
+}
+
+/** A compiled tag's place in the design file (GET /api/scene's `source`). */
+export interface TagSource {
+  feature: number;
+  entry: number | null;
+  ref: string;
+  shape: string | null;
+  sketch: string | null;
+  body: string | null;
+  face: string | null;
+  normal: [number, number, number];
+  hinge: [Pt, Pt] | null;
+  hinge_xy?: [Pt, Pt];
+  over?: string;
+}
+
+/** GET /api/design (server/design_api.Design.info). */
+export interface DesignInfo {
+  path: string | null;
+  state: "memory" | "ok" | "broken" | "missing";
+  text: string;
+  hash: string | null;
+  revision: number;
+  error: { line: number | null; col: number | null; message: string; text?: string } | null;
+  issues: Issue[];
+  schema: string;
 }
 
 export interface SceneDoc {

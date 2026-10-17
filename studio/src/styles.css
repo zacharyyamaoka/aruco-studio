@@ -37,7 +37,7 @@ input, select { font: inherit; }
 .bad { color: var(--bad); }
 .ic { width: 16px; height: 16px; flex: none; display: inline-block; vertical-align: -3px; }
 
-.app { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; height: 100vh; }
+.app { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; grid-template-columns: minmax(0, 1fr); height: 100vh; }
 
 /* ------------------------------------------------------------ toolbar */
 .toolbar { display: flex; align-items: center; gap: 2px; padding: 4px 8px; background: var(--strip);
@@ -230,8 +230,9 @@ input, select { font: inherit; }
 .newtag .keys { font-size: 11px; line-height: 1.6; }
 
 /* ------------------------------------------------------------ status, drawer */
-.statusbar { display: flex; align-items: center; gap: 8px; padding: 2px 8px; background: var(--strip); border-top: 1px solid var(--line); min-height: 24px; }
-.status { cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
+.statusbar { display: flex; align-items: center; gap: 8px; padding: 2px 8px; background: var(--strip); border-top: 1px solid var(--line); min-height: 24px; min-width: 0; overflow: hidden; white-space: nowrap; }
+.statusbar > .muted { flex: none; }
+.status { cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 0; min-width: 0; }
 .status.lv-error { color: var(--bad); }
 .status.lv-warn { color: var(--warn); }
 .drawer { background: var(--body); border-top: 1px solid var(--line); height: 230px; display: flex; flex-direction: column; }
@@ -335,3 +336,57 @@ fieldset.ink:disabled .row-ctl { opacity: 0.55; }
 .vt tr.stale td { color: var(--muted); font-style: italic; }
 .vt tr.stale .vimg { opacity: 0.45; }
 .lib-form-err { color: var(--bad); font-size: 11px; }
+
+/* ------------------------------------------------------------ M8b1: the sketcher */
+.shape .shape-fill { fill: rgba(142, 152, 166, 0.16); stroke: none; cursor: pointer; }
+.shape.extruded .shape-fill { fill: rgba(142, 152, 166, 0.42); }
+.shape-line { fill: none; stroke: #a9b3c1; stroke-width: 1.2; vector-effect: non-scaling-stroke; pointer-events: none; }
+.shape-line.extruded { stroke: #c9d0da; stroke-width: 1.6; }
+.shape-line.sel { stroke: var(--accent-2); stroke-width: 2; }
+.shape-line.picked { stroke: #ff9f1c; stroke-width: 2.4; }
+.shape .hole-line { fill: transparent; stroke: #a9b3c1; stroke-width: 1.2; stroke-dasharray: 3 2; vector-effect: non-scaling-stroke; cursor: pointer; }
+.shape .hole-line.sel { stroke: var(--accent-2); stroke-width: 2; stroke-dasharray: none; }
+.tag.passive .target, .tag.passive .top-body { pointer-events: none; }
+.tag.passive .target.body { fill: none; }
+.tag .tag-hit { fill: transparent; stroke: none; pointer-events: all; }
+.net-face { fill: rgba(255, 159, 28, 0.08); stroke: rgba(255, 159, 28, 0.65); stroke-width: 1.2; stroke-dasharray: 5 3;
+  vector-effect: non-scaling-stroke; cursor: copy; }
+.net-face:hover { fill: rgba(255, 159, 28, 0.2); }
+.net-face.picked { fill: rgba(255, 159, 28, 0.32); stroke: #ff9f1c; stroke-dasharray: none; stroke-width: 2; }
+.hinge { stroke: #ff9f1c; stroke-width: 1.5; stroke-dasharray: 6 4; pointer-events: none; }
+.handle { fill: #fff; stroke: var(--accent-2); stroke-width: 1.5; cursor: pointer; }
+.handle.vertex { fill: var(--accent-2); stroke: #fff; }
+.handle.rot { fill: #fff; cursor: grab; }
+.handle-stem { stroke: var(--accent-2); stroke-width: 1; stroke-dasharray: 2 2; }
+.draft path, .draft-poly { fill: rgba(56, 166, 232, 0.12); stroke: var(--accent-2); stroke-width: 1.5; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+.draft-size { fill: var(--accent-2); font-size: 11px; font-weight: 600; paint-order: stroke; stroke: var(--canvas); stroke-width: 3px; }
+.shapelabel { fill: var(--muted); font-size: 10.5px; paint-order: stroke; stroke: var(--canvas); stroke-width: 3px; pointer-events: none; }
+.canvas2d.tool-rect, .canvas2d.tool-circle, .canvas2d.tool-slot, .canvas2d.tool-polygon { cursor: crosshair; }
+.canvas2d.tool-hole, .canvas2d.tool-rhole { cursor: cell; }
+.canvas2d.tool-aruco { cursor: copy; }
+.bottombar { max-width: calc(100% - 170px); }
+.tool-ask { overflow: hidden; }
+.tool-ask .muted { overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 auto; }
+
+/* the file */
+.filebar { display: inline-flex; align-items: center; gap: 4px; padding: 0 6px; border-radius: 3px; cursor: pointer; max-width: 34%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.filebar.st-ok { color: var(--ok); }
+.filebar.st-broken { color: #fff; background: #a83a2f; }
+.filebar.st-missing { color: #fff; background: #8a5a14; }
+.scene-name.st-broken::after { content: " · does not parse"; color: var(--bad); }
+.scene-name.st-memory::after { content: " · in memory"; color: var(--muted); }
+.drawer-body.file { display: flex; flex-direction: column; gap: 4px; padding: 4px 8px; }
+.file-head { display: flex; align-items: center; gap: 8px; }
+.file-path { font-family: Consolas, monospace; font-size: 11px; color: var(--label); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-state { font-size: 10px; text-transform: uppercase; padding: 0 5px; border-radius: 3px; background: var(--field); }
+.file-state.st-ok { color: var(--ok); }
+.file-state.st-broken { color: var(--bad); }
+.file-text { position: relative; flex: 1; margin: 0; overflow: auto; background: #1d2129; border: 1px solid var(--line); border-radius: 3px; font: 11.5px/1.45 Consolas, monospace; padding: 2px 0; }
+.file-text .fl { white-space: pre; padding-right: 8px; }
+.file-text .fl .ln { display: inline-block; width: 38px; text-align: right; padding-right: 8px; color: #5c6574; user-select: none; }
+.file-text .fl.lit { background: rgba(56, 166, 232, 0.18); }
+.file-text .fl.bad { background: rgba(255, 122, 107, 0.25); }
+.aruco-rows { border-bottom: 1px solid rgba(74, 84, 102, 0.6); padding-bottom: 2px; }
+.tag-link { display: block; text-align: left; padding: 2px 10px; }
+.keymap { overflow: auto; }

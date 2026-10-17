@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./app/App";
 import { studioProbe, useStudio } from "./store";
 import "./styles.css";
+import "./kit/kit.css";
 
 // What the tests read (ARCHITECTURE 4, PLAN M3.5): the camera centre, the
 // scene's z extent, the selection, the store itself.
