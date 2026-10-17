@@ -10,7 +10,7 @@ milestone edits this file after M1.
 |---|---|---|
 | core, plan, scene, verify, server, adapters, ... | `tests/<name>/` holds a `test_*.py` | pytest on that folder (pytest-xdist) |
 | studio | `studio/package.json` | `npm run build`, then `npm run test` (vitest) |
-| e2e | `studio/e2e/` | uvicorn on 127.0.0.1:5360 + Vite on 5361, `npx playwright test`; both stopped in `finally`; refused when a port is already bound |
+| e2e | `e2e/package.json` (or `studio/e2e/`) | uvicorn on 127.0.0.1:5360 + Vite on 5361, `npx playwright test` in `e2e/`; the server's home, scenes and PrusaSlicer folder are a temp dir and the fixture; both stopped in `finally`; refused when a port is already bound |
 
 One line per group ("core: 2,311 passed in 38 s"); exit 1 on any failure.
 `--trace` writes docs/test_trace.md: one row per section of
@@ -34,6 +34,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PY = sys.executable
 STUDIO = ROOT / "studio"
+E2E = ROOT / "e2e"
 PORTS = (5360, 5361)
 
 
@@ -47,7 +48,7 @@ def groups():
             out.append(d.name)
     if (STUDIO / "package.json").exists():
         out.append("studio")
-    if (STUDIO / "e2e").is_dir():
+    if (E2E / "package.json").exists() or (STUDIO / "e2e").is_dir():
         out.append("e2e")
     return out
 
@@ -100,8 +101,15 @@ def _npm():
     return shutil.which("npm.cmd") or shutil.which("npm") or "npm"
 
 
+def _npm_install(folder):
+    """node_modules from the lock file when they are missing (npm only)."""
+    if (folder / "package.json").exists() and not (folder / "node_modules").is_dir():
+        subprocess.run([_npm(), "ci", "--no-audit", "--no-fund"], cwd=str(folder), capture_output=True)
+
+
 def run_studio():
     t0 = time.time()
+    _npm_install(STUDIO)
     for script in ("build", "test"):
         p = subprocess.run([_npm(), "run", script], cwd=str(STUDIO), capture_output=True, text=True,
                            encoding="utf-8", errors="replace")
@@ -146,6 +154,11 @@ def run_e2e():
     t0 = time.time()
     api = ui = None
     env = _env()
+    env.update({"ARUCO_STUDIO_SCENES": os.path.join(env["ARUCO_STUDIO_HOME"], "scenes"),
+                "BAM_ARUCO_PRUSASLICER_DIR": str(ROOT / "goldens" / "prusaslicer")})
+    where = E2E if (E2E / "package.json").exists() else STUDIO
+    _npm_install(STUDIO)
+    _npm_install(where)
     try:
         api = subprocess.Popen([PY, "-m", "uvicorn", "aruco_studio.server.app:app", "--host",
                                 "127.0.0.1", "--port", "5360"], cwd=str(ROOT), env=env,
@@ -156,11 +169,17 @@ def run_e2e():
         if not (_wait(5360) and _wait(5361)):
             return False, "e2e: the servers did not come up on 5360 / 5361"
         npx = shutil.which("npx.cmd") or shutil.which("npx") or "npx"
-        p = subprocess.run([npx, "playwright", "test"], cwd=str(STUDIO), env=env, capture_output=True,
+        # the browser keeps the real profile folder (Chrome refuses a temp
+        # USERPROFILE); only the servers run on the temp home
+        penv = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PYTHONIOENCODING="utf-8")
+        p = subprocess.run([npx, "playwright", "test"], cwd=str(where), env=penv, capture_output=True,
                            text=True, encoding="utf-8", errors="replace")
         ok = p.returncode == 0
-        tail = "\n".join((p.stdout + p.stderr).strip().splitlines()[-25:])
-        return ok, f"e2e: {'passed' if ok else 'FAILED'} in {time.time() - t0:.0f} s" + (
+        lines = (p.stdout + p.stderr).strip().splitlines()
+        tail = "\n".join(lines[-25:])
+        summary = " ".join(x.strip() for x in lines if x.strip().endswith(("passed", "skipped"))
+                           or " passed (" in x or " skipped" in x)[-120:]
+        return ok, f"e2e: {summary or ('passed' if ok else 'FAILED')} in {time.time() - t0:.0f} s" + (
             "" if ok else "\n" + tail)
     finally:
         _stop(ui)
@@ -254,7 +273,7 @@ def main(argv):
         else:
             ok, line = run_pytest(g)
         ok_all &= ok
-        print(line, flush=True)
+        print(line.encode(sys.stdout.encoding or "utf-8", "replace").decode(sys.stdout.encoding or "utf-8"), flush=True)
     print(f"{'OK' if ok_all else 'FAILED'} in {time.time() - t0:.0f} s")
     return 0 if ok_all else 1
 

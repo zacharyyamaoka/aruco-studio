@@ -586,6 +586,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/target": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Target Make
+         * @description The target editor: a box (w x h), a disc (r) or a palette face
+         *     (`key`), round holes (x, y, diameter), a thickness (0 = no body), as a
+         *     Target (plan/target.py; the web app never makes outlines itself).
+         */
+        post: operations["target_make_api_target_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/targets": {
         parameters: {
             query?: never;
@@ -1173,6 +1195,46 @@ export interface components {
             z_sign: number;
         } & {
             [key: string]: unknown;
+        };
+        /**
+         * TargetMakeIn
+         * @description The target editor's numbers (POST /api/target).
+         */
+        TargetMakeIn: {
+            /**
+             * H Mm
+             * @default 40
+             */
+            h_mm: number;
+            /** Holes */
+            holes?: [
+                number,
+                number,
+                number
+            ][];
+            /** Key */
+            key?: string | null;
+            /**
+             * R Mm
+             * @default 20
+             */
+            r_mm: number;
+            /**
+             * Shape
+             * @default box
+             * @enum {string}
+             */
+            shape: "box" | "disc" | "face";
+            /**
+             * Thickness Mm
+             * @default 3
+             */
+            thickness_mm: number;
+            /**
+             * W Mm
+             * @default 40
+             */
+            w_mm: number;
         };
         /** ValidationError */
         ValidationError: {
@@ -2347,6 +2409,41 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
+                };
+            };
+        };
+    };
+    target_make_api_target_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetMakeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

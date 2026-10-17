@@ -10,7 +10,7 @@ import type {
 } from "./api/types";
 import { matMul, poseOf, sceneZ, tagBox, unionBox } from "./model/geom";
 import {
-  docOf, moveLocal, patchFor, placeNew, pushHistory, redoStep, renameSel, rotateLocal,
+  arrangeRow, docOf, moveLocal, patchFor, placeNew, pushHistory, redoStep, renameSel, rotateLocal,
   selectClick, toggleView, undoStep, type History, type View,
 } from "./model/scene";
 
@@ -66,10 +66,13 @@ export interface StudioState {
   commitMove(names: string[], before: SceneDoc): Promise<void>;
   nudge(dx: number, dy: number): Promise<void>;
   rotateSel(deg: number): Promise<void>;
+  arrange(): Promise<void>;
   duplicateSel(): Promise<void>;
   deleteSel(): Promise<void>;
   edit(path: string, value: unknown, extra?: Record<string, unknown>): Promise<void>;
-  editTarget(t: Target): Promise<void>;
+  editTarget(t: Target | (() => Promise<Target>)): Promise<void>;
+  moveLabel(name: string, x_mm: number, y_mm: number): Promise<void>;
+  setMode(mode: string): Promise<void>;
   rename(from: string, to: string): Promise<void>;
   setFlag(name: string, flag: "locked" | "hidden", v: boolean): Promise<void>;
   applyPreset(name: string, preset?: any): Promise<void>;
@@ -217,7 +220,7 @@ export const useStudio = create<StudioState>((set, get) => {
       const b = unionBox(tags.map((t) => tagBox(t)));
       if (!b) return;
       const { w, h } = get().viewport;
-      const zoom = Math.max(0.2, Math.min(60, Math.min((w - 80) / Math.max(1, b.x1 - b.x0), (h - 80) / Math.max(1, b.y1 - b.y0))));
+      const zoom = Math.max(0.2, Math.min(16, Math.min((w * 0.7) / Math.max(1, b.x1 - b.x0), (h * 0.7) / Math.max(1, b.y1 - b.y0))));
       set({ camera: { cx: (b.x0 + b.x1) / 2, cy: (b.y0 + b.y1) / 2, zoom } });
     },
 
@@ -240,7 +243,8 @@ export const useStudio = create<StudioState>((set, get) => {
         set({ sel: [t.name] });
       });
       const t = get().scene.tags.find((x) => x.name === get().sel[0]);
-      if (t) {
+      if (t && get().scene.tags.length === 1) get().zoomToFit();
+      else if (t) {
         const b = tagBox(t);
         const { camera, viewport } = get();
         if (b) {
@@ -276,6 +280,15 @@ export const useStudio = create<StudioState>((set, get) => {
       const before = get().scene;
       set((s) => ({ scene: rotateLocal(s.scene, names, deg) }));
       await get().commitMove(names, before);
+    },
+    async arrange() {
+      const tags = get().scene.tags.filter((t) => !t.hidden && (!get().sel.length || get().sel.includes(t.name)));
+      if (!tags.length) return;
+      const before = get().scene;
+      const to = arrangeRow(tags);
+      set((s) => ({ scene: { ...s.scene, tags: s.scene.tags.map((t) => to[t.name] ? { ...t, x_mm: to[t.name][0], y_mm: to[t.name][1] } : t) } }));
+      await get().commitMove(Object.keys(to), before);
+      get().zoomToFit();
     },
     async duplicateSel() {
       const tags = tagsSel();
@@ -326,8 +339,33 @@ export const useStudio = create<StudioState>((set, get) => {
     async editTarget(t) {
       const tags = tagsSel();
       if (!tags.length) return;
-      await run(`target: ${t.name || "edited"}`, async () => {
-        for (const x of tags) await api.patchTag(x.name, { target: t });
+      let name = "";
+      await run("", async () => {
+        const tgt = typeof t === "function" ? await t() : t;      // made inside the queue: idle() waits for it
+        name = tgt.name;
+        for (const x of tags) await api.patchTag(x.name, { target: tgt });
+        get().say(`target: ${name || "edited"}`);
+      });
+    },
+    async setMode(mode) {
+      // REF's dialog keeps the black's step from the white top when the
+      // Extrude changes (its refresh: black offset = white top + delta). The
+      // core's preset mapping holds that rule (preset_of's black_step, then
+      // the preset applied under the new mode): only the mode and the black
+      // offset are taken from it.
+      const tags = tagsSel();
+      await run(`Colours: ${mode}`, async () => {
+        for (const t of tags) {
+          const of = await api.presetOf(t.spec as any);
+          const p = { ...of.preset, tag: { ...of.preset.tag, mode } };
+          const sp = await api.presetApply(t.spec as any, "", p as any);
+          await api.patchTag(t.name, { settings: { mode: sp.settings.mode }, numbers: { black_offset: sp.numbers.black_offset } });
+        }
+      });
+    },
+    async moveLabel(name, x_mm, y_mm) {
+      await run(`${name}: label moved to X ${x_mm.toFixed(2)}, Y ${y_mm.toFixed(2)} mm`, async () => {
+        await api.patchTag(name, { settings: { label: { position: "manual", x_mm, y_mm } } });
       });
     },
     async rename(from, to) {

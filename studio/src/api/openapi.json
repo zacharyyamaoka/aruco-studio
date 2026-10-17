@@ -1354,6 +1354,75 @@
     "title": "TargetIn",
     "type": "object"
    },
+   "TargetMakeIn": {
+    "additionalProperties": false,
+    "description": "The target editor's numbers (POST /api/target).",
+    "properties": {
+     "h_mm": {
+      "default": 40.0,
+      "title": "H Mm",
+      "type": "number"
+     },
+     "holes": {
+      "items": {
+       "maxItems": 3,
+       "minItems": 3,
+       "prefixItems": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "number"
+        },
+        {
+         "type": "number"
+        }
+       ],
+       "type": "array"
+      },
+      "title": "Holes",
+      "type": "array"
+     },
+     "key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Key"
+     },
+     "r_mm": {
+      "default": 20.0,
+      "title": "R Mm",
+      "type": "number"
+     },
+     "shape": {
+      "default": "box",
+      "enum": [
+       "box",
+       "disc",
+       "face"
+      ],
+      "title": "Shape",
+      "type": "string"
+     },
+     "thickness_mm": {
+      "default": 3.0,
+      "title": "Thickness Mm",
+      "type": "number"
+     },
+     "w_mm": {
+      "default": 40.0,
+      "title": "W Mm",
+      "type": "number"
+     }
+    },
+    "title": "TargetMakeIn",
+    "type": "object"
+   },
    "ValidationError": {
     "properties": {
      "loc": {
@@ -2850,6 +2919,47 @@
      }
     },
     "summary": "Scenes"
+   }
+  },
+  "/api/target": {
+   "post": {
+    "description": "The target editor: a box (w x h), a disc (r) or a palette face\n(`key`), round holes (x, y, diameter), a thickness (0 = no body), as a\nTarget (plan/target.py; the web app never makes outlines itself).",
+    "operationId": "target_make_api_target_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TargetMakeIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Target Make Api Target Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Target Make"
    }
   },
   "/api/targets": {

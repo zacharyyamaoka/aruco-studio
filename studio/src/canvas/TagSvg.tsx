@@ -3,7 +3,7 @@
 // as an outline path (data-layer), the guides, the OpenCV frame's axes.
 import { memo } from "react";
 import type { SceneTag } from "../api/types";
-import { layerD, loopD, loopsD, poseOf, rectLoop, svgMatrix, targetLoops, topD } from "../model/geom";
+import { boxOf, layerD, loopD, loopsD, poseOf, rectLoop, svgMatrix, targetLoops, topD } from "../model/geom";
 import type { Show } from "../store";
 
 const AXIS_FRACTION = 0.42;
@@ -19,7 +19,17 @@ function axes(m: number[], len: number) {
   );
 }
 
-export const TagSvg = memo(function TagSvg({ tag, show, selected }: { tag: SceneTag; show: Show; selected: boolean }) {
+/** Where a selected tag's label can be grabbed: each label part's box (the
+ *  plan's label parts, or the refused preview's box). */
+function labelHits(p: NonNullable<SceneTag["plan"]>): number[][] {
+  const parts = ((p.label as any)?.parts ?? []) as { rect: number[] }[];
+  if (parts.length) return parts.map((x) => x.rect);
+  const prev = (p.guides?.label_preview ?? []) as unknown as [number, number][][];
+  const b = boxOf(prev.flat());
+  return b ? [[b.x0, b.y0, b.x1, b.y1]] : [];
+}
+
+export const TagSvg = memo(function TagSvg({ tag, show, selected, labelShift }: { tag: SceneTag; show: Show; selected: boolean; labelShift?: [number, number] }) {
   const p = tag.plan;
   const pose = poseOf(tag.x_mm, tag.y_mm, tag.rotation_deg);
   const t = tag.spec.target;
@@ -42,6 +52,7 @@ export const TagSvg = memo(function TagSvg({ tag, show, selected }: { tag: Scene
           <g data-view="layers" className={show.outlines ? "layers on" : "layers"}>
             {p.layers.map((L, i) => (
               <path key={i} data-layer={L.name} data-part={L.part} data-op={L.op} data-colour={L.colour}
+                data-label-drag={L.name.startsWith("label") && selected ? "1" : undefined}
                 data-z={`${L.z[0]},${L.z[1]}`} className={`layer op-${L.op} c-${L.colour}${L.step === "sub" ? " sub" : ""}`}
                 fillRule="evenodd" d={layerD(L)} />
             ))}
@@ -52,13 +63,22 @@ export const TagSvg = memo(function TagSvg({ tag, show, selected }: { tag: Scene
               {show.quiet && labelOn && g.clear_preferred && <path data-guide="clear_preferred" className="g-clear" d={loopD(rectLoop(g.clear_preferred))} />}
               {(g.keepouts || []).map((k, i) => <path key={`k${i}`} data-guide="keepout" className="g-keepout" d={loopD(k as any)} />)}
               {(g.label_preview || []).length > 0 && (
-                <path data-layer="label_preview" data-state="refused" className="g-refused" fillRule="nonzero"
+                <path data-layer="label_preview" data-state="refused" className="g-refused" fillRule="nonzero" data-label-drag={selected ? "1" : undefined}
                   d={(g.label_preview || []).map((b) => loopD(b as any)).join("")} />
               )}
               {g.trim && (g.trim as any).outline && <path data-guide="trim" className="g-trim" d={loopD(rectLoop((g.trim as any).outline))} />}
             </g>
           )}
+          {selected && labelHits(p).map((r, i) => (
+            <path key={`h${i}`} data-label-hit={i} data-label-drag="1" className="label-hit" d={loopD(rectLoop(r))} />
+          ))}
           {show.axes && axes(p.frames.opencv, Math.max(2, markerMm * AXIS_FRACTION))}
+          {labelShift && (
+            <g data-ghost="label" transform={`translate(${labelShift[0]} ${labelShift[1]})`} className="label-ghost">
+              {p.layers.filter((L) => L.name.startsWith("label")).map((L, i) => <path key={i} d={layerD(L)} fillRule="evenodd" />)}
+              {(g?.label_preview || []).map((b, i) => <path key={`p${i}`} d={loopD(b as any)} />)}
+            </g>
+          )}
         </g>
       )}
       {p && !p.ok && <path data-state="error" className="g-error" d={loopsD(tl)} />}

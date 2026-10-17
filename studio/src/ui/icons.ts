@@ -81,6 +81,7 @@ export const STUDIO_ICONS: Record<string, string> = {
   sheet: `<path d="M3.5 1.5h9v13h-9z" fill="none" ${S}/><path d="M5.5 4h2v2h-2zM8.5 4h2v2h-2zM5.5 7.5h2v2h-2z" fill="currentColor"/>`,
   file: `<path d="M3.5 1.5h6l3 3v10h-9z" fill="none" ${S}/><path d="M9.5 1.5v3h3" fill="none" ${S}/>`,
   dot: `<circle cx="8" cy="8" r="3" fill="currentColor"/>`,
+  arrange: `<rect x="1.5" y="4" width="3.5" height="5" fill="currentColor"/><rect x="6.25" y="4" width="3.5" height="7" fill="currentColor"/><rect x="11" y="4" width="3.5" height="4" fill="currentColor"/><path d="M1 2.5h14" stroke="#38a6e8" stroke-width="1.2"/>`,
 };
 
 export const ICONS: Record<string, string> = { ...REF_ICONS, ...STUDIO_ICONS };

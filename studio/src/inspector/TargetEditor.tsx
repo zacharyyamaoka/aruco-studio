@@ -36,17 +36,25 @@ export function TargetEditor({ tag, issues }: { tag: SceneTag; issues: Issue[] }
     { value: "disc", label: "Disc (typed)", icon: "target" },
     ...palette.map((p) => ({ value: p.key, label: p.title, icon: "target" })),
   ];
-  const apply = async (next: Recipe, thickness: number) => {
+  // every change starts from the newest recipe (two quick edits must not
+  // undo each other), and the server makes the outline inside the store's
+  // queue, so the next change waits for it
+  const apply = async (change: Partial<Recipe> | ((r: Recipe) => Recipe), thickness: number) => {
+    const cur = typed[tag.uid] ?? r;
+    const next = typeof change === "function" ? change(cur) : { ...cur, ...change };
     typed[tag.uid] = next;
-    try {
-      const tgt = await api.makeTarget({
-        shape: next.shape, key: next.key, w_mm: next.w, h_mm: next.h, r_mm: next.d / 2, holes: next.holes, thickness_mm: thickness,
-      });
-      setBad(null);
-      await st.editTarget({ ...tgt, kind: t.kind, z_sign: t.z_sign } as any);
-    } catch (e) {
-      setBad(String((e as Error).message));
-    }
+    setBad(null);
+    await st.editTarget(async () => {
+      try {
+        const tgt = await api.makeTarget({
+          shape: next.shape, key: next.key, w_mm: next.w, h_mm: next.h, r_mm: next.d / 2, holes: next.holes, thickness_mm: thickness,
+        });
+        return { ...tgt, kind: t.kind, z_sign: t.z_sign } as any;
+      } catch (e) {
+        setBad(String((e as Error).message));
+        throw e;
+      }
+    });
   };
   return (
     <div className="target-ed" data-testid="target-editor">
@@ -57,9 +65,9 @@ export function TargetEditor({ tag, issues }: { tag: SceneTag; issues: Issue[] }
             <Dropdown path="target" value={custom} options={opts} wide
               onChange={(v) => {
                 const k = String(v);
-                if (k === "box") apply({ ...r, shape: "box", key: undefined }, thick);
-                else if (k === "disc") apply({ ...r, shape: "disc", key: undefined, d: Math.max(r.w, r.h) }, thick);
-                else apply({ ...r, shape: "face", key: k }, thick);
+                if (k === "box") apply({ shape: "box", key: undefined }, thick);
+                else if (k === "disc") apply((c) => ({ ...c, shape: "disc", key: undefined, d: Math.max(c.w, c.h) }), thick);
+                else apply({ shape: "face", key: k }, thick);
               }} />
           </div>
         </div>
@@ -70,12 +78,12 @@ export function TargetEditor({ tag, issues }: { tag: SceneTag; issues: Issue[] }
           <div className="row-ctl">
             {r.shape === "box" && (
               <span className="pair">
-                <NumberInput path="target.w_mm" value={t.w_mm} unit="" onBad={setBad} onCommit={(v) => apply({ ...r, w: v }, thick)} />
+                <NumberInput path="target.w_mm" value={t.w_mm} unit="" onBad={setBad} onCommit={(v) => apply({ w: v }, thick)} />
                 <span className="x">×</span>
-                <NumberInput path="target.h_mm" value={t.h_mm} unit="mm" onBad={setBad} onCommit={(v) => apply({ ...r, h: v }, thick)} />
+                <NumberInput path="target.h_mm" value={t.h_mm} unit="mm" onBad={setBad} onCommit={(v) => apply({ h: v }, thick)} />
               </span>
             )}
-            {r.shape === "disc" && <NumberInput path="target.d_mm" value={r.d} unit="mm" onBad={setBad} onCommit={(v) => apply({ ...r, d: v }, thick)} />}
+            {r.shape === "disc" && <NumberInput path="target.d_mm" value={r.d} unit="mm" onBad={setBad} onCommit={(v) => apply({ d: v }, thick)} />}
             {r.shape === "face" && <span className="ro">{t.w_mm.toFixed(1)} × {t.h_mm.toFixed(1)} mm</span>}
           </div>
         </div>
@@ -84,7 +92,7 @@ export function TargetEditor({ tag, issues }: { tag: SceneTag; issues: Issue[] }
         <div className="row-main">
           <label className="row-label" title="the body under the face: 0 = nothing under it">Thickness</label>
           <div className="row-ctl">
-            <NumberInput path="target.thickness" value={thick} unit="mm" onBad={setBad} onCommit={(v) => apply(r, Math.max(0, v))} />
+            <NumberInput path="target.thickness" value={thick} unit="mm" onBad={setBad} onCommit={(v) => apply({}, Math.max(0, v))} />
           </div>
         </div>
       </div>
@@ -94,17 +102,17 @@ export function TargetEditor({ tag, issues }: { tag: SceneTag; issues: Issue[] }
           <div className="row-ctl">
             <span className="muted">{Math.max(0, (t.loops_mm?.length ?? 1) - 1)}</span>
             <IconButton icon="plus" title="Add a round hole (x, y, diameter)" testid="hole-add"
-              onClick={() => apply({ ...r, holes: [...r.holes, [0, 0, 5]] }, thick)} />
+              onClick={() => apply((c) => ({ ...c, holes: [...c.holes, [0, 0, 5]] }), thick)} />
           </div>
         </div>
         {r.holes.map((hh, i) => (
           <div className="row-main sub" key={i} data-hole={i}>
             <span className="row-label">⌀ at</span>
             <span className="row-ctl pair">
-              <NumberInput path={`hole.${i}.x`} value={hh[0]} onBad={setBad} onCommit={(v) => apply({ ...r, holes: r.holes.map((x, j) => j === i ? [v, x[1], x[2]] : x) }, thick)} />
-              <NumberInput path={`hole.${i}.y`} value={hh[1]} onBad={setBad} onCommit={(v) => apply({ ...r, holes: r.holes.map((x, j) => j === i ? [x[0], v, x[2]] : x) }, thick)} />
-              <NumberInput path={`hole.${i}.d`} value={hh[2]} unit="⌀" onBad={setBad} onCommit={(v) => apply({ ...r, holes: r.holes.map((x, j) => j === i ? [x[0], x[1], v] : x) }, thick)} />
-              <IconButton icon="close" title="Remove this hole" onClick={() => apply({ ...r, holes: r.holes.filter((_x, j) => j !== i) }, thick)} />
+              <NumberInput path={`hole.${i}.x`} value={hh[0]} onBad={setBad} onCommit={(v) => apply((c) => ({ ...c, holes: c.holes.map((x, j) => j === i ? [v, x[1], x[2]] : x) }), thick)} />
+              <NumberInput path={`hole.${i}.y`} value={hh[1]} onBad={setBad} onCommit={(v) => apply((c) => ({ ...c, holes: c.holes.map((x, j) => j === i ? [x[0], v, x[2]] : x) }), thick)} />
+              <NumberInput path={`hole.${i}.d`} value={hh[2]} unit="⌀" onBad={setBad} onCommit={(v) => apply((c) => ({ ...c, holes: c.holes.map((x, j) => j === i ? [x[0], x[1], v] : x) }), thick)} />
+              <IconButton icon="close" title="Remove this hole" onClick={() => apply((c) => ({ ...c, holes: c.holes.filter((_x, j) => j !== i) }), thick)} />
             </span>
           </div>
         ))}

@@ -88,15 +88,26 @@ function TagInspector({ tag, count, form, options, tab, setTab }: {
       return <span className="ro" data-path={p}>{v === undefined || v === null ? `absent (rule 1)` : `rule ${String(v)}`}</span>;
     }
     if (p === "numbers.size" || p === "numbers.square") {
-      const auto = !Number(v);
-      const built = p === "numbers.size" ? Number((plan?.marker as any)?.marker_length_m || 0) * 1000
-        : Number((plan?.marker as any)?.square_length_m || 0) * 1000;
+      // ONE Auto for the size and the checker (REF's dialog: values() types
+      // both or neither); off, the fields start at what Auto built
+      const auto = !Number(n.size);
+      const m = plan?.marker as any;
+      const builtSize = Number(m?.marker_length_m || 0) * 1000;
+      const builtSquare = Number(m?.square_length_m || 0) * 1000;
+      const built = p === "numbers.size" ? builtSize : builtSquare;
+      const shownV = auto ? (built || null) : (Number(v) || built || null);
       return (
         <span className="pair">
-          <Toggle value={auto} label="Auto" path={`${p}:auto`}
-            onChange={(a) => edit(p, a ? 0 : +(built || 20).toFixed(2), { "settings.size_auto": a, ...(a ? { "settings.force": null } : {}) })} />
-          <NumberInput value={auto ? (built || null) : Number(v)} path={p} unit="mm" disabled={auto} onBad={setLocal(p)}
-            onCommit={(x) => edit(p, x, { "settings.size_auto": x === 0 })} />
+          {p === "numbers.size" && (
+            <Toggle value={auto} label="Auto" path={`${p}:auto`}
+              onChange={(a) => edit(p, a ? 0 : +(builtSize || 20).toFixed(3), {
+                "settings.size_auto": a,
+                ...(layout === "charuco" ? { "numbers.square": a ? 0 : +(builtSquare || 0).toFixed(3) } : {}),
+                ...(a ? { "settings.force": null } : {}),
+              })} />
+          )}
+          <NumberInput value={shownV} path={p} unit="mm" disabled={auto} onBad={setLocal(p)}
+            onCommit={(x) => edit(p, x, p === "numbers.size" ? { "settings.size_auto": x === 0 } : undefined)} />
         </span>
       );
     }
@@ -104,6 +115,11 @@ function TagInspector({ tag, count, form, options, tab, setTab }: {
       const cur = (v as number[] | null) ?? null;
       const m = plan?.marker as any;
       const cols = cur?.[0] ?? m?.cols ?? 1, rows = cur?.[1] ?? m?.rows ?? 1;
+      if (tag.spec.target.kind === "face") {
+        // REF evaluate(): on a face the fit lays out as many as fit; only a
+        // sketch profile takes a typed count (Advanced > Target kind)
+        return <span className="ro" data-path={p} title="On a face the fit lays out as many as fit; a sketch profile (Advanced › Kind) takes a typed count">{m?.cols ?? "–"} × {m?.rows ?? "–"} (as many as fit on a face)</span>;
+      }
       return (
         <span className="pair">
           <NumberInput int value={cols} path={`${p}[0]`} onBad={setLocal(p)} onCommit={(x) => edit(p, [x, rows])} />
@@ -129,6 +145,10 @@ function TagInspector({ tag, count, form, options, tab, setTab }: {
           {cur && cur.rule === 1 && <Toggle value={Boolean(cur.force)} label="Cut anyway" path={`${p}.force`} onChange={(x) => edit(p, { ...cur, force: x })} />}
         </span>
       );
+    }
+    if (p === "settings.mode") {
+      const opts: Opt[] = (f.choices ?? []).map((c) => ({ value: c.value, label: c.label, icon: ICONS_OF[p][String(c.value)] }));
+      return <Dropdown path={p} value={v as any} options={opts} onChange={(x) => st.setMode(String(x))} />;
     }
     switch (f.type) {
       case "choice": {
@@ -191,7 +211,11 @@ function TagInspector({ tag, count, form, options, tab, setTab }: {
         {tab === "print" && <PrintInfo tag={tag} />}
       </div>
       {general.length > 0 && <Msgs path="tag" issues={general} />}
-      {plan && !plan.ok && <div className="msgs" data-issues-for="errors">{plan.errors.map((e, i) => <div key={i} className="issue lv-error">{e}</div>)}</div>}
+      {plan && !plan.ok && plan.errors.some((e) => !issues.some((i) => i.text === e)) && (
+        <div className="msgs" data-issues-for="errors">
+          {plan.errors.filter((e) => !issues.some((i) => i.text === e)).map((e, i) => <div key={i} className="issue lv-error">{e}</div>)}
+        </div>
+      )}
       <div className={`summary lv-${summary.level}`} data-testid="summary">{summary.text}</div>
     </aside>
   );

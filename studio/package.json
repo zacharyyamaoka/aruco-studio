@@ -10,7 +10,8 @@
     "preview": "vite preview --host 127.0.0.1 --port 5361 --strictPort",
     "test": "vitest run",
     "types": "openapi-typescript src/api/openapi.json -o src/api/schema.d.ts",
-    "e2e": "npm --prefix ../e2e test"
+    "e2e": "npm --prefix ../e2e test",
+    "studio": "node scripts/serve.mjs"
   },
   "dependencies": {
     "react": "19.3.1",

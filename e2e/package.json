@@ -1,0 +1,14 @@
+{
+  "name": "aruco-studio-e2e",
+  "private": true,
+  "version": "0.3.0",
+  "description": "Playwright end-to-end tests of the Studio on the real server (127.0.0.1:5360) and the Vite UI (127.0.0.1:5361).",
+  "scripts": {
+    "test": "playwright test",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "24.10.1"
+  }
+}

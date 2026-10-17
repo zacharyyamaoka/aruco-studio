@@ -64,6 +64,8 @@ export function shown(f: FormField, s: Record<string, any>, n: Record<string, an
     if (!lab.on) return false;
     if (p === "settings.label.text") return lab.content === "custom";
     if (p === "settings.label.x_mm" || p === "settings.label.y_mm") return lab.position === "manual";
+    // the legacy nudge (before 2026-10-13): shown only on a tag that has one
+    if (p === "settings.label.offset_x_mm" || p === "settings.label.offset_y_mm") return Boolean(lab.offset_x_mm || lab.offset_y_mm);
   }
   if (p === "settings.trim.margin_mm") return Boolean(s.trim && s.trim.rule === 1);
   if (p === "name") return false;                     // the header holds the name

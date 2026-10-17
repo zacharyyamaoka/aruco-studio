@@ -25,7 +25,8 @@ export function IdsTable() {
     <aside className="ids-panel" data-testid="ids">
       <div className="panel-head">
         <Icon name="ids" /><b>IDs</b>
-        <span className={`muted${nDup ? " warn" : ""}`} data-testid="dup-count">{nDup ? `${nDup} duplicate id${nDup === 1 ? "" : "s"}` : "unique"}</span>
+        <span className={`muted${nDup ? " warn" : ""}`} data-testid="dup-count" data-dups={nDup}
+          title={nDup ? `${nDup} id${nDup === 1 ? " is" : "s are"} printed by more than one tag` : "every id is printed once"}>{nDup ? `${nDup} dup.` : "unique"}</span>
         <span className="grow" />
         <button className="btn small" data-testid="renumber" title="Renumber all: unique ids per dictionary family; printed (locked) tags and typed ids are kept"
           onClick={() => st.renumber()} disabled={!scene.tags.length}><Icon name="renumber" /> Renumber all</button>
@@ -62,8 +63,8 @@ export function IdsTable() {
       </div>
       {report && (report.errors.length > 0 || report.warnings.length > 0) && (
         <div className="msgs" data-issues-for="renumber">
-          {report.errors.map((e, i) => <div key={`e${i}`} className="issue lv-error">{e}</div>)}
-          {report.warnings.map((e, i) => <div key={`w${i}`} className="issue lv-warn">{e}</div>)}
+          {report.errors.map((e, i) => <div key={`e${i}`} className="issue lv-error">{e.replace(/\|tag/g, "")}</div>)}
+          {report.warnings.map((e, i) => <div key={`w${i}`} className="issue lv-warn">{e.replace(/\|tag/g, "")}</div>)}
         </div>
       )}
     </aside>

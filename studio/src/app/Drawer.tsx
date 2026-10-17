@@ -16,6 +16,7 @@ export const KEYS: [string, string][] = [
   ["Space+drag, middle or right drag", "pan"],
   ["R / Shift+R", "rotate 90° clockwise / counter-clockwise"],
   ["Ctrl+D", "duplicate"],
+  ["Shift+A", "arrange in a row, 10 mm apart"],
   ["Del / Backspace", "delete"],
   ["Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y", "undo, redo"],
   ["Ctrl+A / Esc", "select all / none"],
@@ -39,8 +40,8 @@ export function StatusBar() {
       <span className={`status lv-${status.level}`} data-testid="status" onClick={() => st.setDrawer(drawer === "messages" ? null : "messages")}>{status.text || "Ready"}</span>
       <span className="grow" />
       <span className="muted">{n} tag{n === 1 ? "" : "s"}{sel ? ` · ${sel} selected` : ""} · {camera.zoom.toFixed(2)} px/mm · centre {camera.cx.toFixed(1)}, {camera.cy.toFixed(1)} mm</span>
-      <button className={`tb small${drawer === "verify" ? " on" : ""}`} onClick={() => st.setDrawer(drawer === "verify" ? null : "verify")} data-testid="drawer-verify"><Icon name="verify" />Verify</button>
-      <button className={`tb small${drawer === "messages" ? " on" : ""}`} onClick={() => st.setDrawer(drawer === "messages" ? null : "messages")} data-testid="drawer-messages"><Icon name="doc" />Messages</button>
+      <button className={`tb small${drawer === "verify" ? " on" : ""}`} onClick={() => st.setDrawer(drawer === "verify" ? null : "verify")} data-testid="sb-verify"><Icon name="verify" />Verify</button>
+      <button className={`tb small${drawer === "messages" ? " on" : ""}`} onClick={() => st.setDrawer(drawer === "messages" ? null : "messages")} data-testid="sb-messages"><Icon name="doc" />Messages</button>
     </div>
   );
 }

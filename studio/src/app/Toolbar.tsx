@@ -69,6 +69,7 @@ export function Toolbar() {
         <IconButton icon="rotate" title="Rotate 90° (R; Shift+R the other way)" disabled={none} onClick={() => st.rotateSel(-90)} testid="rotate" />
         <IconButton icon="dup" title="Duplicate (Ctrl+D)" disabled={none} onClick={() => st.duplicateSel()} testid="duplicate" />
         <IconButton icon="trash" title="Delete (Del)" disabled={none} onClick={() => st.deleteSel()} testid="delete" />
+        <IconButton icon="arrange" title="Arrange in a row, 10 mm apart (the selection, or every tag) (Shift+A)" onClick={() => st.arrange()} testid="arrange" />
       </div>
       <span className="sep" />
       <div className="group" aria-label="View">

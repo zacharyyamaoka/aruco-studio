@@ -2,10 +2,10 @@
 // zoom at the cursor, space-drag / middle-drag / right-drag to pan, click
 // and shift-click to select, marquee, drag to move (0.5 mm snap), rulers.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
-import type { SceneDoc } from "../api/types";
+import type { SceneDoc, SceneTag } from "../api/types";
 import { tagBox, type Box } from "../model/geom";
 import { idsText, marqueeSelect } from "../model/scene";
-import { useStudio } from "../store";
+import { patternToScene, useStudio } from "../store";
 import { TagSvg } from "./TagSvg";
 
 const RULER = 20;
@@ -19,7 +19,30 @@ function niceStep(zoom: number, px = 70): number {
 type Drag =
   | { kind: "pan"; sx: number; sy: number; cx: number; cy: number }
   | { kind: "move"; wx: number; wy: number; names: string[]; from: Record<string, [number, number]>; before: SceneDoc; moved: boolean }
-  | { kind: "marquee"; sx: number; sy: number; ex: number; ey: number; additive: boolean };
+  | { kind: "marquee"; sx: number; sy: number; ex: number; ey: number; additive: boolean }
+  | { kind: "label"; tag: string; wx: number; wy: number; inv: number[]; cx: number; cy: number; dx: number; dy: number; moved: boolean };
+
+/** Where a tag's label block is now (its centre, pattern frame mm): the
+ *  typed position, else the plan's label parts, else the refused preview. */
+function labelCentre(t: SceneTag): [number, number] | null {
+  const lab = (t.spec.settings.label ?? {}) as any;
+  if (lab.position === "manual") return [Number(lab.x_mm || 0), Number(lab.y_mm || 0)];
+  const parts = ((t.plan?.label as any)?.parts ?? []) as { rect: number[] }[];
+  const prev = (t.plan?.guides?.label_preview ?? []) as unknown as [number, number][][];
+  const pts: [number, number][] = parts.length
+    ? parts.flatMap((p) => [[p.rect[0], p.rect[1]], [p.rect[2], p.rect[3]]] as [number, number][]) : prev.flat();
+  if (!pts.length) return null;
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
+}
+
+/** The inverse of a 2D rigid placement (row-major 4x4, its xy part). */
+function invRigid(m: number[]): number[] {
+  const [a, b, tx, c, d, ty] = [m[0], m[1], m[3], m[4], m[5], m[7]];
+  const det = a * d - b * c;
+  const ia = d / det, ib = -b / det, ic = -c / det, id = a / det;
+  return [ia, ib, -(ia * tx + ib * ty), ic, id, -(ic * tx + id * ty)];
+}
 
 export function Canvas2D() {
   const host = useRef<HTMLDivElement>(null);
@@ -105,6 +128,17 @@ export function Canvas2D() {
     if (e.button !== 0) return;
     const tagEl = (e.target as Element).closest("[data-tag]");
     const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+    const labelEl = (e.target as Element).closest("[data-label-drag]");
+    if (tagEl && labelEl && !additive) {
+      const t = st.scene.tags.find((x) => x.name === tagEl.getAttribute("data-tag"));
+      const M = t ? patternToScene(t) : null;
+      const c = t ? labelCentre(t) : null;
+      if (t && M && c) {
+        const [wx, wy] = toWorld(sx, sy);
+        setDrag({ kind: "label", tag: t.name, wx, wy, inv: invRigid(M), cx: c[0], cy: c[1], dx: 0, dy: 0, moved: false });
+        return;
+      }
+    }
     if (tagEl) {
       const name = tagEl.getAttribute("data-tag")!;
       let names = st.sel;
@@ -138,6 +172,13 @@ export function Canvas2D() {
       if (!drag.moved && Math.hypot(dx * z, dy * z) < 3) return;
       st.previewMove(drag.names, dx, dy, drag.from);
       if (!drag.moved) setDrag({ ...drag, moved: true });
+    } else if (drag.kind === "label") {
+      const [wx, wy] = toWorld(sx, sy);
+      const i = drag.inv;
+      // the pointer's move in the tag's pattern frame
+      const dx = i[0] * (wx - drag.wx) + i[1] * (wy - drag.wy), dy = i[3] * (wx - drag.wx) + i[4] * (wy - drag.wy);
+      if (!drag.moved && Math.hypot(dx * z, dy * z) < 3) return;
+      setDrag({ ...drag, dx, dy, moved: true });
     } else {
       setDrag({ ...drag, ex: sx, ey: sy });
     }
@@ -148,6 +189,9 @@ export function Canvas2D() {
     const st = useStudio.getState();
     if (drag.kind === "move" && drag.moved) {
       st.commitMove(drag.names, drag.before);
+    } else if (drag.kind === "label" && drag.moved) {
+      const r = (v: number) => Math.round(v * 4) / 4;           // 0.25 mm steps
+      st.moveLabel(drag.tag, r(drag.cx + drag.dx), r(drag.cy + drag.dy));
     } else if (drag.kind === "marquee") {
       const [ax, ay] = toWorld(Math.min(drag.sx, drag.ex), Math.max(drag.sy, drag.ey));
       const [bx, by] = toWorld(Math.max(drag.sx, drag.ex), Math.min(drag.sy, drag.ey));
@@ -210,7 +254,8 @@ export function Canvas2D() {
       <svg width={w} height={h} className="stage" data-zoom={z.toFixed(4)}>
         <g className="gridlines">{gridLines}</g>
         <g data-world="1" transform={world}>
-          {visible.map((t) => <TagSvg key={t.uid} tag={t} show={show} selected={sel.includes(t.name)} />)}
+          {visible.map((t) => <TagSvg key={t.uid} tag={t} show={show} selected={sel.includes(t.name)}
+            labelShift={drag?.kind === "label" && drag.tag === t.name ? [drag.dx, drag.dy] : undefined} />)}
         </g>
         <g className="overlay">
           {visible.map((t) => sel.includes(t.name) ? selBox(boxes[t.name], `s${t.uid}`, "selbox") : null)}

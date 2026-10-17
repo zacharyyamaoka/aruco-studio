@@ -42,8 +42,13 @@ function LibraryWindow({ tag }: { tag?: string }) {
   const load = async (selected?: string | null) => {
     const d = await api.library(tag);
     setData(d);
-    setColl((c) => (c && d.collections.some((x) => x.id === c) ? c : (d.collections.find((x) => x.count > 0) ?? d.collections[0]).id));
-    if (selected !== undefined) setPicked(selected);
+    const sc = selected ? d.cards.find((c) => c.id === selected) : undefined;
+    setColl((c) => {
+      // a card just made or picked is shown where it lives (REF onState)
+      if (sc && !(c && sc.in.includes(c))) return home(sc);
+      return c && d.collections.some((x) => x.id === c) ? c : (d.collections.find((x) => x.count > 0) ?? d.collections[0]).id;
+    });
+    if (selected !== undefined) { setPicked(selected); if (selected) setSide("info"); }
     await st.loadPresets();
   };
   useEffect(() => { load().catch((e) => setStatus({ text: String(e), kind: "bad" })); }, [tag]);

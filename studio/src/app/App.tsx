@@ -46,6 +46,7 @@ function useKeys() {
       if (k === "c") return go(() => st.addTag("charuco"));
       if (k === "f") return go(() => st.zoomToFit(st.sel.length ? st.sel : undefined));
       if (k === "q") return go(() => st.setShow("quiet", !st.show.quiet));
+      if (k === "a" && e.shiftKey) return go(() => st.arrange());
       if (k === "a") return go(() => st.setShow("axes", !st.show.axes));
       if (k === "l") return go(() => st.setShow("outlines", !st.show.outlines));
       if (k === "v") return go(() => st.verifySel());

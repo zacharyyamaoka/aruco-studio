@@ -94,6 +94,21 @@ export function placeNew(tags: SceneTag[], w: number): [number, number] {
   return [snap(x1 + 10 + w / 2, 0.5), snap(cy, 0.5)];
 }
 
+/** Arrange tags in a row, left to right in scene order, `gap` mm apart,
+ *  their tops level with the first one's: -> {name: [x_mm, y_mm]}. */
+export function arrangeRow(tags: SceneTag[], gap = 10): Record<string, [number, number]> {
+  const out: Record<string, [number, number]> = {};
+  let x = 0, top: number | null = null;
+  for (const t of tags) {
+    const b = tagBox(t);
+    if (!b) continue;
+    if (top === null) { top = b.y1; x = b.x0; }
+    out[t.name] = [snap(t.x_mm + (x - b.x0)), snap(t.y_mm + (top - b.y1))];
+    x += b.x1 - b.x0 + gap;
+  }
+  return out;
+}
+
 /** Rename in a selection. */
 export function renameSel(sel: string[], from: string, to: string): string[] {
   return sel.map((n) => (n === from ? to : n));
