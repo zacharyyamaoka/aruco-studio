@@ -11,8 +11,8 @@ entity once and hands over numbers:
 | every loop, stroked as Fusion strokes an edge | `face_loops_2d`, `_profile_points` | `Target.loops_mm` (mm, base frame) |
 | the body under, boxed in the base frame, and whether it was measured | `_trim_face_body`, `_body_extent_mm`, `_trim_inputs` | `Target.body_mm`, `has_body` |
 
-`keep_x` is pure maths kept here verbatim; docs/FUSION_ADAPTER.md asks the
-core for it (Core requests).
+`keep_x` is pure maths: it lives in `core.geometry` (REF's text verbatim,
+pinned by tests/core/test_port_fidelity.py) and is imported here.
 """
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ import math
 import adsk.core
 import adsk.fusion
 
+from ...core.geometry import keep_x  # noqa: F401  (REF aruco_feature.keep_x)
 from ...plan.target import Target
 from .api import cross, dot, sub, unit, vec
 
@@ -35,21 +36,6 @@ def _rot(v, axis, deg):
     kxv = cross(k, v)
     kd = dot(k, v)
     return [v[i] * c + kxv[i] * s + k[i] * kd * (1 - c) for i in range(3)]
-
-
-def keep_x(x, y, z, w, h, x_base, square_tol=1e-6):
-    """REF aruco_feature.keep_x, verbatim: the creation's direction wins (a
-    flip, or on a square face any quarter turn). -> (x, y, w, h)."""
-    if not x_base:
-        return x, y, w, h
-    if abs(w - h) <= square_tol * max(w, h, 1e-9):
-        cands = [(x, y, w, h), (y, [-c for c in x], h, w),
-                 ([-c for c in x], [-c for c in y], w, h), ([-c for c in y], x, h, w)]
-        return max(cands, key=lambda c: dot(c[0], x_base))
-    if dot(x, x_base) < -1e-6:
-        x = [-c for c in x]
-        return x, cross(z, x), w, h
-    return x, y, w, h
 
 
 def native_of(ent):

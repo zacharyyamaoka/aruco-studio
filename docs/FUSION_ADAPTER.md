@@ -128,7 +128,7 @@ From `docs/inventory/addin.md` ("Fusion 2705 behaviours and quirks on record"), 
 | Q24 | delete + create cascade-deletes downstream features | Skeleton: `restructure.py` restructures in place |
 | Q25 | a fillet on the plate dies on structural edits | Later: open item OI-FILLET |
 | Q26 | a sketch-point move recomputes lazily | Later: read the face after Compute All in gates |
-| Q27 | a reversed longest edge turned the pattern 180 degrees | Skeleton: `target.keep_x` with `x_base`, `Target.x_ref`; tested with reversed edges |
+| Q27 | a reversed longest edge turned the pattern 180 degrees | Skeleton: `core.geometry.keep_x` (called by `target.of_face`) with `x_base`, `Target.x_ref`; tested with reversed edges |
 | Q28 | `TimelineGroup` has no `entityToken` | Skeleton: `make_group` falls back to "group lo..hi" |
 | Q29 | a Joint Origin after the node is not re-evaluated when compute moves the sketch | Skeleton: `sync.after_compute` + `run_pending` re-place it after the compute |
 | Q30 | Undo is one clean step; compute does not run on Undo | Later: `core.edits.SyncState.undoing` set from Fusion's undo events |
@@ -354,7 +354,7 @@ Things the adapter needed that `core/` and `plan/` do not give yet. Not changed 
 
 | # | Request | Why | Stop-gap now |
 |---|---|---|---|
-| R1 | `keep_x` (pure) into `core/geometry.py` | it is maths on vectors; it decides a face tag's x on every compute | a verbatim copy in `adapters/fusion/target.py` |
+| R1 | `keep_x` (pure) into `core/geometry.py` | it is maths on vectors; it decides a face tag's x on every compute | DONE (audit C8): `core.geometry.keep_x`, REF's text pinned by test_port_fidelity; `target.py` imports it |
 | R2 | `face_frame`'s pure half (longest straight edge -> x, extents -> centre and size) as a function of edge segments in `core/geometry.py` | so every adapter (build123d too) picks a face's x the same way | `target.face_frame` |
 | R3 | `plan_tag(spec, base=...)` to also give `frames.pattern_host` and `frames.opencv_host` (the host's unit, 16 numbers) | an adapter should not compose frames | `recipe.host_frame(base, frames.pattern_in_target)`: about 1e-15 cm from REF's own frame |
 | R4 | the body and sketch names (`aruco cells`, `aruco white`, `tag tile`, `aruco pin`, `aruco pocket`, `aruco recess`, `aruco trim`, `aruco frame`, `FRAME_LEN_CM = 0.5`) in `plan/record.py` | they are stored in records (`fusion.cells_body`) and read by the exporter | constants in `adapters/recipe.py` |

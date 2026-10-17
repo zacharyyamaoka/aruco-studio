@@ -5,13 +5,15 @@ Ported from REF (cad-exporter c8216ff), the Fusion-free bodies only:
 | From | What |
 |---|---|
 | `ArucoMarkers/aruco_tags.py` | `_v`, `_sub`, `_dot`, `_cross`, `_unit`, `_rot` (Rodrigues), `_area2`, `_frame_error`, `_solve3`, and the composition maths of `_place_joint_origin` as `jo_decompose` / `jo_compose` |
-| `ArucoMarkers/aruco_feature.py` | `_rotz`, `_xf_point` / `_xf_vector` / `_xf_frame` (Fusion's `Matrix3D.transformBy` on a row-major 16-number array), `_chain`, `_inside_loops`, `_is_box`, `_loops_mm` |
+| `ArucoMarkers/aruco_feature.py` | `_rotz`, `_xf_point` / `_xf_vector` / `_xf_frame` (Fusion's `Matrix3D.transformBy` on a row-major 16-number array), `_chain`, `_inside_loops`, `_is_box`, `_loops_mm`, `keep_x` (a face tag's x as made; the Fusion adapter's target reading calls it) |
 
 `aruco_tags._dot` (p0 + p1 + p2) and `aruco_feature._dot` (sum(), which
 starts from the int 0) differ in one bit: the sign of a zero (0 + -0.0 is
 +0.0), and `atan2` sees that sign. So both are kept: `_dot` is aruco_tags',
 `_dot_f` is aruco_feature's and only aruco_feature's functions call it.
 `_unit` sums squares (never -0.0), so one copy is exact for both.
+`keep_x` is REF's text verbatim and calls `_dot`: it only compares dot
+products (`< -1e-6`, `max`), where the sign of a zero never matters.
 
 How Fusion composes a Joint Origin from (angle, offsets, flip) on a geometry
 whose own frame is (o, x, y, z), measured with `jo_probe` on 2026-10-08
@@ -196,6 +198,25 @@ def _loops_mm(loops_m, base, o, x, y):
         if len(pts) >= 3:
             out.append(pts)
     return out
+
+
+def keep_x(x, y, z, w, h, x_base, square_tol=1e-6):
+    """A face tag's x as it was made (x_base): face_frame takes x along the
+    face's longest edge, start -> end, and an upstream edit can reverse
+    that edge (measured 2026-10-08: the tag turned 180°) -- or, on a square
+    face whose edges are all as long, pick a perpendicular one (its edge
+    order and float noise decide). The creation's direction wins: a flip,
+    or on a square face any quarter turn. -> (x, y, w, h)."""
+    if not x_base:
+        return x, y, w, h
+    if abs(w - h) <= square_tol * max(w, h, 1e-9):
+        cands = [(x, y, w, h), (y, [-c for c in x], h, w),
+                 ([-c for c in x], [-c for c in y], w, h), ([-c for c in y], x, h, w)]
+        return max(cands, key=lambda c: _dot(c[0], x_base))
+    if _dot(x, x_base) < -1e-6:
+        x = [-c for c in x]
+        return x, _cross(z, x), w, h
+    return x, y, w, h
 
 
 # ------------------------------------------------ the Joint Origin maths
