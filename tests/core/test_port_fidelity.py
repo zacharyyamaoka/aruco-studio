@@ -28,11 +28,13 @@ PORTS = {
     "slabs": [(B + "aruco_slabs.py", set())],
     "chamfer": [(B + "aruco_chamfer.py", set())],
     "autosize": [(B + "aruco_autosize.py", set())],
-    "label": [(B + "aruco_label.py", set())],
+    # M6a: label rule 3 (a ChArUco label by hand in any black square)
+    "label": [(B + "aruco_label.py", {"RULES", "_offset_label", "label_violations",
+                                      "check_label", "describe"})],
     "trim": [(B + "aruco_trim.py", set())],
     "numbering": [(B + "aruco_numbering.py", set())],
     "markers": [(B + "markers.py", set())],
-    "sheet": [(B + "print_sheet.py", set())],
+    "sheet": [(B + "print_sheet.py", {"PrintItem", "SheetSettings"})],    # M6a: new fields
     "beds": [(B + "print_beds.py", set())],
     "faces": [(A + "aruco_autosize_gallery.py", set())],
     "settings": [(A + "aruco_feature.py", {"M", "A", "SL", "CH", "OR", "AL", "TR"})],
@@ -45,6 +47,7 @@ PORTS = {
                  (A + "aruco_feature.py", {"_dot", "_unit", "_cross", "_xf_point", "_xf_vector",
                                            "_rotz", "_loops_mm"})],
     "presets": [(A + "aruco_presets.py", {"_SL", "_AL", "_markers", "load", "save", "_empty",
+                                          "normalise", "line_mm",          # M6a: the machine's keys
                                           "_broken", "builtins", "catalog", "save_as", "update",
                                           "delete", "set_last", "import_profile",
                                           "_builtin_names"}),
@@ -56,7 +59,7 @@ PORTS = {
              (A + "aruco_extrude_ui.py", {"trim_issues"})],
     "validate": [(A + "bam_fusion_ui.py", {"_plain"}),      # aruco_extrude_ui's _plain is kept
                  (A + "aruco_extrude_ui.py", {"label_issues", "trim_issues", "X"})],
-    "marker_table": [(A + "aruco_marker_table.py", {"spec_info", "T"}),
+    "marker_table": [(A + "aruco_marker_table.py", {"spec_info", "T", "MarkerRow"}),   # M6a: made_by
                      (A + "aruco_ids_cmd.py", set()), (A + "aruco_ids_preview.py", {"T"})],
     "export_rows": [(A + "aruco_commands.py", {"T"}), (A + "aruco_export.py", set()),
                     (A + "aruco_export_preview.py", set())],

@@ -1,5 +1,8 @@
 # Ported from REF CADExporter/bam_cad_core/print_sheet.py at c8216ff:
-# copied verbatim, only the package-relative imports renamed.
+# copied verbatim, only the package-relative imports renamed. ArUco Studio
+# M6a (2026-10-16) adds fields to PrintItem and SheetSettings (defaults =
+# REF's behaviour) and, below "the sticker sheet", the plan-driven sheet:
+# layout_stickers (spaced / tight), render_sticker_pdf / _svg, sticker_summary.
 """Printable marker sheets: exact-size ArUco stickers as a vector PDF.
 
 ### The one rule: a marker is never scaled to fit
@@ -105,6 +108,17 @@ class PrintItem:
     # "#id" bottom + part name top costs -0.2 pp vs "#id" alone, within
     # noise). "" = nothing in the top row.
     top_label: str = ""
+    # ArUco Studio M6a (not REF's; None / "" = REF's sticker): the sticker as
+    # its plan has it, in the sticker's own frame (mm, y up, the pattern's
+    # centre at 0): the cut polygon {"outer": [[u, v]...], "holes": [...]}
+    # and the black seen from above [[outer, hole, ...], ...]. With ink_mm
+    # the sheet draws THIS and none of its own marks.
+    outline_mm: Optional[dict] = None
+    ink_mm: Optional[list] = None
+    caption: str = ""               # spaced mode: the words under the sticker
+    made_by: str = ""               # "sticker" / "print3d" (a paper proof)
+    name: str = ""                  # the tag's name
+    ids: List[int] = field(default_factory=list)
 
 
 @dataclass
@@ -121,6 +135,8 @@ class SheetSettings:
     id_mark: str = "border"        # "border" | "off"
     top_label: bool = True         # part name in the top border row
     orient_mark: str = "triangle"  # "triangle" | "off"
+    mode: str = "spaced"           # M6a, layout_stickers: "spaced" (gaps, captions, crop
+                                   # marks) | "tight" (shared cut lines, guillotine shelves)
 
 
 class RejectedItem(NamedTuple):
@@ -734,3 +750,617 @@ def render_pdf(items: List[PrintItem], settings: Optional[SheetSettings] = None)
     Rejected items are not drawn; the footer says how many, and
     layout_sheet / layout_summary say which and why."""
     return render_layout_pdf(layout_sheet(items, settings or SheetSettings()))
+
+
+# =================================================================== the sticker sheet
+#
+# ArUco Studio M6a (not REF's; docs/design/M6_stickers_profiles_print.md f):
+# the sheet drawn from the PLAN. Each item is a sticker with its cut polygon
+# (`outline_mm`) and its black (`ink_mm`), both in its own frame (mm, y up);
+# the sheet draws exactly that ink, the cut lines (the outline and every
+# hole, grey CUT_GREY, CUT_LINE_MM), and none of REF's own marks. Two modes:
+#
+#   spaced  gap_mm between cells, the caption under each sticker, crop marks
+#           at each sticker's corners (outside it); first-fit-decreasing
+#           shelves (layout_sheet's rule)
+#   tight   gap 0: guillotine shelves -- items sorted by (height, width),
+#           identical sizes adjacent; one shelf per height; a shelf is a
+#           full-width straight cut and its columns are straight cuts. No
+#           captions; one line per shelf in the left margin
+#
+# An item is packed by the box of its outline, turned 90 degrees when only
+# that fits, never scaled: too big for the page is REJECTED with a reason.
+# Never mirrored: the sheet shows the sticker as seen from above.
+# The PDF and the SVG are drawn from ONE list of page operations, so their
+# numbers are the same.
+
+CROP_MM = 2.0                  # a crop mark's length (spaced), outside the corner
+CROP_OFF_MM = 0.5              # its gap from the corner
+PUNCH_MM = 3.0                 # a hole under this gets a cross (a punch, not scissors)
+SHELF_FONT_PT = 5.0
+MODES = ("spaced", "tight")
+
+
+@dataclass
+class StickerPlace:
+    item: PrintItem
+    page: int                       # 0-based
+    x_mm: float                     # the box's top-left on the page (y down)
+    y_mm: float
+    w_mm: float                     # the box as placed (after the turn)
+    h_mm: float
+    rotation: int                   # 0 or 90 (counter-clockwise, seen from above)
+    box: Tuple[float, float, float, float]       # the box in the sticker's frame, unturned
+    shelf: int = -1
+    caption_lines: List[str] = field(default_factory=list)
+    caption_pt: float = LABEL_FONT_PT
+
+    @property
+    def origin(self) -> Tuple[float, float]:
+        """Where the sticker frame's (0, 0) lands on the page (mm, y down)."""
+        u0, _v0, _u1, v1 = _turn_box(self.box, self.rotation)
+        return (self.x_mm - u0, self.y_mm + v1)
+
+    def to_page(self, u: float, v: float) -> Tuple[float, float]:
+        """A point of the sticker's frame (mm, y up) on the page (mm, y down)."""
+        ru, rv = _turn(u, v, self.rotation)
+        ox, oy = self.origin
+        return (ox + ru, oy - rv)
+
+
+@dataclass
+class StickerLayout:
+    settings: SheetSettings
+    page_mm: Tuple[float, float]
+    printable_mm: Tuple[float, float, float, float]
+    pages: List[List[StickerPlace]]
+    rejected: List[RejectedItem]
+    ruler: Optional[dict]
+    warnings: List[str]
+    shelves: List[dict]             # tight and spaced: {page, y, h, x0, x1, keys}
+
+    @property
+    def page_count(self) -> int:
+        return len(self.pages)
+
+    @property
+    def placed(self) -> List[StickerPlace]:
+        return [p for page in self.pages for p in page]
+
+    def cuts(self) -> int:
+        """Straight cuts to free every sticker (tight: shelves stacked, so a
+        page of k shelves has k + 1 long cuts; a shelf of c stickers c + 1
+        short ones). Spaced: four per sticker."""
+        if self.settings.mode != "tight":
+            return 4 * len(self.placed)
+        n = 0
+        for pi in range(len(self.pages)):
+            sh = [s for s in self.shelves if s["page"] == pi]
+            if sh:
+                n += len(sh) + 1 + sum(len(s["keys"]) + 1 for s in sh)
+        return n
+
+
+def _turn(u, v, rot):
+    return (u, v) if not rot else (-v, u)
+
+
+def _turn_box(box, rot):
+    u0, v0, u1, v1 = box
+    if not rot:
+        return box
+    pts = [_turn(u, v, rot) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))]
+    us = [p[0] for p in pts]
+    vs = [p[1] for p in pts]
+    return (min(us), min(vs), max(us), max(vs))
+
+
+def _loop_box(lp):
+    us = [float(p[0]) for p in lp]
+    vs = [float(p[1]) for p in lp]
+    return (min(us), min(vs), max(us), max(vs))
+
+
+def default_outline(item: PrintItem) -> dict:
+    """REF's sticker as a cut polygon: the pattern + its quiet zone."""
+    info = aruco_dict.dictionary_info(item.dictionary)
+    ew, eh = (v * 1000.0 for v in aruco_board.extent_m(board_spec(item)))
+    q = float(item.quiet_modules) * float(item.marker_length_m) * 1000.0 / info["modules"]
+    w, h = ew / 2.0 + q, eh / 2.0 + q
+    return {"outer": [[-w, -h], [w, -h], [w, h], [-w, h]], "holes": []}
+
+
+def default_ink(item: PrintItem) -> list:
+    """REF's black (aruco_board.black_rects_m) as polygons, mm, y up."""
+    out = []
+    for x0, y0, x1, y1 in aruco_board.black_rects_m(board_spec(item)):
+        a, b, c, d = x0 * 1000.0, y0 * 1000.0, x1 * 1000.0, y1 * 1000.0
+        out.append([[[a, b], [c, b], [c, d], [a, d]]])
+    return out
+
+
+def outline_of(item: PrintItem) -> dict:
+    return item.outline_mm if item.outline_mm else default_outline(item)
+
+
+def ink_of(item: PrintItem) -> list:
+    return item.ink_mm if item.ink_mm is not None else default_ink(item)
+
+
+def _caption(item: PrintItem, width: float, settings: SheetSettings):
+    if settings.mode == "tight" or not settings.labels:
+        return [], LABEL_FONT_PT, 0.0
+    text = item.caption or (identity_label(item) + (f" · {item.name}" if item.name else ""))
+    lines = [text]
+    font = LABEL_FONT_PT
+    wd = text_width_mm(text, font)
+    if wd > width:
+        font = max(LABEL_MIN_FONT_PT, LABEL_FONT_PT * width / wd)
+    lines = [_fit_text(t, font, max(width, 20.0)) for t in lines]
+    return lines, font, LABEL_GAP_MM + len(lines) * font * LABEL_LEADING / MM_TO_PT
+
+
+def _area(settings: SheetSettings):
+    """(page w, h, x0, y0, area w, area h, ruler, warnings): layout_sheet's."""
+    page_w, page_h = page_size_mm(settings)
+    m = float(settings.margin_mm)
+    gap = float(settings.gap_mm)
+    if m < 0 or gap < 0:
+        raise ValueError("margin_mm and gap_mm must be >= 0")
+    warnings: List[str] = []
+    x0, y0 = m, m
+    area_w = page_w - 2 * m
+    footer_top = page_h - m - FOOTER_H_MM
+    ruler = None
+    area_bottom = footer_top - BAND_GAP_MM
+    if settings.ruler:
+        if area_w + _EPS >= RULER_W_MM:
+            top = footer_top - RULER_H_MM
+            ruler = {"top": top, "mm_bar": (x0, top + 10.5, 100.0, 1.2),
+                     "in_bar": (x0, top + 13.3, 101.6, 1.2)}
+            area_bottom = top - BAND_GAP_MM
+        else:
+            warnings.append("page is %.1f mm wide inside the margins; the scale ruler needs "
+                            "%.0f mm and was left off -- check the print scale another way"
+                            % (area_w, RULER_W_MM))
+    area_h = area_bottom - y0
+    if area_w <= 0 or area_h <= 0:
+        raise ValueError("margins and ruler leave no printable area on a %.1f x %.1f mm page"
+                         % (page_w, page_h))
+    return page_w, page_h, x0, y0, area_w, area_h, ruler, warnings
+
+
+def layout_stickers(items: List[PrintItem], settings: Optional[SheetSettings] = None
+                    ) -> StickerLayout:
+    """Place every sticker at its exact size (spaced or tight), or reject it
+    with a reason. Deterministic for a given input."""
+    settings = settings or SheetSettings()
+    mode = settings.mode if settings.mode in MODES else "spaced"
+    tight = mode == "tight"
+    page_w, page_h, x0, y0, area_w, area_h, ruler, warnings = _area(settings)
+    if settings.mode not in MODES:
+        warnings.append("sheet mode %r: spaced" % (settings.mode,))
+    gap = 0.0 if tight else float(settings.gap_mm)
+    prepared, rejected = [], []
+    for index, item in enumerate(items):
+        try:
+            info = aruco_dict.dictionary_info(item.dictionary)
+            if not (isinstance(item.marker_length_m, (int, float)) and item.marker_length_m > 0):
+                raise ValueError("marker_length_m must be > 0 (got %r)" % (item.marker_length_m,))
+            box = _loop_box(outline_of(item)["outer"])
+        except (ValueError, TypeError, KeyError, IndexError) as exc:
+            rejected.append(RejectedItem(item, str(exc)))
+            continue
+        w, h = box[2] - box[0], box[3] - box[1]
+        rot = 0
+        if (w > area_w + _EPS or h > area_h + _EPS) and h <= area_w + _EPS and w <= area_h + _EPS:
+            rot = 90                                  # longer than the page: it turns
+        bw, bh = (h, w) if rot else (w, h)
+        lines, font, cap_h = _caption(item, bw, settings)
+        if bw > area_w + _EPS or bh + cap_h > area_h + _EPS:
+            rejected.append(RejectedItem(item, (
+                "sticker is %.1f x %.1f mm but the printable area is %.1f x %.1f mm -- markers "
+                "are never scaled to fit; use a larger page, landscape or smaller margins"
+                % (w, h, area_w, area_h))))
+            continue
+        module = float(item.marker_length_m) * 1000.0 / info["modules"]
+        if module < SMALL_MODULE_MM:
+            warnings.append("%s: module is %.2f mm -- below ~%.1f mm many printers blur the "
+                            "cells" % (item.key, module, SMALL_MODULE_MM))
+        prepared.append({"index": index, "item": item, "box": box, "rot": rot, "w": bw,
+                         "h": bh, "cell_w": max(bw, max([text_width_mm(t, font) for t in lines],
+                                                        default=0.0) if lines else bw),
+                         "cell_h": bh + cap_h, "lines": lines, "font": font})
+    if tight:
+        prepared.sort(key=lambda p: (-round(p["h"], 6), -round(p["w"], 6), p["index"]))
+    else:
+        prepared.sort(key=lambda p: (-p["h"], -p["w"], -p["cell_h"], p["index"]))
+    x1, y1 = x0 + area_w, y0 + area_h
+    shelves: List[dict] = []
+    next_y: List[float] = []
+    pages: List[List[StickerPlace]] = []
+    for p in prepared:
+        spot = None
+        for sh in shelves:
+            same_h = abs(sh["h"] - p["cell_h"]) <= 1e-6 if tight else p["cell_h"] <= sh["h"] + _EPS
+            if same_h and sh["x1"] + p["cell_w"] <= x1 + _EPS:
+                spot = (sh["page"], sh["x1"], sh["y"], sh)
+                break
+        if spot is None:
+            for pi, y in enumerate(next_y):
+                if y + p["cell_h"] <= y1 + _EPS:
+                    spot = (pi, x0, y, None)
+                    break
+            if spot is None:
+                pages.append([])
+                next_y.append(y0)
+                spot = (len(pages) - 1, x0, y0, None)
+            sh = {"page": spot[0], "y": spot[2], "h": p["cell_h"], "x0": x0, "x1": x0,
+                  "keys": [], "index": len(shelves)}
+            shelves.append(sh)
+            next_y[spot[0]] = spot[2] + p["cell_h"] + gap
+            spot = (spot[0], x0, spot[2], sh)
+        pi, cx, cy, sh = spot
+        sx = cx + (p["cell_w"] - p["w"]) / 2.0
+        sh["x1"] = cx + p["cell_w"] + gap
+        sh["keys"].append(p["item"].key)
+        pages[pi].append(StickerPlace(item=p["item"], page=pi, x_mm=sx, y_mm=cy, w_mm=p["w"],
+                                      h_mm=p["h"], rotation=p["rot"], box=p["box"],
+                                      shelf=sh["index"], caption_lines=p["lines"],
+                                      caption_pt=p["font"]))
+    for page in pages:
+        page.sort(key=lambda q: (q.y_mm, q.x_mm))
+    for sh in shelves:
+        sh["x1"] = sh["x1"] - gap if sh["keys"] else sh["x1"]
+    return StickerLayout(settings=settings, page_mm=(page_w, page_h),
+                         printable_mm=(x0, y0, area_w, area_h), pages=pages, rejected=rejected,
+                         ruler=ruler, warnings=warnings, shelves=shelves)
+
+
+def _r4(v):
+    return round(float(v), 4) + 0.0
+
+
+def place_outline(p: StickerPlace) -> dict:
+    """The cut polygon of a placed sticker on the page (mm, y down)."""
+    o = outline_of(p.item)
+    return {"outer": [list(map(_r4, p.to_page(u, v))) for u, v in o["outer"]],
+            "holes": [[list(map(_r4, p.to_page(u, v))) for u, v in h] for h in o.get("holes", [])]}
+
+
+def sticker_summary(layout: StickerLayout) -> dict:
+    """sheet.json: the layout, and per sticker its page, place, turn, outline,
+    made by, name and ids -- the WYSIWYG test's oracle (page mm, y down,
+    page numbers 1-based)."""
+    s = layout.settings
+    x, y, w, h = layout.printable_mm
+    return {
+        "schema": "arucostudio.sheet/1", "mode": s.mode, "page": s.page,
+        "page_mm": [_r4(layout.page_mm[0]), _r4(layout.page_mm[1])],
+        "landscape": bool(s.landscape), "margin_mm": _r4(s.margin_mm),
+        "printable_mm": {"x": _r4(x), "y": _r4(y), "w": _r4(w), "h": _r4(h)},
+        "origin": "page top-left, y down, millimetres", "scale": 1.0,
+        "pages": layout.page_count, "cuts": layout.cuts(),
+        "stickers": [{
+            "key": p.item.key, "name": p.item.name, "made_by": p.item.made_by or "sticker",
+            "dictionary": p.item.dictionary, "layout": p.item.layout,
+            "ids": list(p.item.ids) or [p.item.marker_id],
+            "marker_length_mm": _r4(p.item.marker_length_m * 1000.0),
+            "page": p.page + 1, "x_mm": _r4(p.x_mm), "y_mm": _r4(p.y_mm), "w_mm": _r4(p.w_mm),
+            "h_mm": _r4(p.h_mm), "rotation": p.rotation, "box_mm": [_r4(v) for v in p.box],
+            "origin_mm": [_r4(v) for v in p.origin], "shelf": p.shelf,
+            "outline_mm": outline_of(p.item), "outline_page_mm": place_outline(p),
+            "caption": list(p.caption_lines)} for p in layout.placed],
+        "shelves": [{"page": sh["page"] + 1, "y_mm": _r4(sh["y"]), "h_mm": _r4(sh["h"]),
+                     "x0_mm": _r4(sh["x0"]), "x1_mm": _r4(sh["x1"]), "keys": list(sh["keys"])}
+                    for sh in layout.shelves],
+        "rejected": [{"key": r.item.key, "name": r.item.name, "reason": r.reason}
+                     for r in layout.rejected],
+        "ruler": None if layout.ruler is None else {
+            k: ([_r4(v) for v in val] if isinstance(val, tuple) else _r4(val))
+            for k, val in layout.ruler.items()},
+        "warnings": list(layout.warnings),
+    }
+
+
+class _Ops:
+    """A page as a list of drawing operations (mm, top-left origin, y down):
+    the PDF and the SVG are both written from it. It has _Page's methods, so
+    REF's _draw_ruler draws into it."""
+
+    def __init__(self, page_h_mm: float):
+        self.h = page_h_mm
+        self.ops: List[tuple] = []
+
+    def fill_rects(self, rects, grey=0.0):
+        if rects:
+            self.ops.append(("rects", [tuple(map(float, r)) for r in rects], float(grey)))
+
+    def text(self, x, baseline_y, s, size, align="left", grey=0.0):
+        self.ops.append(("text", float(x), float(baseline_y), str(s), float(size), align,
+                         float(grey), 0))
+
+    def text_up(self, x, baseline_y, s, size, grey=0.0):
+        """Text reading upwards (turned 90 degrees), starting at (x, y)."""
+        self.ops.append(("text", float(x), float(baseline_y), str(s), float(size), "left",
+                         float(grey), 90))
+
+    def fill_polys(self, polys, grey=0.0):
+        """Polygons with holes (lists of loops), even-odd, filled."""
+        if polys:
+            self.ops.append(("fill", [[[tuple(map(float, q)) for q in lp] for lp in poly]
+                                      for poly in polys], float(grey)))
+
+    def stroke_loops(self, loops, grey, width_mm, key=""):
+        if loops:
+            self.ops.append(("loops", [[tuple(map(float, q)) for q in lp] for lp in loops],
+                             float(grey), float(width_mm), key))
+
+    def line(self, x0, y0, x1, y1, grey, width_mm):
+        self.ops.append(("line", float(x0), float(y0), float(x1), float(y1), float(grey),
+                         float(width_mm)))
+
+    def sticker(self, p: StickerPlace):
+        self.ops.append(("sticker", p))
+
+
+def _draw_sticker(pg: _Ops, p: StickerPlace, s: SheetSettings):
+    item = p.item
+    pg.sticker(p)
+    ink = [[[p.to_page(u, v) for u, v in lp] for lp in poly] for poly in ink_of(item)]
+    pg.fill_polys(ink, 0.0)
+    o = outline_of(item)
+    loops = [[p.to_page(u, v) for u, v in o["outer"]]]
+    loops += [[p.to_page(u, v) for u, v in hl] for hl in o.get("holes", [])]
+    if s.cut_marks:
+        pg.stroke_loops(loops, CUT_GREY, CUT_LINE_MM, key=item.key)
+        for hl in loops[1:]:
+            b = _loop_box(hl)
+            d = max(b[2] - b[0], b[3] - b[1])
+            if d < PUNCH_MM:
+                cx, cy = (b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0
+                pg.line(cx - d / 2.0, cy, cx + d / 2.0, cy, CUT_GREY, CUT_LINE_MM)
+                pg.line(cx, cy - d / 2.0, cx, cy + d / 2.0, CUT_GREY, CUT_LINE_MM)
+    if s.mode != "tight":
+        if s.cut_marks:
+            L = min(CROP_MM, max(0.0, float(s.gap_mm) / 2.0 - CROP_OFF_MM))
+            if L > 0:
+                x0, y0, x1, y1 = p.x_mm, p.y_mm, p.x_mm + p.w_mm, p.y_mm + p.h_mm
+                for cx, cy, sx, sy in ((x0, y0, -1, -1), (x1, y0, 1, -1), (x1, y1, 1, 1),
+                                       (x0, y1, -1, 1)):
+                    pg.line(cx + sx * CROP_OFF_MM, cy, cx + sx * (CROP_OFF_MM + L), cy,
+                            CUT_GREY, CUT_LINE_MM)
+                    pg.line(cx, cy + sy * CROP_OFF_MM, cx, cy + sy * (CROP_OFF_MM + L),
+                            CUT_GREY, CUT_LINE_MM)
+        line_mm = p.caption_pt * LABEL_LEADING / MM_TO_PT
+        for k, t in enumerate(p.caption_lines):
+            base = p.y_mm + p.h_mm + LABEL_GAP_MM + k * line_mm + 0.9 * p.caption_pt / MM_TO_PT
+            pg.text(p.x_mm + p.w_mm / 2.0, base, t, p.caption_pt, "center")
+
+
+def _shelf_words(layout: StickerLayout, sh: dict) -> str:
+    by = {p.item.key: p.item for p in layout.placed}
+    ids = []
+    names = []
+    for k in sh["keys"]:
+        it = by[k]
+        ids += list(it.ids) or [it.marker_id]
+        if it.name and it.name not in names:
+            names.append(it.name)
+    idw = ("#%d" % ids[0]) if len(ids) == 1 else ("#%d-%d" % (min(ids), max(ids)))
+    return "row %d: %s %s" % (sh["index"] + 1, idw, " ".join(names[:3])
+                              + (" ..." if len(names) > 3 else ""))
+
+
+def sticker_page_ops(layout: StickerLayout, page_index: int, date: str) -> _Ops:
+    s = layout.settings
+    page_w, page_h = layout.page_mm
+    total = max(1, layout.page_count)
+    pg = _Ops(page_h)
+    items = layout.pages[page_index] if page_index < len(layout.pages) else []
+    for p in items:
+        _draw_sticker(pg, p, s)
+    if s.mode == "tight":
+        for sh in layout.shelves:
+            if sh["page"] != page_index:
+                continue
+            words = _fit_text(_shelf_words(layout, sh), SHELF_FONT_PT, max(sh["h"] - 1.0, 3.0))
+            x = max(1.5, float(s.margin_mm) - 2.0)
+            pg.text_up(x, sh["y"] + sh["h"] - 0.5, words, SHELF_FONT_PT, grey=0.3)
+    if layout.ruler is not None:
+        _draw_ruler(pg, layout.ruler)
+    m = float(s.margin_mm)
+    base = page_h - m - 1.0
+    title = s.title or "ArUco sticker sheet"
+    pg.text(m, base, "%s · %s · %s" % (title, s.mode, date), FOOTER_FONT_PT)
+    pg.text(page_w - m, base, "page %d/%d" % (page_index + 1, total), FOOTER_FONT_PT, "right")
+    if layout.rejected:
+        pg.text(page_w / 2.0, base, "%d sticker(s) NOT printed -- see sheet.json"
+                % len(layout.rejected), FOOTER_FONT_PT, "center")
+    if not layout.pages:
+        pg.text(m, m + 5, "No stickers placed.", 9)
+    return pg
+
+
+def _pdf_ops(pg: _Ops) -> bytes:
+    """_Ops -> a PDF content stream (points, bottom-left origin)."""
+    H = pg.h
+    out: List[str] = []
+
+    def P(x, y):
+        return "%s %s" % (_n(x * MM_TO_PT), _n((H - y) * MM_TO_PT))
+    for op in pg.ops:
+        kind = op[0]
+        if kind == "rects":
+            out.append("%s g" % _n(op[2]))
+            for x, y, w, h in op[1]:
+                out.append("%s %s %s %s re" % (_n(x * MM_TO_PT), _n((H - y - h) * MM_TO_PT),
+                                               _n(w * MM_TO_PT), _n(h * MM_TO_PT)))
+            out.append("f")
+        elif kind == "fill":
+            out.append("%s g" % _n(op[2]))
+            for poly in op[1]:
+                for lp in poly:
+                    if len(lp) < 3:
+                        continue
+                    out.append("%s m" % P(*lp[0]))
+                    out.extend("%s l" % P(*q) for q in lp[1:])
+                    out.append("h")
+            out.append("f*")
+        elif kind == "loops":
+            out.append("%s G %s w" % (_n(op[2]), _n(op[3] * MM_TO_PT)))
+            for lp in op[1]:
+                if len(lp) < 2:
+                    continue
+                out.append("%s m" % P(*lp[0]))
+                out.extend("%s l" % P(*q) for q in lp[1:])
+                out.append("h")
+            out.append("S")
+        elif kind == "line":
+            out.append("%s G %s w %s m %s l S" % (_n(op[5]), _n(op[6] * MM_TO_PT), P(op[1], op[2]),
+                                                 P(op[3], op[4])))
+        elif kind == "text":
+            _k, x, y, txt, size, align, grey, rot = op
+            if rot:
+                out.append("BT /F1 %s Tf %s g 0 1 -1 0 %s Tm %s Tj ET"
+                           % (_n(size), _n(grey), P(x, y), pdf_string(txt)))
+                continue
+            if align != "left":
+                wd = text_width_mm(txt, size)
+                x -= wd / 2.0 if align == "center" else wd
+            out.append("BT /F1 %s Tf %s g %s Td %s Tj ET" % (_n(size), _n(grey), P(x, y),
+                                                            pdf_string(txt)))
+    return "\n".join(out).encode("ascii")
+
+
+def _pdf_doc(pages: List[bytes], page_mm, title: str) -> bytes:
+    """PDF 1.4 bytes from page content streams (render_layout_pdf's file)."""
+    page_w, page_h = page_mm
+    objects: List[bytes] = []
+
+    def add(body: bytes) -> int:
+        objects.append(body)
+        return len(objects)
+    add(b"<< /Type /Catalog /Pages 2 0 R >>")
+    add(b"")
+    font = add(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica "
+               b"/Encoding /WinAnsiEncoding >>")
+    info = add(("<< /Title %s /Producer (aruco_studio.core.sheet) >>"
+                % _utf16_hex(title)).encode("ascii"))
+    media = "[0 0 %s %s]" % (_n(page_w * MM_TO_PT), _n(page_h * MM_TO_PT))
+    kids = []
+    for body in pages:
+        stream = zlib.compress(body, 9)
+        content = add(b"<< /Length %d /Filter /FlateDecode >>\nstream\n" % len(stream) + stream
+                      + b"\nendstream")
+        kids.append(add(("<< /Type /Page /Parent 2 0 R /MediaBox %s "
+                         "/Resources << /Font << /F1 %d 0 R >> >> "
+                         "/Contents %d 0 R >>" % (media, font, content)).encode("ascii")))
+    objects[1] = ("<< /Type /Pages /Kids [%s] /Count %d >>"
+                  % (" ".join("%d 0 R" % k for k in kids), len(kids))).encode("ascii")
+    out = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = []
+    for number, body in enumerate(objects, start=1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % number + body + b"\nendobj\n"
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1)
+    for off in offsets:
+        out += b"%010d 00000 n \n" % off
+    out += (b"trailer\n<< /Size %d /Root 1 0 R /Info %d 0 R >>\nstartxref\n%d\n%%%%EOF\n"
+            % (len(objects) + 1, info, xref))
+    return bytes(out)
+
+
+def render_sticker_pdf(layout: StickerLayout, date: Optional[str] = None) -> bytes:
+    """The sticker sheet as PDF 1.4 (vectors; the MediaBox is the page, so a
+    viewer's default scale is 1:1)."""
+    date = date or datetime.date.today().isoformat()
+    total = max(1, layout.page_count)
+    pages = [_pdf_ops(sticker_page_ops(layout, i, date)) for i in range(total)]
+    return _pdf_doc(pages, layout.page_mm, layout.settings.title or "ArUco sticker sheet")
+
+
+def _xml(t: str) -> str:
+    return (str(t).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace('"', "&quot;"))
+
+
+def _svg_n(v: float) -> str:
+    t = "%.4f" % v
+    t = t.rstrip("0").rstrip(".")
+    return "0" if t in ("", "-0") else t
+
+
+def _grey_hex(g: float) -> str:
+    c = int(round(max(0.0, min(1.0, g)) * 255))
+    return "#%02x%02x%02x" % (c, c, c)
+
+
+def _svg_ops(pg: _Ops) -> List[str]:
+    out: List[str] = []
+    for op in pg.ops:
+        kind = op[0]
+        if kind == "rects":
+            d = " ".join("M%s %sh%sv%sh%sz" % (_svg_n(x), _svg_n(y), _svg_n(w), _svg_n(h),
+                                               _svg_n(-w)) for x, y, w, h in op[1])
+            out.append('<path fill="%s" d="%s"/>' % (_grey_hex(op[2]), d))
+        elif kind == "fill":
+            d = " ".join("M" + " L".join("%s %s" % (_svg_n(x), _svg_n(y)) for x, y in lp) + " Z"
+                         for poly in op[1] for lp in poly if len(lp) >= 3)
+            out.append('<path data-ink="1" fill="%s" fill-rule="evenodd" d="%s"/>'
+                       % (_grey_hex(op[2]), d))
+        elif kind == "loops":
+            d = " ".join("M" + " L".join("%s %s" % (_svg_n(x), _svg_n(y)) for x, y in lp) + " Z"
+                         for lp in op[1] if len(lp) >= 2)
+            out.append('<path data-cut="%s" fill="none" stroke="%s" stroke-width="%s" d="%s"/>'
+                       % (_xml(op[4]), _grey_hex(op[2]), _svg_n(op[3]), d))
+        elif kind == "line":
+            out.append('<line x1="%s" y1="%s" x2="%s" y2="%s" stroke="%s" stroke-width="%s"/>'
+                       % (_svg_n(op[1]), _svg_n(op[2]), _svg_n(op[3]), _svg_n(op[4]),
+                          _grey_hex(op[5]), _svg_n(op[6])))
+        elif kind == "text":
+            _k, x, y, txt, size, align, grey, rot = op
+            anchor = {"left": "start", "center": "middle", "right": "end"}[align]
+            fs = size / MM_TO_PT
+            tr = ' transform="rotate(-90 %s %s)"' % (_svg_n(x), _svg_n(y)) if rot else ""
+            out.append('<text x="%s" y="%s" font-family="Helvetica, Arial, sans-serif" '
+                       'font-size="%s" text-anchor="%s" fill="%s"%s>%s</text>'
+                       % (_svg_n(x), _svg_n(y), _svg_n(fs), anchor, _grey_hex(grey), tr,
+                          _xml(txt)))
+        elif kind == "sticker":
+            p = op[1]
+            it = p.item
+            out.append('<rect data-sticker="%s" data-name="%s" data-made-by="%s" data-page="%d" '
+                       'data-x="%s" data-y="%s" data-w="%s" data-h="%s" data-rotation="%d" '
+                       'x="%s" y="%s" width="%s" height="%s" fill="none" stroke="none"/>'
+                       % (_xml(it.key), _xml(it.name), _xml(it.made_by or "sticker"), p.page + 1,
+                          _svg_n(p.x_mm), _svg_n(p.y_mm), _svg_n(p.w_mm), _svg_n(p.h_mm),
+                          p.rotation, _svg_n(p.x_mm), _svg_n(p.y_mm), _svg_n(p.w_mm),
+                          _svg_n(p.h_mm)))
+    return out
+
+
+SVG_PAGE_GAP_MM = 10.0
+
+
+def render_sticker_svg(layout: StickerLayout, date: Optional[str] = None) -> str:
+    """The same sheet as SVG (mm, y down): one <g data-page> per page,
+    stacked with a gap; each sticker's box as an invisible <rect
+    data-sticker> (its numbers are sheet.json's)."""
+    date = date or datetime.date.today().isoformat()
+    page_w, page_h = layout.page_mm
+    total = max(1, layout.page_count)
+    H = total * page_h + (total - 1) * SVG_PAGE_GAP_MM
+    body = []
+    for i in range(total):
+        oy = i * (page_h + SVG_PAGE_GAP_MM)
+        ops = _svg_ops(sticker_page_ops(layout, i, date))
+        body.append('<g data-page="%d" transform="translate(0 %s)"><rect width="%s" height="%s" '
+                    'fill="#ffffff" stroke="#cccccc" stroke-width="0.2"/>%s</g>'
+                    % (i + 1, _svg_n(oy), _svg_n(page_w), _svg_n(page_h), "".join(ops)))
+    title = layout.settings.title or "ArUco sticker sheet"
+    return ('<svg xmlns="http://www.w3.org/2000/svg" width="%smm" height="%smm" '
+            'viewBox="0 0 %s %s" data-mode="%s" data-pages="%d"><title>%s</title>%s</svg>'
+            % (_svg_n(page_w), _svg_n(H), _svg_n(page_w), _svg_n(H), layout.settings.mode,
+               total, _xml(title), "".join(body)))

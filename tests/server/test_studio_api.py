@@ -33,7 +33,7 @@ def test_new_tag_is_what_todays_dialog_stores(client):
         s, n = sp["settings"], sp["numbers"]
         assert s["layout"] == layout and s["v"] == 2
         assert s["origin_v"] == origin.ORIGIN_RULE
-        assert s["label"]["rule"] == label.RULE
+        assert s["label"]["rule"] == label.NEW_RULE           # M6a: rule 3 beside 2
         assert s["cells"] == presets.cell_setting(presets.default_preset())
         assert s["cells"]["rule"] == autosize.CELL_RULE
         assert s["mode"] == "black"                         # Auto on a body (resolve_mode)

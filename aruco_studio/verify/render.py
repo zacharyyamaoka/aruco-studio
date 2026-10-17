@@ -122,10 +122,13 @@ def _body(plan: dict, target: Optional[dict] = None):
 
 def top_view(plan, px_per_mm: float = 20.0, margin_mm: float = 4.0, ss: int = 4,
              target: Optional[dict] = None, region: str = "tag", body_grey: Optional[int] = None,
-             background: Optional[int] = None) -> Raster:
+             background: Optional[int] = None, grid=None) -> Raster:
     """The tag seen from above (+z), `ss` x `ss` samples a pixel. `target`:
     the TagSpec's target dict (the body under it); `region`: "tag" (the tag
-    and a margin) or "target" (the whole target)."""
+    and a margin) or "target" (the whole target). `grid` (u0, v1, W, H):
+    these pixels exactly (the image's left edge at u0 mm, its top at v1,
+    W x H pixels) instead of the tag's bounds (verify/sheet_check lays the
+    plan on a page's pixels)."""
     d = plan.to_dict() if hasattr(plan, "to_dict") else plan
     if not d.get("ok"):
         raise ValueError("a refused plan has nothing to draw: " + "; ".join(d.get("errors") or []))
@@ -135,9 +138,12 @@ def top_view(plan, px_per_mm: float = 20.0, margin_mm: float = 4.0, ss: int = 4,
         body_grey = 0 if mode == "white" else 255
     if background is None:
         background = 0 if mode == "white" else 255
-    u0, v0, u1, v1 = _bounds(d, margin_mm, region)
-    W = int(math.ceil((u1 - u0) * px_per_mm))
-    H = int(math.ceil((v1 - v0) * px_per_mm))
+    if grid is not None:
+        u0, v1, W, H = float(grid[0]), float(grid[1]), int(grid[2]), int(grid[3])
+    else:
+        u0, v0, u1, v1 = _bounds(d, margin_mm, region)
+        W = int(math.ceil((u1 - u0) * px_per_mm))
+        H = int(math.ceil((v1 - v0) * px_per_mm))
     cv = _Canvas(u0, v1, W * ss, H * ss, px_per_mm * ss)
     layers = d["layers"]
     masks = [cv.mask(L["polygons"]) for L in layers]
@@ -171,7 +177,7 @@ def top_view(plan, px_per_mm: float = 20.0, margin_mm: float = 4.0, ss: int = 4,
             if r is None:
                 continue
             c = comb.get(part, {})
-            if part == "tile":
+            if part in ("tile", "sticker"):           # sticker / ink: core.make (M6a)
                 Wt |= r
             elif part == "pin":
                 Wt |= r
@@ -179,7 +185,7 @@ def top_view(plan, px_per_mm: float = 20.0, margin_mm: float = 4.0, ss: int = 4,
                 Wt &= ~r
                 if c.get("into") == "body":
                     B &= ~r
-            elif part == "pattern":
+            elif part in ("pattern", "ink"):
                 P |= r
             elif part == "recess":
                 B &= ~r

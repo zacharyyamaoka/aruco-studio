@@ -10,6 +10,12 @@ not built (a refused label), as REF's dialog says it.
 The order is REF evaluate()'s (plan/evaluate.py): fit on the loops, the
 Origin turn, the corner mark, the label (a strip grows the tile; the cut
 and the pins follow), the pins, the trim, the slabs.
+
+How the tag is made (`settings.make`, core.make, M6a) branches once, after
+`check` and before evaluate(): a printed sticker plans as its 3D twin's
+fit, mark and label on a thin stock (parts `sticker` and `ink`); a tag
+without the key, or 3D printed, takes REF's path untouched. `made_by` and
+`rules.make` say which.
 """
 from __future__ import annotations
 
@@ -23,6 +29,7 @@ from typing import List, Optional
 from ..core import edits as _E
 from ..core import form as _F
 from ..core import label as _AL
+from ..core import make as _MK
 from ..core import origin as _OR
 from ..core import settings as _S
 from ..core import trim as _TR
@@ -214,9 +221,9 @@ def issues_of(ev, s, n, spec: TagSpec) -> List[Issue]:
 
 # ------------------------------------------------------------- the plan
 
-def _rules(s, spec, ev):
+def _rules(s, spec, ev, make=None):
     lab = ev.get("label") if ev else None
-    return {"spec": _S.SPEC_VERSION,
+    return {"spec": _S.SPEC_VERSION, "make": make.rule if make is not None else None,
             "origin": s.get("origin_v") if s.get("origin_v") == _OR.ORIGIN_RULE else None,
             "cells": copy.deepcopy(s.get("cells")) if _S.cells_of(s) is not None else None,
             "label": (lab.settings.rule if lab is not None and lab.settings.on else None),
@@ -315,6 +322,28 @@ def plan_tag(spec, base=None) -> TagPlan:
                        [f"{type(exc).__name__}: {exc}"[:300]])
 
 
+def sticker_inputs(spec: TagSpec, s: dict, n: dict, make):
+    """A sticker's settings and numbers (its 3D twin's: White + black, New
+    body, a flush ink inlay on the stock) and what that changed, as Issues."""
+    s2, notes = _MK.twin_settings(make, s)
+    out = [Issue(f, lv, t) for f, lv, t in notes]
+    if s.get("pin") not in (None, "none"):
+        out.append(Issue("settings.pin", "info", "a sticker has no locating pins"))
+    lab = s2.get("label")
+    if isinstance(lab, dict) and lab.get("on") and lab.get("place") == "white" \
+            and not _MK.has_white(make):
+        s2["label"] = dict(lab, place="auto")
+        out.append(Issue("settings.label.place", "warn",
+                         "no white outside the quiet zone (Perimeter = Marker): the label goes "
+                         "on the black"))
+    if make.perimeter == "profile" and s2.get("corner_mark") == "cut":
+        s2["corner_mark"] = "none"
+        out.append(Issue("settings.corner_mark", "info",
+                         "a Profile sticker keeps its outline: no corner cut (Perimeter = Marker "
+                         "cuts one)"))
+    return s2, _MK.twin_numbers(make, n), out
+
+
 def _plan(spec: TagSpec, base=None) -> TagPlan:
     issues = check(spec)
     errs = [i for i in issues if i.level == "error"]
@@ -322,26 +351,96 @@ def _plan(spec: TagSpec, base=None) -> TagPlan:
         return refused(spec, issues, [i.text for i in errs])
     s = settings_of(spec)
     n = numbers_of(spec, s)
+    make, _notes = _MK.make_of(spec.settings or {})        # its notes are check()'s
+    sticker = make if make.sticker else None
+    if sticker is not None:
+        s, n, more = sticker_inputs(spec, s, n, make)
+        issues += more
     try:
-        ev = EV.evaluate(spec.target, s, n, base=base, name=spec.name)
+        ev = EV.evaluate(spec.target, s, n, base=base, name=spec.name, sticker=sticker)
         optical = R.optical_of_ev(ev, spec.key or "tag")
     except Exception as exc:                       # noqa: BLE001
         text = str(exc) if isinstance(exc, ValueError) else f"{type(exc).__name__}: {exc}"
         f, _lv = route(text, refused=True)
         return refused(spec, issues + [Issue(f, "error", text[:400])], [text[:400]])
-    return build(spec, s, n, ev, optical, issues)
+    return build(spec, s, n, ev, optical, issues, make=make)
 
 
-def build(spec: TagSpec, s: dict, n: dict, ev: dict, optical=None, issues=()) -> TagPlan:
+# the rows a sticker does not have (its heights are fixed): their notes go
+STICKER_QUIET = ("numbers.white_offset", "numbers.white_height", "numbers.black_offset",
+                 "numbers.black_height", "settings.mode", "settings.op", "settings.pin")
+
+
+def _crosses(poly_pts, rect) -> bool:
+    """Does a polygon (a hole) overlap a rect by some area?"""
+    kept = _TR.clip(list(poly_pts), tuple(rect))
+    if len(kept) < 3:
+        return False
+    a = 0.0
+    for i in range(len(kept)):
+        a += kept[i - 1][0] * kept[i][1] - kept[i][0] * kept[i - 1][1]
+    return abs(a) / 2.0 > 1e-6
+
+
+def extra_issues(spec: TagSpec, s: dict, ev: dict, fr: dict, make, guides: dict) -> List[Issue]:
+    """The M6a messages: holes crossed under Holes: ignore, a Profile
+    sticker's extra cuts, a ChArUco label off its black square."""
+    out: List[Issue] = []
+    raw = spec.settings or {}
+    loops = guides.get("target") or []
+    holes = loops[1:] if len(loops) > 1 else []
+    if raw.get("holes") == "ignore" and holes:
+        if make is not None and make.sticker:
+            rect = _AL.sticker_rect(ev["spec"])
+            for k, h in enumerate(holes, 1):
+                if _crosses(h, rect):
+                    out.append(Issue("settings.holes", "warn",
+                                     f"the marker crosses hole {k}: cut the hole out after "
+                                     "sticking, or Avoid"))
+        else:
+            rect = fr["tile_rect"] or _AL.sticker_rect(ev["spec"])
+            k = sum(1 for h in holes if _crosses(h, rect))
+            if k:
+                out.append(Issue("settings.holes", "warn",
+                                 f"the tile covers {k} hole{'s' if k != 1 else ''}"))
+    if make is not None and make.sticker and make.perimeter == "profile" and holes:
+        k = len(holes)
+        out.append(Issue("settings.make.perimeter", "info",
+                         f"the outline has {k} hole{'s' if k != 1 else ''}: {k} extra cut"
+                         f"{'s' if k != 1 else ''}"))
+    lab = raw.get("label")
+    if s.get("layout") == "charuco" and isinstance(lab, dict) and lab.get("on"):
+        if lab.get("place") == "white":
+            out.append(Issue("settings.label.place", "warn",
+                             "a ChArUco label belongs in a black square"))
+        elif lab.get("row") in ("bottom", "top", "both"):
+            out.append(Issue("settings.label.row", "warn",
+                             "a ChArUco label belongs in a black square"))
+    return out
+
+
+def build(spec: TagSpec, s: dict, n: dict, ev: dict, optical=None, issues=(),
+          make=None) -> TagPlan:
     """The TagPlan of an evaluate() result (plan/variants.py builds a copy's
-    plan from its template's this way)."""
+    plan from its template's this way). `make` (core.make.Make): a printed
+    sticker builds its two parts."""
     issues = list(issues)
+    if make is None:
+        make = _MK.make_of(spec.settings or {})[0]
+    sticker = make.sticker
     if optical is None:
         optical = R.optical_of_ev(ev, spec.key or "tag")
     target = spec.target
     fr = LY.pattern_frames(ev, target)
-    lb = LY.LayerBuilder(ev, n, fr)
-    layers = lb.build()
+    guides = LY.guides(ev, fr, target, ev["base"])
+    if sticker:
+        guides["cut_line"] = LY.cut_line(ev, fr, target, make)
+        layers = LY.sticker_layers(ev, n, fr, make, guides["cut_line"])
+    else:
+        lb = LY.LayerBuilder(ev, n, fr)
+        layers = lb.build()
+    guides["target_ignored"] = (guides["target"][1:] if (spec.settings or {}).get("holes")
+                                == "ignore" else [])
     lab = ev.get("label")
     lay = ev["layout"]
     pl = ev.get("placement")
@@ -368,22 +467,33 @@ def build(spec: TagSpec, s: dict, n: dict, ev: dict, optical=None, issues=()) ->
                          "r": LY._r(p["r"])})
         else:
             pins.append({"kind": "poly", "pts": LY._pts([(cu + a, cv + b) for a, b in p["pts"]])})
-    rec = R.record(ev, key=spec.key or "tag", component="")
+    rec = R.record(ev, key=spec.key or "tag", component="",
+                   fusion={"make": make.to_dict()} if sticker else None)
+    found = issues_of(ev, s, n, spec)
+    if sticker:
+        found = [i for i in found if i.field not in STICKER_QUIET]
+    found += extra_issues(spec, s, ev, fr, make, guides)
+    w = writes(s, n, ev)
+    if sticker:
+        w["settings"].update(parts=list(LY.STICKER_PARTS), pin="none")
+        w["settings"].pop("trim", None)
     data = {"schema": SCHEMA, "ok": True, "errors": [],
+            "made_by": make.by,
             "marker": ev["spec"].to_dict(), "layout": _lay(lay), "placement": placement,
-            "parts": list(ev["plan"].parts),
+            "parts": list(LY.STICKER_PARTS) if sticker else list(ev["plan"].parts),
             "layers": [l.to_dict() for l in layers],
-            "combines": LY.combines(ev["plan"]),
+            "combines": LY.sticker_combines() if sticker else LY.combines(ev["plan"]),
             "frames": LY.frames_dict(ev, fr, optical),
             "ids": list(ev["spec"].ids), "labels": labels,
             "mark": R.mark_record(ev), "label": R.label_record(ev), "trim": _trim(ev.get("trim")),
-            "pins": pins, "guides": LY.guides(ev, fr, target, ev["base"]),
-            "warnings": [i.to_dict() for i in issues + issues_of(ev, s, n, spec)],
-            "rules": _rules(s, spec, ev), "writes": writes(s, n, ev), "record": rec,
+            "pins": pins, "guides": guides,
+            "warnings": [i.to_dict() for i in issues + found],
+            "rules": _rules(s, spec, ev, make), "writes": w, "record": rec,
             "notes": list(ev["notes"]), "node_warning": R.node_warning(ev),
             "digest": R.ev_digest(ev), "name": spec.name, "key": spec.key,
             "body": _body(target, LY.guides_target(ev, fr, target)),
-            "slabs": {"white": ev["plan"].layers.white, "black": ev["plan"].layers.black,
+            "slabs": _sticker_slabs(make) if sticker else {
+                      "white": ev["plan"].layers.white, "black": ev["plan"].layers.black,
                       "pattern": list(ev["plan"].layers.pattern),
                       "surface": ev["plan"].layers.surface, "depth": ev["plan"].layers.depth,
                       "raise": ev["plan"].layers.raise_, "recess": ev["plan"].layers.recess,
@@ -391,6 +501,14 @@ def build(spec: TagSpec, s: dict, n: dict, ev: dict, optical=None, issues=()) ->
                       "recesses": [[w, list(sl)] for w, sl in ev["plan"].recess]}}
     data = json.loads(json.dumps(data, allow_nan=False))
     return TagPlan(data, ev=ev, settings=s, numbers=n, request=spec)
+
+
+def _sticker_slabs(make) -> dict:
+    t = float(make.thickness_mm)
+    top = t + _MK.INK_MM
+    return {"white": [0.0, t], "black": [t, top], "pattern": [t, top], "surface": top,
+            "depth": _MK.INK_MM, "raise": 0.0, "recess": 0.0, "pocket": None, "pin": None,
+            "recesses": []}
 
 
 def validate(spec) -> List[dict]:

@@ -33,6 +33,10 @@ from ..core import faces as _faces
 
 KINDS = ("face", "profile", "free")
 Pt = Tuple[float, float]
+# One chord tolerance for every curve made into loops (M6 note b): a face's
+# edges and a sketch curve, both 0.05 mm (core.faces strokes at the same);
+# the cut line on paper is then within 0.05 mm of the true arc.
+CHORD_MM = _faces.CHORD_TOL_MM
 
 
 class SpecTypeError(TypeError):
@@ -179,7 +183,7 @@ class Target:
         fl = d.get("face_loops_mm")
         return cls(kind=kind, w_mm=_num(d, "w_mm", path, required=True),
                    h_mm=_num(d, "h_mm", path, required=True),
-                   loops_mm=_loops(d.get("loops_mm"), f"{path}.loops_mm"),
+                   loops_mm=normalised(_loops(d.get("loops_mm"), f"{path}.loops_mm")),
                    has_body=hb, z_sign=int(zs), x_ref=xr, body_mm=body,
                    body_loops_mm=_loops(bl, f"{path}.body_loops_mm") if bl is not None else None,
                    face_loops_mm=_loops(fl, f"{path}.face_loops_mm") if fl is not None else None,
@@ -197,6 +201,29 @@ def _ccw(pts, ccw=True):
     if (_area2(pts) > 0) != ccw:
         pts.reverse()
     return pts
+
+
+def normalised(loops: Sequence[Sequence[Pt]]) -> List[List[Pt]]:
+    """The loops turned the contract's way (ARCHITECTURE 5): the outer loop
+    counter-clockwise, every hole clockwise. A loop already that way (or
+    with no area) is kept as it is, point for point."""
+    out = []
+    for i, lp in enumerate(loops):
+        pts = [(float(u), float(v)) for u, v in lp]
+        a = _area2(pts) if len(pts) >= 3 else 0.0
+        if (i == 0 and a < 0) or (i > 0 and a > 0):
+            pts.reverse()
+        out.append(pts)
+    return out
+
+
+def chord_segments(r_mm: float, chord_mm: float = CHORD_MM, least: int = 12) -> int:
+    """How many segments stroke a circle of radius r within `chord_mm` (the
+    sagitta r (1 - cos(pi / n)) <= chord_mm)."""
+    if r_mm <= chord_mm:
+        return least
+    n = math.pi / math.acos(max(-1.0, 1.0 - chord_mm / r_mm))
+    return max(least, int(math.ceil(n - 1e-9)))
 
 
 def _box_of(loops):

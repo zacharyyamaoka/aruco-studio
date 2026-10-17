@@ -45,6 +45,21 @@ Never in a preset: the target, the Type (single / grid / ChArUco), Auto
 size or a typed size, the ids, the Origin / turn, Flip, the tag's name, the
 label's position and "Build anyway".
 
+ArUco Studio M6a (2026-10-16, not REF's): the preset is the MACHINE.
+`profile` may carry the kind of printer and, for a sticker printer, its
+page; a preset without them is a 3D printer, exactly as before, and the
+file stays `bam_aruco_presets/1` (REF's normalise drops the keys it does
+not know, so a Studio file still loads in the add-in):
+
+    "profile": {..., "kind": "print3d" | "sticker", "dpi": 600,
+                "page": "letter", "landscape": false, "margin_mm": 10,
+                "stock_mm": 0.1, "sheet": "spaced" | "tight"}
+
+A sticker printer's `line_mm` is its dot, 25.4 / dpi; its nozzle and
+layers are 0. Built-in: "Sticker · Letter · 600 dpi" and "Sticker · A4 ·
+600 dpi" (whole dots, stock 0.1 mm, min cell 1 mm, label stroke 0.2 mm,
+spaced). `collections` sorts a catalog into 3D printers / Sticker printers.
+
 Reads are tolerant: a missing file is no presets; a broken one is no
 presets plus a note, and the next save first moves it aside
 (aruco_presets.broken-<time>.json) so nothing is lost. Writes are atomic.
@@ -189,17 +204,21 @@ def _text(limit=200):
 
 def normalise(p, name=None):
     """A preset as this code keeps it: Default's shape, every value checked
-    (a wrong one is Default's), unknown keys dropped. Never raises."""
+    (a wrong one is Default's), unknown keys dropped. Never raises.
+    Adapted (M6a): a profile's kind and its sticker keys are kept (KIND_KEYS);
+    a sticker printer's dot (line_mm) and nozzle may be under 0.05 mm."""
     S = _SL()
     out = default_preset()
     p = p if isinstance(p, dict) else {}
     out["name"] = str(name or p.get("name") or out["name"])[:MAX_NAME]
     pr, src = out["profile"], p.get("profile")
     _pick(src, pr, "name", _text())
-    for k, lo in (("nozzle_mm", 0.05), ("line_mm", 0.05), ("layer_mm", 0.0),
-                  ("first_layer_mm", 0.0)):
+    dots = isinstance(src, dict) and src.get("kind") == "sticker"
+    for k, lo in (("nozzle_mm", 0.0 if dots else 0.05), ("line_mm", 0.001 if dots else 0.05),
+                  ("layer_mm", 0.0), ("first_layer_mm", 0.0)):
         _pick(src, pr, k, lambda v, lo=lo: _num(v, lo, 5.0))
     _pick(src, pr, "source", _text(40))
+    _kind_keys(src, pr)
     c, src = out["cells"], p.get("cells")
     _pick(src, c, "of", _choice(("cell", "marker")))
     _pick(src, c, "step", _choice(("line", "mm")))
@@ -234,9 +253,12 @@ def normalise(p, name=None):
 
 
 def line_mm(p):
-    """The preset's line width (mm): its profile's, or None."""
-    v = ((p or {}).get("profile") or {}).get("line_mm")
-    return float(v) if _num(v, 0.05) is not None else None
+    """The preset's line width (mm): its profile's, or None. Adapted (M6a):
+    a sticker printer's line is its dot (25.4 / dpi, under 0.05 mm)."""
+    pr = (p or {}).get("profile") or {}
+    v = pr.get("line_mm")
+    lo = 0.001 if pr.get("kind") == "sticker" else 0.05
+    return float(v) if _num(v, lo) is not None else None
 
 
 def cell_setting(p):
@@ -417,6 +439,78 @@ def save(data, store):
     return store
 
 
+# ------------------------------------------------- the machine (M6a, not REF's)
+
+KINDS = ("print3d", "sticker")
+SHEET_MODES = ("spaced", "tight")
+STICKER_PAGES = ("letter", "a4", "legal", "a3", "tabloid", "a5")   # core.sheet.PAGE_SIZES_MM
+DPIS = (300, 600, 1200)
+STICKER_DEFAULTS = {"dpi": 600, "page": "letter", "landscape": False, "margin_mm": 10.0,
+                    "stock_mm": 0.1, "sheet": "spaced"}
+KIND_KEYS = ("kind",) + tuple(STICKER_DEFAULTS)
+KIND_COLLECTIONS = [("print3d", "3D printers", "cube"), ("sticker", "Sticker printers", "sticker")]
+STICKER_STROKE_MM = 0.2          # the label's stroke on paper (min cap = 5 x 0.2 = 1 mm)
+STICKER_MIN_CELL_MM = 1.0
+
+
+def _kind_keys(src, pr):
+    """The machine's keys of a profile (normalise): kept when given, a
+    sticker printer's filled in; a profile without them is left as REF's."""
+    if not isinstance(src, dict) or not any(k in src for k in KIND_KEYS):
+        return
+    kind = src.get("kind") if src.get("kind") in KINDS else "print3d"
+    pr["kind"] = kind
+    if kind != "sticker":
+        return
+    for k, v in STICKER_DEFAULTS.items():
+        pr[k] = v
+    _pick(src, pr, "dpi", lambda v: int(v) if _num(v, 72, 4800) is not None
+          and float(v).is_integer() else None)
+    _pick(src, pr, "page", _choice(STICKER_PAGES))
+    _pick(src, pr, "landscape", _bool)
+    _pick(src, pr, "margin_mm", lambda v: _num(v, 0.0, 50.0))
+    _pick(src, pr, "stock_mm", lambda v: _num(v, 0.05, 2.0))
+    _pick(src, pr, "sheet", _choice(SHEET_MODES))
+
+
+def kind_of(p):
+    """A preset's kind: "sticker" or "print3d" (absent: 3D, every REF file)."""
+    k = ((p or {}).get("profile") or {}).get("kind")
+    return k if k in KINDS else "print3d"
+
+
+def sticker_preset(page="letter", dpi=600):
+    """A built-in sticker printer: whole dots, stock 0.1 mm, min cell 1 mm,
+    label stroke 0.2 mm, spaced sheets."""
+    p = default_preset()
+    pg = "A4" if page == "a4" else page[:1].upper() + page[1:]
+    p["name"] = f"Sticker · {pg} · {dpi} dpi"
+    p["profile"] = {"name": f"Sticker printer, {pg}, {dpi} dpi", "nozzle_mm": 0.0,
+                    "line_mm": round(25.4 / dpi, 6), "layer_mm": 0.0, "first_layer_mm": 0.0,
+                    "source": "", "kind": "sticker", "dpi": int(dpi), "page": page,
+                    "landscape": False, "margin_mm": 10.0, "stock_mm": 0.1, "sheet": "spaced"}
+    p["cells"] = {"of": "cell", "step": "line", "mm": 0.5, "min_mm": STICKER_MIN_CELL_MM,
+                  "min_lines": 0}
+    p["tag"].update(mode="both", op="new", pin="none", grow=False)
+    p["label"]["nozzle_mm"] = STICKER_STROKE_MM
+    return normalise(p)
+
+
+def sticker_builtins():
+    """Letter first (Zach, 2026-10-16), then A4."""
+    return [sticker_preset("letter"), sticker_preset("a4")]
+
+
+def collections(items):
+    """[(name, preset, kind)] (a catalog's items) -> [{"id", "title", "icon",
+    "names"}]: the 3D printers and the Sticker printers, each in order."""
+    out = []
+    for cid, title, icon in KIND_COLLECTIONS:
+        out.append({"id": cid, "title": title, "icon": icon,
+                    "names": [n for n, p, _k in items if kind_of(p) == cid]})
+    return out
+
+
 # ---------------------------------------------------------------- catalog
 
 def builtins(prusa=None):
@@ -444,6 +538,19 @@ def catalog(store, prusa=None):
             items.append((name, data["presets"][name], "user"))
     last = data.get("last") if any(n == data.get("last") for n, _p, _k in items) else None
     return {"items": items, "last": last, "notes": [t for t in (note, bnote) if t]}
+
+
+def catalog_all(store, prusa=None):
+    """The Studio's catalog (M6a, not REF's): REF's catalog (Default,
+    PrusaSlicer's, the user's) with the sticker printers after the 3D
+    built-ins -- both kinds of machine, built-ins first."""
+    cat = catalog(store, prusa)
+    items = list(cat["items"])
+    k = sum(1 for _n, _p, kind in items if kind == "builtin")
+    taken = {n for n, _p, _k in items}
+    st = [(p["name"], p, "builtin") for p in sticker_builtins() if p["name"] not in taken]
+    users = [it for it in items[k:] if it[0] not in {p["name"] for p in sticker_builtins()}]
+    return dict(cat, items=items[:k] + st + users)
 
 
 def find(cat, name):
@@ -862,5 +969,19 @@ def group_nodes(nodes, catalog_items):
 
 def preset_of(settings, numbers, profile=None):
     """A tag's print settings (its settings + numbers, mm) as a preset: REF
-    preset_of_node's mapping. The adapter reads the node; this maps."""
+    preset_of_node's mapping. The adapter reads the node; this maps. A
+    printed sticker (settings.make, M6a) reads as a sticker printer's preset
+    (its dot from the cells, its stock from the make)."""
+    from . import make as _MK
+    mk, _n = _MK.make_of(settings or {})
+    if mk.sticker and not profile:
+        c = (settings or {}).get("cells") or {}
+        dot = c.get("mm") if isinstance(c, dict) else None
+        dot = float(dot) if _num(dot, 0.001, 5.0) is not None else round(25.4 / 600, 6)
+        profile = {"name": "", "nozzle_mm": 0.0, "line_mm": dot, "layer_mm": 0.0,
+                   "first_layer_mm": 0.0, "source": "", "kind": "sticker",
+                   "dpi": int(round(25.4 / dot)), "stock_mm": mk.thickness_mm}
+        p = preset_of_node(settings, numbers, None)
+        p["profile"] = profile
+        return normalise(p)
     return preset_of_node(settings, numbers, profile)

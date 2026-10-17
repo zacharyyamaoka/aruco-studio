@@ -277,9 +277,18 @@ RULES = {
     # the quiet ring is the hard line, 0.25 module preferred, the far search
     2: Rule(gap_min=WHITE_GAP_MIN, gap_pref=WHITE_GAP_PREF, far=True, slack=SIDE_SLACK,
             exact=True),
+    # NOT REF's (ArUco Studio M6a, 2026-10-16, Zach's FB-13): rule 2, and a
+    # ChArUco label placed by hand may sit in ANY black square of the board,
+    # checked against THAT square (its edges, its corners); Auto still picks
+    # the top-left one. Rule 2 refused a spot outside the top-left square.
+    3: Rule(gap_min=WHITE_GAP_MIN, gap_pref=WHITE_GAP_PREF, far=True, slack=SIDE_SLACK,
+            exact=True),
 }
 RULE = 2                   # what a NEW label is made under
 RULE_NOTE = ("older label rule (2-module gap): change any label setting to use the new one")
+NEW_RULE = 3               # what the Studio's new tag stores (core.form.new_tag_settings);
+                           # REF's RULE (2) stays the LabelSettings default
+ANY_SQUARE_RULE = 3        # from this rule on a ChArUco label by hand takes any black square
 
 
 def rule_of(settings) -> Rule:
@@ -1277,6 +1286,33 @@ def charuco_square(spec: TagSpec) -> Rect:
     return (u0, ext[3] - S, u0 + S, ext[3])
 
 
+def charuco_black_squares(spec: TagSpec) -> List[Rect]:
+    """Every black chessboard square of a ChArUco board (mm, centre frame),
+    row by row from the top-left (not REF's: label rule 3)."""
+    S = spec.square_length_m * 1000.0
+    _m, ext, _q = _mm(spec)
+    out = []
+    for r in range(int(spec.rows)):
+        for c in range(int(spec.cols)):
+            if aruco_board._charuco_black(c, r, spec.rows, bool(spec.legacy)):
+                u0 = ext[0] + c * S
+                out.append((u0, ext[3] - (r + 1) * S, u0 + S, ext[3] - r * S))
+    return out
+
+
+def label_square(spec: TagSpec, r: Optional[Rect], rule: int) -> Rect:
+    """The black square a ChArUco label at `r` is checked against: the
+    top-left one (charuco_square) under rules 1 and 2; from rule 3 the black
+    square holding r's centre, if any (not REF's)."""
+    if rule is None or rule < ANY_SQUARE_RULE or r is None:
+        return charuco_square(spec)
+    cu, cv = (r[0] + r[2]) / 2.0, (r[1] + r[3]) / 2.0
+    for sq in charuco_black_squares(spec):
+        if sq[0] - TOL <= cu <= sq[2] + TOL and sq[1] - TOL <= cv <= sq[3] + TOL:
+            return sq
+    return charuco_square(spec)
+
+
 def charuco_corners_mm(spec: TagSpec) -> List[Pt]:
     """Inner chessboard corners (the ones the detector refines), mm, centre frame."""
     _m, ext, _q = _mm(spec)
@@ -2137,7 +2173,7 @@ def label_violations(spec: TagSpec, lab: Label, *, loops=(), bounds=(),
             r = p.rect
             if sl.where == "square":
                 S = spec.square_length_m * 1000.0
-                sq = charuco_square(spec)
+                sq = label_square(spec, r, s.rule)
                 off = max(sq[0] - r[0], r[2] - sq[2], sq[1] - r[1], r[3] - sq[3], 0.0)
                 if off > TOL:
                     out.append(f"{p.text!r} runs {off:.1f} mm out of the black square")
@@ -2438,6 +2474,9 @@ def _offset_label(lab: Label, spec: TagSpec, dx: float, dy: float, notes: List[s
         corners = charuco_corners_mm(spec)
         for sl in new.slots:
             r = sl.rect
+            if lab.settings.rule >= ANY_SQUARE_RULE:         # rule 3: the square it moved into
+                sq = label_square(spec, r, lab.settings.rule)
+                sl.bound = sq
             if r[0] < sq[0] + e - TOL or r[1] < sq[1] + e - TOL or r[2] > sq[2] - e + TOL \
                     or r[3] > sq[3] - e + TOL:
                 return None, f"{off} takes it out of the black square ({e:.1f} mm in from its edges)"
@@ -2995,7 +3034,7 @@ def describe(label, mode: str = "both") -> List[Tuple[str, str]]:
     that says so and how to leave it (RULE_NOTE)."""
     lab = from_dict(label) if isinstance(label, dict) else label
     out = _describe(lab, mode)
-    if out and lab.settings.rule != RULE:
+    if out and lab.settings.rule < RULE:                  # rule 3 is newer, not older
         out.append((NOTE, RULE_NOTE[0].upper() + RULE_NOTE[1:] + "."))
     return out
 
@@ -3118,7 +3157,7 @@ def check_label(spec: TagSpec, label, tol: float = 1e-6) -> List[str]:
         where = sl.where if sl else ""
         if where == "square":
             S = spec.square_length_m * 1000.0
-            sq = charuco_square(spec)
+            sq = label_square(spec, ink_rect(p.boxes), lab.settings.rule)
             if any(not (sq[0] - tol <= x <= sq[2] + tol and sq[1] - tol <= y <= sq[3] + tol)
                    for q in polys for x, y in q):
                 out.append(f"{p.text!r}: ink outside the black square")
