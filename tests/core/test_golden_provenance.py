@@ -37,11 +37,15 @@ def test_there_are_goldens():
                          ids=lambda p: p.relative_to(GOLDENS).as_posix())
 def test_json_golden_has_provenance(path):
     doc = json.loads(path.read_text(encoding="utf-8"))
-    assert doc["ref_commit"] == ref_path.REF_COMMIT
+    # N-1: goldens/ref_head/ are made by REF's code at REF_HEAD (the add-in the
+    # core was brought up to), by tools/make_goldens_ref_head.py
+    head = path.relative_to(GOLDENS).parts[0] == "ref_head"
+    assert doc["ref_commit"] == (ref_path.REF_HEAD if head else ref_path.REF_COMMIT)
     assert doc["maker"].startswith(str(ref_path.REF)), doc["maker"]
     assert doc.get("sha256"), "no sha256"
     # M2's evaluate() goldens come from tools/make_evaluate_goldens.py (PLAN M2 step 2)
-    assert doc["made_by"].startswith(("tools/make_goldens_from_ref.py",
+    assert doc["made_by"].startswith(("tools/make_goldens_ref_head.py",) if head else
+                                     ("tools/make_goldens_from_ref.py",
                                       "tools/make_evaluate_goldens.py"))
     if isinstance(doc["sha256"], dict):
         for rel, digest in doc["sha256"].items():
