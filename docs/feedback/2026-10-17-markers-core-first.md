@@ -35,3 +35,15 @@ The key idea: "we have the markers that we can just do standalone and then all t
 - **N-2:** one agent; it writes `docs/design/extrude_ui_proposals/` here.
 - **N-3:** one agent on an aruco-studio lane branch (`studio/` + `examples/`).
 - **CF-4..CF-8** (the new preset fields, face-down cells, the size lint, paper thickness / 2 black, Flip) are model changes. N-2's proposals design them; they get built after N-1 lands, so the refactor changes no behaviour.
+
+## Pivot (Zach, 2026-10-17 midday): 2D only, inkjet on vinyl
+
+"I have decided to move away from the 3D printed aruco markers for now… I found the 3d printed multi material to be too unreliable for now. I will prefer to just 2D print them on vinyl paper… I will just be printing with ink jet moving forward. So you can keep the 3D things there just as placeholders… no need to further develop the features… focus on just the 2D thing… continue at full speed."
+
+| ID | Requirement | What it changes |
+|---|---|---|
+| CF-13 | **2D (inkjet on vinyl sticker paper) is the only manufacturing path we develop.** 3D printing stays as it is, as a placeholder: it keeps working (no regressions) but gets no new features. | Dropped: CF-8 (flush depths, Flip), the 3D half of CF-4 (first-layer width, face-down cells, bed size) and of CF-6 (the bed lint), and print orientation (Q4). Kept and prioritised: CF-4 inkjet (paper size, **paper thickness: vinyl**, margins), CF-6 (the page lint), CF-7 (black = paper t/2 inside the sticker), Q7 (margin and cut line on the export sheet), the Fusion sticker node (M7.4), the PDF / Print path, ArUco IDs. N-1's acceptance in Fusion puts the 2D path first; 3D gets offline equivalence plus a smoke test. |
+
+Zach's two "up to you" answers (the same reply):
+- A gallery card opens a fresh copy, so the golden example stays pristine; the copies stay in the file drawer.
+- The three older examples are covered by the gallery (forearm = multi-face, sticker_sheet = the sticker sheet). They leave File › Open, and their files stay for the tests.
