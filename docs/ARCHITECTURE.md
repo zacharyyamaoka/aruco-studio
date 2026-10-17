@@ -85,7 +85,7 @@ One module per REF core module, same public names, so the port is a copy and the
 | `core/form.py` | NEW, from `aruco_extrude_cmd.py` and `aruco_extrude_ui.py` | the tag form's pure model: defaults and limits, `values` (fields -> settings + numbers), `label_values`, `trim_values`, `preset_values`, `snap_size`, `round_line`, `size_line`, `cells_line`, `layer_lines`, `info_rows`, `same_build`, `check_auto` | mm |
 | `core/validate.py` | NEW, from `bam_fusion_ui.py` (Issue, Validator) and `aruco_extrude_ui.py` (`classify`, `label_issues`, `trim_issues`) | per-field messages: `Issue(field, level, text)`, `worst`, `summary_text`, `validate(spec, plan) -> [Issue]` | |
 | `core/presets.py` | `ArucoMarkers/aruco_presets.py` (minus load / save), `aruco_preset_library.py` (words, cards, `Library`, the pure half of `preset_of_node`) | `default_preset`, `from_profile`, `preset_of(settings, numbers)` (a tag's print settings as a preset; the adapter reads the node, the core maps), `normalise`, `line_mm`, `cell_setting`, `builtins`, `catalog`, `find`, `unique_name`, `changes`, `describe_changes`, `layer_note`; the cards' words and `thumb_svg` | mm |
-| `core/prusa.py` | `ArucoMarkers/aruco_prusa.py` (minus the directory walk) | `read_ini(text)`, `read_bundle(text)`, `resolve`, `nozzle_of`, `width_of`, `profile`, `describe` | mm |
+| `core/prusa.py` | `ArucoMarkers/aruco_prusa.py` (minus the directory walk) | `read_ini(text)`, `read_bundle(text)`, `resolve`, `nozzle_of`, `width_of`, `profile`, `describe`; M8c (not REF's): the allow-list (`PHYSICAL_KEYS`, `private_key`, `drop_private`), `parse_physical`, `physical_printers`, `printer_of`, `condition` / `fits` (which print presets fit a printer), `prints_for`, `pair_profile`, `selected` | mm |
 | `core/geometry.py` | NEW, from `aruco_feature.py` (`_v`..`_rotz`, `_xf_frame`), `aruco_tags.py` (Rodrigues, `_frame_error`, `_solve3`, the composition maths of `_place_joint_origin`), `aruco_preview.py` (boxes, prisms) | vectors, 4x4 frames, box / prism polygons, polygon area and clipping helpers shared by plan/; `jo_decompose(frame) -> (angle_deg, offsets, flip)` and `jo_compose(...) -> frame` (how Fusion composes a Joint Origin: x turned by `angle` about the UNFLIPPED z, the flip half a turn about x', offsets along the FINAL axes). Pure maths; the adapter only passes the three numbers to Fusion | mm |
 | `core/restructure.py` | `ArucoMarkers/aruco_restructure.py` (pure half) | `has_combine`, `restructure_plan(parts_old, op_old, parts_new, op_new)`, `new_parts`, `needed_params`, `refusal` (the words), `lost_after`, `what_goes`; with `core.edits.structural_change` this is the whole "what a structural edit does" model. The in-place `restructure()` itself stays in the adapter | |
 | `core/faces.py` | `ArucoMarkers/aruco_autosize_gallery.py` (`FACES`, `TYPED`, `shape_pts`, `loops_mm`, `bbox_mm`, `summary`) | the ten non-box faces plus a box and a disc as loops in mm (chord tolerance 0.05 mm, the way Fusion strokes an edge). Product data: the Studio's target palette serves them (`GET /api/targets`); the tests use the same list | mm |
@@ -145,6 +145,7 @@ FastAPI + uvicorn on `127.0.0.1:5360`. Serves `studio/dist/` at `/` when it exis
 | `POST /api/export/{svg,png,pdf,stl,3mf}` | files into `ROOT/.data/exports/<scene>/` |
 | `POST /api/verify` | `TagPlan` -> the verify report |
 | `GET/POST /api/presets`, `GET /api/prusa/profiles` | `core.presets` over `server/store.py` |
+| `GET /api/prusa/printers`, `/api/prusa/stale`, `/api/prusa/watch`, `POST /api/scene/send/prusaslicer` | M8c, in `server/prusa_api.py` (the folder's watcher in `server/prusa_watch.py`): docs/API_prusa.md |
 
 `server/store.py` owns every file: presets (`bam_aruco_presets/1`, same shape as REF so a preset file can be copied over), remembered options, the recent list, PrusaSlicer's config directory (read only; `BAM_ARUCO_PRUSASLICER_DIR` points at a fixture).
 
@@ -173,7 +174,7 @@ Stack: Vite + React + TypeScript. State in one store (zustand). Built as planned
 | Part | What it does |
 |---|---|
 | 2D canvas | an SVG canvas like Figma: pan, zoom, select, drag, snap, rulers in mm; many tags on one canvas, each on its own target. Each tag draws its target's outline and holes, then its `TagPlan` layers as `<path>` elements (polygons with holes, `fill-rule="evenodd"`), then its `guides` (the quiet ring, the clear zones, a refused label's preview in orange); white, black, cut, keep-column colours from a theme table. Every `<path>` carries `data-layer="<name>"` and a refused label's preview `data-state="refused"`, so a test can count and find them. |
-| Target editor | part of the inspector: pick a target from `/api/targets` (box, disc, the ten faces) or type `w_mm` / `h_mm`, a thickness (`body_mm.z0..z1`, 0 = no body) and holes (circles); the canvas draws it. This is the Studio's stand-in for the clicked face. |
+| Sketch and shapes (M8b1) | the target editor is gone. The Studio edits the design file (`arucostudio.scene/2`): shape tools (rectangle, circle, polygon, slot, holes), Extrude, and ArUco Extrude on a shape or on faces picked in 2D or 3D. A face of an Extrude is the tag's target. See docs/STUDIO.md. |
 | 3D view | three.js; the same layers extruded between `z[0]` and `z[1]`, from `/api/plan?mesh=1` only (the app never triangulates); a Google-Maps-style 2D / 3D toggle that keeps the camera's centre and zoom; the OpenCV frame as a triad. The store exposes the scene's z extent (`zRange`) and the camera centre for the tests. |
 | Inspector | the tag form from `/api/form`'s field list: layout, dictionary, id, size (Auto), cells, mode, op, Offset / Height per colour, Origin, corner mark, label, pins, trim, the Layout candidates; per-field messages from `/api/validate` under the field each `Issue.field` names |
 | IDs table | one row per scene tag (`core.marker_table` rows), renumber, overrides; click a row to select |
@@ -199,7 +200,7 @@ Types are written like JSON schema. `mm` means millimetres. Polygons are `[[u, v
 | `body_mm` | `{u0, v0, u1, v1, z0, z1} \| null` | the body under, boxed in the target frame (trim) |
 | `volumes_mm3` | `{body, under_face} \| null` | measured volumes for the trim rules; null = "nothing measured" (a refusal unless `trim.force`). The Studio fills it with `plan/target.prism_volumes` (exact for its prism targets); Fusion measures the real body |
 
-The adapter fills this. The core never sees an entity. In the Studio the target editor (section 4) fills it, so a Studio tag with a thickness behaves like a tag on a plate: pocket, recess, pins and trim all plan.
+The adapter fills this. The core never sees an entity. In the Studio the design file's shapes and Extrudes fill it (`plan/shapes.face_target`, section 4), so a Studio tag with a thickness behaves like a tag on a plate: pocket, recess, pins and trim all plan.
 
 ### 5.2 `TagSpec` (the request)
 

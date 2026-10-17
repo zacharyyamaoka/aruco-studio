@@ -733,7 +733,7 @@ def preset_apply(req: M.PresetApplyIn) -> dict:
     """`spec` with a preset's print settings (by `name`, or a `preset`)."""
     p = req.preset
     if p is None:
-        p, _kind = _P.find(_P.catalog(S.presets_store(), _prusa()), req.name)
+        p, _kind = _P.find(_P.catalog_all(S.presets_store(), _prusa()), req.name)
         if p is None:
             raise HTTPException(status_code=404, detail=f"no preset {req.name!r}")
     _spec(req.spec)
@@ -746,7 +746,7 @@ def preset_of(req: M.PresetOfIn) -> dict:
     _spec(req.spec)
     p = _NEW.preset_of(req.spec.plain(), req.name)
     match = None
-    for n, cp, _k in _P.catalog(S.presets_store(), _prusa())["items"]:
+    for n, cp, _k in _P.catalog_all(S.presets_store(), _prusa())["items"]:
         if _P.same_print(p, cp):
             match = n
             break
@@ -817,3 +817,4 @@ if DIST.is_dir():
     app.mount("/", StaticFiles(directory=str(DIST), html=True), name="studio")
 
 from . import sheet_api  # noqa: E402,F401  (M6a: the sticker sheet routes)
+from . import prusa_api  # noqa: E402,F401  (M8c: PrusaSlicer printers, Send, the folder's watcher)
