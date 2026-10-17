@@ -1,8 +1,5 @@
 {
  "about": "Why a REF section has no ported pytest test (or only a parked one). tools/check.py --trace reads it. A key is a section's exact header text, or '*' for every section of the suite without a test. Statuses: 'parked: <milestone>' (a test exists and skips until that milestone), 'skipped: venv' (needs another venv), 'not ported: ...' (Fusion or UI, owned elsewhere), 'deferred: <milestone>' (pure, but its home is a later milestone).",
- "tests/test_aruco_settings.py": {
-  "*": "deferred: M2b (aruco_settings is the remembered dialog options and their file: server/store.py; snapshot / apply read Fusion command inputs; find_prusaslicer is server/prusa_launch.py)"
- },
  "tests/test_aruco_frame.py": {
   "== the dialog: Origin words, Rotate, the info line": "not ported: the Fusion dialog (adapters/fusion, M4); the words are core.origin's (test_ref_frame s01) and core.form._origin_line (goldens/form.json)",
   "== the dialog: Corner mark -- only what the tag can have, the old checkbox": "not ported: the Fusion dialog (adapters/fusion, M4); chamfer.valid_marks / choice_of are in goldens/chamfer.json",

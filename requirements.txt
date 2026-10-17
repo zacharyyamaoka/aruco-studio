@@ -1,6 +1,31 @@
 # ArUco Studio, Python 3.11. PyPI only, every version pinned.
-# core/ and plan/ need none of these (stdlib only); the tests and verify/ do.
+# core/, plan/ and scene/ need none of these (stdlib only); verify/, server/
+# and the tests do.
 pytest==8.4.2
 pytest-xdist==3.8.0
+execnet==2.1.2
+iniconfig==2.3.1
+packaging==26.3
+pluggy==1.7.0
+Pygments==2.21.0
+colorama==0.4.6
+# verify/: OpenCV's own detector, PnP and raster
 numpy==2.3.5
 opencv-contrib-python-headless==5.0.0.93
+# server/: FastAPI + uvicorn on 127.0.0.1:5360; httpx for its TestClient
+fastapi==0.115.12
+starlette==0.46.2
+pydantic==2.11.7
+pydantic_core==2.33.2
+annotated-types==0.8.0
+typing-inspection==0.4.4
+typing_extensions==4.16.0
+uvicorn==0.34.2
+click==8.5.0
+h11==0.16.0
+httpx==0.28.1
+httpcore==1.0.9
+anyio==4.9.0
+sniffio==1.3.1
+idna==3.20
+certifi==2026.7.22

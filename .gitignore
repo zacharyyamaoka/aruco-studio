@@ -8,3 +8,5 @@ studio/dist/
 studio/test-results/
 studio/playwright-report/
 reports/spec.html
+.studio_data/
+scenes/

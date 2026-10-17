@@ -40,7 +40,9 @@ def test_json_golden_has_provenance(path):
     assert doc["ref_commit"] == ref_path.REF_COMMIT
     assert doc["maker"].startswith(str(ref_path.REF)), doc["maker"]
     assert doc.get("sha256"), "no sha256"
-    assert doc["made_by"].startswith("tools/make_goldens_from_ref.py")
+    # M2's evaluate() goldens come from tools/make_evaluate_goldens.py (PLAN M2 step 2)
+    assert doc["made_by"].startswith(("tools/make_goldens_from_ref.py",
+                                      "tools/make_evaluate_goldens.py"))
     if isinstance(doc["sha256"], dict):
         for rel, digest in doc["sha256"].items():
             assert len(digest) == 64 and not rel.startswith(("aruco_studio", "/")), rel
