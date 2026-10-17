@@ -12,11 +12,16 @@ export const SCREENS = path.join(ROOT, "reports", "screens");
 export const API = `http://127.0.0.1:${process.env.ARUCO_STUDIO_API_PORT || 5360}`;
 const PY = path.join(ROOT, ".venv", "Scripts", "python.exe");
 
+/** The Studio with the dev flag that keeps the drawing tools (R C P O H)
+ *  and starts on the canvas, not the gallery: what the tests before the
+ *  gallery (N-3, 2026-10-17) drive. gallery.spec.ts runs without it. */
+export const STUDIO_URL = "/?draw=1";
+
 /** A fresh scene on the server, the app loaded on it. */
 export async function fresh(page: Page, name = "e2e") {
   const r = await page.request.post(`${API}/api/scene/new`, { data: { name } });
   expect(r.ok()).toBeTruthy();
-  await page.goto("/");
+  await page.goto(STUDIO_URL);
   await expect(page.locator('.app[data-ready="1"]')).toBeVisible();
   await idle(page);
 }
@@ -65,7 +70,7 @@ export async function freshFile(page: Page, name: string, text?: string): Promis
   fs.writeFileSync(file, text ?? JSON.stringify({ schema: "arucostudio.scene/2", name, sketches: [], features: [] }, null, 1) + "\n", "utf-8");
   const r = await page.request.post(`${API}/api/design/open`, { data: { path: file } });
   expect(r.ok()).toBeTruthy();
-  await page.goto("/");
+  await page.goto(STUDIO_URL);
   await expect(page.locator('.app[data-ready="1"]')).toBeVisible();
   await idle(page);
   return file;

@@ -105,6 +105,8 @@ Since M8a the open scene is a design file (`arucostudio.scene/2`, docs/FILE_FORM
 | `POST /api/design/reveal` | `{open: true}`: the OS file browser on the file; `open: false` only answers the command |
 | `GET /api/design/files` | the Open dialog's lists: `{examples, recent, scenes, scenes_dir}` (`server/files_api.py`) |
 | `POST /api/design/open_example` | `{name}`: the example copied into the scenes folder (a fresh name when taken) and opened; `examples/` is never written |
+| `GET /api/gallery` | the gallery (N-3): `examples/gallery/gallery.json`, `{schema, groups: [{id, title, line, items: [{name, file, title, line, look, actions, text}]}], dir}`; each item carries its file's text (the Studio plans it for the card's thumbnail through `POST /api/design/preview`) (`server/gallery_api.py`) |
+| `POST /api/gallery/open` | `{name}`: the example copied afresh to `<home>/gallery/<name>.arucostudio.json` and opened, answered as `POST /api/design/open` plus `item` (its manifest row); `examples/` is never written; 404: no such example |
 | `GET /api/design/browse` | `?dir=`: a folder's `*.arucostudio.json` and subfolders, `{dir, parent, folders, files}`; the scenes folder by default. 403 under the two forbidden folders |
 | `GET /api/events` | server-sent events (`text/event-stream`): `hello {revisions, file}` on connect; `scene {revision, path, why}` when the file changed on disk; `file {state, path, error}` when it breaks, goes, or parses again. `prusa {revision, added, removed, changed, files, ms, stale}` when PrusaSlicer's folder changed (M8c, docs/API_prusa.md); `presets` is reserved. Each event's data has `t` (the server's clock). `?max_events=N&timeout=S` end the stream (tests, one-shot pollers) |
 

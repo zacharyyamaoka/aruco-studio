@@ -3,7 +3,8 @@
 // Arrange), view (2D / 3D, quiet zones, axes, layer outlines, fit, the
 // theme), Verify and Export (the sticker sheet, Print, Send to
 // PrusaSlicer, the files). The tools are at the canvas's foot (BottomBar);
-// S finds any command.
+// S finds any command. The Gallery button (N-3) goes to the landing page;
+// on the gallery the bar holds only the file and the theme.
 import { Glyph as Icon, IconButton, Menu, MenuItem, MenuSeparator, useTheme } from "@bam/ui";
 import { madeBy, useStudio } from "../store";
 import { printBlock, sendBlock } from "./Print";
@@ -27,6 +28,8 @@ export function Toolbar() {
   const design = useStudio((s) => s.design);
   const shapes = useStudio((s) => s.shapeSel.length);
   const zScale = useStudio((s) => s.zScale);
+  const page = useStudio((s) => s.page);
+  const example = useStudio((s) => s.example);
   const [theme, setTheme] = useTheme();
   const none = !sel.length && !shapes;
   void tags;
@@ -36,15 +39,21 @@ export function Toolbar() {
   return (
     <header className="toolbar" data-testid="toolbar">
       <div className="brand" title="ArUco Studio"><span className="logo"><Icon name="single" /></span>ArUco Studio</div>
+      <button type="button" className={`tb${page === "gallery" ? " on" : ""}`} data-testid="gallery-button" title="The gallery: examples of every feature"
+        onClick={() => (page === "gallery" ? st.showStudio() : st.showGallery())}>
+        <Icon name="grid" />Gallery
+      </button>
       <Menu icon="file" label="File" testid="menu-file">
+        <MenuItem icon="grid" label="Gallery…" hint="the examples" onClick={() => st.showGallery()} testid="file-gallery" />
         <MenuItem icon="newdoc" label="New scene…" hint="a new file" onClick={() => st.setDialog({ kind: "new" })} testid="file-new" />
         <MenuItem icon="open" label="Open…" hint="Ctrl+O" onClick={() => st.setDialog({ kind: "open" })} testid="file-open" />
         <MenuItem icon="save" label="Save as…" hint="copy, then follow" onClick={() => st.setDialog({ kind: "save" })} testid="file-saveas" />
         <MenuItem icon="folder" label="Reveal the file" disabled={!design.path} onClick={() => st.reveal()} testid="file-reveal" />
         <MenuItem icon="file" label="File drawer (the text)" onClick={() => st.setDrawer("file")} testid="file-drawer-open" />
       </Menu>
+      {page === "gallery" ? <span className="grow" /> : <>
       <span className={`scene-name st-${design.state}`} data-state={design.state} data-testid="scene-name"
-        title={design.path ? `${design.path}: every change is written to it` : "in memory: Save as… gives it a file"}>{name}</span>
+        title={design.path ? `${design.path}: every change is written to it` : "in memory: Save as… gives it a file"}>{example ? `${example.title} (a copy)` : name}</span>
       <span className="sep" />
       <div className="group" aria-label="Edit">
         <IconButton icon="undo" title={`Undo (Ctrl+Z)${hist.undo.length ? "" : ": nothing to undo"}`} disabled={!hist.undo.length} onClick={() => st.undo()} testid="undo" />
@@ -75,8 +84,10 @@ export function Toolbar() {
         )}
       </div>
       <span className="grow" />
+      </>}
       {busy > 0 && <span className="spin" title="working" data-testid="busy" />}
       <div className="group">
+        {page !== "gallery" && <>
         <Menu icon="verify" label="Verify" testid="menu-verify" align="end">
           <MenuItem icon="verify" label={!sel.length ? "Every tag (OpenCV)" : `Selected tag${sel.length > 1 ? "s" : ""} (OpenCV)`} hint="S › Verify" onClick={() => st.verifySel()} testid="verify-sel" />
           <MenuItem icon="sheet" label="The sheet (every marker in place)" onClick={() => st.verifyScene()} testid="verify-scene" />
@@ -100,6 +111,7 @@ export function Toolbar() {
           <MenuItem icon="single" label="Selected tag: STL" disabled={sel.length !== 1} onClick={() => st.exportTag("stl")} testid="export-tag-stl" />
           <MenuItem icon="single" label="Selected tag: plan JSON" disabled={sel.length !== 1} onClick={() => st.exportTag("json")} testid="export-tag-json" />
         </Menu>
+        </>}
         <IconButton icon={theme === "dark" ? "sun" : "moon"} title={theme === "dark" ? "Light theme" : "Dark theme"}
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")} testid="theme" />
         <IconButton icon="help" title="Keyboard (?)" onClick={() => st.setDrawer(useStudio.getState().drawer === "messages" ? null : "messages")} testid="help" />

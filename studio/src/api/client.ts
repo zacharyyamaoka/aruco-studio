@@ -129,6 +129,9 @@ export const api = {
   designFiles: () => get<DesignFiles>("/api/design/files"),
   openExample: (name: string) => post<any>("/api/design/open_example", { name }),
   browse: (dir?: string) => get<Browse>(`/api/design/browse${dir ? `?dir=${encodeURIComponent(dir)}` : ""}`),
+  // the gallery (N-3): the examples by feature, an example opened as a fresh copy
+  gallery: () => get<GalleryDoc>("/api/gallery"),
+  galleryOpen: (name: string) => post<DesignInfo & { item: GalleryItem }>("/api/gallery/open", { name }),
   save: (name: string) => post<{ saved: string; name: string }>("/api/scene/save", { name }),
   open: (name: string) => post<SceneDoc>("/api/scene/open", { name }),
   sceneVerify: () => post<any>("/api/scene/verify?px_per_mm=10"),
@@ -166,6 +169,22 @@ export interface DesignFiles {
   scenes: { name: string; file: string; bytes: number; modified: string }[];
   scenes_dir: string;
 }
+/** GET /api/gallery: examples/gallery/gallery.json, each item with its file's text. */
+export interface GalleryItem {
+  name: string;
+  file: string;
+  title: string;
+  /** one line on what it shows (the card) */
+  line: string;
+  /** what to look at (the note on the opened copy) */
+  look: string;
+  /** the note's buttons: "3d", "sheet", "send", "ids" */
+  actions?: string[];
+  text: string | null;
+  group?: string;
+}
+export interface GalleryGroup { id: string; title: string; line: string; items: GalleryItem[] }
+export interface GalleryDoc { schema: string; groups: GalleryGroup[]; dir: string }
 export interface Browse {
   dir: string; parent: string | null;
   folders: { name: string; path: string }[];

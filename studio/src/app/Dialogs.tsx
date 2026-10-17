@@ -80,8 +80,11 @@ function OpenLists({ close, path, setPath, keys }: { close: () => void; path: st
   const recent = (files?.recent ?? []).filter((r) => r.exists);
   return (
     <div className="open-lists">
-      <div className="open-head">Examples <span className="muted">a copy opens in the scenes folder</span></div>
+      <div className="open-head">Examples <span className="muted">the gallery: every feature, each a copy to change</span></div>
       <div className="scenes" data-testid="open-examples">
+        <button className="scene-item gallery-item" data-testid="open-gallery" onClick={() => { close(); st.showGallery(); }}>
+          <Icon name="grid" /><span><b>The gallery</b></span><span className="muted">{galleryCount(useStudio.getState().gallery)} examples by feature</span>
+        </button>
         {files === null && <div className="muted">…</div>}
         {files?.examples.map((x) => (
           <button key={x.name} className="scene-item" data-example={x.name} onClick={async () => { close(); await st.openExample(x.name); }}>
@@ -121,6 +124,10 @@ function OpenLists({ close, path, setPath, keys }: { close: () => void; path: st
       </div>
     </div>
   );
+}
+
+function galleryCount(g: { groups: { items: unknown[] }[] } | null): number {
+  return (g?.groups ?? []).reduce((n, x) => n + x.items.length, 0);
 }
 
 const PAGES = [

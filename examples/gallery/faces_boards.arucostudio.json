@@ -1,0 +1,210 @@
+{
+ "schema": "arucostudio.scene/2",
+ "name": "Boards on odd faces",
+ "preset": "0.32mm SPEED @MK4IS 0.6 - Aruco",
+ "sketches": [
+  {
+   "id": "sk",
+   "shapes": [
+    {
+     "id": "ring",
+     "circle": 60,
+     "holes": [
+      {
+       "circle": 30
+      }
+     ],
+     "at": [
+      0,
+      0
+     ]
+    },
+    {
+     "id": "hexagon",
+     "polygon": [
+      [
+       30,
+       0
+      ],
+      [
+       15,
+       25.9808
+      ],
+      [
+       -15,
+       25.9808
+      ],
+      [
+       -30,
+       0
+      ],
+      [
+       -15,
+       -25.9808
+      ],
+      [
+       15,
+       -25.9808
+      ]
+     ],
+     "at": [
+      75,
+      0
+     ]
+    },
+    {
+     "id": "stadium",
+     "slot": [
+      74,
+      24
+     ],
+     "at": [
+      160,
+      0
+     ]
+    },
+    {
+     "id": "notch",
+     "polygon": [
+      [
+       -35,
+       -22.5
+      ],
+      [
+       35,
+       -22.5
+      ],
+      [
+       35,
+       22.5
+      ],
+      [
+       10,
+       22.5
+      ],
+      [
+       10,
+       4.5
+      ],
+      [
+       -10,
+       4.5
+      ],
+      [
+       -10,
+       22.5
+      ],
+      [
+       -35,
+       22.5
+      ]
+     ],
+     "at": [
+      0,
+      -70
+     ]
+    },
+    {
+     "id": "strip",
+     "rect": [
+      150,
+      14
+     ],
+     "at": [
+      115,
+      -70
+     ]
+    },
+    {
+     "id": "triangle",
+     "polygon": [
+      [
+       0,
+       40.4145
+      ],
+      [
+       -35,
+       -20.2073
+      ],
+      [
+       35,
+       -20.2073
+      ]
+     ],
+     "at": [
+      230,
+      -70
+     ]
+    }
+   ]
+  }
+ ],
+ "features": [
+  {
+   "id": "ring_b",
+   "extrude": "ring",
+   "height": 3
+  },
+  {
+   "id": "hexagon_b",
+   "extrude": "hexagon",
+   "height": 3
+  },
+  {
+   "id": "stadium_b",
+   "extrude": "stadium",
+   "height": 3
+  },
+  {
+   "id": "notch_b",
+   "extrude": "notch",
+   "height": 3
+  },
+  {
+   "id": "strip_b",
+   "extrude": "strip",
+   "height": 3
+  },
+  {
+   "id": "triangle_b",
+   "extrude": "triangle",
+   "height": 3
+  },
+  {
+   "id": "on_ring",
+   "aruco": "ring_b.top",
+   "layout": "single",
+   "first_id": 0
+  },
+  {
+   "id": "on_hexagon",
+   "aruco": "hexagon_b.top",
+   "layout": "charuco",
+   "first_id": 1
+  },
+  {
+   "id": "on_stadium",
+   "aruco": "stadium_b.top",
+   "layout": "single",
+   "first_id": 5
+  },
+  {
+   "id": "on_notch",
+   "aruco": "notch_b.top",
+   "layout": "charuco",
+   "first_id": 6
+  },
+  {
+   "id": "on_strip",
+   "aruco": "strip_b.top",
+   "layout": "grid",
+   "first_id": 12
+  },
+  {
+   "id": "on_triangle",
+   "aruco": "triangle_b.top",
+   "layout": "single",
+   "first_id": 26
+  }
+ ]
+}

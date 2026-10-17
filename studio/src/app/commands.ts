@@ -1,9 +1,11 @@
 // Every command of the Studio, once: its name, its key, its group and what
 // it runs. The bottom toolbar, the command palette (S), the key handler and
 // the keys table of docs/STUDIO.md are all this list (the e2e test diffs
-// the palette with the doc's table).
+// the palette with the doc's table). The drawing tools are listed only
+// with the dev flag `?draw=1` (flags.ts): the gallery draws the inputs.
 import { getTheme, setTheme } from "@bam/ui";
 import { useStudio, type ToolId } from "../store";
+import { toolOn } from "./flags";
 
 export interface Command {
   id: string;
@@ -20,7 +22,7 @@ export interface Command {
 
 const st = () => useStudio.getState();
 
-export const TOOLS: { tool: ToolId; name: string; key: string; icon: string; hint: string }[] = [
+export const ALL_TOOLS: { tool: ToolId; name: string; key: string; icon: string; hint: string }[] = [
   { tool: "select", name: "Select / move", key: "V", icon: "pointer", hint: "click, Shift+click, marquee; drag moves (0.5 mm); handles on the selection" },
   { tool: "rect", name: "Rectangle", key: "R", icon: "rect", hint: "drag a box (Alt from the centre, Shift square), or type 80 50 Enter" },
   { tool: "circle", name: "Circle", key: "C", icon: "circle", hint: "drag a diameter, or type 50 Enter" },
@@ -31,6 +33,9 @@ export const TOOLS: { tool: ToolId; name: string; key: string; icon: string; hin
   { tool: "extrude", name: "Extrude", key: "E", icon: "extrude", hint: "the selected shape: type the height, Enter; or drag the arrow in 3D" },
   { tool: "aruco", name: "ArUco Extrude", key: "A", icon: "arucoext", hint: "click a shape or a face; Shift+click more; Enter" },
 ];
+
+/** The tools offered now: every one with `?draw=1`, else none that draws a shape. */
+export const TOOLS = ALL_TOOLS.filter((t) => toolOn(t.tool));
 
 export function commands(): Command[] {
   const tools: Command[] = TOOLS.map((t) => ({
@@ -68,6 +73,7 @@ export function commands(): Command[] {
     { id: "tag.grid", name: "ArUco: grid", key: "", group: "Tag", icon: "grid", run: () => st().addTag("grid") },
     { id: "tag.charuco", name: "ArUco: ChArUco", key: "", group: "Tag", icon: "charuco", run: () => st().addTag("charuco") },
     { id: "tag.library", name: "Preset library", key: "", group: "Tag", icon: "library", run: () => st().setLibrary(true) },
+    { id: "file.gallery", name: "Gallery", key: "", group: "File", icon: "grid", run: () => st().showGallery() },
     { id: "file.new", name: "New scene", key: "", group: "File", icon: "newdoc", run: () => st().setDialog({ kind: "new" }) },
     { id: "file.open", name: "Open", key: "Ctrl+O", group: "File", icon: "open", run: () => st().setDialog({ kind: "open" }) },
     { id: "file.saveas", name: "Save as", key: "", group: "File", icon: "save", run: () => st().setDialog({ kind: "save" }) },

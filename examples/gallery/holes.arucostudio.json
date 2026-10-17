@@ -1,0 +1,184 @@
+{
+ "schema": "arucostudio.scene/2",
+ "name": "Holes: avoid or ignore",
+ "preset": "0.32mm SPEED @MK4IS 0.6 - Aruco",
+ "sketches": [
+  {
+   "id": "sk",
+   "shapes": [
+    {
+     "id": "plate_avoid",
+     "rect": [
+      60,
+      45
+     ],
+     "holes": [
+      {
+       "circle": 10,
+       "at": [
+        8,
+        4
+       ]
+      }
+     ],
+     "at": [
+      0,
+      0
+     ]
+    },
+    {
+     "id": "plate_ignore",
+     "rect": [
+      60,
+      45
+     ],
+     "holes": [
+      {
+       "circle": 10,
+       "at": [
+        8,
+        4
+       ]
+      }
+     ],
+     "at": [
+      75,
+      0
+     ]
+    },
+    {
+     "id": "disc_avoid",
+     "circle": 50,
+     "holes": [
+      {
+       "circle": 8
+      }
+     ],
+     "at": [
+      0,
+      -65
+     ]
+    },
+    {
+     "id": "disc_ignore",
+     "circle": 50,
+     "holes": [
+      {
+       "circle": 8
+      }
+     ],
+     "at": [
+      75,
+      -65
+     ]
+    },
+    {
+     "id": "board_avoid_p",
+     "rect": [
+      80,
+      50
+     ],
+     "holes": [
+      {
+       "circle": 18
+      }
+     ],
+     "at": [
+      10,
+      -135
+     ]
+    },
+    {
+     "id": "board_ignore_p",
+     "rect": [
+      80,
+      50
+     ],
+     "holes": [
+      {
+       "circle": 18
+      }
+     ],
+     "at": [
+      105,
+      -135
+     ]
+    }
+   ]
+  }
+ ],
+ "features": [
+  {
+   "id": "pa",
+   "extrude": "plate_avoid",
+   "height": 3
+  },
+  {
+   "id": "pi",
+   "extrude": "plate_ignore",
+   "height": 3
+  },
+  {
+   "id": "da",
+   "extrude": "disc_avoid",
+   "height": 3
+  },
+  {
+   "id": "di",
+   "extrude": "disc_ignore",
+   "height": 3
+  },
+  {
+   "id": "ba",
+   "extrude": "board_avoid_p",
+   "height": 3
+  },
+  {
+   "id": "bi",
+   "extrude": "board_ignore_p",
+   "height": 3
+  },
+  {
+   "id": "avoid",
+   "aruco": "pa.top",
+   "layout": "single",
+   "holes": "avoid",
+   "first_id": 0
+  },
+  {
+   "id": "ignore",
+   "aruco": "pi.top",
+   "layout": "single",
+   "holes": "ignore",
+   "first_id": 1
+  },
+  {
+   "id": "disc_avoid_t",
+   "aruco": "da.top",
+   "layout": "single",
+   "holes": "avoid",
+   "first_id": 2
+  },
+  {
+   "id": "disc_ignore_t",
+   "aruco": "di.top",
+   "layout": "single",
+   "holes": "ignore",
+   "first_id": 3
+  },
+  {
+   "id": "board_avoid",
+   "aruco": "ba.top",
+   "layout": "charuco",
+   "holes": "avoid",
+   "first_id": 10
+  },
+  {
+   "id": "board_ignore",
+   "aruco": "bi.top",
+   "layout": "charuco",
+   "holes": "ignore",
+   "first_id": 20
+  }
+ ]
+}

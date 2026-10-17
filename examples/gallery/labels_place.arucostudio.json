@@ -1,0 +1,100 @@
+{
+ "schema": "arucostudio.scene/2",
+ "name": "Labels: auto, or placed by hand",
+ "preset": "0.32mm SPEED @MK4IS 0.6 - Aruco",
+ "sketches": [
+  {
+   "id": "sk",
+   "shapes": [
+    {
+     "id": "a",
+     "rect": [
+      45,
+      55
+     ],
+     "at": [
+      0,
+      0
+     ]
+    },
+    {
+     "id": "b",
+     "rect": [
+      45,
+      55
+     ],
+     "at": [
+      60,
+      0
+     ]
+    },
+    {
+     "id": "c",
+     "rect": [
+      45,
+      55
+     ],
+     "at": [
+      120,
+      0
+     ]
+    }
+   ]
+  }
+ ],
+ "features": [
+  {
+   "id": "pa",
+   "extrude": "a",
+   "height": 3
+  },
+  {
+   "id": "pb",
+   "extrude": "b",
+   "height": 3
+  },
+  {
+   "id": "pc",
+   "extrude": "c",
+   "height": 3
+  },
+  {
+   "id": "auto",
+   "aruco": "pa.top",
+   "layout": "single",
+   "size": 28.56,
+   "label": "#id + name",
+   "name": "arm",
+   "first_id": 0
+  },
+  {
+   "id": "above",
+   "aruco": "pb.top",
+   "layout": "single",
+   "size": 28.56,
+   "label": {
+    "on": true,
+    "content": "id_name",
+    "place": "white",
+    "side": "above"
+   },
+   "name": "arm",
+   "first_id": 1
+  },
+  {
+   "id": "by_hand",
+   "aruco": "pc.top",
+   "layout": "single",
+   "size": 28.56,
+   "label": {
+    "on": true,
+    "content": "id",
+    "place": "white",
+    "position": "manual",
+    "x_mm": 12,
+    "y_mm": -22
+   },
+   "first_id": 2
+  }
+ ]
+}

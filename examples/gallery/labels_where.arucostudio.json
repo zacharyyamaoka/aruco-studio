@@ -1,0 +1,144 @@
+{
+ "schema": "arucostudio.scene/2",
+ "name": "Labels: on the black or on the white",
+ "preset": "0.32mm SPEED @MK4IS 0.6 - Aruco",
+ "sketches": [
+  {
+   "id": "sk",
+   "shapes": [
+    {
+     "id": "a",
+     "rect": [
+      60,
+      60
+     ],
+     "at": [
+      0,
+      0
+     ]
+    },
+    {
+     "id": "b",
+     "rect": [
+      45,
+      55
+     ],
+     "at": [
+      65,
+      0
+     ]
+    },
+    {
+     "id": "c",
+     "rect": [
+      55,
+      45
+     ],
+     "at": [
+      125,
+      0
+     ]
+    },
+    {
+     "id": "d",
+     "rect": [
+      30,
+      30
+     ],
+     "at": [
+      0,
+      -60
+     ]
+    },
+    {
+     "id": "e",
+     "rect": [
+      40,
+      45
+     ],
+     "at": [
+      50,
+      -60
+     ]
+    }
+   ]
+  }
+ ],
+ "features": [
+  {
+   "id": "pa",
+   "extrude": "a",
+   "height": 3
+  },
+  {
+   "id": "pb",
+   "extrude": "b",
+   "height": 3
+  },
+  {
+   "id": "pc",
+   "extrude": "c",
+   "height": 3
+  },
+  {
+   "id": "black",
+   "aruco": "pa.top",
+   "layout": "single",
+   "size": 44.88,
+   "label": {
+    "on": true,
+    "content": "id",
+    "place": "black"
+   },
+   "first_id": 0
+  },
+  {
+   "id": "below",
+   "aruco": "pb.top",
+   "layout": "single",
+   "size": 28.56,
+   "label": {
+    "on": true,
+    "content": "id",
+    "place": "white",
+    "side": "below"
+   },
+   "first_id": 1
+  },
+  {
+   "id": "right",
+   "aruco": "pc.top",
+   "layout": "single",
+   "size": 28.56,
+   "label": {
+    "on": true,
+    "content": "id",
+    "place": "white",
+    "side": "right"
+   },
+   "first_id": 2
+  },
+  {
+   "id": "sticker_black",
+   "aruco": "d",
+   "preset": "Sticker · Letter · 600 dpi",
+   "layout": "single",
+   "label": "#id",
+   "first_id": 3
+  },
+  {
+   "id": "sticker_white",
+   "aruco": "e",
+   "preset": "Sticker · Letter · 600 dpi",
+   "layout": "single",
+   "perimeter": "profile",
+   "label": {
+    "on": true,
+    "content": "id",
+    "place": "white",
+    "side": "below"
+   },
+   "first_id": 4
+  }
+ ]
+}

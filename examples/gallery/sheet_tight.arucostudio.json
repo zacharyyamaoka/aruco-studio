@@ -1,0 +1,112 @@
+{
+ "schema": "arucostudio.scene/2",
+ "name": "The sticker sheet: tight",
+ "preset": "Sticker · Letter · 600 dpi",
+ "sketches": [
+  {
+   "id": "sk",
+   "shapes": [
+    {
+     "id": "a",
+     "rect": [
+      30,
+      30
+     ],
+     "at": [
+      0,
+      0
+     ]
+    },
+    {
+     "id": "b",
+     "rect": [
+      30,
+      30
+     ],
+     "at": [
+      40,
+      0
+     ]
+    },
+    {
+     "id": "c",
+     "rect": [
+      60,
+      40
+     ],
+     "at": [
+      0,
+      50
+     ]
+    },
+    {
+     "id": "d",
+     "circle": 50,
+     "holes": [
+      {
+       "circle": 6,
+       "at": [
+        0,
+        18
+       ]
+      }
+     ],
+     "at": [
+      80,
+      50
+     ]
+    },
+    {
+     "id": "e",
+     "rect": [
+      40,
+      25
+     ],
+     "at": [
+      100,
+      0
+     ]
+    }
+   ]
+  }
+ ],
+ "features": [
+  {
+   "id": "t1",
+   "aruco": "a",
+   "layout": "single",
+   "label": "#id",
+   "first_id": 0
+  },
+  {
+   "id": "t2",
+   "aruco": "b",
+   "layout": "single",
+   "label": "#id",
+   "first_id": 1
+  },
+  {
+   "id": "t3",
+   "aruco": "c",
+   "layout": "grid",
+   "first_id": 2
+  },
+  {
+   "id": "t4",
+   "aruco": "d",
+   "layout": "charuco",
+   "perimeter": "profile",
+   "first_id": 8
+  },
+  {
+   "id": "t5",
+   "aruco": "e",
+   "layout": "grid",
+   "first_id": 20
+  }
+ ],
+ "sheet": {
+  "page": "letter",
+  "mode": "tight"
+ }
+}

@@ -19,6 +19,7 @@ import { idsText } from "../model/scene";
 import { findShape } from "../model/design";
 import { madeBy, useStudio } from "../store";
 import { MadeByLine, PresetRow, StaleRows } from "./PresetRow";
+import { DRAW } from "../app/flags";
 import { ShapeInspector } from "./ShapeInspector";
 
 export function Inspector() {
@@ -360,11 +361,20 @@ function NewTagDefaults() {
       <div className="insp-head"><Icon name="plus" /><b>New tag</b></div>
       <PresetRow tag={null} issues={[]} />
       <MadeByLine tag={null} />
+      {DRAW ? <>
       <div className="muted pad">Draw a shape (R, C, P, O), then A puts a tag on it with this preset; E extrudes it, so a tag can go on a face.
         {scene.tags.length ? ` ${scene.tags.length} tag(s) in '${scene.name}'.` : ""}</div>
       <div className="keys muted pad">
         Keys: <b>V</b> select · <b>R</b> rectangle · <b>C</b> circle · <b>P</b> polygon · <b>O</b> slot · <b>H</b> hole · <b>E</b> extrude · <b>A</b> ArUco Extrude · <b>S</b> search · <b>?</b> all keys
       </div>
+      </> : <>
+      <div className="muted pad" data-testid="newtag-hint">Click a tag to change its numbers, or a shape for its size and holes.
+        A on a selected shape puts a tag on it with this preset; E extrudes it, so a tag can go on a face.
+        {scene.tags.length ? ` ${scene.tags.length} tag(s) in '${scene.name}'.` : ""}</div>
+      <div className="keys muted pad">
+        Keys: <b>V</b> select · <b>E</b> extrude · <b>A</b> ArUco Extrude · <b>Tab</b> 2D / 3D · <b>S</b> search · <b>?</b> all keys
+      </div>
+      </>}
     </div>
   );
 }

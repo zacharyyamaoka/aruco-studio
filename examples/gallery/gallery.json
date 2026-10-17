@@ -1,0 +1,103 @@
+{
+ "schema": "arucostudio.gallery/1",
+ "note": "The Studio's landing page (Zach's N-3, 2026-10-17): golden examples, the inputs drawn for the user, markers first. Each item is a design file beside this one; the Studio opens a copy (GET /api/gallery, POST /api/gallery/open). `look` is the card's 'what to look at'; `actions` are its buttons: 3d (the 3D view), sheet (Export > Sticker sheet...), send (Export > Send to PrusaSlicer...), ids (Renumber all).",
+ "groups": [
+  {"id": "basics", "title": "Markers by hand", "line": "Type first, then the inner numbers; the outer size follows.",
+   "items": [
+    {"name": "basics_single", "file": "basics_single.arucostudio.json", "title": "A single marker",
+     "line": "Single, Marker size typed: the tile and the trimmed plate follow.",
+     "look": "Typed: Single, DICT_4X4_50, Marker size 30 mm. The 0.6 mm printer's cells are whole 0.68 mm lines, so it builds 28.56 mm (the Size row says so). The outer size is derived: one module of white each side makes a 38.1 mm tile, and Trim excess cuts the 50 mm plate down to it. Type another Marker size in the inspector.",
+     "actions": ["3d"]},
+    {"name": "basics_grid", "file": "basics_grid.arucostudio.json", "title": "A grid board",
+     "line": "Grid, 3 × 2 at 12.24 mm: the board is 46.2 × 31.3 mm.",
+     "look": "Typed: Grid, Marker size 12.24 mm, 3 × 2. On a sketch profile the typed count is kept; the board with its white border, 46.2 × 31.3 mm, is the outer size and the plate is trimmed to it. Change Columns × rows or the Marker size.",
+     "actions": ["3d"]},
+    {"name": "basics_charuco", "file": "basics_charuco.arucostudio.json", "title": "A ChArUco board",
+     "line": "ChArUco, checker 16.32, marker 12.24, 4 × 3.",
+     "look": "Typed: ChArUco, Checker 16.32 mm, Marker 12.24 mm, 4 × 3. The board is 65.3 × 49.0 mm with no outer border: its six inner corners are the checker's. The plate is trimmed to the board.",
+     "actions": ["3d"]}
+   ]},
+  {"id": "made", "title": "Made two ways", "line": "The preset is the machine.",
+   "items": [
+    {"name": "two_ways", "file": "two_ways.arucostudio.json", "title": "3D printed and inkjet",
+     "line": "The same 30 mm marker, made by two presets.",
+     "look": "Both tags ask for a 30 mm single. Left, the 0.6 mm 3D printer: whole 0.68 mm lines give 28.56 mm, the black printed on the plate (3D badge). Right, the Letter 600 dpi sticker printer: whole dots give 29.97 mm on 0.1 mm paper, cut along the marker (2D badge). Select one: Made by under the Preset says how it is made.",
+     "actions": ["3d"]}
+   ]},
+  {"id": "ids", "title": "IDs", "line": "One numbering, 2D and 3D.",
+   "items": [
+    {"name": "ids", "file": "ids.arucostudio.json", "title": "Unique across 2D and 3D",
+     "line": "Seven tags made without ids, all #0: Renumber all makes them unique.",
+     "look": "Every tag here was made without an id, so each starts at #0: the IDs table on the left marks the duplicates. Press Renumber all: the 3D tags and the stickers get one numbering per dictionary family (a sticker #3 and a printed #3 would be one duplicate). 'other' is DICT_6X6, a family of its own, so it keeps #0.",
+     "actions": ["ids"]}
+   ]},
+  {"id": "auto", "title": "Auto-placement on profiles", "line": "The largest clear rectangle, holes avoided or ignored, 0° or 90°.",
+   "items": [
+    {"name": "faces", "file": "faces.arucostudio.json", "title": "The largest clear rectangle",
+     "line": "Zach's disc, a D-shape, an L and a plate with a hole.",
+     "look": "Nothing is typed: each Auto size fills its face's largest clear square, holes and notches avoided. Zach's Ø53 disc with four holes: a 37.4 mm square, a 24.48 mm marker. The D-shape 30.7 mm, the plate beside its hole 31.0 mm, the L in one leg. Drag a shape's handle (select the shape, not the tag) and the marker re-places live.",
+     "actions": ["3d"]},
+    {"name": "faces_boards", "file": "faces_boards.arucostudio.json", "title": "Boards on odd faces",
+     "line": "A ring, a hexagon, a slot, a notch, a strip and a triangle.",
+     "look": "A board on Auto takes as many markers as fit in the face's largest clear rectangle: the strip gets a long row, the notched plate a board beside the notch. Where Auto's cells come out under the preset's 2.0 mm minimum, the Size row warns and names a checker size that passes."},
+    {"name": "holes", "file": "holes.arucostudio.json", "title": "Holes: avoid or ignore",
+     "line": "The same faces with Holes on Avoid (left) and Ignore (right).",
+     "look": "Avoid keeps the tile clear of every hole; Ignore lets the tile cover them and says so (the covered hole is dashed). The plate's offset hole: 24.48 mm becomes 32.64 mm; the disc's centre hole: 12.24 mm becomes 24.48 mm; the ChArUco: 2 × 4 becomes 4 × 3. Switch Holes in the inspector to watch it re-place."},
+    {"name": "angles", "file": "angles.arucostudio.json", "title": "0° or 90°",
+     "line": "The fit turns the board with the face; the Origin turns the marker.",
+     "look": "The fit tries the tile at 0° and at 90° and keeps the one with more markers: the same Auto grid is 4 × 1 on the wide plate and 1 × 4 on the tall one. On the right, Origin 0 and 90: the marker and its OpenCV frame (x red, y green) a quarter turn apart on the face; the corner triangle shows which way.",
+     "actions": ["3d"]}
+   ]},
+  {"id": "labels", "title": "Labels", "line": "On the black or the white, auto or by hand; a ChArUco label in a black square.",
+   "items": [
+    {"name": "labels_where", "file": "labels_where.arucostudio.json", "title": "On the black, on the white",
+     "line": "3D tags and stickers, each label where it prints.",
+     "look": "A 3D label cut out of the black strokes at least 1.1 cell lines (rule 5): 3.74 mm letters at 0.68 mm lines, so the black row must be a 7.48 mm module (the 44.88 mm marker). On the white: below and to the right. Stickers print much smaller letters: '#3' on the black of a 22 mm sticker; on the white when Perimeter = Profile leaves white for it."},
+    {"name": "labels_place", "file": "labels_place.arucostudio.json", "title": "Auto, or placed by hand",
+     "line": "Auto picks the black or the white; Above; X / Y by hand.",
+     "look": "Left, Auto: the black row is too small for the letters, so the label goes on the white and the Label row says why. Middle, Above with '#id + name'. Right, Placed by hand (X 12, Y -22 mm). Select a tag and drag its label on the canvas (0.25 mm steps)."},
+    {"name": "labels_charuco", "file": "labels_charuco.arucostudio.json", "title": "A ChArUco label",
+     "line": "In a black square only: Auto, and dragged to another square.",
+     "look": "A ChArUco label goes in a black square, never on the white. Left, Auto: the first black square that holds '#0-3'. Right, placed by hand (Placed: manual, X 24.48, Y -24.48 mm) in the bottom-right black square. Select it and drag the label into any other black square; a square too small refuses it with the reason."}
+   ]},
+  {"id": "marks", "title": "Corner marks", "line": "Which way is up.",
+   "items": [
+    {"name": "marks", "file": "marks.arucostudio.json", "title": "None, cut corner, triangle",
+     "line": "The three marks on singles, a grid and a ChArUco.",
+     "look": "Top: None, Cut white corner, Black triangle. Bottom: a grid and a ChArUco with the triangle. On a single or a grid the mark sits in the quiet zone's corner, so the marker's own squares are never cut. A ChArUco board has no white corner: its top-left black checker square loses its outer corner instead (the Corner mark row says so).",
+     "actions": ["3d"]}
+   ]},
+  {"id": "trim", "title": "Trim and Perimeter", "line": "The outline or the marker.",
+   "items": [
+    {"name": "trim", "file": "trim.arucostudio.json", "title": "Marker or Profile",
+     "line": "A 3D plate trimmed or not; stickers cut as a rectangle or as the disc.",
+     "look": "Top, 3D: Trim excess off keeps the 50 mm plate (Profile); on, the plate is cut to the 38.1 mm tile (Marker). Bottom, stickers on Zach's disc: Perimeter = Profile cuts along the disc and its four holes; Perimeter = Marker cuts the marker's rectangle. The cut lines are dashed grey.",
+     "actions": ["3d"]}
+   ]},
+  {"id": "multi", "title": "Multi-face", "line": "One feature, many faces.",
+   "items": [
+    {"name": "forearm", "file": "forearm.arucostudio.json", "title": "The forearm box",
+     "line": "Four ChArUco boards on the four sides of a 120 × 40 × 40 box.",
+     "look": "One feature, four faces: each side gets its own board and its own ids (0, 6, 10, 16). In 2D the box is drawn as its net, each side hinged at a dashed line; in 3D the boards stand on their faces. Change one face's settings and the list splits into one feature per face.",
+     "actions": ["3d"]}
+   ]},
+  {"id": "sheet", "title": "The sticker sheet", "line": "Tight or spaced.",
+   "items": [
+    {"name": "sheet_tight", "file": "sheet_tight.arucostudio.json", "title": "Tight",
+     "line": "Five stickers in shelves that share their cut lines.",
+     "look": "Open the sheet: Tight packs the stickers in shelves where neighbours share a cut line (fewer cuts); the disc keeps its outline and hole as cut lines. The page carries the 100 mm bar to check the print scale.",
+     "actions": ["sheet"]},
+    {"name": "sheet_spaced", "file": "sheet_spaced.arucostudio.json", "title": "Spaced",
+     "line": "The same stickers with gaps, captions and crop marks.",
+     "look": "Open the sheet: Spaced leaves gaps, puts the id and name under each sticker and crop marks at its corners. Switch Tight / Spaced, the page or the margin in the dialog.",
+     "actions": ["sheet"]}
+   ]},
+  {"id": "print", "title": "PrusaSlicer", "line": "The colours on their extruders.",
+   "items": [
+    {"name": "send", "file": "send.arucostudio.json", "title": "Beds and Send",
+     "line": "Four 3D tags for one bed.",
+     "look": "Export › Send to PrusaSlicer… picks the physical printer (PrusaSlicer's current one first), a print preset that fits it and the white and black extruders, then writes a 3MF project with the colours set. Open PrusaSlicer is a tick in the dialog.",
+     "actions": ["send", "3d"]}
+   ]}
+ ]
+}
