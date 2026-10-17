@@ -33,7 +33,10 @@ PORTS = {
     "label": [(B + "aruco_label.py", {"RULES", "_offset_label", "label_violations",
                                       "check_label", "describe",
                                       # audit 2026-10-17: rule 4 (a ChArUco label on auto stays in a black square)
-                                      "plan_label", "_describe"})],
+                                      "plan_label", "_describe",
+                                      # 2026-10-17: rule 5 (a label cut from the black strokes
+                                      # >= 1.1 cell lines; Label carries line_mm)
+                                      "Label", "LabelSettings", "from_dict", "relabel"})],
     "trim": [(B + "aruco_trim.py", set())],
     "numbering": [(B + "aruco_numbering.py", set())],
     "markers": [(B + "markers.py", set())],

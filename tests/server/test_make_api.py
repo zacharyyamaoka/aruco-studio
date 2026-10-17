@@ -45,7 +45,7 @@ def test_every_form_row_says_where_it_applies(client):
     assert rows["settings.holes"]["intent"] == "both"
     assert rows["settings.make.by"]["read_only"] and rows["settings.label.nozzle_mm"][
         "label_2d"] == "Stroke"
-    assert f["rules"]["make"] == 1 and f["rules"]["label_new"] == 4     # rule 4: audit 2026-10-17
+    assert f["rules"]["make"] == 1 and f["rules"]["label_new"] == 5     # rule 5: 2026-10-17 (Q1)
 
 
 def test_a_sticker_preset_makes_a_sticker(client):
@@ -54,7 +54,7 @@ def test_a_sticker_preset_makes_a_sticker(client):
     s = sp["settings"]
     assert s["make"] == {"rule": 1, "by": "sticker", "thickness_mm": 0.1, "margin_mm": 0.0,
                          "cut_line": True, "perimeter": "marker"}
-    assert "trim" not in s and s["holes"] == "avoid" and s["label"]["rule"] == 4
+    assert "trim" not in s and s["holes"] == "avoid" and s["label"]["rule"] == 5
     assert s["cells"] == {"rule": 1, "of": "cell", "mm": 0.042333, "min_mm": 1.0}
     assert s["label"]["nozzle_mm"] == 0.2
     p = client.post("/api/plan", json=sp).json()

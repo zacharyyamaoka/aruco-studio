@@ -70,7 +70,7 @@ def test_the_new_tag_rule_stamps_make_holes_and_the_new_label_rule():
     s = S.default_settings()
     out = F.new_tag_settings(s, True)
     assert out["make"] == {"rule": 1, "by": "print3d"}
-    assert out["holes"] == "avoid" and out["label"]["rule"] == L.NEW_RULE == 4   # rule 4: audit 2026-10-17
+    assert out["holes"] == "avoid" and out["label"]["rule"] == L.NEW_RULE == 5   # rule 5: 2026-10-17 (Q1)
     st = F.new_tag_settings(s, True, preset=P.sticker_preset())
     assert st["make"]["by"] == "sticker" and st["make"]["thickness_mm"] == 0.1
     assert (st["mode"], st["op"], st["pin"]) == ("both", "new", "none") and "trim" not in st

@@ -32,9 +32,10 @@ def plate_tag(rule):
     return spec
 
 
-def test_a_new_tag_stores_rule_4():
-    assert L.NEW_RULE == 4 and L.SQUARE_ONLY_RULE == 4
-    assert plate_tag(None).settings["label"]["rule"] == 4
+def test_a_new_tag_stores_rule_4_or_later():
+    # rule 5 (test_label_rule5.py) keeps rule 4's square-only auto
+    assert L.NEW_RULE == 5 and L.SQUARE_ONLY_RULE == 4
+    assert plate_tag(None).settings["label"]["rule"] == L.NEW_RULE
 
 
 def test_rule_3_keeps_its_white_fallback():

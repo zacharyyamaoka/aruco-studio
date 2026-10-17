@@ -41,7 +41,23 @@ def test_four_identical_30_mm_stickers_tight_one_shelf_7_cuts():
     assert [round(b - a, 9) for a, b in zip(xs, xs[1:])] == [30.0, 30.0, 30.0]  # shared cuts
     assert len({p.y_mm for p in L.placed}) == 1
     assert L.cuts() == 7                     # 2 long + 5 short (16 for four rectangles)
-    assert lay([item(f"t{i}", 30, 30, ids=(i,)) for i in range(4)], "spaced").cuts() == 16
+    # spaced, a guillotine count (audit nit A6): 2 long + 8 short, not 4 per sticker
+    assert lay([item(f"t{i}", 30, 30, ids=(i,)) for i in range(4)], "spaced").cuts() == 10
+
+
+def test_spaced_cuts_are_a_guillotine_count_and_tight_still_wins():
+    """Audit nit A6: spaced counted 4 per sticker (an upper bound). Now each
+    straight cut that crosses no sticker counts once; tight keeps the
+    design's own count, and still needs fewer."""
+    assert SH._guillotine([(0, 0, 10, 10)], (0, 0, 100, 100), 0) == 2        # two sides inside
+    assert SH._guillotine([(0, 0, 10, 10), (20, 0, 30, 10)], (0, 0, 100, 100), 0) == 4
+    pin = [(0, 0, 20, 10), (20, 0, 30, 20), (10, 20, 30, 30), (0, 10, 10, 30)]   # a pinwheel
+    assert SH._guillotine(pin, (0, 0, 30, 30), 0) == 4 * 4                    # as before
+    its = ([item(f"a{i}", 30, 30, ids=(i,)) for i in range(5)]
+           + [item(f"b{i}", 45, 20, ids=(10 + i,)) for i in range(3)]
+           + [item(f"c{i}", 25, 40, ids=(20 + i,)) for i in range(4)])
+    spaced, tight = lay(its, "spaced"), lay(its, "tight")
+    assert tight.cuts() < spaced.cuts() < 4 * len(spaced.placed)
 
 
 def _crosses(L):

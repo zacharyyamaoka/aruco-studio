@@ -22,6 +22,7 @@ Beyond REF (M6a, both absent = REF's evaluate() exactly):
 | | |
 |---|---|
 | `settings.holes == "ignore"` | the fit and the label's white read the OUTER loop only (`fit_loops`); the trim still reads every loop |
+| label rule 5 (`label.LINE_RULE`) | `label_for` hands `plan_label` the tag's cell line (`cell_line_mm`: the `cells` step when it is of the cell); a label cut out of the black strokes at least that. Rules 1-4 ignore it |
 | `sticker=` a `core.make.Make` | a printed sticker: fitted on the loops like a face (a sketch area too), the tile is the sticker grown by its margin, the label's white is the sticker's cut polygon (Marker: that rectangle; Profile: the outline with its holes), the record's depth is the ink's |
 """
 from __future__ import annotations
@@ -124,6 +125,16 @@ def sticker_region(target, s, spec, base, frame, sticker):
     return [al.rect_loop((u0 - m, v0 - m, u1 + m, v1 + m))]
 
 
+def cell_line_mm(s):
+    """NOT REF's (label rule 5): the line of the tag's cell rule, mm -- the
+    `cells` step when the cell is a whole number of it (of "cell"), else 0
+    (a marker step, or a tag made before the cells: no line floor)."""
+    c = _A.cells_of((s or {}).get("cells"))
+    if c is None or c[0] != "cell":
+        return 0.0
+    return round(c[1] * 1000.0, 6)
+
+
 def label_for(target, s, n, spec, plan, mark, tile_mm, base, frame, name="", sticker=None):
     """REF label_for: the tag's label (aruco_label.plan_label), its white
     from where this mode has it, the corner mark and pins kept clear of.
@@ -139,7 +150,8 @@ def label_for(target, s, n, spec, plan, mark, tile_mm, base, frame, name="", sti
         region = sticker_region(target, s, spec, base, frame, sticker)
         return al.plan_label(spec, ls, mode="both", op=plan.op, name=name, key=s.get("key", ""),
                              region=region, grow=False, bounds=None, tile=tile, mark=mark,
-                             pins=None, slab=tuple(plan.layers.pattern))
+                             pins=None, slab=tuple(plan.layers.pattern),
+                             line_mm=cell_line_mm(s))
     mode = s["mode"]
     op = plan.op
     has_body = bool(s.get("has_body"))
@@ -174,7 +186,7 @@ def label_for(target, s, n, spec, plan, mark, tile_mm, base, frame, name="", sti
     key = s.get("key", "")
     return al.plan_label(spec, ls, mode=mode, op=op, name=name, key=key,
                          region=region, grow=room["grow"], bounds=bounds,
-                         tile=tile, mark=mark, pins=pins, slab=slab)
+                         tile=tile, mark=mark, pins=pins, slab=slab, line_mm=cell_line_mm(s))
 
 
 def x_ref_3d(target, base):

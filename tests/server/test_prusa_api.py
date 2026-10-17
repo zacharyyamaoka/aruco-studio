@@ -16,9 +16,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import shutil
+import time
 import zipfile
 from pathlib import Path
 
@@ -209,9 +211,15 @@ def test_no_folder_says_so(env, monkeypatch, tmp_path):
 
 # ------------------------------------------------------------------ M8c.3
 
-def test_the_marker_is_nowhere(env, caplog):
+def test_the_marker_is_nowhere(env, caplog, monkeypatch):
     c, ps, tmp, _DA = env
     mark(ps)
+    # the folder's watcher too (audit nit A7): a `prusa` event and /api/prusa/watch
+    from aruco_studio.server import prusa_watch as PW
+    events = []
+    w = PW.PrusaWatch(lambda _e, d: events.append(d))
+    monkeypatch.setattr(PW, "WATCH", w)
+    w.tick()                                           # the state at start
     raw = (ps / "physical_printer" / "ontario.ini").read_text(encoding="utf-8")
     assert raw.count(MARK) == len(HOST_KEYS)
     caplog.set_level(logging.DEBUG)
@@ -235,10 +243,21 @@ def test_the_marker_is_nowhere(env, caplog):
     for f in home.rglob("*"):
         if f.is_file():
             out.append(f.read_bytes().decode("utf-8", errors="replace"))
+    kappa = ps / "physical_printer" / "kappa.ini"
+    text = kappa.read_text(encoding="utf-8")
+    old_name = 'preset_names = "Original Prusa MK3.5 & MK3.5S 0.6 nozzle"'
+    assert old_name in text
+    kappa.write_text(text.replace(old_name, 'preset_names = "Original Prusa i3 MK3 0.6 nozzle"'),
+                     encoding="utf-8")
+    for _ in range(3):
+        w.tick()
+        time.sleep(w.quiet + 0.05)
+    assert events and events[-1]["changed"] == ["physical_printer/kappa"], events
+    out += [json.dumps(e) for e in events]
+    out.append(c.get("/api/prusa/watch").text)
     out += [rec.getMessage() for rec in caplog.records]
     hits = [i for i, t in enumerate(out) if MARK in t]
     assert not hits, hits
-    assert any("printhost" not in t for t in out)
 
 
 def test_nothing_is_written_under_zachs_prusaslicer_folder():

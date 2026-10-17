@@ -100,3 +100,14 @@ def test_form_lists_every_row():
     assert f["schema"] == "arucostudio.form/1"
     assert {r["path"] for r in f["fields"]} == {r["path"] for r in fields()}
     assert set(f["groups"]) >= {r["group"] for r in f["fields"]}
+
+
+@pytest.mark.parametrize("key, word", [("size", "Marker size"), ("square", "Checker size")])
+def test_a_negative_size_says_so_in_words_the_short_line_keeps(key, word):
+    """Audit nit C2: "size -5.0: 0 (Auto) or ..." showed as "size -5.0: 0"
+    (the kit's short line cuts at " ("). Now the whole sentence survives."""
+    sp = base_spec("charuco")
+    sp["numbers"][key] = -5.0
+    texts = [i.text for i in check(TagSpec.from_dict(sp)) if i.field == f"numbers.{key}"]
+    assert texts == [f"{word} -5 mm: 0 for Auto, or more than 0 mm"], texts
+    assert not any(cut in texts[0] for cut in (" (", ". ", "; "))

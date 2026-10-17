@@ -13,7 +13,7 @@ The morning hand-over of 2026-10-17. `main` of `C:\Users\BAM\Documents\aruco-stu
 | Print stickers | open `sticker_sheet`, Export › Sticker sheet… (Spaced / Tight, Letter / A4), then Export › Print sticker sheet… (M6c.5 below: measure the 100 mm bar once with a ruler) |
 | Send to PrusaSlicer | open `forearm`, Export › Send to PrusaSlicer…. The dialog starts on PrusaSlicer's current physical printer; tick Open PrusaSlicer to launch it. With your own PrusaSlicer folder the Library's Printers collection shows your printers |
 
-Three questions wait for you (section 4): the cut-from-black label stroke, a sticker's ChArUco Auto size, and the forearm's labels on three faces.
+Two questions wait for you (section 4): a sticker's ChArUco Auto size, and the forearm's labels on three faces. The third, the cut-from-black label stroke (Q1), took its recommended default while you slept: label rule 5 (lane polish, `docs/status/polish.md`).
 
 ## 2. The check run
 
@@ -31,7 +31,7 @@ Three questions wait for you (section 4): the cut-from-black label stroke, a sti
 | e2e | 47 Playwright passed (3.9 m) in 236 s |
 | **all** | **OK in 523 s**, exit 0 |
 
-`tools/check.py --trace`: 233 REF sections, ported 212, not ported (Fusion / UI) 17, skipped (other venvs) 4, **missing 0**. The 4 core skips are the parked `evaluate()` sections of two legacy goldens (`tests/plan/test_golden_evaluate.py` covers them). The verify skip is M8c's strict xfail (section 4, Q1).
+`tools/check.py --trace`: 233 REF sections, ported 212, not ported (Fusion / UI) 17, skipped (other venvs) 4, **missing 0**. The 4 core skips are the parked `evaluate()` sections of two legacy goldens (`tests/plan/test_golden_evaluate.py` covers them). The verify skip was M8c's strict xfail (section 4, Q1); lane polish turned it into a pass under label rule 5.
 
 ### The morning screenshots
 
@@ -64,7 +64,7 @@ Each milestone's own record has the numbers and the evidence per check: `docs/st
 | M6a.3 | Holes: avoid / ignore; avoid = today byte for byte; the crossing warn | PASS; the plate with a hole: 23.0 -> 37.0 mm (`tests/plan/test_holes.py`, 45) |
 | M6a.4 | Perimeter Marker / Profile on 12 faces x labels | PASS, 72 cases |
 | M6a.5 | label rule 3 builds in each of 18 black squares; rules 1 and 2 unchanged | PASS, 18 / 18 (`tests/core/test_label_rule3.py`) |
-| M6a.6, M6a.7 | tight: four 30 mm stickers, one shelf, 7 cuts (16 spaced); odd shapes packed by their boxes with every cut line | PASS (`tests/core/test_sheet_modes.py`) |
+| M6a.6, M6a.7 | tight: four 30 mm stickers, one shelf, 7 cuts (spaced: 16 in the note, 10 counted since lane polish); odd shapes packed by their boxes with every cut line | PASS (`tests/core/test_sheet_modes.py`) |
 | M6a.8 | WYSIWYG: the PDF's raster at 600 dpi equals each sticker's plan | PASS: worst ink XOR 0.82 %, side 0.012 mm, label IoU 0.959, outline 0.072 mm, bars 0.034 mm (`tests/verify/test_sheet_wysiwyg.py`) |
 | M6a.9 | sheet.svg = sheet.json within 0.01 mm | PASS |
 | M6a.10 | a 96-point disc with 3 holes plans under 50 ms | PASS, 21.9 ms |
@@ -108,7 +108,7 @@ Each milestone's own record has the numbers and the evidence per check: `docs/st
 | M8c.4 | `/api/prusa/printers`, the Printers collection, Select makes a preset | PASS |
 | M8c.5 | the watcher: a `prusa` event within 3 s (0.55-0.63 s); a bundle swap under 200 ms CPU (94 ms); a tag never changes by itself, "Apply?" instead | PASS (`tests/server/test_prusa_watch.py`) |
 | M8c.6 | Send: the forearm one object, volumes closed and two-manifold, black on extruder 2, the config = the printer's chain; stickers 400 | PASS (`tests/scene/test_print3d.py`) |
-| M8c.7 | the headless slice: layers, the black's heights, lines per cell, ink IoU >= 0.9, footprint, the four side tags | PASS on every bar but one: **the label-pixel bar FAILS** on labels cut from the black at a 0.64 mm stroke under the 0.68 mm line (37 of 216 pixels; the same on a flat face). A strict xfail: `tests/verify/test_slice_check.py` (section 4, Q1) |
+| M8c.7 | the headless slice: layers, the black's heights, lines per cell, ink IoU >= 0.9, footprint, the four side tags | PASS. The label-pixel bar passes for new tags since label rule 5 (lane polish): the forearm's '#0-5' cut from the black at the floor stroke, 0.748 mm, prints 85 of 85 pixels. A rule-4 tag still loses 37 of 216 at 0.64 mm, kept as its own test (`tests/verify/test_slice_check.py`, no xfail left) |
 | M8c.8 | `open: false` in every test; the GUI path and `--single-instance` recorded | recorded: `C:\Program Files\Prusa3D\PrusaSlicer\prusa-slicer.exe`, 2.9.6, `--single-instance` accepted |
 | M8c.9 | check green; nothing under `%APPDATA%\PrusaSlicer`, CADExporter or REF; `test_purity` passes | PASS |
 
@@ -149,7 +149,7 @@ The 15-point Definition of Done of `docs/PLAN.md` section 4 was verified on 2026
 
 | # | Question | Where it stands |
 |---|---|---|
-| Q1 | **A label cut out of the black** with a stroke under one line (0.64 mm against a 0.68 mm line) loses font pixels when sliced: 37 of 216 pixels under 60 % on the forearm, 44 of 216 on a flat face. A label printed in black on the white passes at 100 % | Either a new label rule (rule 5: a cut-from-black stroke is at least one line width) or a finer nozzle for the black. `tests/verify/test_slice_check.py` holds a strict xfail that fails loudly the day it passes |
+| Q1 | **Resolved with label rule 5**, the recommended default, taken while Zach slept (lane polish, 2026-10-17). A label cut out of the black now strokes at least one line of the tag's cell rule. The slice showed exactly one line is not quite enough: at 0.68-0.72 mm the white prints but the one-pixel black counters drop out (10 of 85 pixels). From 0.74 mm every pixel prints. So the floor is 1.1 lines: 0.748 mm, 3.74 mm letters at 0.68 mm lines. Only new tags store rule 5; rules 1-4 plan exactly as before (the goldens hold). Change `label.LINE_STROKE` before any tag is printed if you want another margin | `tests/verify/test_slice_check.py` passes (no xfail); `tests/core/test_label_rule5.py`. A finer black nozzle is still the other road |
 | Q2 | **A sticker's ChArUco Auto** uses the 3D tube rule (k squares across, raised to the printable minimum), not the largest board that fits | Changing it changes Auto for every stored sticker: a new versioned rule, and your word on what "fills" means (2 x 2 of 13.5 mm or 3 x 3 of 9 mm) |
 | Q3 | **The forearm's labels** fit only on the front: a 19 mm square holds four characters at a 0.6 mm nozzle; the other faces' `#6-9`, `#10-15`, `#16-19` are refused (one message each) | 2 x 2 squares would fit the text but give one inner corner, weak for a pose. Or Content `#id` on each face. The example ships with `#id` |
 | Q4 | **M8c.2's yes / no table** for the MK4 MMU3 0.4 and 0.6 printers was read from the conditions by hand, never off PrusaSlicer's dropdown (no test may open the GUI) | Open PrusaSlicer once, compare the print dropdown for the two printers with the table in `docs/status/M8c.md`, write the answer there |
@@ -162,7 +162,7 @@ The 15-point Definition of Done of `docs/PLAN.md` section 4 was verified on 2026
 | Live re-placement on the forearm is slow: 2D preview 245 ms, 3D 715 ms median (the top view and the mesh, 20-100 ms per tag) | needs a design change: plan faces in a process pool, or a light drag preview with the meshes on release (audit B1) |
 | A typed Columns x rows on a face is explained, not honoured | a new fit rule (audit B10) |
 | Send… does not preselect the printer the tags were planned for; it names the matching printers and a click picks one | as M8b2.3 requires (audit B2) |
-| The nits of the final audit: `/api/health` still says scene `/1` (the file is `/2`); `cuts()` overcounts shared margin cuts in spaced mode (tight's numbers are the design's); one trivially true assertion in `test_the_marker_is_nowhere`; `/api/scene/export/pdf` is still REF's old sheet ("Old sticker sheet" in the Export menu); renumber rows do not carry `made_by`; the status bar speaks in key paths; a few wording and truncation slips; floats and 60+ exact keys written after the first inspector edit; small drawing slips during a drag | listed with their fixes in the final audit (ids A5-A10, C1-C4); none changes a result |
+| The nits of the final audit (A5-A10, C1-C4) | lane polish fixed A5 (`/api/health` names the file's `/2`), A6 (spaced `cuts()` is a guillotine count: 10, not 16), A7 (the trivially true assertion is gone; the watcher's event and route are scanned), A10 (renumber rows carry `made_by`) and the server's half of C2 (the size error and the cell-minimum warn read whole in the short line). Left, with reasons in `docs/status/polish.md`: A9 (the "Old sticker sheet" entry), C1 (key paths in the status bar), the Studio half of C2, C3 (floats and exact keys), C4 (drawing slips): all in `studio/`, which the drag-preview lane owned this run |
 | The e2e suite's screenshots are rewritten on every full check (`reports/screens/`) | committed as they come |
 | Another session's worktree `C:\Users\BAM\Documents\aruco-studio-preview` (detached) | left alone; `git worktree remove` it when it is not needed |
 
@@ -191,9 +191,9 @@ The server's files go under `ROOT/.studio_data/` and scenes under `ROOT/scenes/`
 
 | Note said | Built | Why |
 |---|---|---|
-| M6: a new tag stores label rule 3 | rule 4 (a ChArUco label on Auto stays in a black square); rule 3 itself is unchanged; `label.RULE` stays 2 because REF's suites pin it | the audit's FB-13 fix |
+| M6: a new tag stores label rule 3 | rule 5 (rule 4: a ChArUco label on Auto stays in a black square; rule 5: a label cut from the black strokes at least 1.1 cell lines); rules 3 and 4 are unchanged; `label.RULE` stays 2 because REF's suites pin it | the audit's FB-13 fix; Q1's default (lane polish) |
 | M6: the sticker built-ins in the catalog | in `catalog_all()`, not REF's `catalog` (REF's suites pin it); the server reads `catalog_all` everywhere since Merge 2 | port fidelity |
-| M6: tight-mode cuts | counted so that the design's own example gives 7; spaced `cuts()` is an upper bound | audit nit A6 |
+| M6: tight-mode cuts | counted so that the design's own example gives 7; spaced `cuts()` is a guillotine count since lane polish (four 30 mm stickers: 10; the note said 16) | audit nit A6 |
 | M6c.1: compare with `/api/scene/export/pdf` | compared with `/api/scene/print.pdf` and the bundle's `sheet.pdf`; `export/pdf` is still REF's old A4 sheet | the old route was kept for M7 |
 | M6b.6: the sheet dialog's Export writes the print bundle | it writes the sheet only; `POST /api/scene/export/print` without `sheet_only` still writes the bundle | audit B6 |
 | M6c.4's words | "3D tags: Send to PrusaSlicer…" on a 3D scene | audit B7 |

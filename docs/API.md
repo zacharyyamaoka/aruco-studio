@@ -42,7 +42,7 @@ A path under `%USERPROFILE%\CADExporter` is refused, even when a variable points
 
 | Route | Does |
 |---|---|
-| `GET /api/health` | `{ok, version, ref_commit, schemas, home, scenes}` |
+| `GET /api/health` | `{ok, version, ref_commit, schemas, home, scenes}`. `schemas.scene` is the shape `GET /api/scene` answers (`/1`); `schemas.file` is the design file's (`arucostudio.scene/2`) |
 | `GET /api/dictionaries` | the 21 dictionaries: `name, bits, capacity, family, modules` |
 | `GET /api/options` | every choice the inspector offers, with the Fusion dialog's words (layouts, modes, ops, pins, corner marks, turns, label choices, trim, cells, limits) |
 | `GET /api/form` | the inspector's field list (`plan/fields.py`): per field its key path, type, default, limits, choices; one row per row of ARCHITECTURE 5.6 |
@@ -84,7 +84,7 @@ Since M8a the open scene is a design file (`arucostudio.scene/2`, docs/FILE_FORM
 | `DELETE /api/scene/tags/{name}` | delete it, and the body, shape and sketch only it used |
 | `POST /api/scene/tags/{name}/duplicate?dx_mm=&dy_mm=&number=1` | a copy with its own uid; `number=1` (default): the next free ids of its family |
 | `PUT /api/scene/overrides/{name}` | `{id}` a typed first id: checked (0 or more; every id of the board inside the dictionary; not on a locked tag) and used at once: `{overrides, tag, ids}`; refused: 409 `{issues}` on field `override`. `{id: null}` back to auto (the ids stay until Renumber) |
-| `POST /api/scene/renumber` | unique ids per dictionary family (core.numbering, the scene's ledger): `{rows, changed, duplicates, warnings, errors, ok}` |
+| `POST /api/scene/renumber` | unique ids per dictionary family (core.numbering, the scene's ledger): `{rows, changed, duplicates, warnings, errors, ok}`; each row also has `tag` and `made_by` (`print3d` / `sticker`, the plan's; "" for a tag that does not plan) |
 | `GET /api/scenes` | the files in `scenes/` |
 | `POST /api/scene/save` | `{name}`: write `scenes/<name>.arucostudio.json` (`/2`) and follow it: every later change writes it |
 | `POST /api/scene/open` | `{name}`: read it (a `/1` file is migrated) and follow it |
