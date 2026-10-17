@@ -1,0 +1,23 @@
+{
+ "schema": "arucostudio.scene/2",
+ "name": "Inkjet: Shift by hand",
+ "preset": "Inkjet · Letter vinyl",
+ "sketches": [
+  {
+   "id": "sk",
+   "shapes": [
+    {"id": "centred", "rect": [80, 50], "at": [0, 0]},
+    {"id": "corner", "rect": [80, 50], "at": [95, 0]},
+    {"id": "disc", "circle": 60, "at": [190, 0]}
+   ]
+  }
+ ],
+ "features": [
+  {"id": "fit", "aruco": "centred", "layout": "single", "size": 24, "first_id": 0,
+   "name": "where the fit puts it"},
+  {"id": "moved", "aruco": "corner", "layout": "single", "size": 24, "shift": [20, 8],
+   "first_id": 1, "name": "shifted 20, 8"},
+  {"id": "on_disc", "aruco": "disc", "layout": "single", "size": 20, "perimeter": "profile",
+   "shift": [0, -12], "first_id": 2, "name": "disc, shifted down"}
+ ]
+}

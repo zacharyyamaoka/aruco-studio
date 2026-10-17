@@ -31,6 +31,7 @@ type Drag =
   | { kind: "marquee"; sx: number; sy: number; ex: number; ey: number; additive: boolean }
   | { kind: "label"; tag: string; wx: number; wy: number; inv: number[]; cx: number; cy: number; dx: number; dy: number; moved: boolean }
   | { kind: "handle"; key: string; id: string; moved: boolean; text: string | null }
+  | { kind: "shift"; tag: string; wx: number; wy: number; rot: number; x0: number; y0: number; du: number; dv: number; moved: boolean }
   | { kind: "draw"; tool: "rect" | "circle" | "slot"; a: Pt; b: Pt; centre: boolean; square: boolean };
 
 /** Where a tag's label block is now (its centre, pattern frame mm). */
@@ -233,6 +234,18 @@ export function Canvas2D() {
       } else if (!additive) useStudio.setState({ picks: [] });
       return;
     }
+    // Shift (2026-10-17, CF-2): the selected sticker's crosshair moves it off
+    // where the fit put it, along its target's axes (settings.shift)
+    const shiftEl = target.closest("[data-shift-handle]");
+    if (shiftEl && t === "select") {
+      const tg = st.scene.tags.find((x) => x.name === shiftEl.getAttribute("data-shift-handle"));
+      if (tg) {
+        const cur = ((tg.spec.settings as any).shift ?? null) as { x_mm?: number; y_mm?: number } | null;
+        setDrag({ kind: "shift", tag: tg.name, wx, wy, rot: Number(tg.rotation_deg || 0), x0: Number(cur?.x_mm ?? 0),
+          y0: Number(cur?.y_mm ?? 0), du: 0, dv: 0, moved: false });
+        return;
+      }
+    }
     // select / move (and Extrude: pick the shape)
     const labelEl = target.closest("[data-label-drag]");
     const tagEl = target.closest("[data-tag]");
@@ -294,6 +307,13 @@ export function Canvas2D() {
       const dx = wx - drag.wx, dy = wy - drag.wy;
       if (!drag.moved && Math.hypot(dx * z, dy * z) < 3) return;
       setDrag({ ...drag, dx: drag.free ? dx : snap(dx), dy: drag.free ? dy : snap(dy), moved: true });
+    } else if (drag.kind === "shift") {
+      // the scene delta in the target's frame (its rotation undone), 0.5 mm steps (Alt: free)
+      const dx = wx - drag.wx, dy = wy - drag.wy;
+      if (!drag.moved && Math.hypot(dx * z, dy * z) < 3) return;
+      const a = -drag.rot * Math.PI / 180;
+      const du = Math.cos(a) * dx - Math.sin(a) * dy, dv = Math.sin(a) * dx + Math.cos(a) * dy;
+      setDrag({ ...drag, du: e.altKey ? du : snap(du), dv: e.altKey ? dv : snap(dv), moved: true });
     } else if (drag.kind === "label") {
       const i = drag.inv;
       const dx = i[0] * (wx - drag.wx) + i[1] * (wy - drag.wy), dy = i[3] * (wx - drag.wx) + i[4] * (wy - drag.wy);
@@ -337,6 +357,10 @@ export function Canvas2D() {
     } else if (drag.kind === "label" && drag.moved) {
       const r = (v: number) => Math.round(v * 4) / 4;
       st.moveLabel(drag.tag, r(drag.cx + drag.dx), r(drag.cy + drag.dy));
+    } else if (drag.kind === "shift" && drag.moved) {
+      const r = (v: number) => Math.round(v * 100) / 100;
+      const x = r(drag.x0 + drag.du), y = r(drag.y0 + drag.dv);
+      void st.shiftTag(drag.tag, x, y);
     } else if (drag.kind === "handle") {
       if (drag.moved && drag.text) {
         const text = drag.text;
@@ -468,6 +492,36 @@ export function Canvas2D() {
     return <line key={`hg${t.uid}`} className="hinge" data-hinge={t.name} data-face={t.source?.face ?? ""} x1={x0} y1={y0} x2={x1} y2={y1} />;
   });
 
+  // the selected sticker's Shift crosshair (2026-10-17): at its pattern's
+  // centre; a drag writes settings.shift (Alt: no 0.5 mm steps)
+  const shiftHandle = (): ReactElement | null => {
+    if (tool !== "select" || sel.length !== 1 || (drag?.kind === "move" && drag.moved)) return null;
+    const t = visible.find((x) => x.name === sel[0]);
+    if (!t || t.locked || !t.plan?.ok || madeBy(t) !== "sticker") return null;
+    const M = patternToScene(t);
+    if (!M) return null;
+    const off = offsetOf(t.source?.shape) ?? [0, 0];
+    let [cx, cy] = [M[3] + off[0], M[7] + off[1]];
+    if (drag?.kind === "shift" && drag.tag === t.name && drag.moved) {
+      const a = drag.rot * Math.PI / 180;
+      cx += Math.cos(a) * drag.du - Math.sin(a) * drag.dv;
+      cy += Math.sin(a) * drag.du + Math.cos(a) * drag.dv;
+    }
+    const [x, y] = toScreen(cx, cy);
+    const sh = (t.spec.settings as any).shift;
+    return (
+      <g className="shift-handle" data-shift-handle={t.name} data-shift={sh ? `${sh.x_mm ?? 0},${sh.y_mm ?? 0}` : "0,0"}>
+        <title>Shift: drag to move the sticker off where the fit puts it (Alt: free)</title>
+        <circle cx={x} cy={y} r={7} />
+        <line x1={x - 11} y1={y} x2={x + 11} y2={y} />
+        <line x1={x} y1={y - 11} x2={x} y2={y + 11} />
+        {drag?.kind === "shift" && drag.tag === t.name && drag.moved && (
+          <text className="draft-size" x={x + 12} y={y - 10}>shift {+(drag.x0 + drag.du).toFixed(2)}, {+(drag.y0 + drag.dv).toFixed(2)} mm</text>
+        )}
+      </g>
+    );
+  };
+
   // the selected shape's handles (one shape or hole)
   let handleEls: ReactElement[] = [];
   if (tool === "select" && shapeSel.length === 1 && !(drag?.kind === "move" && drag.moved)) {
@@ -535,7 +589,8 @@ export function Canvas2D() {
           {visible.map((t) => {
             const off = offsetOf(t.source?.shape);
             const el = <TagSvg key={t.uid} tag={t} show={show} selected={sel.includes(t.name)} passive={onShapeFace(t)}
-              labelShift={drag?.kind === "label" && drag.tag === t.name ? [drag.dx, drag.dy] : undefined} />;
+              labelShift={drag?.kind === "label" && drag.tag === t.name ? [drag.dx, drag.dy] : undefined}
+              shift={drag?.kind === "shift" && drag.tag === t.name && drag.moved ? [drag.du, drag.dv] : undefined} />;
             return off ? <g key={t.uid} transform={`translate(${off[0]} ${off[1]})`}>{el}</g> : el;
           })}
           <g className="shape-lines">{lineEls}</g>
@@ -569,6 +624,7 @@ export function Canvas2D() {
             );
           })}
           {handleEls}
+          {shiftHandle()}
           {drawSize && drag?.kind === "draw" && (
             <text className="draft-size" x={toScreen(drag.b[0], 0)[0] + 12} y={toScreen(0, drag.b[1])[1] - 8}>
               {sizeText(drawSize.shape)}

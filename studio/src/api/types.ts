@@ -194,11 +194,13 @@ export interface PresetItem {
   name: string;
   kind: "builtin" | "user";
   preset: Preset;
-  /** its profile's kind (M6a): a 3D printer or a sticker printer */
+  /** its profile's kind (M6a): a 3D printer or an inkjet printer ("sticker", stored) */
   made_by?: "print3d" | "sticker";
+  /** an older sticker preset (make rule 1, 2026-10-17): offered only to a tag that has it */
+  legacy?: boolean;
 }
 
-/** GET /api/presets' collections (M6a): 3D printers, sticker printers. */
+/** GET /api/presets' collections (M6a): 3D printers, inkjet printers. */
 export interface PresetCollection { id: string; title: string; icon: string; names: string[] }
 
 /** server/library.py's card (REF aruco_preset_library.Library._card). */
@@ -231,6 +233,8 @@ export interface LibraryCard {
   current?: boolean;
   host_kind?: string;
   technology?: string;
+  /** which Edit form: an inkjet printer's ("2d") or a 3D printer's */
+  edit?: "2d" | "3d";
 }
 
 /** A print preset that fits a physical printer (a Printers card's choice). */
@@ -281,6 +285,8 @@ export interface LibraryState {
   cards: LibraryCard[];
   selected: string | null;
   schema: [string, string, string, [string, string][] | null][];
+  /** an inkjet printer preset's Edit form (2026-10-17, CF-4): paper size, thickness, page margins, dpi */
+  schema_2d?: [string, string, string, [string, string][] | null][];
   /** the range a preset keeps each number in (server/library.LIMITS) */
   limits?: Record<string, [number, number]>;
   notes: string[];

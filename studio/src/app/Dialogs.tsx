@@ -3,7 +3,8 @@
 //   every change. A new scene is a new file in the scenes folder; Open takes
 //   a scene of the folder or a file anywhere (a path); Save as copies the
 //   design and follows that file from then on.
-// * Sticker sheet… (M6b): page, landscape, Spaced / Tight, the margin; the
+// * Sticker sheet… (M6b): page, landscape, Spaced / Tight, the page margins,
+//   and (2026-10-17, Q7) the Sticker margin and Cut lines; the
 //   preview is the server's own sheet.svg (the same layout as the PDF), the
 //   rejected stickers with their reasons; Print and Export (sheet.pdf,
 //   sheet.svg, sheet.json, markers.json: the sheet only, never the 3D parts,
@@ -85,12 +86,8 @@ function OpenLists({ close, path, setPath, keys }: { close: () => void; path: st
         <button className="scene-item gallery-item" data-testid="open-gallery" onClick={() => { close(); st.showGallery(); }}>
           <Icon name="grid" /><span><b>The gallery</b></span><span className="muted">{galleryCount(useStudio.getState().gallery)} examples by feature</span>
         </button>
-        {files === null && <div className="muted">…</div>}
-        {files?.examples.map((x) => (
-          <button key={x.name} className="scene-item" data-example={x.name} onClick={async () => { close(); await st.openExample(x.name); }}>
-            <Icon name="file" /><span>{x.title || x.name}</span><span className="muted">{x.file}</span>
-          </button>
-        ))}
+        {/* the three older examples (forearm, plate_charuco, sticker_sheet) left File › Open on
+            2026-10-17: the gallery covers them (Zach); their files stay for the tests */}
       </div>
       {recent.length > 0 && (<>
         <div className="open-head">Recent</div>
@@ -182,8 +179,15 @@ function SheetDialog() {
               options={[{ value: "spaced", label: "Spaced", hint: "gaps between stickers, a caption under each, crop marks" },
                 { value: "tight", label: "Tight", hint: "no gaps: neighbours share a cut line (fewer cuts)" }]} />
           </FieldRow>
-          <FieldRow path="sheet.margin_mm" label="Margin">
+          <FieldRow path="sheet.margin_mm" label="Page margins" title="the page's own margins: nothing prints there">
             <NumberField path="sheet.margin_mm" value={sheet.margin_mm} unit="mm" step={1} min={0} max={50} onCommit={(v) => st.setSheet({ margin_mm: v })} />
+          </FieldRow>
+          {/* 2026-10-17 (Zach's Q7: "Only in export sheet"): the sticker's white margin and the cut lines are the sheet's */}
+          <FieldRow path="sheet.sticker_margin_mm" label="Sticker margin" title="white paper round each sticker: its cut line moves out by this much (the holes stay where they are)">
+            <NumberField path="sheet.sticker_margin_mm" value={sheet.sticker_margin_mm} unit="mm" step={0.5} min={0} max={20} onCommit={(v) => st.setSheet({ sticker_margin_mm: v })} />
+          </FieldRow>
+          <FieldRow path="sheet.cut_lines" label="Cut lines" title="the grey cut lines round each sticker and its holes (and the crop marks)">
+            <Switch path="sheet.cut_lines" value={sheet.cut_lines} onChange={(v) => st.setSheet({ cut_lines: v })} />
           </FieldRow>
           <div className="sheet-stats" data-testid="sheet-stats" data-stickers={stickers.length} data-pages={json?.pages ?? 0} data-cuts={json?.cuts ?? ""}>
             <Badge tone="accent">{stickers.length} sticker{stickers.length === 1 ? "" : "s"}</Badge>

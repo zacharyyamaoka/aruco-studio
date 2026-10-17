@@ -75,7 +75,7 @@ export interface StudioState {
   printers: PrusaPrinters | null;
   filter: KindFilter;
   /** the sheet dialog's choices (from the file's `sheet`, then as set) */
-  sheet: Required<Pick<SheetQuery, "page" | "landscape" | "mode" | "margin_mm">>;
+  sheet: Required<Pick<SheetQuery, "page" | "landscape" | "mode" | "margin_mm" | "sticker_margin_mm" | "cut_lines">>;
   lastSend: SendAnswer | null;
   /** the open design file (GET /api/design) */
   design: DesignInfo;
@@ -164,6 +164,8 @@ export interface StudioState {
   deleteSel(): Promise<void>;
   edit(path: string, value: unknown, extra?: Record<string, unknown>): Promise<void>;
   moveLabel(name: string, x_mm: number, y_mm: number): Promise<void>;
+  /** Shift (2026-10-17): a sticker moved off where the fit puts it (0, 0: back) */
+  shiftTag(name: string, x_mm: number, y_mm: number): Promise<void>;
   setMode(mode: string): Promise<void>;
   rename(from: string, to: string): Promise<void>;
   setFlag(name: string, flag: "locked" | "hidden", v: boolean): Promise<void>;
@@ -471,7 +473,7 @@ export const useStudio = create<StudioState>((set, get) => {
     stale: [],
     printers: null,
     filter: "all",
-    sheet: { page: "letter", landscape: false, mode: "spaced", margin_mm: 10 },
+    sheet: { page: "letter", landscape: false, mode: "spaced", margin_mm: 10, sticker_margin_mm: 0, cut_lines: true },
     lastSend: null,
     design: NO_DESIGN,
     doc: null,
@@ -608,7 +610,10 @@ export const useStudio = create<StudioState>((set, get) => {
       if (fresh && sh && typeof sh === "object") {
         set((s) => ({ sheet: { ...s.sheet, ...(typeof sh.page === "string" ? { page: sh.page } : {}),
           ...(sh.mode === "tight" || sh.mode === "spaced" ? { mode: sh.mode } : {}),
-          ...(typeof sh.landscape === "boolean" ? { landscape: sh.landscape } : {}) } }));
+          ...(typeof sh.landscape === "boolean" ? { landscape: sh.landscape } : {}),
+          // 2026-10-17 (Q7): the sheet's sticker margin and cut lines
+          ...(typeof sh.sticker_margin_mm === "number" && sh.sticker_margin_mm >= 0 ? { sticker_margin_mm: sh.sticker_margin_mm } : {}),
+          ...(typeof sh.cut_lines === "boolean" ? { cut_lines: sh.cut_lines } : {}) } }));
       }
     },
 
@@ -1023,6 +1028,11 @@ export const useStudio = create<StudioState>((set, get) => {
     async moveLabel(name, x_mm, y_mm) {
       await run(`${name}: label moved to X ${x_mm.toFixed(2)}, Y ${y_mm.toFixed(2)} mm`, async () => {
         await api.patchTag(name, { settings: { label: { position: "manual", x_mm, y_mm } } });
+      });
+    },
+    async shiftTag(name, x_mm, y_mm) {
+      await run(`${name}: shifted to X ${x_mm.toFixed(2)}, Y ${y_mm.toFixed(2)} mm`, async () => {
+        await api.patchTag(name, { settings: { shift: x_mm || y_mm ? { rule: 1, x_mm, y_mm } : null } });
       });
     },
     async rename(from, to) {

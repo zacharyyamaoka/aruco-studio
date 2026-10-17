@@ -1,0 +1,19 @@
+{
+ "schema": "arucostudio.scene/2",
+ "name": "Inkjet: too big for the page",
+ "preset": "Inkjet · Letter vinyl",
+ "sketches": [
+  {
+   "id": "sk",
+   "shapes": [
+    {"id": "big", "rect": [280, 280], "at": [0, 0]},
+    {"id": "auto", "rect": [300, 300], "at": [310, 0]}
+   ]
+  }
+ ],
+ "features": [
+  {"id": "typed", "aruco": "big", "layout": "single", "size": 200, "first_id": 0,
+   "name": "typed 200 mm"},
+  {"id": "capped", "aruco": "auto", "layout": "single", "first_id": 1, "name": "Auto, capped"}
+ ]
+}

@@ -1,6 +1,6 @@
 {
  "schema": "arucostudio.gallery/1",
- "note": "The Studio's landing page (Zach's N-3, 2026-10-17): golden examples, the inputs drawn for the user, markers first. Each item is a design file beside this one; the Studio opens a copy (GET /api/gallery, POST /api/gallery/open). `look` is the card's 'what to look at'; `actions` are its buttons: 3d (the 3D view), sheet (Export > Sticker sheet...), send (Export > Send to PrusaSlicer...), ids (Renumber all).",
+ "note": "The Studio's landing page (Zach's N-3, 2026-10-17): golden examples, the inputs drawn for the user, markers first. Each item is a design file beside this one; the Studio opens a copy (GET /api/gallery, POST /api/gallery/open). `look` is the card's 'what to look at'; `actions` are its buttons: 3d (the 3D view), sheet (Export > Sticker sheet...), send (Export > Send to PrusaSlicer...), ids (Renumber all). `lint` (2026-10-17): the error-level messages an example shows on purpose (the page lint's red row; it still builds); absent = 0.",
  "groups": [
   {"id": "basics", "title": "Markers by hand", "line": "Type first, then the inner numbers; the outer size follows.",
    "items": [
@@ -17,11 +17,30 @@
      "look": "Typed: ChArUco, Checker 16.32 mm, Marker 12.24 mm, 4 × 3. The board is 65.3 × 49.0 mm with no outer border: its six inner corners are the checker's. The plate is trimmed to the board.",
      "actions": ["3d"]}
    ]},
+  {"id": "inkjet", "title": "Inkjet stickers (2D)", "line": "Vinyl sticker paper: the black printed into it, the page it prints on, moved by hand.",
+   "items": [
+    {"name": "inkjet_paper", "file": "inkjet_paper.arucostudio.json", "title": "The paper and the black inside it",
+     "line": "One paper body t thick; the black t/2 into it, flush with the top.",
+     "look": "Make rule 2, what every new inkjet sticker gets: the sticker is ONE paper body as thick as the paper (t), the whole cut outline; the black is printed t/2 into its top, flush, no film on it; the tag frame (OpenCV's) sits on the paper's top, t over the face. Left, real vinyl: 0.10 mm (the default; measure yours, liner off). Middle and right: the same on 2 mm 'paper', exaggerated so the 3D view shows the black sunk into the white. Select one: the Inkjet tab's grey line under Paper thickness gives the depths.",
+     "actions": ["3d"]},
+    {"name": "inkjet_presets", "file": "inkjet_presets.arucostudio.json", "title": "Letter and A4 vinyl",
+     "line": "The two inkjet presets, and a tag's own paper thickness.",
+     "look": "The preset is the machine: 'Inkjet · Letter vinyl' and 'Inkjet · A4 vinyl' (600 dpi, whole dots, 0.10 mm vinyl, 10 mm page margins). Select a tag: Made by reads Inkjet printer, and the Inkjet tab has Paper thickness (with its stock suggestions), Paper size and Page margins. Right: this tag's own 0.18 mm (vinyl + laminate), an override on the tag only: its Preset row reads This tag (modified).",
+     "actions": ["3d"]},
+    {"name": "page_lint", "file": "page_lint.arucostudio.json", "title": "Too big for the page",
+     "line": "A typed size over the page is flagged red and still built; Auto stops at the page.",
+     "look": "Left: a typed 200 mm marker makes a 266.5 mm sticker, over what Letter prints (195.9 × 233.4 mm inside 10 mm margins, the footer and the scale bars) whichever way round: the Marker size row is red like a linter, the cut line red, and the tag is still built (the sheet will not place it). Right: Auto size on a 300 mm face stops at the page, a 195.7 mm sticker, and the Size row says it was capped.",
+     "lint": 1, "actions": ["sheet"]},
+    {"name": "shift", "file": "shift.arucostudio.json", "title": "Shift by hand",
+     "line": "Shift X / Y move a sticker off where the fit puts it.",
+     "look": "Left, where the fit puts it: centred. Middle, Shift 20, 8 mm along the face's own x and y. Right, on a disc (Perimeter = Profile), shifted 12 mm down. Select a sticker and drag its crosshair (0.5 mm steps, Alt for free), or type Shift X / Y on the Marker tab; a sticker shifted off its face is warned.",
+     "actions": ["3d"]}
+   ]},
   {"id": "made", "title": "Made two ways", "line": "The preset is the machine.",
    "items": [
     {"name": "two_ways", "file": "two_ways.arucostudio.json", "title": "3D printed and inkjet",
      "line": "The same 30 mm marker, made by two presets.",
-     "look": "Both tags ask for a 30 mm single. Left, the 0.6 mm 3D printer: whole 0.68 mm lines give 28.56 mm, the black printed on the plate (3D badge). Right, the Letter 600 dpi sticker printer: whole dots give 29.97 mm on 0.1 mm paper, cut along the marker (2D badge). Select one: Made by under the Preset says how it is made.",
+     "look": "Both tags ask for a 30 mm single. Left, the 0.6 mm 3D printer: whole 0.68 mm lines give 28.56 mm, the black printed on the plate (3D badge). Right, the Letter vinyl inkjet preset: whole 600 dpi dots give 29.97 mm on 0.10 mm vinyl, the black printed 0.05 mm into it, cut along the marker (2D badge). Select one: Made by under the Preset says how it is made.",
      "actions": ["3d"]}
    ]},
   {"id": "ids", "title": "IDs", "line": "One numbering, 2D and 3D.",
@@ -81,7 +100,7 @@
      "look": "One feature, four faces: each side gets its own board and its own ids (0, 6, 10, 16). In 2D the box is drawn as its net, each side hinged at a dashed line; in 3D the boards stand on their faces. Change one face's settings and the list splits into one feature per face.",
      "actions": ["3d"]}
    ]},
-  {"id": "sheet", "title": "The sticker sheet", "line": "Tight or spaced.",
+  {"id": "sheet", "title": "The sticker sheet", "line": "Tight or spaced; a white margin round each sticker; cut lines on or off.",
    "items": [
     {"name": "sheet_tight", "file": "sheet_tight.arucostudio.json", "title": "Tight",
      "line": "Five stickers in shelves that share their cut lines.",
@@ -90,6 +109,10 @@
     {"name": "sheet_spaced", "file": "sheet_spaced.arucostudio.json", "title": "Spaced",
      "line": "The same stickers with gaps, captions and crop marks.",
      "look": "Open the sheet: Spaced leaves gaps, puts the id and name under each sticker and crop marks at its corners. Switch Tight / Spaced, the page or the margin in the dialog.",
+     "actions": ["sheet"]},
+    {"name": "sheet_options", "file": "sheet_options.arucostudio.json", "title": "Sticker margin and cut lines",
+     "line": "The sheet's own options, not the tag's: 3 mm of white round each sticker.",
+     "look": "Open the sheet: Sticker margin 3 mm puts white paper round each sticker, so its cut line moves 3 mm out (the disc's hole stays where it is); Cut lines off prints the stickers alone. Both moved from the tag to the sheet (Zach's Q7: \"Only in export sheet\"); a tag made before keeps its own margin.",
      "actions": ["sheet"]}
    ]},
   {"id": "print", "title": "PrusaSlicer", "line": "The colours on their extruders.",

@@ -7,7 +7,7 @@ import {
   API, add, backToTag, choose, freshFile, idle, issueTexts, options, probe, sceneTags, shapeOfTag, shot, tab, toggle,
 } from "./helpers";
 
-const STICKER = "Sticker · Letter · 600 dpi";
+const STICKER = "Inkjet · Letter vinyl";        // 2026-10-17: the vinyl preset (make rule 2); the older one is for files only
 
 async function tagOf(page: Page, name: string): Promise<any> {
   const tags = await sceneTags(page.request);
@@ -40,7 +40,7 @@ test("M6b.1-3 a sticker on the disc: Made by, its four tabs, Holes, Perimeter", 
   expect(name).toBeTruthy();
   const head = page.getByTestId("inspector");
   await expect(head).toHaveAttribute("data-made-by", "sticker");
-  await expect(page.getByTestId("made-by")).toContainText("Printed sticker");
+  await expect(page.getByTestId("made-by")).toContainText("Inkjet printer");
   await expect(page.locator('[data-row="settings.make.by"] .row-label')).toHaveText("Made by");
   const tabs = await page.locator('[role="tab"][data-tab]').evaluateAll((els) => els.map((e) => e.getAttribute("data-tab")));
   expect(tabs).toEqual(["marker", "print", "label", "advanced"]);                       // four tabs, no Heights
@@ -51,11 +51,16 @@ test("M6b.1-3 a sticker on the disc: Made by, its four tabs, Holes, Perimeter", 
     }
   }
   await tab(page, "print");
-  await expect(page.locator('[data-row="settings.make.thickness_mm"] .row-label')).toHaveText("Sticker thickness");
-  await expect(page.locator('[data-row="settings.make.margin_mm"] .row-label')).toHaveText("Sticker margin");
+  await expect(page.locator('[role="tab"][data-tab="print"]')).toContainText("Inkjet");        // the Make tab named after the method
+  await expect(page.locator('[data-row="settings.make.thickness_mm"] .row-label')).toHaveText("Paper thickness");
+  await expect(page.locator('[data-row="settings.make.page"] .row-label')).toHaveText("Paper size");
+  await expect(page.locator('[data-row="settings.make.page_margin_mm"] .row-label')).toHaveText("Page margins");
+  // the sticker's margin and cut line are the sheet's now (Q7): not on a new tag
+  await expect(page.locator('[data-row="settings.make.margin_mm"]')).toHaveCount(0);
+  await expect(page.locator('[data-row="settings.make.cut_line"]')).toHaveCount(0);
   await expect(page.locator(`[data-badge-for="${name}"]`)).toHaveAttribute("data-badge", "2D");
   const z = await page.evaluate(() => (window as any).__studio.zRange);
-  expect(z[1]).toBeCloseTo(0.11, 6);
+  expect(z[1]).toBeCloseTo(0.1, 6);                         // make rule 2: the black inside the 0.1 mm paper
   await shot(page, "m8b2_sticker_print_tab");
 
   // M6b.2: a hole in the disc (H, 8, Enter at the shape's centre); Holes: Ignore grows the marker
@@ -93,12 +98,9 @@ test("M6b.1-3 a sticker on the disc: Made by, its four tabs, Holes, Perimeter", 
   const places = await options(page, "settings.label.place");
   expect(places).toContain("black");
   expect(places).not.toContain("white");
-  // a margin gives the white back
-  await tab(page, "print");
-  const m = page.locator('input[data-path="settings.make.margin_mm"]');
-  await m.fill("4");
-  await m.press("Enter");
-  await idle(page);
+  // Perimeter = Profile gives the white back (a new tag has no margin of its own: the sheet's)
+  await tab(page, "marker");
+  await choose(page, "settings.make.perimeter", "profile");
   await tab(page, "label");
   expect(await options(page, "settings.label.place")).toContain("white");
   await shot(page, "m8b2_sticker_label");

@@ -1,0 +1,23 @@
+{
+ "schema": "arucostudio.scene/2",
+ "name": "Inkjet presets: Letter and A4 vinyl",
+ "preset": "Inkjet · Letter vinyl",
+ "sketches": [
+  {
+   "id": "sk",
+   "shapes": [
+    {"id": "letter", "rect": [45, 45], "at": [0, 0]},
+    {"id": "a4", "rect": [45, 45], "at": [60, 0]},
+    {"id": "own", "rect": [45, 45], "at": [120, 0]}
+   ]
+  }
+ ],
+ "features": [
+  {"id": "on_letter", "aruco": "letter", "layout": "single", "size": 30, "first_id": 0,
+   "name": "Letter vinyl"},
+  {"id": "on_a4", "aruco": "a4", "preset": "Inkjet · A4 vinyl", "layout": "single", "size": 30,
+   "first_id": 1, "name": "A4 vinyl"},
+  {"id": "own_paper", "aruco": "own", "layout": "single", "size": 30, "paper_mm": 0.18,
+   "first_id": 2, "name": "laminated 0.18"}
+ ]
+}

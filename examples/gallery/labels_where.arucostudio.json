@@ -121,7 +121,7 @@
   {
    "id": "sticker_black",
    "aruco": "d",
-   "preset": "Sticker · Letter · 600 dpi",
+   "preset": "Inkjet · Letter vinyl",
    "layout": "single",
    "label": "#id",
    "first_id": 3
@@ -129,7 +129,7 @@
   {
    "id": "sticker_white",
    "aruco": "e",
-   "preset": "Sticker · Letter · 600 dpi",
+   "preset": "Inkjet · Letter vinyl",
    "layout": "single",
    "perimeter": "profile",
    "label": {

@@ -254,7 +254,7 @@
   {
    "id": "profile2d",
    "aruco": "d_profile",
-   "preset": "Sticker · Letter · 600 dpi",
+   "preset": "Inkjet · Letter vinyl",
    "layout": "single",
    "perimeter": "profile",
    "first_id": 2
@@ -262,7 +262,7 @@
   {
    "id": "marker2d",
    "aruco": "d_marker",
-   "preset": "Sticker · Letter · 600 dpi",
+   "preset": "Inkjet · Letter vinyl",
    "layout": "single",
    "perimeter": "marker",
    "first_id": 3

@@ -15,7 +15,7 @@ import { API, ROOT, idle, probe, shot } from "./helpers";
 
 const GALLERY = path.join(ROOT, "examples", "gallery");
 const MANIFEST = JSON.parse(fs.readFileSync(path.join(GALLERY, "gallery.json"), "utf-8"));
-const ITEMS: { name: string; file: string; title: string; actions?: string[]; group: string }[] =
+const ITEMS: { name: string; file: string; title: string; actions?: string[]; group: string; lint?: number }[] =
   MANIFEST.groups.flatMap((g: any) => g.items.map((it: any) => ({ ...it, group: g.id })));
 const DRAWING = [["R", "Rectangle"], ["C", "Circle"], ["P", "Polygon"], ["O", "Slot"], ["H", "Hole"], ["Shift+H", "Rectangular hole"]];
 
@@ -85,7 +85,8 @@ test("N-3.1 the gallery is the landing page: every example, its thumbnail from i
     const th = card.locator(`[data-thumb="${it.name}"]`);
     await expect(th, it.name).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
     expect(Number(await th.getAttribute("data-tags")), it.name).toBeGreaterThan(0);
-    await expect(th, it.name).toHaveAttribute("data-errors", "0");
+    // the page lint (2026-10-17) is red on purpose where the manifest says so (`lint`)
+    await expect(th, it.name).toHaveAttribute("data-errors", String(it.lint ?? 0));
     // the thumbnail is the plan drawn: each tag's top view, black cells in it
     await expect(th.locator('g[data-tag] [data-top="black"]').first()).toBeAttached();
     expect(await th.locator("g[data-tag]").count(), it.name).toBe(Number(await th.getAttribute("data-tags")));
@@ -119,7 +120,8 @@ test("N-3.2 every example opens as a copy, plans with no error, toggles 2D / 3D"
     expect(page.url()).toContain(`#example=${it.name}`);
     // the server's plans: every tag built, no error-level message
     const got = await serverErrors(page);
-    expect(got.errors, it.name).toEqual([]);
+    expect(got.errors.filter((e) => !/: Over the page by /.test(e)), it.name).toEqual([]);
+    expect(got.errors.length, it.name).toBe(it.lint ?? 0);
     expect(got.tags, it.name).toBeGreaterThan(0);
     await expect(page.locator(".canvas2d g[data-tag]")).toHaveCount(got.tags);
     await expect(page.locator('.canvas2d g[data-tag][data-ok="0"]')).toHaveCount(0);
@@ -272,10 +274,19 @@ test("N-3.5 File › Open › Examples points at the gallery; Open and the File 
   await dlg.getByTestId("open-gallery").click();
   await expect(page.getByTestId("dialog-open")).toHaveCount(0);
   await expect(page.getByTestId("gallery")).toBeVisible();
-  // Open still opens a file: an older example from the dialog; the note goes
+  // the three older examples are not listed any more (2026-10-17, Zach: the
+  // gallery covers them); Open still opens a file by its path, and the note goes
   await page.getByTestId("menu-file").click();
   await page.getByTestId("file-open").click();
-  await page.getByTestId("dialog-open").locator('[data-example="plate_charuco"]').click();
+  for (const ex of ["forearm", "plate_charuco", "sticker_sheet"]) {
+    await expect(page.getByTestId("dialog-open").locator(`[data-example="${ex}"]`)).toHaveCount(0);
+  }
+  const dir = path.join(ROOT, "e2e", ".tmp", "files");
+  fs.mkdirSync(dir, { recursive: true });
+  const copy = path.join(dir, "plate_charuco.arucostudio.json");
+  fs.copyFileSync(path.join(ROOT, "examples", "plate_charuco.arucostudio.json"), copy);
+  await page.getByTestId("dialog-path").fill(copy);
+  await page.getByTestId("dialog-ok").click();
   await idle(page);
   await expect(page.locator('.app[data-page="studio"]')).toBeVisible();
   await expect(page.getByTestId("example-note")).toHaveCount(0);

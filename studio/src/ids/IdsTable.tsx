@@ -39,7 +39,7 @@ export function IdsTable() {
       </div>
       <div className="ids-scroll">
         <table className="ids-table">
-          <thead><tr><th>Tag</th><th title="Made by: 3D printed or a printed sticker">Made</th><th>Dict</th><th>IDs</th><th title="a typed first id (empty = auto)">First</th><th /></tr></thead>
+          <thead><tr><th>Tag</th><th title="Made by: 3D printed or an inkjet sticker">Made</th><th>Dict</th><th>IDs</th><th title="a typed first id (empty = auto)">First</th><th /></tr></thead>
           <tbody>
             {scene.tags.map((t) => {
               const m = t.plan?.marker as any;
@@ -52,7 +52,7 @@ export function IdsTable() {
                 <tr data-ids-row={t.name} className={`${sel.includes(t.name) ? "on" : ""}${d.length ? " dup" : ""}${t.hidden ? " hid" : ""}${rowErr.length ? " bad" : ""}`}
                   onClick={(e) => st.select(t.name, e.shiftKey || e.ctrlKey)} onDoubleClick={() => st.zoomToFit([t.name])}>
                   <td className="nm"><Icon name={String(t.spec.settings.layout ?? "single")} />{t.name}</td>
-                  <td className="mb" data-made-by={madeBy(t)}><Badge tone={madeBy(t) === "sticker" ? "accent" : "neutral"} title={madeBy(t) === "sticker" ? "a printed sticker" : "3D printed"}>{madeBy(t) === "sticker" ? "2D" : "3D"}</Badge></td>
+                  <td className="mb" data-made-by={madeBy(t)}><Badge tone={madeBy(t) === "sticker" ? "accent" : "neutral"} title={madeBy(t) === "sticker" ? "an inkjet sticker" : "3D printed"}>{madeBy(t) === "sticker" ? "2D" : "3D"}</Badge></td>
                   <td className="muted">{m ? String(m.dictionary).replace("DICT_", "") : "–"}</td>
                   <td className="idc" data-ids={(t.plan?.ids ?? []).join(",")}>{t.plan?.ok ? idsText(t.plan.ids) : <span className="bad">not built</span>}{changed.has(t.name) && <i className="chg" title="changed by the last Renumber">•</i>}</td>
                   <td onClick={(e) => e.stopPropagation()} className={idErrors[t.name] ? "first bad" : "first"}

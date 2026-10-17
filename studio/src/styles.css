@@ -300,6 +300,11 @@ kbd { background: var(--panel-2); border: 1px solid var(--line); border-radius: 
 .handle.vertex { fill: var(--accent); stroke: var(--panel); }
 .handle.rot { fill: var(--panel); cursor: grab; }
 .handle-stem { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 2 2; }
+/* 2026-10-17: the Shift crosshair of a selected sticker; a sticker over its page (the lint) */
+.shift-handle { cursor: move; }
+.shift-handle circle { fill: var(--panel); fill-opacity: 0.75; stroke: var(--accent); stroke-width: 1.5; }
+.shift-handle line { stroke: var(--accent); stroke-width: 1.5; }
+.tag .g-cut.over { stroke: var(--bad); stroke-width: 2; stroke-dasharray: none; }
 .draft path, .draft-poly { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
 .draft-size { fill: var(--accent); font-size: 11px; font-weight: 600; paint-order: stroke; stroke: var(--canvas); stroke-width: 3px; }
 .shapelabel { fill: var(--muted); font-size: 10.5px; paint-order: stroke; stroke: var(--canvas); stroke-width: 3px; pointer-events: none; }

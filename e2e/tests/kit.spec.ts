@@ -54,7 +54,7 @@ test("M8b2.1 no Fusion token; every panel in light and dark; every row 24 px", a
   const t3 = (await probe(page)).sel[0];
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
-  await choose(page, "new.preset", "Sticker · Letter · 600 dpi");
+  await choose(page, "new.preset", "Inkjet · Letter vinyl");
   await add(page, "single");
   await page.locator(`[data-ids-row="${t3}"]`).click();
   await idle(page);

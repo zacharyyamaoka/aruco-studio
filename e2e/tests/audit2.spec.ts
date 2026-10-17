@@ -46,19 +46,25 @@ test("a new tag after a split list takes a fresh id and is selected alone", asyn
   await shot(page, "audit2_new_tag_after_split");
 });
 
-test("Open lists the examples (opened as a copy), the recent files and a folder", async ({ page }) => {
-  const repoFile = path.join(ROOT, "examples", "forearm.arucostudio.json");
+test("Open lists the gallery (an example opens as a copy), the recent files and a folder", async ({ page }) => {
+  // 2026-10-17 (Zach): the three older examples left File › Open -- the
+  // gallery covers them (forearm = multi-face, sticker_sheet = the sheet);
+  // their files stay in examples/ for the tests
+  const repoFile = path.join(ROOT, "examples", "gallery", "forearm.arucostudio.json");
   const before = fs.readFileSync(repoFile);
   const first = await freshFile(page, "e2e-audit-open");
   await page.getByTestId("menu-file").click();
   await page.getByTestId("file-open").click();
   const dlg = page.getByTestId("dialog-open");
   await expect(dlg).toBeVisible();
-  for (const ex of ["forearm", "plate_charuco", "sticker_sheet"]) await expect(dlg.locator(`[data-example="${ex}"]`)).toHaveCount(1);
+  await expect(dlg.getByTestId("open-gallery")).toBeVisible();
+  for (const ex of ["forearm", "plate_charuco", "sticker_sheet"]) await expect(dlg.locator(`[data-example="${ex}"]`)).toHaveCount(0);
   await expect(dlg.getByTestId("open-recent").locator(`[data-recent]`).first()).toBeVisible();
   await expect(dlg.getByTestId("open-dir")).not.toBeEmpty();
   await shot(page, "audit2_open_dialog");
-  await dlg.locator('[data-example="forearm"]').click();
+  await dlg.getByTestId("open-gallery").click();
+  await expect(page.getByTestId("gallery")).toBeVisible();
+  await page.locator('.gal-card[data-example="forearm"]').click();
   await idle(page);
   await expect.poll(async () => (await probe(page)).tags.length).toBe(4);
   const opened = (await probe(page)).design.path as string;

@@ -4,6 +4,8 @@
 // M6b: a sticker's cut line (guides.cut_line: the rectangle for Perimeter =
 // Marker, the outline with every hole for Profile) dashed, and the holes
 // Holes: ignore leaves out (guides.target_ignored) dashed.
+// 2026-10-17: a rule-2 sticker over its page (plan.sticker.page.fits false)
+// has its cut line red (the page lint, CF-6); `shift` previews a Shift drag.
 import { memo } from "react";
 import type { SceneTag } from "../api/types";
 import { boxOf, layerD, loopD, loopsD, poseOf, rectLoop, svgMatrix, targetLoops, topD } from "../model/geom";
@@ -34,8 +36,10 @@ function labelHits(p: NonNullable<SceneTag["plan"]>): number[][] {
 
 /** `passive`: the tag stands on a shape's top: its target is the shape's
  *  face, so a click there (outside the marker) reaches the shape. */
-export const TagSvg = memo(function TagSvg({ tag, show, selected, labelShift, passive }: { tag: SceneTag; show: Show; selected: boolean; labelShift?: [number, number]; passive?: boolean }) {
+export const TagSvg = memo(function TagSvg({ tag, show, selected, labelShift, passive, shift }: { tag: SceneTag; show: Show; selected: boolean; labelShift?: [number, number]; passive?: boolean; shift?: [number, number] }) {
   const p = tag.plan;
+  // a rule-2 sticker over its page's printable area (CF-6): its cut line red
+  const over = (p as any)?.sticker?.page && (p as any).sticker.page.fits === false;
   const pose = poseOf(tag.x_mm, tag.y_mm, tag.rotation_deg);
   const t = tag.spec.target;
   const tl = targetLoops(t);
@@ -48,7 +52,7 @@ export const TagSvg = memo(function TagSvg({ tag, show, selected, labelShift, pa
       transform={svgMatrix(pose)} className={`tag${selected ? " sel" : ""}${tag.locked ? " locked" : ""}${passive ? " passive" : ""}`}>
       <path data-layer="target" className={t.has_body ? "target body" : "target free"} fillRule="evenodd" d={loopsD(tl)} />
       {p && p.ok && p.frames && (
-        <g data-frame="pattern" transform={svgMatrix(p.frames.pattern_in_target)}>
+        <g data-frame="pattern" transform={(shift ? `translate(${shift[0]} ${shift[1]}) ` : "") + svgMatrix(p.frames.pattern_in_target)}>
           {passive && g && <path data-hit="marker" className="tag-hit" d={loopD(rectLoop((g as any).tile ?? g.quiet_ring))} />}
           <g data-view="top">
             {p.top?.body && <path data-top="body" className="top-body" fillRule="evenodd" d={topD(p.top, "body")} />}
@@ -75,7 +79,8 @@ export const TagSvg = memo(function TagSvg({ tag, show, selected, labelShift, pa
               {g.trim && (g.trim as any).outline && <path data-guide="trim" className="g-trim" d={loopD(rectLoop((g.trim as any).outline))} />}
               {(g as any).cut_line && (
                 <path data-guide="cut_line" data-kind={(g as any).cut_line.kind} data-points={((g as any).cut_line.outer ?? []).length}
-                  data-holes={((g as any).cut_line.holes ?? []).length} className="g-cut" fillRule="evenodd"
+                  data-holes={((g as any).cut_line.holes ?? []).length} data-overpage={over ? "1" : undefined}
+                  className={over ? "g-cut over" : "g-cut"} fillRule="evenodd"
                   d={loopD((g as any).cut_line.outer ?? []) + ((g as any).cut_line.holes ?? []).map((h: any) => loopD(h)).join("")} />
               )}
               {(((g as any).target_ignored ?? []) as any[]).map((l, i) => (

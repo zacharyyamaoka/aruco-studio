@@ -48,7 +48,7 @@
   {
    "id": "sticker",
    "aruco": "paper",
-   "preset": "Sticker · Letter · 600 dpi",
+   "preset": "Inkjet · Letter vinyl",
    "layout": "single",
    "size": 30,
    "first_id": 1,
