@@ -22,6 +22,7 @@ same expression, so they are bit-identical and the merge is exact.
 from __future__ import annotations
 
 import math
+from bisect import bisect_left, bisect_right
 from typing import Callable, Dict, List, Sequence, Tuple
 
 Pt = Tuple[float, float]
@@ -94,10 +95,32 @@ def _edges(groups):
 
 def boolean(groups: Sequence[Sequence[Sequence[Sequence[Pt]]]],
             expr: Callable[[Tuple[bool, ...]], bool]) -> List[Trapezoid]:
+    return booleans(groups, [expr])[0]
+
+
+def _memo(expr):
+    """`expr` kept by its flags: it is a pure function of them, and a sweep
+    asks the same few combinations thousands of times (lane speed)."""
+    seen: Dict[Tuple[bool, ...], bool] = {}
+
+    def f(flags):
+        v = seen.get(flags)
+        if v is None:
+            v = seen[flags] = expr(flags)
+        return v
+    return f
+
+
+def booleans(groups: Sequence[Sequence[Sequence[Sequence[Pt]]]],
+             exprs: Sequence[Callable[[Tuple[bool, ...]], bool]]) -> List[List[Trapezoid]]:
+    """boolean(groups, e) for each e of `exprs`, from one sweep: the slabs,
+    the edges' order and their crossings do not depend on the expression,
+    so each result is exactly what boolean(groups, e) alone gives."""
     edges, xs, npoly = _edges(groups)
     ng = len(groups)
     edges.sort(key=lambda e: e.x0)
-    out: List[Trapezoid] = []
+    fs = [_memo(e) for e in exprs]
+    outs: List[List[Trapezoid]] = [[] for _ in fs]
     active: List[Edge] = []
     j = 0
     for xa, xb in zip(xs, xs[1:]):
@@ -109,8 +132,8 @@ def boolean(groups: Sequence[Sequence[Sequence[Sequence[Pt]]]],
             j += 1
         active = [e for e in active if e.x1 > xm]
         if active:
-            _slab(active, xa, xb, ng, npoly, expr, out, 0)
-    return _snap(out)
+            _slab(active, xa, xb, ng, npoly, fs, outs, 0)
+    return [_snap(out) for out in outs]
 
 
 SNAP = 1e-7             # corners on one slab line closer than this are one corner
@@ -141,14 +164,20 @@ def _snap(traps: List["Trapezoid"]) -> List["Trapezoid"]:
     return out
 
 
-def _slab(active, xa, xb, ng, npoly, expr, out, depth):
+def _slab(active, xa, xb, ng, npoly, exprs, outs, depth):
+    """The runs of each expression in exprs between xa and xb, appended to
+    the matching list of outs. Each edge's heights at xa, xm and xb are
+    computed once (the same Edge.y calls as before, so the same floats)."""
     xm = (xa + xb) / 2.0
-    es = sorted(active, key=lambda e: (e.y(xm), e.y(xa) + e.y(xb)))
+    ya = [e.y(xa) for e in active]
+    yb = [e.y(xb) for e in active]
+    ymid = [e.y(xm) for e in active]
+    order = sorted(range(len(active)), key=lambda k: (ymid[k], ya[k] + yb[k]))
     # edges that cross inside the slab: split it where they do
     if depth < 30:
         cuts = set()
-        for p, q in zip(es, es[1:]):
-            da, db = q.y(xa) - p.y(xa), q.y(xb) - p.y(xb)
+        for p, q in zip(order, order[1:]):
+            da, db = ya[q] - ya[p], yb[q] - yb[p]
             if (da < -EPS and db > EPS) or (da > EPS and db < -EPS):
                 t = da / (da - db)
                 xc = _q(xa + t * (xb - xa))
@@ -158,32 +187,43 @@ def _slab(active, xa, xb, ng, npoly, expr, out, depth):
             pts = [xa] + sorted(cuts) + [xb]
             for a, b in zip(pts, pts[1:]):
                 if b - a > EPS:
-                    _slab(active, a, b, ng, npoly, expr, out, depth + 1)
+                    _slab(active, a, b, ng, npoly, exprs, outs, depth + 1)
             return
+    es = [active[k] for k in order]
+    eya = [ya[k] for k in order]
+    eyb = [yb[k] for k in order]
+    eym = [ymid[k] for k in order]
     parity = [False] * npoly
     count = [0] * ng
-    state = lambda: expr(tuple(c > 0 for c in count))
-    start = None
+    inside = [False] * ng                      # count[g] > 0, kept as the counts change
+    ne = len(exprs)
+    flags = tuple(inside)
+    states = [f(flags) for f in exprs]
+    starts: List = [None] * ne
     i, n = 0, len(es)
     while i < n:
         # every edge at this height at once: no zero-height gaps
         j = i
-        ym = es[i].y(xm)
-        while j < n and es[j].y(xm) - ym <= EPS:
+        ym = eym[i]
+        while j < n and eym[j] - ym <= EPS:
             j += 1
-        before = state()
-        for e in es[i:j]:
+        for k in range(i, j):
+            e = es[k]
             parity[e.p] = not parity[e.p]
             count[e.g] += 1 if parity[e.p] else -1
-        after = state()
-        if not before and after:
-            start = es[i]
-        elif before and not after and start is not None:
-            e = es[j - 1]
-            t = Trapezoid(xa, xb, _q(start.y(xa)), _q(start.y(xb)), _q(e.y(xa)), _q(e.y(xb)))
-            if (t.yt0 - t.yb0) > EPS or (t.yt1 - t.yb1) > EPS:
-                out.append(t)
-            start = None
+            inside[e.g] = count[e.g] > 0
+        flags = tuple(inside)
+        for x in range(ne):
+            before = states[x]
+            after = states[x] = exprs[x](flags)
+            if not before and after:
+                starts[x] = i
+            elif before and not after and starts[x] is not None:
+                s, k = starts[x], j - 1
+                t = Trapezoid(xa, xb, _q(eya[s]), _q(eyb[s]), _q(eya[k]), _q(eyb[k]))
+                if (t.yt0 - t.yb0) > EPS or (t.yt1 - t.yb1) > EPS:
+                    outs[x].append(t)
+                starts[x] = None
         i = j
 
 
@@ -246,12 +286,13 @@ def boundary(traps: Sequence[Trapezoid]):
         L = _merge_intervals(right.get(x, []))       # inside, to the left of x
         R = _merge_intervals(left.get(x, []))        # inside, to the right of x
         ys = ys_at.get(x, [])
+        # ys is sorted: the ys strictly between lo and hi are one slice of it
         for lo, hi in _intervals_minus(L, R):         # inside on the left: going up
-            seq = [lo] + [y for y in ys if lo < y < hi] + [hi]
+            seq = [lo] + ys[bisect_right(ys, lo):bisect_left(ys, hi)] + [hi]
             for a, b in zip(seq, seq[1:]):
                 edges.append(((x, a), (x, b)))
         for lo, hi in _intervals_minus(R, L):         # inside on the right: going down
-            seq = [hi] + [y for y in reversed(ys) if lo < y < hi] + [lo]
+            seq = [hi] + ys[bisect_right(ys, lo):bisect_left(ys, hi)][::-1] + [lo]
             for a, b in zip(seq, seq[1:]):
                 edges.append(((x, a), (x, b)))
     return edges, ys_at
@@ -285,13 +326,16 @@ def polygons(traps: Sequence[Trapezoid]) -> List[List[List[Pt]]]:
 def faces(traps: Sequence[Trapezoid], ys_at: Dict[float, list]):
     """A watertight triangulation of the region (for a mesh's top and
     bottom): each trapezoid fanned from its centre, its vertical sides
-    split at every corner on that line (so neighbours share edges)."""
+    split at every corner on that line (so neighbours share edges).
+    `ys_at` as boundary() gives it: each line's ys sorted."""
     tris = []
     for t in traps:
         ring = [(t.x0, t.yb0), (t.x1, t.yb1)]
-        ring += [(t.x1, y) for y in ys_at.get(t.x1, []) if t.yb1 < y < t.yt1]
+        ys = ys_at.get(t.x1, [])                       # sorted: one slice of it
+        ring += [(t.x1, y) for y in ys[bisect_right(ys, t.yb1):bisect_left(ys, t.yt1)]]
         ring += [(t.x1, t.yt1), (t.x0, t.yt0)]
-        ring += [(t.x0, y) for y in reversed(ys_at.get(t.x0, [])) if t.yb0 < y < t.yt0]
+        ys = ys_at.get(t.x0, [])
+        ring += [(t.x0, y) for y in ys[bisect_right(ys, t.yb0):bisect_left(ys, t.yt0)][::-1]]
         pts = []
         for p in ring:
             if not pts or p != pts[-1]:
@@ -357,18 +401,23 @@ def _simplify(lp):
             pts.append(p)
     if len(pts) > 1 and abs(pts[0][0] - pts[-1][0]) <= EPS and abs(pts[0][1] - pts[-1][1]) <= EPS:
         pts.pop()
-    changed = True
-    while changed and len(pts) > 3:
-        changed = False
-        for i in range(len(pts)):
-            a, b, c = pts[i - 1], pts[i], pts[(i + 1) % len(pts)]
-            cr = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0])
-            la = math.hypot(c[0] - a[0], c[1] - a[1]) or 1.0
-            if abs(cr) / la <= EPS and ((b[0] - a[0]) * (c[0] - b[0])
-                                        + (b[1] - a[1]) * (c[1] - b[1])) >= 0:
-                pts.pop(i)
-                changed = True
-                break
+    # the first collinear point dropped, again and again, until none is left
+    # (or three points). After a drop at i only i - 1 and i see new
+    # neighbours (and 0, when the last point went), so the scan goes on
+    # from there instead of from 0: the same drops in the same order, in
+    # linear time (lane speed; it was quadratic on long straight runs).
+    i = 0
+    while len(pts) > 3 and i < len(pts):
+        n = len(pts)
+        a, b, c = pts[i - 1], pts[i], pts[(i + 1) % n]
+        cr = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0])
+        la = math.hypot(c[0] - a[0], c[1] - a[1]) or 1.0
+        if abs(cr) / la <= EPS and ((b[0] - a[0]) * (c[0] - b[0])
+                                    + (b[1] - a[1]) * (c[1] - b[1])) >= 0:
+            pts.pop(i)
+            i = 0 if i == n - 1 else max(i - 1, 0)
+            continue
+        i += 1
     return pts
 
 

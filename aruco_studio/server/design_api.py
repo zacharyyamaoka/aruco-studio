@@ -449,6 +449,12 @@ def design_save_as(req: PathIn):
 @router.post("/api/design/preview")
 def design_preview(req: DesignTextIn, mesh: int = Query(0), top: int = Query(0)):
     """Compile `text` and plan it; nothing written, nothing kept."""
+    from .app import no_gc
+    with no_gc():
+        return _preview(req, mesh, top)
+
+
+def _preview(req: DesignTextIn, mesh: int, top: int):
     from .app import cached_plan_dict
     try:
         doc = loads_design(req.text)
@@ -462,9 +468,21 @@ def design_preview(req: DesignTextIn, mesh: int = Query(0), top: int = Query(0))
     if isinstance(frozen, dict) and isinstance(doc, dict) and _DS.FROZEN not in doc:
         doc[_DS.FROZEN] = frozen                   # a drag's text: the open design's copies
     sc, issues = _DS.compile(doc, resolver())
-    return {"scene": scene_dict(sc, plans=True, mesh=bool(mesh), top=bool(top),
-                                plan_dict=cached_plan_dict),
-            "issues": [i.to_dict() for i in issues], "error": None}
+    return plain_json({"scene": scene_dict(sc, plans=True, mesh=bool(mesh), top=bool(top),
+                                           plan_dict=cached_plan_dict),
+                       "issues": [i.to_dict() for i in issues], "error": None})
+
+
+def plain_json(d) -> JSONResponse:
+    """`d` as FastAPI would send it, without its jsonable_encoder walk (a 3D
+    preview is half a megabyte of numbers; lane speed). The data is plain
+    JSON already, so the bytes are the same; anything else (a TypeError)
+    goes through the encoder as before."""
+    try:
+        return JSONResponse(content=d)
+    except TypeError:
+        from fastapi.encoders import jsonable_encoder
+        return JSONResponse(content=jsonable_encoder(d))
 
 
 def reveal_command(path: Path) -> List[str]:

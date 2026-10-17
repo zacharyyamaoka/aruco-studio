@@ -11,8 +11,11 @@ from __future__ import annotations
 
 import base64
 import copy
+import gc
 import json
+import threading
 from collections import OrderedDict
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -138,15 +141,53 @@ def cached_plan_dict(spec: TagSpec, mesh: bool = False, top: bool = False) -> di
     if "dict" not in e:
         e["dict"] = p.to_dict()
     d = dict(e["dict"])
+    # mesh() and top() read the kept dict: the same data as p.to_dict(),
+    # without another deep copy (lane speed); they never change it
     if mesh and p.ok:
         if "mesh" not in e:
-            e["mesh"] = _ME.mesh(p)
+            e["mesh"] = _kept_mesh(_ME.mesh(e["dict"]))
         d["mesh"] = e["mesh"]
     if top and p.ok:
         if "top" not in e:
-            e["top"] = _ME.top(p)
+            e["top"] = _ME.top(e["dict"])
         d["top"] = e["top"]
     return d
+
+
+_GC = {"hold": 0, "was": True}
+_GC_LOCK = threading.Lock()
+
+
+@contextmanager
+def no_gc():
+    """Python's cyclic GC held off while a request plans and writes its
+    answer (lane speed). A 3D preview makes some 100,000 short-lived lists
+    and trapezoids; alive across a few young collections they reach the
+    old generation and set off full collections (100-170 ms each, about one
+    edit in three on the forearm). They hold no cycles, so reference
+    counting frees them as before; the collector runs again when the last
+    request in flight is done. Nested and threaded calls share one count."""
+    with _GC_LOCK:
+        if _GC["hold"] == 0:
+            _GC["was"] = gc.isenabled()
+            gc.disable()
+        _GC["hold"] += 1
+    try:
+        yield
+    finally:
+        with _GC_LOCK:
+            _GC["hold"] -= 1
+            if _GC["hold"] == 0 and _GC["was"]:
+                gc.enable()
+
+
+def _kept_mesh(ms: list) -> list:
+    """A mesh as the cache keeps it: each body's positions and indices as
+    tuples. JSON writes a tuple as a list, so the bytes sent are the same;
+    a tuple of numbers is left out of Python's cyclic GC, which otherwise
+    walks every number of every kept mesh at each full collection (100+ ms
+    pauses in the middle of a drag; lane speed)."""
+    return [dict(b, positions=tuple(b["positions"]), indices=tuple(b["indices"])) for b in ms]
 
 
 def _scene_plans(sc: Scene) -> dict:
@@ -432,8 +473,9 @@ def scene_get(plans: int = Query(0), mesh: int = Query(0), top: int = Query(0)):
     """The open scene, compiled from the design file (the `/1` shape: tags
     with their TagSpec); ?plans=1 adds each tag's TagPlan (?mesh=1 its mesh,
     ?top=1 its top view). Written straight out (audit F14)."""
-    body = json.dumps(_scene_out(bool(plans), bool(mesh), bool(top)), separators=(",", ":"),
-                      allow_nan=False)
+    with no_gc():
+        body = json.dumps(_scene_out(bool(plans), bool(mesh), bool(top)), separators=(",", ":"),
+                          allow_nan=False)
     return Response(body, media_type="application/json",
                     headers={"X-Scene-Revision": str(_DA.D.revision),
                              "X-Design-State": _DA.D.state})
