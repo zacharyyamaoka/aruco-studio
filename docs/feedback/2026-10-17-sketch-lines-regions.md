@@ -20,3 +20,11 @@ These are from his daily note (Daily Note - Oct 17 2026, from line 53). The vaul
 - **SK-1, SK-3, SK-4** are waiting on the survey's answer, because the tool we pick may supply the drawing and the region picking.
   - Either way, the core must find regions itself (MC-9, file first): an AI can write lines into a scene file with no browser open.
 - **PP-1** is a small core rule, not yet built.
+
+## Superseded (2026-10-17, later that morning)
+
+Zach: "I am also moving away from aruco studio having its own like sketch platform no point in maintaining that... simply if you want to bring in sketches I could just like export DXF from fusion... 100% we don't need to maintain yet another cad program."
+- SK-1..SK-6 are dropped, and the survey's SK-a..e plan is not built.
+- Bringing sketches in from other programs (e.g. DXF) is the direction.
+- See `2026-10-17-markers-core-first.md` (CF-12).
+- PP-1 lives on as part of CF-6.
