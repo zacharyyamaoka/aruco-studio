@@ -1,0 +1,16 @@
+sketches.add('face')
+Sketch.name=('tile')
+sketchLines.addByTwoPoints x4
+extrudeFeatures.add('new', 1, 0, 0.2, [])
+BRepBody.name=('tag tile t1')
+sketches.add('face')
+Sketch.name=('pocket')
+sketchLines.addByTwoPoints x204
+extrudeFeatures.add('new', 51, 0.14, 0.2, [])
+BRepBody.name=('aruco pocket t1')
+combineFeatures.add('cut', 'tag tile t1', ['aruco pocket t1'])
+sketches.add('face')
+Sketch.name=('pattern')
+sketchLines.addByTwoPoints x204
+extrudeFeatures.add('new', 51, 0.14, 0.2, [])
+BRepBody.name=('aruco cells t1')

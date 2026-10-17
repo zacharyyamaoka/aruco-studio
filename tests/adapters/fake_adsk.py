@@ -42,6 +42,8 @@ STATE = types.SimpleNamespace(app=None)
 def _fmt(v):
     if isinstance(v, bool) or v is None:
         return str(v)
+    if isinstance(v, int):
+        return str(v)
     if isinstance(v, float):
         return f"{v:.6g}"
     if isinstance(v, (list, tuple)):
@@ -175,6 +177,12 @@ class ObjectCollection:
     def create():
         return ObjectCollection()
 
+    @staticmethod
+    def _of(items):
+        c = ObjectCollection()
+        c._items = list(items)
+        return c
+
     def add(self, x):
         self._items.append(x)
         return True
@@ -286,6 +294,12 @@ class Csg:
                 p0, p1, r = self.a
                 self._bb = ([min(p0[i], p1[i]) - r for i in range(3)],
                             [max(p0[i], p1[i]) + r for i in range(3)])
+            elif k == "prism":
+                o, x, y, z, pts, lo, hi = self.a
+                cs = [[o[i] + x[i] * u + y[i] * v + z[i] * w for i in range(3)]
+                      for (u, v) in pts for w in (lo, hi)]
+                self._bb = ([min(c[i] for c in cs) for i in range(3)],
+                            [max(c[i] for c in cs) for i in range(3)])
             elif k == "union":
                 bbs = [c.bbox() for c in self.a[0]]
                 self._bb = ([min(b[0][i] for b in bbs) for i in range(3)],
@@ -316,6 +330,19 @@ class Csg:
             return _dot(q, q) <= (r + eps) ** 2
         if k == "union":
             return any(c.contains(p, eps) for c in self.a[0])
+        if k == "prism":
+            o, x, y, z, pts, lo, hi = self.a
+            d = _sub(p, o)
+            w = _dot(d, z)
+            if w < lo - eps or w > hi + eps:
+                return False
+            u, v = _dot(d, x), _dot(d, y)
+            inside = False
+            for i in range(len(pts)):
+                (x0, y0), (x1, y1) = pts[i - 1], pts[i]
+                if (y0 > v) != (y1 > v) and u < x0 + (v - y0) * (x1 - x0) / (y1 - y0):
+                    inside = not inside
+            return inside
         op, a, b = self.a
         if op == BooleanTypes.DifferenceBooleanType:
             return a.contains(p, eps) and not b.contains(p, -eps)
@@ -715,22 +742,38 @@ class CombineFeatures:
 
 
 class Sketch(Feature):
+    """A sketch on a plane or a planar face: its frame is the plane's (the
+    component's XY plane: the identity)."""
+
     def __init__(self, comp, plane, name="Sketch"):
         super().__init__(comp, name)
         self.__dict__["referencePlane"] = plane
         self.__dict__["isVisible"] = True
-        self.__dict__["sketchCurves"] = types.SimpleNamespace(sketchLines=SketchLines(self))
+        self.__dict__["sketchCurves"] = types.SimpleNamespace(
+            sketchLines=SketchLines(self), sketchCircles=SketchCircles(self))
         self.__dict__["sketchPoints"] = SketchPoints(self)
+        self.__dict__["_profiles"] = []
+        f = getattr(plane, "frame", None)
+        self.__dict__["frame"] = f if f is not None else (
+            [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0])
 
     @staticmethod
     def cast(x):
         return x if isinstance(x, Sketch) else None
 
-    def modelToSketchSpace(self, p):        # on the component's XY plane: the identity
-        return Point3D(p.x, p.y, p.z)
+    def modelToSketchSpace(self, p):
+        o, x, y, z = self.frame
+        d = _sub(_a(p), o)
+        return Point3D(_dot(d, x), _dot(d, y), _dot(d, z))
 
     def sketchToModelSpace(self, p):
-        return Point3D(p.x, p.y, p.z)
+        o, x, y, z = self.frame
+        q = _a(p)
+        return Point3D(*[o[i] + x[i] * q[0] + y[i] * q[1] + z[i] * q[2] for i in range(3)])
+
+    @property
+    def profiles(self):
+        return ObjectCollection._of(self._profiles)
 
 
 class SketchPoint(Entity):
@@ -776,9 +819,17 @@ class SketchLine(Entity):
         self.__dict__["endSketchPoint"] = b
 
 
+class SketchProfile:
+    """A closed region a sketch made: a polygon (sketch coordinates) or a circle."""
+
+    def __init__(self, sk, kind, pts=None, c=None, r=None):
+        self.parentSketch, self.kind, self.pts, self.c, self.r = sk, kind, pts, c, r
+
+
 class SketchLines:
     def __init__(self, sk):
         self.sk, self._items = sk, []
+        self._chain = None                      # [first point, ..., last point]
 
     def addByTwoPoints(self, a, b):
         log("sketchLines.addByTwoPoints", a if isinstance(a, Point3D) else a.geometry,
@@ -787,6 +838,16 @@ class SketchLines:
         pb = b if isinstance(b, SketchPoint) else SketchPoint(self.sk, b)
         ln = SketchLine(self.sk, pa, pb)
         self._items.append(ln)
+        ch = self._chain
+        if ch is not None and pa is ch[-1]:
+            if pb is ch[0]:                     # closed: a profile
+                self.sk._profiles.append(SketchProfile(
+                    self.sk, "poly", pts=[(q.geometry.x, q.geometry.y) for q in ch]))
+                self._chain = None
+            else:
+                ch.append(pb)
+        else:
+            self._chain = [pa, pb]
         return ln
 
     @property
@@ -795,6 +856,85 @@ class SketchLines:
 
     def item(self, i):
         return self._items[i]
+
+
+class SketchCircles:
+    def __init__(self, sk):
+        self.sk = sk
+
+    def addByCenterRadius(self, c, r):
+        log("sketchCircles.addByCenterRadius", c, r)
+        self.sk._profiles.append(SketchProfile(self.sk, "circle", c=(c.x, c.y), r=float(r)))
+        return types.SimpleNamespace(centerSketchPoint=SketchPoint(self.sk, c), radius=r)
+
+
+class OffsetStartDefinition:
+    def __init__(self, offset):
+        self.offset = offset
+
+    @staticmethod
+    def create(offset):
+        return OffsetStartDefinition(offset)
+
+
+class ExtrudeFeatureInput:
+    def __init__(self, profiles, operation):
+        self.profiles, self.operation = profiles, operation
+        self.startExtent = OffsetStartDefinition(ValueInput.createByReal(0.0))
+        self.distance = None
+        self.participantBodies = []
+
+    def setDistanceExtent(self, isSymmetric, distance):
+        self.distance = distance
+        return True
+
+
+class ExtrudeFeature(Feature):
+    @staticmethod
+    def cast(x):
+        return x if isinstance(x, ExtrudeFeature) else None
+
+    @property
+    def bodies(self):
+        return _BodyList(self._bodies)
+
+
+class ExtrudeFeatures:
+    def __init__(self, comp):
+        self.comp = comp
+
+    def createInput(self, profiles, operation):
+        log("extrudeFeatures.createInput", FeatureOperations.NAMES[operation])
+        return ExtrudeFeatureInput(profiles, operation)
+
+    def add(self, inp):
+        op = FeatureOperations.NAMES[inp.operation]
+        s0 = inp.startExtent.offset.realValue
+        d = inp.distance.realValue
+        lo, hi = min(s0, s0 + d), max(s0, s0 + d)
+        log("extrudeFeatures.add", op, inp.profiles.count, lo, hi,
+            [b for b in inp.participantBodies])
+        kids = []
+        for pr in inp.profiles:
+            sk = pr.parentSketch
+            o, x, y, z = sk.frame
+            if pr.kind == "circle":
+                p0 = [o[i] + x[i] * pr.c[0] + y[i] * pr.c[1] + z[i] * lo for i in range(3)]
+                p1 = [o[i] + x[i] * pr.c[0] + y[i] * pr.c[1] + z[i] * hi for i in range(3)]
+                kids.append(Csg("cyl", p0, p1, pr.r))
+            else:
+                kids.append(Csg("prism", o, x, y, z, pr.pts, lo, hi))
+        csg = kids[0] if len(kids) == 1 else Csg("union", kids)
+        des = self.comp._design()
+        ext = ExtrudeFeature(self.comp, f"Extrude{len(des.timeline.items) + 1}")
+        ext.__dict__.update(csg=csg, operation=inp.operation,
+                            participants=list(inp.participantBodies), _bodies=[])
+        if op == "new":
+            b = BRepBody(self.comp, csg, "Body")
+            b.__dict__["base"] = ext
+            self.comp.bRepBodies._items.append(b)
+            ext._bodies.append(b)
+        return des.timeline.insert(ext)
 
 
 class Sketches:
@@ -1348,7 +1488,8 @@ class Component(Entity):
         d["bRepBodies"] = BRepBodies(self)
         d["features"] = types.SimpleNamespace(baseFeatures=BaseFeatures(self),
                                               combineFeatures=CombineFeatures(self),
-                                              customFeatures=CustomFeatures(self))
+                                              customFeatures=CustomFeatures(self),
+                                              extrudeFeatures=ExtrudeFeatures(self))
         d["sketches"] = Sketches(self)
         d["jointOrigins"] = JointOrigins(self)
         d["attributes"] = Attributes()
@@ -1448,6 +1589,18 @@ class Design:
                     if b.isValid:
                         out[b] = b.own
                         alive.add(b)
+            elif isinstance(e, ExtrudeFeature) and e.isValid:
+                if e._bodies:
+                    for b in e._bodies:
+                        out[b] = e.csg
+                        alive.add(b)
+                else:
+                    kind = {0: BooleanTypes.UnionBooleanType,
+                            1: BooleanTypes.DifferenceBooleanType,
+                            2: BooleanTypes.IntersectionBooleanType}[e.operation]
+                    for t in e.participants:
+                        if t in out:
+                            out[t] = Csg.combine(kind, out[t], e.csg)
             elif isinstance(e, CombineFeature) and e.isValid:
                 t = e.targetBody
                 if t not in out:
@@ -1628,7 +1781,8 @@ FUSION_NAMES = {"TemporaryBRepManager": TemporaryBRepManager, "BooleanTypes": Bo
                 "CustomFeature": CustomFeature, "CustomFeatureDefinition": CustomFeatureDefinition,
                 "JointOrigin": JointOrigin, "JointGeometry": JointGeometry,
                 "JointKeyPointTypes": JointKeyPointTypes,
-                "BRepBody": BRepBody, "BRepFace": PlanarFace, "Profile": Profile}
+                "BRepBody": BRepBody, "BRepFace": PlanarFace, "Profile": Profile,
+                "ExtrudeFeature": ExtrudeFeature, "OffsetStartDefinition": OffsetStartDefinition}
 
 
 def install():
@@ -1731,4 +1885,18 @@ def summary(log_=None, keep=KEEP):
         flush()
         out.append(line)
     flush()
-    return out
+    # a run of more than two sketch lines: one line with the count
+    runs = []
+    for line in out:
+        if line.startswith("sketchLines.addByTwoPoints") and runs and \
+                runs[-1][0].startswith("sketchLines.addByTwoPoints"):
+            runs[-1].append(line)
+        else:
+            runs.append([line])
+    folded = []
+    for r in runs:
+        if len(r) > 2:
+            folded.append(f"sketchLines.addByTwoPoints x{len(r)}")
+        else:
+            folded += r
+    return folded
