@@ -114,7 +114,23 @@ Every id read; the disc's four holes found. Cut lines off: every check passes wi
 
 ### The check
 
-CHECK_TABLE
+`.venv/Scripts/python tools/check.py` (full), on the lane after the second merge of `main` (`ceee19e`: lane/fusion-core 8f66ec2 and lane/scene-fixes 0e62f83) and `plan_sticker`, on ports 5380 / 5381 (`ARUCO_STUDIO_API_PORT` / `_UI_PORT`: 5370 / 5371 are Zach's preview; nothing listened on 5380 / 5381 after):
+
+| Group | Result |
+|---|---|
+| adapters | 97 passed in 77 s |
+| core | 7,433 passed, 4 skipped in 48 s |
+| plan | 735 passed in 240 s |
+| scene | 56 passed in 24 s |
+| server | 114 passed in 39 s |
+| verify | 128 passed in 125 s |
+| studio | build + vitest passed in 10 s |
+| e2e | 62 passed, 1 skipped (7.3 m) in 442 s |
+| **all** | **OK in 1008 s** |
+
+`tools/mesh_digests.py --check`: 947 cases, 0 differ (the 824 evaluate goldens replay in `plan`). `tools/check.py --trace`: missing 0. `tools/spec_status.py --check`: 92 passing, 4 planned, 0 failing (the orchestrator adds this lane's rows to `docs/spec.json`).
+
+The second merge kept both sides of `scene/design.py`'s sugar: lane/scene-fixes' `perimeter` (a 3D tag's Trim excess) and this lane's `shift` / `paper_mm`. Its write-back fix (typed ids kept after an edit) also fixed the gallery copies here: editing the `shift` example's middle sticker no longer sends the others to #0.
 
 ## 3. Screenshots (light)
 
