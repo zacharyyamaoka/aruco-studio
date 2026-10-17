@@ -126,6 +126,8 @@ They are in `examples/`, as the design note has them.
 | `forearm.arucostudio.json` | a box 120 x 40 x 40 with one ChArUco on each of its four sides, the label `#id`, each face its own ids (`marker_ids` 0, 6, 10, 16) |
 | `sticker_sheet.arucostudio.json` | four stickers on bare shapes: two singles, a grid, a ChArUco on a disc with a hole; each its own ids (`first_id`) |
 
+The gallery's examples (N-3, 2026-10-17) are design files too, in `examples/gallery/` with their manifest `gallery.json` (group, title, one line, what to look at): eighteen files, markers first. They use the sugar wherever it says what they show; a 3D tag with Trim excess carries its exact `settings` / `numbers`, because the sugar has no trim key (`perimeter` on a tag with a body writes a string the plan does not read: reported to the orchestrator, 2026-10-17).
+
 The forearm and sticker files open renumbered (audit 2026-10-17); on the forearm only the front's `#0-5` fits its square at a 0.6 mm nozzle, the other faces say "no room in a … mm square". Open › Examples opens a copy in the scenes folder, so the files here are never written.
 
 ## 7. What it compiles to

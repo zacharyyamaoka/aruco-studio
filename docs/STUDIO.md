@@ -1,6 +1,16 @@
 # ArUco Studio: the web app
 
-The Studio is a bare-bones mini CAD on top of the core. You draw shapes, extrude them, and put markers on a shape or a face. **The design file is the model** (`arucostudio.scene/2`, docs/FILE_FORMAT.md): the Studio draws it and writes it on every action; a person or an AI can edit the same file in any editor and the Studio follows. Every outline, height, id and message of a tag comes from a `TagPlan`, a `Target` or an `Issue` that the server sent.
+The Studio shows the core's features on golden examples. **It opens on the gallery** (Zach's N-3, 2026-10-17): the examples, the inputs drawn for you, grouped by feature, markers first. A card opens a copy; change any number in the inspector and watch the plan follow. The Studio is no longer a sketcher (CF-12): the shape-drawing tools (Rectangle, Circle, Polygon, Slot, Hole, Rectangular hole) are hidden, frozen, behind the dev flag `?draw=1`. **The design file is the model** (`arucostudio.scene/2`, docs/FILE_FORMAT.md): the Studio draws it and writes it on every action; a person or an AI can edit the same file in any editor and the Studio follows. Every outline, height, id and message of a tag comes from a `TagPlan`, a `Target` or an `Issue` that the server sent.
+
+## The gallery
+
+| | |
+|---|---|
+| What it is | the landing page: `examples/gallery/gallery.json` lists the examples by group (Markers by hand, Made two ways, IDs, Auto-placement on profiles, Labels, Corner marks, Trim and Perimeter, Multi-face, The sticker sheet, PrusaSlicer). Each card's thumbnail is the example's real plan (`POST /api/design/preview`, drawn by the 2D canvas's own code), its title and one line |
+| A card | opens a fresh copy, `<home>/gallery/<name>.arucostudio.json` (`POST /api/gallery/open`); the example file is never written. The first tag is selected. The note over the canvas says what to look at and has the example's buttons (3D view, Sticker sheet…, Send to PrusaSlicer…, Renumber all), Start over (a fresh copy), the previous / next example and Gallery |
+| Back | the top bar's Gallery button, File › Gallery…, S › "Gallery", or Open… › Examples › The gallery |
+| Where a window starts | the gallery, unless a file was opened on purpose (`--open`, Open…) or the URL says otherwise: `#gallery`, `#studio`, `#example=<name>` (a reload keeps the example and its note) |
+| The dev flag | `?draw=1` (e.g. http://127.0.0.1:5360/?draw=1): the drawing tools, their keys and buttons and palette rows come back, and the window starts on the canvas. The older e2e tests run this way |
 
 ## Run it
 
@@ -26,7 +36,7 @@ First time only: `npm --prefix studio ci` and `npm --prefix e2e ci`. The e2e tes
 | A file that does not parse | the bar at the bottom left turns red and says "line N col M"; the last good scene stays on the canvas; every write is refused until the file parses again |
 | A file that goes away | the bar says so; writes stop; Save as… writes it again |
 | New scene | a new file `scenes/<name>.arucostudio.json`, followed at once |
-| Open | the examples (a copy opens in the scenes folder), the recent files, a folder to browse (the scenes folder first), or any file by its path |
+| Open | the gallery, the three older examples (a copy opens in the scenes folder), the recent files, a folder to browse (the scenes folder first), or any file by its path |
 | A typed file | opening it freezes the presets its sugar names into the file (`frozen_presets`): a PrusaSlicer profile changed later shows **Apply** under the Preset, never a changed tag |
 | Save as | a copy at a name or a path; the Studio follows the copy from then on |
 | The File drawer | the file's text, read only, the selection's lines lit, Reveal opens Explorer on it (the status bar's File button) |
@@ -46,7 +56,7 @@ First time only: `npm --prefix studio ci` and `npm --prefix e2e ci`. The e2e tes
 
 ## Commands and keys
 
-S opens the command palette: it lists exactly these commands (the e2e test diffs the two lists). A command without a key runs from the palette.
+S opens the command palette: with `?draw=1` it lists exactly these commands (the e2e test diffs the two lists); without it, these but the six drawing tools (R, C, P, O, H, Shift+H), whose keys then do nothing (`e2e/tests/gallery.spec.ts`). A command without a key runs from the palette.
 
 | Key | Command |
 |---|---|
@@ -88,6 +98,7 @@ S opens the command palette: it lists exactly these commands (the e2e test diffs
 | | ArUco: grid |
 | | ArUco: ChArUco |
 | | Preset library |
+| | Gallery |
 | | New scene |
 | Ctrl+O | Open |
 | | Save as |

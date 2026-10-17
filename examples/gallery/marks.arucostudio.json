@@ -1,0 +1,135 @@
+{
+ "schema": "arucostudio.scene/2",
+ "name": "Corner marks",
+ "preset": "0.32mm SPEED @MK4IS 0.6 - Aruco",
+ "sketches": [
+  {
+   "id": "sk",
+   "shapes": [
+    {
+     "id": "a",
+     "rect": [
+      45,
+      45
+     ],
+     "at": [
+      0,
+      0
+     ]
+    },
+    {
+     "id": "b",
+     "rect": [
+      45,
+      45
+     ],
+     "at": [
+      60,
+      0
+     ]
+    },
+    {
+     "id": "c",
+     "rect": [
+      45,
+      45
+     ],
+     "at": [
+      120,
+      0
+     ]
+    },
+    {
+     "id": "d",
+     "rect": [
+      80,
+      60
+     ],
+     "at": [
+      20,
+      -70
+     ]
+    },
+    {
+     "id": "e",
+     "rect": [
+      80,
+      60
+     ],
+     "at": [
+      115,
+      -70
+     ]
+    }
+   ]
+  }
+ ],
+ "features": [
+  {
+   "id": "pa",
+   "extrude": "a",
+   "height": 3
+  },
+  {
+   "id": "pb",
+   "extrude": "b",
+   "height": 3
+  },
+  {
+   "id": "pc",
+   "extrude": "c",
+   "height": 3
+  },
+  {
+   "id": "pd",
+   "extrude": "d",
+   "height": 3
+  },
+  {
+   "id": "pe",
+   "extrude": "e",
+   "height": 3
+  },
+  {
+   "id": "none",
+   "aruco": "pa.top",
+   "layout": "single",
+   "size": 28.56,
+   "mark": "none",
+   "first_id": 0
+  },
+  {
+   "id": "cut",
+   "aruco": "pb.top",
+   "layout": "single",
+   "size": 28.56,
+   "mark": "cut",
+   "first_id": 1
+  },
+  {
+   "id": "triangle",
+   "aruco": "pc.top",
+   "layout": "single",
+   "size": 28.56,
+   "mark": "triangle",
+   "first_id": 2
+  },
+  {
+   "id": "grid_tri",
+   "aruco": "pd.top",
+   "layout": "grid",
+   "size": 16.32,
+   "mark": "triangle",
+   "first_id": 3
+  },
+  {
+   "id": "charuco_tri",
+   "aruco": "pe.top",
+   "layout": "charuco",
+   "square": 19.04,
+   "size": 14.28,
+   "mark": "triangle",
+   "first_id": 20
+  }
+ ]
+}

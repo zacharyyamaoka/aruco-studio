@@ -8,7 +8,7 @@ import { useEffect, useRef } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import { Kbd, ToolButton } from "@bam/ui";
 import { useStudio, TYPED_TOOLS, type ToolId } from "../store";
-import { TOOLS } from "./commands";
+import { ALL_TOOLS, TOOLS } from "./commands";
 
 export const TOOL_ICONS: Record<ToolId, ReactNode> = {
   select: <MousePointer2 size={16} />,
@@ -144,7 +144,7 @@ export function BottomBar() {
     <div className="bottombar" data-testid="bottombar">
       {(tool !== "select") && (
         <div className="tool-ask" data-testid="tool-ask">
-          <b>{TOOLS.find((t) => t.tool === tool)?.name}</b>
+          <b>{ALL_TOOLS.find((t) => t.tool === tool)?.name}</b>
           <span className="muted">{ASK[tool]}</span>
           {takesTyped && (
             <span className="typed" data-testid="typed" title="Type, paste (Ctrl+V) or use an input method"

@@ -1,0 +1,70 @@
+{
+ "schema": "arucostudio.scene/2",
+ "name": "A ChArUco label, in a black square",
+ "preset": "0.32mm SPEED @MK4IS 0.6 - Aruco",
+ "sketches": [
+  {
+   "id": "sk",
+   "shapes": [
+    {
+     "id": "a",
+     "rect": [
+      80,
+      80
+     ],
+     "at": [
+      0,
+      0
+     ]
+    },
+    {
+     "id": "b",
+     "rect": [
+      80,
+      80
+     ],
+     "at": [
+      95,
+      0
+     ]
+    }
+   ]
+  }
+ ],
+ "features": [
+  {
+   "id": "pa",
+   "extrude": "a",
+   "height": 3
+  },
+  {
+   "id": "pb",
+   "extrude": "b",
+   "height": 3
+  },
+  {
+   "id": "auto",
+   "aruco": "pa.top",
+   "layout": "charuco",
+   "square": 24.48,
+   "size": 16.32,
+   "label": "#id",
+   "first_id": 0
+  },
+  {
+   "id": "by_hand",
+   "aruco": "pb.top",
+   "layout": "charuco",
+   "square": 24.48,
+   "size": 16.32,
+   "label": {
+    "on": true,
+    "content": "id",
+    "position": "manual",
+    "x_mm": 24.48,
+    "y_mm": -24.48
+   },
+   "first_id": 10
+  }
+ ]
+}

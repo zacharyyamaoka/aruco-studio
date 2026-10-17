@@ -10,7 +10,7 @@ test("the server serves the built Studio on 5360", async ({ page, request }) => 
   const r = await request.get(`${API}/`);
   test.skip(!r.ok() || !(await r.text()).includes('id="root"'), "studio/dist was not built when the server started");
   await request.post(`${API}/api/scene/new`, { data: { name: "e2e-served" } });
-  await page.goto(`${API}/`);
+  await page.goto(`${API}/?draw=1`);                                  // the canvas first (the gallery is gallery.spec's)
   await expect(page.locator('.app[data-ready="1"]')).toBeVisible();
   await add(page, "charuco");
   await expect(page.locator('g[data-tag="charuco1"] [data-layer="pattern"]')).toHaveCount(1);

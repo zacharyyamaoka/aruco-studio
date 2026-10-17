@@ -7,12 +7,14 @@
 // TEXTS. The server's events (GET /api/events) bring outside changes in.
 // Changes run one at a time (a queue).
 import { create } from "zustand";
-import { api, errorText, ApiError, type SheetQuery } from "./api/client";
+import { api, errorText, ApiError, type GalleryDoc, type GalleryItem, type SheetQuery } from "./api/client";
 import { connectEvents, type Events } from "./api/events";
 import type {
   DesignInfo, Dictionary, FormDoc, PaletteEntry, PresetCollection, PresetItem, PrusaPrinters, RenumberReport, SceneDoc, SceneTag,
   SendAnswer, SendBody, StaleInfo, VerifyReport, Pt,
 } from "./api/types";
+import { DRAW } from "./app/flags";
+import { landing, type Page } from "./gallery/model";
 import { printPdf, type PrintOutcome } from "./app/Print";
 import { matMul, poseOf, sceneZ, tagBox, unionBox } from "./model/geom";
 import { dump, parse, type Span } from "./model/json";
@@ -52,8 +54,15 @@ export function filtered(tags: SceneTag[], f: KindFilter): SceneTag[] {
 /** tools that take typed numbers */
 export const TYPED_TOOLS: ToolId[] = ["rect", "circle", "slot", "hole", "rhole", "extrude"];
 
+export type { Page } from "./gallery/model";
+
 export interface StudioState {
   ready: boolean;
+  page: Page;
+  /** GET /api/gallery (null until read; an empty doc when the server has none) */
+  gallery: GalleryDoc | null;
+  /** the gallery example open now (its copy): the note's words and buttons */
+  example: GalleryItem | null;
   form: FormDoc | null;
   options: Record<string, any> | null;
   dictionaries: Dictionary[];
@@ -114,6 +123,10 @@ export interface StudioState {
   fitRev: number;
 
   init(): Promise<void>;
+  loadGallery(): Promise<GalleryDoc | null>;
+  showGallery(): void;
+  showStudio(): void;
+  openGallery(name: string): Promise<void>;
   refresh(): Promise<void>;
   say(text: string, level?: "info" | "warn" | "error"): void;
   setView(v: View): Promise<void>;
@@ -122,7 +135,7 @@ export interface StudioState {
   setViewport(w: number, h: number): void;
   setShow(k: keyof Show, v: boolean): void;
   setZScale(v: number): void;
-  zoomToFit(names?: string[]): void;
+  zoomToFit(names?: string[], insetRight?: number, fill?: number): void;
   select(name: string | null, additive?: boolean): void;
   setSel(names: string[]): void;
   selectShape(key: string | null, additive?: boolean): void;
@@ -213,6 +226,10 @@ const previews = new Map<string, SceneDoc>();
 const inflight = new Map<string, Promise<SceneDoc | null>>();
 let liveBusy = 0;
 const HIST = 200;
+/** the example's note over the canvas's right side (px, with its margin) */
+const NOTE_W = 350;
+/** a fit to do when the canvas first measures itself (it mounts with the page) */
+let fitPending = false;
 
 function stamp() {
   return new Date().toTimeString().slice(0, 8);
@@ -242,6 +259,14 @@ function parsed(text: string): { doc: Doc | null; spans: Map<string, Span> } {
   } catch {
     return { doc: null, spans: new Map() };
   }
+}
+
+/** The page in the URL's hash (#gallery, #studio, #example=<name>), so a
+ *  reload comes back where it was. */
+function setHash(h: string) {
+  try {
+    if (window.location.hash !== h) window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${h}`);
+  } catch { /* a page without history (tests' about:blank) */ }
 }
 
 const msgOf = (e: unknown) => e instanceof ApiError ? errorText((e.detail as any)?.detail ?? e.detail)
@@ -425,8 +450,17 @@ export const useStudio = create<StudioState>((set, get) => {
     });
   }
 
+  /** A file opened by hand: it is no gallery example, the Studio shows it. */
+  function leftGallery() {
+    set({ example: null, page: "studio" });
+    setHash("#studio");
+  }
+
   return {
     ready: false,
+    page: DRAW ? "studio" : "gallery",
+    gallery: null,
+    example: null,
     form: null,
     options: null,
     dictionaries: [],
@@ -481,6 +515,13 @@ export const useStudio = create<StudioState>((set, get) => {
       set({ form, options, dictionaries, targets });
       await get().loadPresets();
       await get().refresh();
+      const g = await get().loadGallery();
+      const land = landing(window.location.hash, get().design.path, g?.dir ?? null, DRAW);
+      const item = land.example ? (g?.groups ?? []).flatMap((x) => x.items).find((x) => x.name === land.example) ?? null : null;
+      // an example's note only over its own copy (a reload after Open… is the file)
+      const mine = !!item && !!get().design.path && landing("", get().design.path, g?.dir ?? null, false).page === "gallery";
+      set({ page: land.page, example: mine ? item : null });
+      if (land.page === "studio" && land.example && !mine) setHash("#studio");
       set({ ready: true });
       if (get().scene.tags.length || shapesOf(get().doc).length) get().zoomToFit();
       events?.close();
@@ -513,6 +554,46 @@ export const useStudio = create<StudioState>((set, get) => {
           }).catch(() => undefined);
         }
       });
+    },
+
+    async loadGallery() {
+      try {
+        const g = await api.gallery();
+        set({ gallery: g });
+        return g;
+      } catch {
+        const g: GalleryDoc = { schema: "arucostudio.gallery/1", groups: [], dir: "" };
+        set({ gallery: g });
+        return g;
+      }
+    },
+    showGallery() {
+      set({ page: "gallery", tool: "select", typed: "", picks: [], draft: [], palette: false, dialog: null });
+      setHash("#gallery");
+    },
+    showStudio() {
+      set({ page: "studio" });
+      const ex = get().example;
+      setHash(ex ? `#example=${encodeURIComponent(ex.name)}` : "#studio");
+    },
+    async openGallery(name) {
+      const item = (get().gallery?.groups ?? []).flatMap((g) => g.items).find((x) => x.name === name) ?? null;
+      let opened = false;
+      await run(`opened a copy of '${item?.title ?? name}'`, async () => {
+        await api.galleryOpen(name);
+        opened = true;
+        set({ sel: [], shapeSel: [], hist: { undo: [], redo: [] }, verify: {}, verifySpec: {}, sceneVerify: null, renumberReport: null, idErrors: {},
+          tool: "select", typed: "", picks: [], draft: [], filter: "all", view: "2d" });
+      }, { history: false });
+      if (!opened) return;                            // the status bar says why
+      // the first tag selected: its numbers are in the inspector, ready to change
+      const first = get().scene.tags.find((t) => !t.hidden);
+      const mounted = get().page === "studio";
+      set({ example: item, page: "studio", sel: first ? [first.name] : [], shapeSel: [] });
+      setHash(`#example=${encodeURIComponent(name)}`);
+      // fit clear of the note; a canvas that mounts with the page fits on its first size
+      fitPending = !mounted;
+      get().zoomToFit(undefined, NOTE_W, 0.85);
     },
 
     async refresh() {
@@ -548,6 +629,10 @@ export const useStudio = create<StudioState>((set, get) => {
     },
     setViewport(w, h) {
       set({ viewport: { w, h } });
+      if (fitPending) {
+        fitPending = false;
+        get().zoomToFit(undefined, get().example ? NOTE_W : 0, get().example ? 0.85 : 0.7);
+      }
     },
     setShow(k, v) {
       set((s) => ({ show: { ...s.show, [k]: v } }));
@@ -555,7 +640,7 @@ export const useStudio = create<StudioState>((set, get) => {
     setZScale(v) {
       set({ zScale: v });
     },
-    zoomToFit(names) {
+    zoomToFit(names, insetRight = 0, fill = 0.7) {
       const tags = get().scene.tags.filter((t) => !t.hidden && (!names || names.includes(t.name)));
       const boxes = tags.map((t) => tagBox(t));
       if (!names) {
@@ -569,9 +654,12 @@ export const useStudio = create<StudioState>((set, get) => {
       }
       const b = unionBox(boxes);
       if (!b) return;
-      const { w, h } = get().viewport;
-      const zoom = Math.max(0.2, Math.min(16, Math.min((w * 0.7) / Math.max(1, b.x1 - b.x0), (h * 0.7) / Math.max(1, b.y1 - b.y0))));
-      set((s) => ({ camera: { cx: (b.x0 + b.x1) / 2, cy: (b.y0 + b.y1) / 2, zoom }, fitRev: s.fitRev + 1 }));
+      const { w: vw, h } = get().viewport;
+      // insetRight: a panel over the canvas's right side (the example's note)
+      const inset = vw - insetRight > vw * 0.45 ? insetRight : 0;
+      const w = vw - inset;
+      const zoom = Math.max(0.2, Math.min(16, Math.min((w * fill) / Math.max(1, b.x1 - b.x0), (h * fill) / Math.max(1, b.y1 - b.y0))));
+      set((s) => ({ camera: { cx: (b.x0 + b.x1) / 2 + inset / 2 / zoom, cy: (b.y0 + b.y1) / 2, zoom }, fitRev: s.fitRev + 1 }));
     },
 
     select(name, additive = false) {
@@ -1027,18 +1115,21 @@ export const useStudio = create<StudioState>((set, get) => {
         if (list.some((x) => x.name === name)) throw new Error(`a scene '${name}' exists: open it, or pick another name`);
         await api.sceneNew(name);
         await api.save(name);
+        leftGallery();
         set({ sel: [], shapeSel: [], hist: { undo: [], redo: [] }, verify: {}, verifySpec: {}, sceneVerify: null, renumberReport: null, idErrors: {}, tool: "select", typed: "", picks: [] });
       }, { history: false });
     },
     async saveAs(v) {
       await run("", async () => {
         const r = /[\\/:]/.test(v) ? await api.designSaveAs(v) : await api.save(v);
+        leftGallery();
         get().say(`now following ${(r as any).path ?? (r as any).saved}: every change writes it`);
       }, { history: false });
     },
     async openScene(name) {
       await run(`opened '${name}'`, async () => {
         await api.open(name);
+        leftGallery();
         set({ sel: [], shapeSel: [], hist: { undo: [], redo: [] }, verify: {}, verifySpec: {}, sceneVerify: null, renumberReport: null, idErrors: {} });
       }, { history: false });
       get().zoomToFit();
@@ -1046,6 +1137,7 @@ export const useStudio = create<StudioState>((set, get) => {
     async openPath(path) {
       await run(`opened ${path}`, async () => {
         await api.designOpen(path);
+        leftGallery();
         set({ sel: [], shapeSel: [], hist: { undo: [], redo: [] }, verify: {}, verifySpec: {}, sceneVerify: null, renumberReport: null, idErrors: {} });
       }, { history: false });
       get().zoomToFit();
@@ -1053,6 +1145,7 @@ export const useStudio = create<StudioState>((set, get) => {
     async openExample(name) {
       await run(`opened a copy of the example '${name}'`, async () => {
         await api.openExample(name);
+        leftGallery();
         set({ sel: [], shapeSel: [], hist: { undo: [], redo: [] }, verify: {}, verifySpec: {}, sceneVerify: null, renumberReport: null, idErrors: {} });
       }, { history: false });
       get().zoomToFit();

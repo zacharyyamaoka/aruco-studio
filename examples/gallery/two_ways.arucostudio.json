@@ -1,0 +1,58 @@
+{
+ "schema": "arucostudio.scene/2",
+ "name": "One marker, made two ways",
+ "preset": "0.32mm SPEED @MK4IS 0.6 - Aruco",
+ "sketches": [
+  {
+   "id": "sk",
+   "shapes": [
+    {
+     "id": "printed",
+     "rect": [
+      45,
+      45
+     ],
+     "at": [
+      0,
+      0
+     ]
+    },
+    {
+     "id": "paper",
+     "rect": [
+      45,
+      45
+     ],
+     "at": [
+      60,
+      0
+     ]
+    }
+   ]
+  }
+ ],
+ "features": [
+  {
+   "id": "body",
+   "extrude": "printed",
+   "height": 3
+  },
+  {
+   "id": "print3d",
+   "aruco": "body.top",
+   "layout": "single",
+   "size": 30,
+   "first_id": 0,
+   "name": "3D printed"
+  },
+  {
+   "id": "sticker",
+   "aruco": "paper",
+   "preset": "Sticker · Letter · 600 dpi",
+   "layout": "single",
+   "size": 30,
+   "first_id": 1,
+   "name": "sticker"
+  }
+ ]
+}

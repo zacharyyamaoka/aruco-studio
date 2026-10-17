@@ -426,6 +426,58 @@ def copy_example(name: str) -> Path:
     return dst
 
 
+# ------------------------------------------------------------- the gallery (N-3)
+# The Studio's landing page: golden examples, drawn for the user, grouped by
+# feature (examples/gallery/gallery.json). An opened example is a copy in
+# <home>/gallery/, made afresh on every open; examples/ is never written.
+
+GALLERY = EXAMPLES / "gallery"
+GALLERY_MANIFEST = GALLERY / "gallery.json"
+
+
+def gallery_dir() -> Path:
+    """Where an opened gallery example's copy lives."""
+    return _checked(home() / "gallery")
+
+
+def gallery() -> dict:
+    """The manifest with each item's text: {schema, groups: [{id, title,
+    line, items: [{name, file, title, line, look, actions, text}]}]}. An
+    item whose file is gone keeps its row with `text: null`."""
+    doc = json.loads(GALLERY_MANIFEST.read_text(encoding="utf-8"))
+    for g in doc.get("groups") or []:
+        for it in g.get("items") or []:
+            f = GALLERY / str(it.get("file") or "")
+            try:
+                it["text"] = f.read_text(encoding="utf-8") if f.is_file() else None
+            except OSError:
+                it["text"] = None
+    return doc
+
+
+def gallery_item(name: str) -> dict:
+    """The manifest's row for `name` (KeyError when there is none)."""
+    doc = json.loads(GALLERY_MANIFEST.read_text(encoding="utf-8"))
+    for g in doc.get("groups") or []:
+        for it in g.get("items") or []:
+            if it.get("name") == name:
+                return dict(it, group=g.get("id"))
+    raise KeyError(name)
+
+
+def copy_gallery_example(name: str) -> Path:
+    """The gallery example `name` copied to <home>/gallery/<name>.arucostudio.json,
+    written afresh (opening a card starts from the example); the example
+    itself is never opened, so never written."""
+    it = gallery_item(name)
+    src = GALLERY / str(it.get("file") or "")
+    if safe_name(name) != name or src.parent != GALLERY or not src.is_file():
+        raise FileNotFoundError(name)
+    dst = gallery_dir() / (name + SCENE_EXT)
+    write_atomic(dst, src.read_text(encoding="utf-8"))
+    return dst
+
+
 def browse(folder=None) -> dict:
     """A folder's design files and subfolders (not recursive): {dir, parent,
     folders: [{name, path}], files: [{name, path, bytes, modified}]}. The

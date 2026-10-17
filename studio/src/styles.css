@@ -323,3 +323,63 @@ kbd { background: var(--panel-2); border: 1px solid var(--line); border-radius: 
 @keyframes blink { 50% { opacity: 0; } }
 .tool-ask .picks { color: var(--pick); }
 .tool-ask .keys { color: var(--muted); display: inline-flex; gap: 4px; align-items: center; }
+
+/* ------------------------------------------------------------ the gallery (N-3)
+   The landing page: groups of cards, each a thumbnail drawn from the
+   example's plan (the 2D canvas's own classes), a title, one line. */
+.gallery { min-height: 0; overflow-y: auto; background: var(--bg); }
+.gal-inner { max-width: 1340px; margin: 0 auto; padding: 18px 24px 40px; }
+.gal-head { display: flex; align-items: flex-start; gap: 16px; }
+.gal-title { flex: 1; min-width: 0; }
+.gal-title h1 { margin: 0 0 4px; font-size: 18px; font-weight: 650; letter-spacing: -0.01em; }
+.gal-title p { margin: 0; max-width: 760px; font-size: 12.5px; }
+.gal-head-actions { display: flex; gap: 6px; padding-top: 2px; }
+.gal-head-actions .kit-btn .ic { transform: rotate(90deg); }
+.gal-toc { display: flex; flex-wrap: wrap; gap: 4px; margin: 12px 0 4px; position: sticky; top: 0; z-index: 2;
+  padding: 6px 0; background: var(--bg); }
+.gal-toc a { color: var(--text); text-decoration: none; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--panel); font-size: 11px; white-space: nowrap; }
+.gal-toc a:hover { border-color: var(--accent); color: var(--accent); }
+.gal-groups { display: grid; gap: 18px 12px; margin-top: 10px; }
+.gal-group { min-width: 0; scroll-margin-top: 44px; display: flex; flex-direction: column; }
+.gal-group-head { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; min-height: 18px; }
+.gal-group-head h2 { flex: none; white-space: nowrap; }
+.gal-group-head .muted { font-size: 11.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fatal-inline { margin: 12px 0; }
+.gal-group-head h2 { margin: 0; font-size: 13.5px; font-weight: 650; }
+.gal-num { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent-soft); color: var(--accent); font-size: 10.5px; font-weight: 700; flex: none; align-self: center; }
+.gal-cards { display: grid; gap: 12px; flex: 1; }
+.gal-card { display: flex; flex-direction: column; text-align: left; padding: 0; overflow: hidden; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow-sm); color: var(--text); }
+.gal-card:hover:not(:disabled) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.gal-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.gal-card:disabled { cursor: progress; }
+.gal-card-text { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px 10px; border-top: 1px solid var(--line-soft); }
+.gal-card-text b { font-size: 12.5px; font-weight: 600; }
+.gal-card-text .muted { font-size: 11.5px; }
+.gal-thumb { position: relative; height: 150px; background: var(--canvas); display: flex; align-items: center; justify-content: center; }
+.gal-thumb svg { width: 100%; height: 100%; padding: 8px; display: block; }
+.gal-thumb .bad { font-size: 11px; padding: 8px; }
+.gal-thumb .tag { cursor: inherit; }
+.gal-thumb .hinge { stroke-width: 1; vector-effect: non-scaling-stroke; }
+.gal-thumb .spin { margin: 0; }
+
+/* the note over an opened example */
+.example-note { position: absolute; right: 12px; top: 28px; z-index: 18; width: 330px; max-width: calc(100% - 100px);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); padding: 0 0 6px; }
+.en-head { display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 4px 0 10px; border-bottom: 1px solid var(--line-soft); }
+.en-head > .ic { color: var(--accent); }
+.en-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.en-look { padding: 8px 10px 4px; font-size: 12px; line-height: 1.45; }
+.en-actions { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 10px; }
+.en-actions:empty { display: none; }
+.en-foot { display: flex; align-items: center; gap: 4px; padding: 6px 6px 0 10px; }
+.en-count { font-size: 11px; min-width: 38px; text-align: center; }
+.en-copy { font-size: 10.5px; padding: 4px 10px 0; }
+.flip-left .ic { transform: rotate(90deg); }
+.flip-right .ic { transform: rotate(-90deg); }
+.example-chip { position: absolute; right: 12px; top: 28px; z-index: 18; display: inline-flex; align-items: center; gap: 5px; height: 26px;
+  padding: 0 10px; border-radius: 13px; border: 1px solid var(--line); background: var(--panel); box-shadow: var(--shadow-sm); cursor: pointer; }
+.example-chip:hover { border-color: var(--accent); color: var(--accent); }
+.scene-item.gallery-item { border-color: var(--accent); background: var(--accent-soft); }

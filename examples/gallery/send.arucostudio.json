@@ -1,0 +1,133 @@
+{
+ "schema": "arucostudio.scene/2",
+ "name": "To PrusaSlicer: beds and Send",
+ "preset": "0.32mm SPEED @MK4IS 0.6 - Aruco",
+ "sketches": [
+  {
+   "id": "sk",
+   "shapes": [
+    {
+     "id": "a",
+     "rect": [
+      40,
+      40
+     ],
+     "at": [
+      0,
+      0
+     ]
+    },
+    {
+     "id": "b",
+     "rect": [
+      40,
+      40
+     ],
+     "at": [
+      55,
+      0
+     ]
+    },
+    {
+     "id": "c",
+     "rect": [
+      70,
+      50
+     ],
+     "at": [
+      130,
+      0
+     ]
+    },
+    {
+     "id": "d",
+     "circle": 53,
+     "holes": [
+      {
+       "circle": 2.85,
+       "at": [
+        23.75,
+        0
+       ]
+      },
+      {
+       "circle": 2.85,
+       "at": [
+        0,
+        23.75
+       ]
+      },
+      {
+       "circle": 2.85,
+       "at": [
+        -23.75,
+        0
+       ]
+      },
+      {
+       "circle": 2.85,
+       "at": [
+        0,
+        -23.75
+       ]
+      }
+     ],
+     "at": [
+      220,
+      0
+     ]
+    }
+   ]
+  }
+ ],
+ "features": [
+  {
+   "id": "ba",
+   "extrude": "a",
+   "height": 3
+  },
+  {
+   "id": "bb",
+   "extrude": "b",
+   "height": 3
+  },
+  {
+   "id": "bc",
+   "extrude": "c",
+   "height": 3
+  },
+  {
+   "id": "bd",
+   "extrude": "d",
+   "height": 3
+  },
+  {
+   "id": "t1",
+   "aruco": "ba.top",
+   "layout": "single",
+   "mark": "triangle",
+   "first_id": 0
+  },
+  {
+   "id": "t2",
+   "aruco": "bb.top",
+   "layout": "single",
+   "mark": "triangle",
+   "first_id": 1
+  },
+  {
+   "id": "t3",
+   "aruco": "bc.top",
+   "layout": "charuco",
+   "mark": "triangle",
+   "first_id": 2
+  },
+  {
+   "id": "t4",
+   "aruco": "bd.top",
+   "layout": "single",
+   "mark": "triangle",
+   "first_id": 20
+  }
+ ]
+}
