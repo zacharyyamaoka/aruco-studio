@@ -2,7 +2,7 @@
 
 Zach's fiducial-marker project: one pure core plans every tag, and thin shells (a 2D / 3D web app, Fusion, build123d, exports) draw what the plan says.
 
-Local only. Read `docs/BRIEF.md`, then `docs/ARCHITECTURE.md` and `docs/PLAN.md`.
+Public at https://github.com/zacharyyamaoka/aruco-studio (no licence chosen yet). Read `docs/BRIEF.md`, then `docs/ARCHITECTURE.md` and `docs/PLAN.md`. Since 2026-10-17 the focus is 2D: inkjet stickers on vinyl (`docs/feedback/2026-10-17-markers-core-first.md`, CF-13); the Studio opens on a gallery of golden examples, and the Fusion add-in runs on this core (vendored).
 
 **Run the Studio with one command:** `npm --prefix studio run studio`, then open http://127.0.0.1:5360 (it builds the web app and serves it with the API; Ctrl+C stops it). How to use it: `docs/STUDIO.md`.
 
