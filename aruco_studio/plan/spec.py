@@ -56,8 +56,11 @@ SETTINGS_TYPES = {"layout": _STR, "dictionary": _STR, "mode": _STR, "op": _STR,
                   "label": (dict, type(None)), "cells": (dict, type(None)),
                   "force": (list, tuple, type(None)), "origin_v": (int, type(None)),
                   "make": (dict, type(None)), "holes": (str, type(None)),
-                  "shift": (dict, type(None))}
-NUMBER_KEYS = _S.PARAMS + _S.LEGACY_PARAMS
+                  "shift": (dict, type(None)), "as_typed": (bool, type(None))}
+# numbers.separation (2026-10-18): a grid's typed gap, mm; no REF node has it,
+# so it is no node parameter (core.settings.PARAMS) and absent = the gap rule
+EXTRA_NUMBERS = ("separation",)
+NUMBER_KEYS = _S.PARAMS + _S.LEGACY_PARAMS + EXTRA_NUMBERS
 
 
 @dataclass
@@ -159,7 +162,11 @@ def numbers_of(spec: TagSpec, s: dict) -> dict:
     node made before 2026-10-08 (height / thickness / above) mapped to
     Offset / Height pairs."""
     params = {k: v for k, v in (spec.numbers or {}).items() if k in NUMBER_KEYS and v is not None}
-    return _S.numbers_from_params(s, params)
+    n = _S.numbers_from_params(s, params)
+    for k in EXTRA_NUMBERS:
+        if k in params:
+            n[k] = params[k]
+    return n
 
 
 def has_legacy_numbers(spec: TagSpec) -> bool:
@@ -229,6 +236,12 @@ def check(spec: TagSpec) -> List[Issue]:
     if s.get("layout") == "charuco" and _finite(sz) and _finite(sq) and sz > 0 and 0 < sq <= sz:
         add("numbers.square", "error",
             f"the square ({sq:g} mm) must be larger than the marker ({sz:g} mm)")
+    # -- a grid's typed separation (absent / 0 = the gap rule)
+    sep = n.get("separation")
+    if sep is not None and (not _finite(sep) or sep < 0):
+        add("numbers.separation", "error", "Separation: 0 for the default gap, or more than 0 mm")
+    elif sep and s.get("layout") != "grid":
+        add("numbers.separation", "info", "separation is a grid's: not used here")
     # -- a forced board (cols, rows)
     f = raw.get("force")
     if f is not None:

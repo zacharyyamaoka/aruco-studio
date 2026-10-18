@@ -22,6 +22,7 @@ REF does (the trim golden was made with it off and sets it so).
 """
 from __future__ import annotations
 
+import math
 from typing import Optional
 
 from . import autosize as _autosize
@@ -180,6 +181,17 @@ def size_is_auto(s, n):
     except (TypeError, ValueError):
         return False
     return size <= 0.0 and ((s or {}).get("layout") != "charuco" or square <= 0.0)
+
+
+def separation_m(n):
+    """A grid's typed gap (`numbers.separation`, mm; the online Studio,
+    2026-10-18) in metres, or None: absent, 0 or junk = the gap rule
+    (autosize.GAP_RATIO). Not a node parameter (PARAMS): no REF node has it."""
+    try:
+        v = float((n or {}).get("separation") or 0.0)
+    except (TypeError, ValueError):
+        return None
+    return v / 1000.0 if v > 0.0 and math.isfinite(v) else None
 
 
 def has_frame_sketch(s):

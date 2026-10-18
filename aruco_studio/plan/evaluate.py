@@ -26,6 +26,8 @@ Beyond REF (M6a, both absent = REF's evaluate() exactly):
 | `sticker=` a `core.make.Make` | a printed sticker: fitted on the loops like a face (a sketch area too), the tile is the sticker grown by its margin, the label's white is the sticker's cut polygon (Marker: that rectangle; Profile: the outline with its holes), the record's depth is the ink's |
 | make rule 2 (2026-10-17) | the black's depth is t/2 (`Make.ink_mm`); on Auto size a Marker sticker is capped to its page's printable area (`cap_to_page`: the face clipped to a printable-sized box, each way round, the best that fits), `ev["page_cap"]` |
 | `settings.shift` (2026-10-17) | a sticker's origin moved by (x_mm, y_mm) along the base frame's x / y after the fit (`ev["shift_mm"]`); a 3D tag is not moved |
+| `settings.as_typed` (2026-10-18, the online Studio) | on a box target the typed numbers win (`typed_fit`): a typed size / count / checker / separation is laid out as typed, centred, never clamped, and `ev["overflow_mm"]` says how far it pokes past the box; Auto size with a typed count fills the box with that count. Absent or false: today's fit |
+| `numbers.separation` (2026-10-18) | a grid's gap in mm as typed (`autosize`'s `separation_m`); absent or 0 = the gap rule (`GAP_RATIO`) |
 """
 from __future__ import annotations
 
@@ -88,7 +90,7 @@ def _layout_rect(kind, w_m, h_m, s, n):
     """Autosize in a w x h box (m). Size given -> keep it (clamp if needed)."""
     a = A()
     kw = dict(dictionary=s["dictionary"], quiet_modules=float(s["quiet_modules"]),
-              cells=_S.cells_of(s))
+              cells=_S.cells_of(s), separation_m=_S.separation_m(n))
     L = float(n.get("size") or 0.0) / 1000.0
     S = float(n.get("square") or 0.0) / 1000.0
     if L <= 0.0:                    # the same default as a clicked face (fit_on_loops)
@@ -102,6 +104,72 @@ def _layout_rect(kind, w_m, h_m, s, n):
     if not lay.ok or lay.kind != kind:
         lay = a.clamp_to_fit(kind, w_m, h_m, L, S, **kw)
     return lay
+
+
+def _typed_kw(s, n):
+    return dict(dictionary=s["dictionary"], quiet_modules=float(s["quiet_modules"]),
+                cells=_S.cells_of(s), separation_m=_S.separation_m(n))
+
+
+def _force(s, kind):
+    f = s.get("force")
+    if kind == "single" or not isinstance(f, (list, tuple)) or len(f) != 2:
+        return None
+    return (int(f[0]), int(f[1]))
+
+
+def _counted_fit(loops_m, kind, s, n):
+    """Auto size for the typed count on the box of `loops_m` (metres):
+    (layout, placement at the box's centre) -- what cap_to_page refits with."""
+    xs = [p[0] for p in loops_m[0]]
+    ys = [p[1] for p in loops_m[0]]
+    w_m, h_m = max(xs) - min(xs), max(ys) - min(ys)
+    f = _force(s, kind) or (1, 1)
+    lay = A().fill_count(kind, w_m, h_m, f[0], f[1], **_typed_kw(s, n))
+    return lay, _centred(lay, (min(xs) + max(xs)) / 2.0, (min(ys) + max(ys)) / 2.0)
+
+
+def _centred(lay, cx, cy):
+    if lay.marker_m <= 0:
+        return None
+    tw, th = lay.tile_m
+    return {"cx": cx, "cy": cy, "angle_deg": 0.0, "w": tw, "h": th}
+
+
+def typed_fit(target, s, n, kind, w_cm, h_cm):
+    """NOT REF's (`settings.as_typed`, the online Studio 2026-10-18; absent
+    = None, today's fit exactly): on a box target the typed numbers win. A
+    typed size (and count, checker, separation) is laid out as typed,
+    centred, never clamped (`autosize.as_typed`; an overhang is drawn and
+    flagged by the plan); Auto size with a typed count fills the box with
+    that count (`autosize.fill_count`); Auto with no count is today's.
+    -> (layout, placement in the target frame) or None (the rule is off, a
+    non-box target, or Auto without a count)."""
+    if s.get("as_typed") is not True:
+        return None
+    lm = target.loops_m()
+    if target.loops_mm and not _is_box(lm, w_cm, h_cm):
+        return None
+    L = float(n.get("size") or 0.0) / 1000.0
+    S = float(n.get("square") or 0.0) / 1000.0
+    auto = L <= 0 and (kind != "charuco" or S <= 0)
+    force = _force(s, kind)
+    if auto:
+        if force is None:
+            return None
+        return _counted_fit(lm, kind, s, n)
+    xs = [p[0] for p in lm[0]]
+    ys = [p[1] for p in lm[0]]
+    lay = A().as_typed(kind, max(xs) - min(xs), max(ys) - min(ys), L, S, force=force,
+                       **_typed_kw(s, n))
+    return lay, _centred(lay, (min(xs) + max(xs)) / 2.0, (min(ys) + max(ys)) / 2.0)
+
+
+def overflow_mm(lay, target):
+    """How far a layout's tile pokes past the target's box on each side
+    (x, y) mm, 0 when it fits: the as_typed rule's flag."""
+    tw, th = (v * 1000.0 for v in lay.tile_m)
+    return (max(0.0, (tw - target.w_mm) / 2.0), max(0.0, (th - target.h_mm) / 2.0))
 
 
 def fit_loops(target, s):
@@ -280,11 +348,23 @@ def evaluate(target, s, n, base=None, name="", sticker=None):
         return A().fit_on_loops(
             kind, loops, marker_m=(L if L > 0 else None), square_m=S,
             dictionary=s["dictionary"], quiet_modules=float(s["quiet_modules"]),
-            angles_deg=angles, cells=cells)
+            angles_deg=angles, cells=cells, separation_m=_S.separation_m(n))
 
     o, x, y, z, w, h = base_of(target, base)
     page_cap = None
-    if sticker is not None:
+    typed = typed_fit(target, s, n, kind, w, h)
+    if typed is not None:
+        lay, pl = typed
+        if sticker is not None:
+            counted = L <= 0 and (kind != "charuco" or S <= 0)
+            if sticker.inset and counted and sticker.perimeter == "marker":
+                lay, pl, page_cap = cap_to_page(
+                    lambda loops: _counted_fit(loops, kind, s, n), fit_loops(target, s), lay, pl,
+                    sticker)
+        elif target.is_profile:
+            tile_frame = (o, x, y, z, w, h)
+            pl = None                               # the box's centre, as _layout_rect's
+    elif sticker is not None:
         # a sticker sits on the face: fitted on the loops, a sketch area too
         lay, pl = fit(fit_loops(target, s))
         auto = L <= 0 and (kind != "charuco" or S <= 0)
@@ -415,6 +495,8 @@ def evaluate(target, s, n, base=None, name="", sticker=None):
           "tile_mm": tile_mm, "sticker": sticker}
     if page_cap is not None:
         ev["page_cap"] = page_cap
+    if typed is not None:
+        ev["overflow_mm"] = overflow_mm(lay, target)
     if shift[0] or shift[1]:
         ev["shift_mm"] = shift
     ev["trim"] = None

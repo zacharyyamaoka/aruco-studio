@@ -542,9 +542,22 @@ def _nothing(kind: str, kw: dict, why: str) -> Layout:
                   quiet_modules=0.0 if kind == "charuco" else max(0.0, _num(kw["quiet_modules"])))
 
 
-def _kw(dictionary, quiet_modules, gap_ratio, cells=None) -> dict:
+def _kw(dictionary, quiet_modules, gap_ratio, cells=None, separation_m=None) -> dict:
     return dict(dictionary=dictionary, quiet_modules=max(0.0, _num(quiet_modules)),
-                gap_ratio=max(0.0, _num(gap_ratio)), cells=cells_of(cells))
+                gap_ratio=max(0.0, _num(gap_ratio)), cells=cells_of(cells),
+                separation_m=_separation(separation_m))
+
+
+def _separation(separation_m) -> Optional[float]:
+    """A typed grid gap (m, rounded to 1e-7), or None: the gap rule
+    (max(gap_ratio L, L / n), _Grid.gap). 0, None or junk = the rule."""
+    s = _num(separation_m)
+    return _r7(s) if s > 0 else None
+
+
+def _gap(G: "_Grid", L: float, kw: dict) -> float:
+    """A grid's gap at L: the typed separation as typed, else the rule."""
+    return kw["separation_m"] if kw.get("separation_m") else G.gap(L, kw["gap_ratio"])
 
 
 def _typed(kind: str, marker_m, square_m, G: _Grid, notes=None) -> Tuple[float, float]:
@@ -586,7 +599,7 @@ def _cap_count(kind: str, cols: int, rows: int, cap: int) -> Optional[Tuple[int,
 
 def _layout(kind: str, W: float, H: float, L: float, S: float, *, dictionary: str,
             quiet_modules: float, gap_ratio: float, cells=None, force=None,
-            final: bool = True) -> Layout:
+            final: bool = True, separation_m=None) -> Layout:
     """Sizes in -> as many as fit, centred, checked. `final` adds the
     dictionary checks (capacity + aruco_board.check_spec); the sizing walks
     run without them so a size is never shrunk for a dictionary's sake."""
@@ -609,7 +622,8 @@ def _layout(kind: str, W: float, H: float, L: float, S: float, *, dictionary: st
             return _fail(lay, "%s mm + a %s mm quiet zone per side does not fit the %s mm side"
                          % (_mm(L), _mm(Q), _mm(min(W, H))))
     elif kind == "grid":
-        s = G.gap(L, gap_ratio)                  # never below one module
+        # never below one module; a typed separation (separation_m) as typed
+        s = _separation(separation_m) or G.gap(L, gap_ratio)
         lay.separation_m = s
         cols = _fit_count(W - 2 * Q + s, L + s)
         rows = _fit_count(H - 2 * Q + s, L + s)
@@ -694,7 +708,7 @@ def _layout(kind: str, W: float, H: float, L: float, S: float, *, dictionary: st
 def layout_for_size(kind: str, w_m: float, h_m: float, marker_m: float, square_m: float = 0.0, *,
                     dictionary: str = DEFAULT_DICTIONARY, quiet_modules: float = 1.0,
                     gap_ratio: float = GAP_RATIO, force: Optional[Tuple[int, int]] = None,
-                    cells=None) -> Layout:
+                    cells=None, separation_m: Optional[float] = None) -> Layout:
     """THE rule: given the sizes, lay out as many markers as fit the w x h
     box (x = w), centred, and say whether that is valid.
 
@@ -709,8 +723,9 @@ def layout_for_size(kind: str, w_m: float, h_m: float, marker_m: float, square_m
     force    (cols, rows) instead of the maximum; must fit.
     Sizes are used as given (rounded to 1e-7 m); a module under 1.2 mm is
     noted, not refused. `cells`: the size grid (cells_of; "cell" snaps a
-    typed size DOWN onto it, noted). Never raises."""
-    kw = _kw(dictionary, quiet_modules, gap_ratio, cells)
+    typed size DOWN onto it, noted). `separation_m` > 0: the grid's gap as
+    typed instead of the rule (every function here takes it). Never raises."""
+    kw = _kw(dictionary, quiet_modules, gap_ratio, cells, separation_m)
     notes: List[str] = []
     L, S = _typed(kind, marker_m, square_m, _grid(kw), notes)
     lay = _layout(kind, _num(w_m), _num(h_m), L, S, force=force, **kw)
@@ -796,7 +811,7 @@ def _unprintable(lay: Layout) -> Layout:
 
 def default_layout(kind: str, w_m: float, h_m: float, *, dictionary: str = DEFAULT_DICTIONARY,
                    quiet_modules: float = 1.0, gap_ratio: float = GAP_RATIO,
-                   cells=None) -> Layout:
+                   cells=None, separation_m: Optional[float] = None) -> Layout:
     """The smart default: Zach's tube rule generalised, rounded to the
     NEAREST 0.5 mm, checked; if rounding up broke the fit or lost a marker,
     step down 0.5 mm.
@@ -814,7 +829,7 @@ def default_layout(kind: str, w_m: float, h_m: float, *, dictionary: str = DEFAU
     that fits is used (noted); if nothing printable fits, the largest that
     fits at all, ok=False; if nothing fits, marker_m = 0. `cells`: the size
     grid (cells_of) the rule rounds on."""
-    kw = _kw(dictionary, quiet_modules, gap_ratio, cells)
+    kw = _kw(dictionary, quiet_modules, gap_ratio, cells, separation_m)
     W, H = _num(w_m), _num(h_m)
     if kind not in LAYOUTS:
         return _layout(kind, W, H, 0.0, 0.0, **kw)
@@ -829,7 +844,9 @@ def default_layout(kind: str, w_m: float, h_m: float, *, dictionary: str = DEFAU
         k, S, L = 1, 0.0, G.L_nearest(FILL * short)
     elif kind == "grid":
         k, S = (1 if strip else 2), 0.0
-        L = G.L_nearest(FILL * short / (k + (k - 1) * g))
+        sep = kw["separation_m"]
+        L = G.L_nearest((FILL * short - (k - 1) * sep) / k if sep else
+                        FILL * short / (k + (k - 1) * g))
     else:
         k = 2 if strip else 3
         S = G.S_nearest(short / k)
@@ -863,7 +880,8 @@ def default_layout(kind: str, w_m: float, h_m: float, *, dictionary: str = DEFAU
 
 def clamp_to_fit(kind: str, w_m: float, h_m: float, marker_m: float, square_m: float = 0.0, *,
                  dictionary: str = DEFAULT_DICTIONARY, quiet_modules: float = 1.0,
-                 gap_ratio: float = GAP_RATIO, cells=None) -> Layout:
+                 gap_ratio: float = GAP_RATIO, cells=None,
+                 separation_m: Optional[float] = None) -> Layout:
     """P1's answer to a typed size. Fits (as a board: a grid keeps >= 2
     markers) -> exactly layout_for_size, no note. Overhangs -> the largest
     0.5 mm step at or below it that fits, noted ("clamped: 30.0 mm does not
@@ -874,7 +892,7 @@ def clamp_to_fit(kind: str, w_m: float, h_m: float, marker_m: float, square_m: f
     than the dictionary holds is NOT shrunk (smaller means more markers):
     ok=False with a "use a bigger dictionary" note. `cells`: the size grid
     (cells_of; "cell" snaps the typed size DOWN onto it first, noted)."""
-    kw = _kw(dictionary, quiet_modules, gap_ratio, cells)
+    kw = _kw(dictionary, quiet_modules, gap_ratio, cells, separation_m)
     notes: List[str] = []
     lay = _clamp_typed(kind, _num(w_m), _num(h_m), marker_m, square_m, kw, notes)
     lay.notes[:0] = notes
@@ -909,7 +927,7 @@ def _clamp_typed(kind, W, H, marker_m, square_m, kw, notes) -> Layout:
 
 def face_default(kind: str, w_m: float, h_m: float, *, dictionary: str = DEFAULT_DICTIONARY,
                  quiet_modules: float = 1.0, gap_ratio: float = GAP_RATIO,
-                 cells=None) -> Layout:
+                 cells=None, separation_m: Optional[float] = None) -> Layout:
     """The default for a clicked face (or sketch area) whose clear rectangle
     is w x h -- the face itself when it is a plain rectangle, else its
     largest clear rectangle (fit_on_loops).
@@ -926,8 +944,8 @@ def face_default(kind: str, w_m: float, h_m: float, *, dictionary: str = DEFAULT
     nothing fits -> marker_m 0. Never raises."""
     if kind != "single":
         return default_layout(kind, w_m, h_m, dictionary=dictionary, quiet_modules=quiet_modules,
-                              gap_ratio=gap_ratio, cells=cells)
-    kw = _kw(dictionary, quiet_modules, gap_ratio, cells)
+                              gap_ratio=gap_ratio, cells=cells, separation_m=separation_m)
+    kw = _kw(dictionary, quiet_modules, gap_ratio, cells, separation_m)
     W, H = _num(w_m), _num(h_m)
     if not min(W, H) > EPS_M:
         return _nothing(kind, kw, "the face has no area")
@@ -943,6 +961,109 @@ def face_default(kind: str, w_m: float, h_m: float, *, dictionary: str = DEFAULT
     return _unprintable(_finish(lay, W, H, kw))
 
 
+# ------------------------------------------------------ the typed numbers win
+#
+# NOT REF's (the online Studio, 2026-10-18, docs/design/online_studio_v1.md:
+# "it won't block you, it may just throw a warning"): a box target whose
+# numbers are the user's. evaluate() calls these only under the opt-in
+# settings key `as_typed` (core.settings.as_typed); every other caller, and
+# every tag without the key, takes the rule above.
+
+def _tile_for(kind: str, c: int, r: int, L: float, S: float, G: _Grid, kw: dict
+              ) -> Tuple[float, float]:
+    """The tile (pattern + quiet zone; ChArUco: the squares) of a c x r
+    board at (L, S), metres."""
+    if kind == "charuco":
+        return c * S, r * S
+    Q = kw["quiet_modules"] * L / G.n
+    if kind == "single":
+        return L + 2 * Q, L + 2 * Q
+    s = _gap(G, L, kw)
+    return c * L + (c - 1) * s + 2 * Q, r * L + (r - 1) * s + 2 * Q
+
+
+def as_typed(kind: str, w_m: float, h_m: float, marker_m: float, square_m: float = 0.0, *,
+             force: Optional[Tuple[int, int]] = None, dictionary: str = DEFAULT_DICTIONARY,
+             quiet_modules: float = 1.0, gap_ratio: float = GAP_RATIO, cells=None,
+             separation_m: Optional[float] = None) -> Layout:
+    """A typed size (and count) laid out AS TYPED, centred on the w x h box,
+    even when it overhangs it: never clamped. The margins are then negative
+    (the overhang per side, less the quiet zone) and the caller flags it.
+    The size grid still applies ("cell" snaps a typed size DOWN, noted), and
+    so do the dictionary's capacity and OpenCV's checks (ok False). `force`
+    None: as many as fit, at least one (ChArUco 2 x 2). Never raises."""
+    kw = _kw(dictionary, quiet_modules, gap_ratio, cells, separation_m)
+    W, H = _num(w_m), _num(h_m)
+    G = _grid(kw)
+    notes: List[str] = []
+    L, S = _typed(kind, marker_m, square_m, G, notes)
+    if kind not in LAYOUTS or L <= 0 or (kind == "charuco" and S <= 0) or not (W > 0 and H > 0):
+        lay = _layout(kind, W, H, L, S, **kw)
+        lay.notes[:0] = notes
+        return lay
+    lo = 2 if kind == "charuco" else 1
+    if kind == "single":
+        c = r = 1
+    elif force:
+        c, r = int(force[0]), int(force[1])
+    else:
+        geo = _layout(kind, W, H, L, S, final=False, **kw)
+        c, r = (max(lo, geo.cols), max(lo, geo.rows)) if geo.ok else (lo, lo)
+    tw, th = _tile_for(kind, c, r, L, S, G, kw)
+    # laid out in a box just big enough, then measured against the real one
+    pad = 1e-6
+    lay = _layout(kind, max(W, tw) + pad, max(H, th) + pad, L, S,
+                  force=None if kind == "single" else (c, r), **kw)
+    lay.notes[:0] = notes
+    if lay.marker_m > 0:
+        ew, eh = lay.extent_m
+        lay.margins_m = (_r7((W - ew) / 2.0), _r7((H - eh) / 2.0))
+        lay.fill = (ew * eh) / (W * H)
+    return lay
+
+
+def fill_count(kind: str, w_m: float, h_m: float, cols: int, rows: int, *,
+               dictionary: str = DEFAULT_DICTIONARY, quiet_modules: float = 1.0,
+               gap_ratio: float = GAP_RATIO, cells=None,
+               separation_m: Optional[float] = None) -> Layout:
+    """Auto size for a TYPED count: the largest size on the grid at which a
+    cols x rows board fits the w x h box (a ChArUco marker the largest its
+    square holds). A single marker: face_default (the sticker fills the box).
+    Below the printable module it is noted, not refused; nothing fits at all
+    -> marker_m 0, ok False. Never raises."""
+    kw = _kw(dictionary, quiet_modules, gap_ratio, cells, separation_m)
+    W, H = _num(w_m), _num(h_m)
+    if kind == "single" or kind not in LAYOUTS:
+        return face_default(kind, W, H, dictionary=dictionary, quiet_modules=quiet_modules,
+                            gap_ratio=gap_ratio, cells=cells, separation_m=separation_m)
+    c, r = int(cols), int(rows)
+    if c < 1 or r < 1 or not min(W, H) > EPS_M:
+        return _nothing(kind, kw, "%d × %d: no board" % (c, r))
+    G = _grid(kw)
+    n, q = G.n, kw["quiet_modules"]
+    if kind == "charuco":
+        S = G.S_down(min(W / c, H / r))
+        L = G.lmax(S) if S > 0 else 0.0
+    else:
+        sep = kw["separation_m"]
+        if sep:
+            top = min((W - (c - 1) * sep) / (c + 2.0 * q / n), (H - (r - 1) * sep) / (r + 2.0 * q / n))
+        else:
+            g = kw["gap_ratio"]
+            top = min(W / _grid_factor(c, n, q, g), H / _grid_factor(r, n, q, g))
+        L, S = (G.L_down(top) if top > 0 else 0.0), 0.0
+    while L > 0 and L >= G.L_min - 1e-12:
+        lay = _layout(kind, W, H, L, S, force=(c, r), final=False, **kw)
+        if lay.ok and (lay.kind == kind or c * r == 1):
+            return _finish(lay, W, H, kw)
+        if kind == "charuco":
+            S = G.S_next(S)
+            L = G.lmax(S) if S > 0 else 0.0
+        else:
+            L = G.L_next(L)
+    return _nothing(kind, kw, "no %d × %d board fits this %s × %s mm face" % (c, r, _mm(W), _mm(H)))
+
+
 def _badge(out: List[Layout]) -> List[Layout]:
     if out:
         out[0].badges.append("largest marker")
@@ -953,7 +1074,8 @@ def _badge(out: List[Layout]) -> List[Layout]:
 
 def candidates(kind: str, w_m: float, h_m: float, *, dictionary: str = DEFAULT_DICTIONARY,
                quiet_modules: float = 1.0, gap_ratio: float = GAP_RATIO,
-               limit: Optional[int] = 8, cells=None) -> List[Layout]:
+               limit: Optional[int] = 8, cells=None,
+               separation_m: Optional[float] = None) -> List[Layout]:
     """P3's ranked list: every distinct cols x rows that fits, each at the
     LARGEST 0.5 mm size that gives it, biggest marker first, printable only
     (module >= 1.2 mm), dictionary-valid only. Stepping the size down from
@@ -964,7 +1086,7 @@ def candidates(kind: str, w_m: float, h_m: float, *, dictionary: str = DEFAULT_D
     the RETURNED list, so every badge is visible in an 8-entry dropdown.
     The P1 default is usually NOT an entry as such (an entry is the largest
     size for its count: 4 × 2 @ 24.0 here vs the default 4 × 2 @ 22.5)."""
-    kw = _kw(dictionary, quiet_modules, gap_ratio, cells)
+    kw = _kw(dictionary, quiet_modules, gap_ratio, cells, separation_m)
     W, H = _num(w_m), _num(h_m)
     out: List[Layout] = []
     if kind not in LAYOUTS or not min(W, H) > EPS_M:
@@ -1010,7 +1132,8 @@ def candidates(kind: str, w_m: float, h_m: float, *, dictionary: str = DEFAULT_D
 def candidates_on_loops(kind: str, loops_m: Sequence[Sequence[Tuple[float, float]]], *,
                         dictionary: str = DEFAULT_DICTIONARY, quiet_modules: float = 1.0,
                         gap_ratio: float = GAP_RATIO, angles_deg: Sequence[float] = (0.0, 90.0),
-                        limit: Optional[int] = 8, cells=None) -> List[Layout]:
+                        limit: Optional[int] = 8, cells=None,
+                        separation_m: Optional[float] = None) -> List[Layout]:
     """candidates() for a clicked FACE: the Layout list from what fit_on_loops
     really builds at each 0.5 mm size -- holes, notches and round outlines
     count -- every distinct cols x rows at the LARGEST size that gives it,
@@ -1020,7 +1143,7 @@ def candidates_on_loops(kind: str, loops_m: Sequence[Sequence[Tuple[float, float
     Zach, 2026-10-08: the list offered "4 × 1 @ 30.5" on a plate whose end
     holes leave room for 3 -- candidates() had sized the face's box."""
     kw = dict(dictionary=dictionary, quiet_modules=quiet_modules, gap_ratio=gap_ratio,
-              angles_deg=angles_deg, cells=cells)
+              angles_deg=angles_deg, cells=cells, separation_m=separation_m)
     out: List[Layout] = []
     if kind not in LAYOUTS:
         return out
@@ -1508,7 +1631,7 @@ def _search_frame(kind, fr: _Frame, L, S, kw):
     n = _modules(kw["dictionary"])
     q = 0.0 if kind == "charuco" else kw["quiet_modules"]
     Q = q * L / n
-    s = _grid(kw).gap(L, kw["gap_ratio"]) if kind == "grid" else 0.0
+    s = _gap(_grid(kw), L, kw) if kind == "grid" else 0.0
 
     def dims(c, r):
         if kind == "charuco":
@@ -1579,7 +1702,9 @@ def _region_clamp(kind, frames, L, S, floor_L, kw):
         else:
             lm = 0.0
             for c, r in ((2, 1), (1, 2)):
-                fc, frr = _grid_factor(c, n, q, g), _grid_factor(r, n, q, g)
+                # a typed separation is no ratio of L: bounded by no gap at all
+                fc, frr = ((c + 2.0 * q / n, r + 2.0 * q / n) if kw.get("separation_m")
+                           else (_grid_factor(c, n, q, g), _grid_factor(r, n, q, g)))
                 lm = max(lm, 2.0 * fr.clear.largest(fc / frr)[3] / frr)
             cand = (min(L, G.L_down(lm)), 0.0)
         if top is None or cand > top:
@@ -1803,7 +1928,8 @@ def fit_on_loops(kind: str, loops_m: Sequence[Sequence[Tuple[float, float]]], *,
                  marker_m: Optional[float] = None, square_m: float = 0.0,
                  dictionary: str = DEFAULT_DICTIONARY, quiet_modules: float = 1.0,
                  gap_ratio: float = GAP_RATIO, angles_deg: Sequence[float] = (0.0, 90.0),
-                 cells=None) -> Tuple[Layout, Optional[dict]]:
+                 cells=None, separation_m: Optional[float] = None
+                 ) -> Tuple[Layout, Optional[dict]]:
     """Size and place a tag on a clicked planar face that may not be a rectangle.
 
     loops_m: the face's loops as 2D polygons in METRES in the face's own frame
@@ -1835,7 +1961,8 @@ def fit_on_loops(kind: str, loops_m: Sequence[Sequence[Tuple[float, float]]], *,
     Nothing printable fits -> the largest that fits, ok False, a note, and a
     placement. `cells`: the size grid (cells_of; None = the legacy 0.5 mm
     steps -- an int, the old sampling's resolution, is that too). Never raises."""
-    kw = _kw(dictionary, quiet_modules, gap_ratio, cells if not isinstance(cells, int) else None)
+    kw = _kw(dictionary, quiet_modules, gap_ratio, cells if not isinstance(cells, int) else None,
+             separation_m)
     if kind not in LAYOUTS:
         return _layout(kind, 1.0, 1.0, 0.0, 0.0, **kw), None
     loops = [lp for lp in (_clean(l) for l in (loops_m or ())) if len(lp) >= 3]

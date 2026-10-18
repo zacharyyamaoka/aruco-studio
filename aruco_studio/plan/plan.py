@@ -23,6 +23,12 @@ parts sticker / pocket / ink, the frame on the paper's top) adds
 an `error` on `numbers.size` with `ok` still true, CF-6); a shifted
 sticker (`settings.shift`) adds `placement.shift_mm`. A rule-1 or 3D
 plan's dict is exactly what it was.
+
+2026-10-18 (the online Studio, docs/design/online_studio_v1.md):
+`settings.as_typed` (evaluate.typed_fit) adds `data["overflow_mm"]`
+([x, y] per side, the tile past the rectangle) and, when it is over, an
+`error` on `numbers.size` with `ok` still true (`overflow_issues`). A plan
+without the key is exactly what it was.
 """
 from __future__ import annotations
 
@@ -574,6 +580,20 @@ def sticker_issues(spec: TagSpec, ev: dict, fr: dict, make, guides: dict) -> Lis
     return out
 
 
+def overflow_issues(spec: TagSpec, ev: dict) -> List[Issue]:
+    """`settings.as_typed` (2026-10-18): a typed size that does not fit the
+    rectangle is drawn as typed and flagged red on its row, built anyway
+    (calib.io's linter: "it won't block you, it may just throw a warning")."""
+    ox, oy = ev.get("overflow_mm") or (0.0, 0.0)
+    if max(ox, oy) <= 1e-6:
+        return []
+    t = spec.target
+    by = [f"{2.0 * v:.1f} mm {w}" for v, w in ((ox, "wider"), (oy, "taller")) if v > 1e-6]
+    return [Issue("numbers.size", "error",
+                  f"{' and '.join(by)} than the {t.w_mm:g} × {t.h_mm:g} mm rectangle: drawn as "
+                  "typed (a smaller size, or Auto, fits it)")]
+
+
 def build(spec: TagSpec, s: dict, n: dict, ev: dict, optical=None, issues=(),
           make=None) -> TagPlan:
     """The TagPlan of an evaluate() result (plan/variants.py builds a copy's
@@ -630,6 +650,7 @@ def build(spec: TagSpec, s: dict, n: dict, ev: dict, optical=None, issues=(),
         found = [i for i in found if i.field not in STICKER_QUIET]
     found += extra_issues(spec, s, ev, fr, make, guides)
     found += sticker_issues(spec, ev, fr, make, guides)
+    found += overflow_issues(spec, ev)
     w = writes(s, n, ev)
     if sticker:
         w["settings"].update(parts=list(parts), pin="none")
@@ -660,6 +681,8 @@ def build(spec: TagSpec, s: dict, n: dict, ev: dict, optical=None, issues=(),
         data["sticker"] = sticker_block(make, guides)
     if ev.get("shift_mm"):
         data["placement"]["shift_mm"] = [LY._r(v) for v in ev["shift_mm"]]
+    if "overflow_mm" in ev:                        # settings.as_typed only
+        data["overflow_mm"] = [LY._r(v) for v in ev["overflow_mm"]]
     data = json.loads(json.dumps(data, allow_nan=False))
     return TagPlan(data, ev=ev, settings=s, numbers=n, request=spec)
 
