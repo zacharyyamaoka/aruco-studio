@@ -210,5 +210,8 @@ export async function loadCoreFacts(): Promise<void> {
   const [info, builtins] = await Promise.all([core.info(), core.presets()]);
   const s = useStudio.getState();
   useStudio.setState({ info, builtins });
-  if (!s.doc.preset && builtins.length) useStudio.setState({ doc: { ...useStudio.getState().doc, preset: builtins[0] } });
+  // WHY inkjet first: Zach moved to inkjet stickers on vinyl (2026-10-17, CF-13);
+  // 3D-printed markers stay a placeholder, so a new document starts on paper.
+  const first = builtins.find((p) => p.method === "inkjet") ?? builtins[0];
+  if (!s.doc.preset && first) useStudio.setState({ doc: { ...useStudio.getState().doc, preset: first } });
 }

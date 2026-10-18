@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 // The online Studio (arucostudio.com). Dev: 127.0.0.1:5380, preview: 5381
 // (ARUCO_WEB_PORT moves dev). Static build in web/dist; the Python core is
 // packed into public/py/ by scripts/pack-core.mjs and runs in a Pyodide worker.
@@ -25,4 +26,6 @@ export default defineConfig({
   },
   worker: { format: "es" },
   build: { outDir: "dist", emptyOutDir: true, chunkSizeWarningLimit: 1500 },
+  // vitest: unit tests only; web/e2e is Playwright's (npm run e2e).
+  test: { include: ["src/**/*.test.ts"] },
 });

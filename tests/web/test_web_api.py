@@ -364,3 +364,16 @@ def test_call_never_raises():
     assert json.loads(W.call("inscribe", json.dumps({"profile": {"loops": []}, "holes": "avoid"}))) \
         == {"result": None}
     assert len(json.loads(W.call("presets", "{}"))["result"]) == 3
+
+
+def test_sheet_prints_the_label_at_the_sketch_labels_size():
+    # WYSIWYG (Zach, 2026-10-16: "if you have a label on the page it needs to
+    # be in CAD"): the page's label has the cap height plan() gives the sketch.
+    r = req(marker={"type": "grid", "cols": 2, "rows": 2},
+            label={"on": True, "text": "", "height_mm": 0, "side": "below", "gap_mm": 2.0})
+    cap = W.plan(r)["label"]["height_mm"]
+    page = W.sheet({"items": [r], "cut_lines": True}, "2026-10-18")["svg"][0]
+    sizes = [float(f) for f, t in re.findall(r'<text[^>]*font-size="([\d.]+)"[^>]*>([^<]*)</text>', page)
+             if t == W.plan(r)["label"]["text"]]
+    assert sizes, "the label is on the page"
+    assert sizes[0] * W.CAP_EM == pytest.approx(cap, abs=1e-3)

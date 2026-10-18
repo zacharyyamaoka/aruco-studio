@@ -69,6 +69,7 @@ LABEL_FONT_PT = 6.0
 LABEL_MIN_FONT_PT = 4.5      # shrink a long label to the sticker width, not below this
 LABEL_LEADING = 1.2          # line pitch / font size
 LABEL_GAP_MM = 0.8           # sticker bottom -> label box text
+CAP_EM = 0.718               # Helvetica's cap height / em: a cap height in mm -> a font size
 FOOTER_FONT_PT = 6.5
 FOOTER_H_MM = 4.0
 RULER_H_MM = 19.0
@@ -143,6 +144,12 @@ class PrintItem:
     cut_mm: Optional[dict] = None
     ink_mm: Optional[list] = None
     caption: str = ""               # spaced mode: the words under the sticker
+    # The online Studio (2026-10-18; None = the sheet's own 6 pt caption, shrunk
+    # to the sticker): the label's cap height and its gap from the sticker, as
+    # the sketch has them. WHY: WYSIWYG -- the printed label is the size the
+    # CAD label is, so it is never shrunk or cut short to fit the sticker.
+    caption_cap_mm: Optional[float] = None
+    caption_gap_mm: Optional[float] = None
     made_by: str = ""               # "sticker" / "print3d" (a paper proof)
     name: str = ""                  # the tag's name
     ids: List[int] = field(default_factory=list)
@@ -986,6 +993,7 @@ class StickerPlace:
     shelf: int = -1
     caption_lines: List[str] = field(default_factory=list)
     caption_pt: float = LABEL_FONT_PT
+    caption_gap_mm: float = LABEL_GAP_MM
 
     @property
     def origin(self) -> Tuple[float, float]:
@@ -1125,12 +1133,19 @@ def _caption(item: PrintItem, width: float, settings: SheetSettings):
         return [], LABEL_FONT_PT, 0.0
     text = item.caption or (identity_label(item) + (f" · {item.name}" if item.name else ""))
     lines = [text]
+    if item.caption_cap_mm:
+        font = float(item.caption_cap_mm) / CAP_EM * MM_TO_PT
+        return lines, font, _caption_gap(item) + font * LABEL_LEADING / MM_TO_PT
     font = LABEL_FONT_PT
     wd = text_width_mm(text, font)
     if wd > width:
         font = max(LABEL_MIN_FONT_PT, LABEL_FONT_PT * width / wd)
     lines = [_fit_text(t, font, max(width, 20.0)) for t in lines]
     return lines, font, LABEL_GAP_MM + len(lines) * font * LABEL_LEADING / MM_TO_PT
+
+
+def _caption_gap(item: PrintItem) -> float:
+    return LABEL_GAP_MM if item.caption_gap_mm is None else float(item.caption_gap_mm)
 
 
 def _area(settings: SheetSettings):
@@ -1305,7 +1320,8 @@ def layout_stickers(items: List[PrintItem], settings: Optional[SheetSettings] = 
         pages[pi].append(StickerPlace(item=p["item"], page=pi, x_mm=sx, y_mm=cy, w_mm=p["w"],
                                       h_mm=p["h"], rotation=p["rot"], box=p["box"],
                                       shelf=sh["index"], caption_lines=p["lines"],
-                                      caption_pt=p["font"]))
+                                      caption_pt=p["font"],
+                                      caption_gap_mm=_caption_gap(p["item"])))
     for page in pages:
         page.sort(key=lambda q: (q.y_mm, q.x_mm))
     for sh in shelves:
@@ -1438,7 +1454,7 @@ def _draw_sticker(pg: _Ops, p: StickerPlace, s: SheetSettings):
                             CUT_GREY, CUT_LINE_MM)
         line_mm = p.caption_pt * LABEL_LEADING / MM_TO_PT
         for k, t in enumerate(p.caption_lines):
-            base = p.y_mm + p.h_mm + LABEL_GAP_MM + k * line_mm + 0.9 * p.caption_pt / MM_TO_PT
+            base = p.y_mm + p.h_mm + p.caption_gap_mm + k * line_mm + 0.9 * p.caption_pt / MM_TO_PT
             pg.text(p.x_mm + p.w_mm / 2.0, base, t, p.caption_pt, "center")
 
 

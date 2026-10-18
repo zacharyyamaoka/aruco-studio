@@ -64,7 +64,7 @@ PRESET_FIELDS = ("settings.cells", "settings.make")
 TYPE_WORDS = {"single": "ArUco", "grid": "Grid", "charuco": "ChArUco"}
 LABEL_TEMPLATE = "#{ids}"           # an empty label text
 LABEL_CAP = (0.12, 2.5, 12.0)       # height 0: 0.12 x the short side, within 2.5 .. 12 mm
-CAP_EM = 0.718                      # Helvetica's cap height / em (the label's width estimate)
+CAP_EM = _SH.CAP_EM                 # Helvetica's cap height / em (core.sheet prints the label with it)
 ND = 6                              # JSON numbers: 1e-6 mm
 
 
@@ -525,6 +525,9 @@ def sheet(req: dict, date=None) -> dict:
                f"{idw} · {_AL.dict_short(d['marker']['dictionary'])} · "
                f"{_mm(d['marker']['marker_length_m'] * 1000.0)} mm")
         p.key, p.caption = f"m{i + 1}", cap
+        if lab:                                    # WYSIWYG: the sketch label's size and gap
+            p.caption_cap_mm = lab["height_mm"]
+            p.caption_gap_mm = float((it.get("label") or {}).get("gap_mm") or 0.0)
         items.append(p)
     pr = (first or {}).get("preset") or {}
     page = _page_key(pr, []) if pr.get("method") == "inkjet" else "letter"
