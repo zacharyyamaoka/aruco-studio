@@ -2,10 +2,12 @@
 // served by `vite preview` on 5381, driven in Chrome, one worker.
 // E2E_CORE=mock runs the specs on the mock core (?core=mock); the default
 // is the real Python core in its Pyodide worker. hero.spec.ts records a
-// video of the primary flow (its project only).
+// video of the primary flow (its project only). E2E_BASE_URL runs the specs
+// against a deployed site instead (e.g. https://arucostudio.com): no server.
 import { defineConfig } from "@playwright/test";
 
 const PORT = 5381;
+const LIVE = process.env.E2E_BASE_URL;
 
 export default defineConfig({
   testDir: "e2e",
@@ -15,13 +17,13 @@ export default defineConfig({
   expect: { timeout: 20_000 },
   reporter: [["list"]],
   use: {
-    baseURL: `http://127.0.0.1:${PORT}`,
+    baseURL: LIVE ?? `http://127.0.0.1:${PORT}`,
     channel: "chrome",
     viewport: { width: 1280, height: 800 },
     acceptDownloads: true,
     trace: "retain-on-failure",
   },
-  webServer: {
+  webServer: LIVE ? undefined : {
     command: process.env.E2E_SERVER ?? "npm run build && npm run preview",
     url: `http://127.0.0.1:${PORT}`,
     reuseExistingServer: false,
