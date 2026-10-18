@@ -176,6 +176,9 @@ export interface SheetRequest {
   cut_lines: boolean;
   mode?: SheetMode;          // default "spaced"
   gap_mm?: number;           // spaced only; default the core's
+  /** what the packer optimizes first (Zach, 2026-10-18: "fewest cut lines"
+   *  or "most compact (fewest number of sheets)"); default "fewest_sheets" */
+  objective?: "fewest_cuts" | "fewest_sheets";
 }
 
 /** True-scale pages for the preset's paper. svg pages use mm units. */

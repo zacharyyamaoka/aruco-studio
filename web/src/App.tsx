@@ -14,6 +14,7 @@ import { ExtrudePanel } from "./panel/ExtrudePanel";
 import { startPlanner } from "./planner";
 import { PresetsModal } from "./presets/PresetsModal";
 import { PrintDialog } from "./print/PrintDialog";
+import { VerifyDialog } from "./verify/VerifyDialog";
 import { ShapeDims } from "./sketch/ShapeDims";
 import { Viewport } from "./sketch/Viewport";
 import { loadCoreFacts, useStudio } from "./store";
@@ -82,6 +83,7 @@ export function App() {
       </div>
       <PresetsModal />
       <PrintDialog />
+      <VerifyDialog />
       <ExamplesDialog />
     </TooltipProvider>
   );

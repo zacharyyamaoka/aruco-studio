@@ -14,7 +14,7 @@ import { example } from "./sketch/examples";
 import { plainRect, profileLoops, shapeBox, sketchBox, type ProfileRef, type Selection, type Shape } from "./sketch/model";
 
 export type Tool = "select" | "rect" | "circle";
-export type Modal = null | "presets" | "print" | "examples";
+export type Modal = null | "presets" | "print" | "examples" | "verify";
 export type Tab = "marker" | "label";
 
 export interface PanelState {
