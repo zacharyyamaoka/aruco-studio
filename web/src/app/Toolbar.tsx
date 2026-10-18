@@ -30,8 +30,8 @@ export function Toolbar() {
       <span className="tb-sep" />
       <Tool icon={<Glyph name="extrude" />} name="ArUco" full="ArUco Extrude" keys="A" active={panelOpen} onClick={() => void st().extrude()} testid="tool-extrude" />
       <span className="tb-sep" />
-      <Tool icon={<Glyph name="print" />} name="Sheet" full="Sheet: print the stickers" keys="P" onClick={openPrint} testid="tool-sheet" />
-      <Tool icon={<Glyph name="verify" />} name="Verify" full="Verify: a simulated camera reads the marker" onClick={openVerify} testid="tool-verify" />
+      <Tool icon={<Glyph name="print" />} name="Sheet" full="Sheet: print the stickers" keys="S" onClick={openPrint} testid="tool-sheet" />
+      <Tool icon={<Glyph name="verify" />} name="Verify" full="Verify: a simulated camera reads the marker" keys="K" onClick={openVerify} testid="tool-verify" />
       <span className="tb-sep" />
       <Tool icon={<Glyph name="fit" />} name="Fit" keys="F" onClick={() => st().fit()} testid="tool-fit" />
     </div>

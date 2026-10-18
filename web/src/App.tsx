@@ -6,7 +6,7 @@
 import { useEffect } from "react";
 import { TooltipProvider } from "@bam/ui";
 import { ExamplesDialog } from "./app/ExamplesDialog";
-import { openPrint } from "./app/commands";
+import { openPrint, openVerify } from "./app/commands";
 import { Toolbar } from "./app/Toolbar";
 import { TopBar } from "./app/TopBar";
 import { onCoreStatus, coreStatus } from "./coreSource";
@@ -36,7 +36,8 @@ function onKey(e: KeyboardEvent) {
   else if (k === "c") st.setTool("circle");
   else if (k === "a") void st.extrude();
   else if (k === "f") st.fit();
-  else if (k === "p") openPrint();
+  else if (k === "s" || k === "p") openPrint();   // Sheet (P kept: the print key everyone tries)
+  else if (k === "k") openVerify();
   else if (k === "Escape") {
     if (st.tool !== "select") st.setTool("select");
     else if (st.panel.selector) st.setSelector(null);
