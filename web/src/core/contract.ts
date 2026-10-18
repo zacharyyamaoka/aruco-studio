@@ -45,20 +45,27 @@ export interface MarkerParams {
   flip: boolean;             // mirror Z when there is no reference face (ignored with one)
   quiet_modules: number;     // white border in modules (cells); 1 by default
   corner_mark: CornerMark;   // a triangle in the quiet zone's top-left corner
+  /** ChArUco only (Zach, 2026-10-18): put the Joint Origin at the centre of
+   *  board square [col, row] (0-based from OpenCV's origin corner) instead of
+   *  OpenCV's board corner. null / absent = the corner. */
+  origin_square?: [number, number] | null;
 }
 
 export type LabelSide = "below" | "above" | "left" | "right";
 
-/** The label is plain sketch text beside the rectangle, as a CAD text entity
- *  would be; the core only resolves the text and its default spot. */
+/** The label lives INSIDE the marker rectangle (Zach, 2026-10-18: "the outer
+ *  rectangle … efficiently define[s] the outbounds and then the feature will
+ *  take care of populating everything inside of it"). The core reserves a band
+ *  on `side` for the text and fills the rest with the marker. */
 export interface LabelParams {
   on: boolean;
-  /** placeholders: {id} {first} {last} {ids} (e.g. "0-5") {dict} {type} */
+  /** placeholders: {id} {first} {last} {ids} (e.g. "0-5") {dict} {type};
+   *  "\n" breaks lines (multi-line labels) */
   text: string;
-  height_mm: number;         // 0 = the core picks from the rectangle's size
-  side: LabelSide;
-  gap_mm: number;            // from the rectangle's edge to the text
-  offset_mm: Vec2;           // a drag on the canvas adds this to the default spot
+  height_mm: number;         // cap height; 0 = the core picks from the rectangle's size
+  side: LabelSide;           // the preset spot: the band inside the rectangle on that side
+  gap_mm: number;            // between the label band and the marker
+  offset_mm: Vec2;           // x, y from the preset spot (typed, or a drag on the canvas)
 }
 
 export type Method = "inkjet" | "print3d";
@@ -108,6 +115,22 @@ export interface PlacedLabel {
   at: Vec2;                  // the text's centre, sketch frame
   height_mm: number;         // cap height
   angle_deg: number;
+  lines?: string[];          // the text split on "\n"
+  /** inkjet: "sans" (ordinary text); 3D print: "pixel" (blocky strokes a
+   *  nozzle can print, given as `polygons`) */
+  font?: "sans" | "pixel";
+  polygons?: Polygon[];      // the pixel font's ink, sketch frame (empty for sans)
+  box?: Loop;                // the label's band inside the rectangle, sketch frame
+}
+
+/** A dimension the canvas draws (and lets you type into): what it measures,
+ *  between two points in the sketch frame, drawn offset_mm to the left of a->b. */
+export interface Dimension {
+  field: string;             // what typing into it sets: "marker.marker_mm", "rect.w", ...
+  value_mm: number;
+  a: Vec2;
+  b: Vec2;
+  offset_mm: number;
 }
 
 export interface MarkerPlan {
@@ -115,7 +138,8 @@ export interface MarkerPlan {
   ids: number[];
   // geometry, already placed in the sketch frame (rect centre, angle, turn, flip)
   black: Polygon[];          // the ink
-  outer: Loop;               // the white outline (quiet-zone edge): what is cut
+  outer: Loop;               // the white outline (quiet-zone edge)
+  cut?: Loop;                // the sticker's cut line: the marker rectangle (marker + label inside)
   outer_mm: Vec2;            // its width and height in the marker's own frame
   marker_mm: number;
   checker_mm: number;        // 0 unless ChArUco
@@ -129,6 +153,7 @@ export interface MarkerPlan {
    *  16 numbers, row-major 4x4, mm (the Joint Origin) */
   origin: number[];
   label: PlacedLabel | null;
+  dims?: Dimension[];        // marker size, checker, separation, outer, rectangle, label offset
   summary: string;           // one line: "Grid 2×3 DICT_4X4_50 #0–5 · 16.2 mm · outer 41.0 × 60.5 mm"
   warnings: Issue[];
 }
