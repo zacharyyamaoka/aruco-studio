@@ -24,6 +24,8 @@ Fusion composes a Joint Origin: core.geometry.jo_compose).
 | `preset` (method print3d) | `settings.make` = new_make("print3d") |
 | `preset.cell_step_mm`, `min_cell_mm` | `settings.cells` {"of": "cell", "mm": step} (0 = no snap: {"of": "marker", "mm": 0.5}, the legacy step) |
 | `reference_face` | the target is a "profile" with a body (Flip does not apply) else "free" |
+| `label` on (2026-10-18) | core.rect_fill.fill: a band inside the rectangle on `label.side`; the marker is planned in the box it leaves (the target), centred there; "sans" text for an inkjet preset, the pixel font's ink for 3D |
+| `marker.origin_square` | core.rect_fill.square_origin on OpenCV's board frame |
 
 Issue fields: the core's key paths renamed (FIELDS); the page lint ("Over
 the page ...") and the cell / make rows -> "preset"; target -> "rect".
@@ -44,6 +46,7 @@ from .core import dictionary as _D
 from .core import label as _AL
 from .core import make as _MK
 from .core import presets as _P
+from .core import rect_fill as _RF
 from .core import sheet as _SH
 from .plan import TagSpec, Target, plan_tag
 from .plan import exports as _X
@@ -63,9 +66,10 @@ FIELDS = {"numbers.size": "marker.marker_mm", "numbers.square": "marker.checker_
 PRESET_FIELDS = ("settings.cells", "settings.make")
 TYPE_WORDS = {"single": "ArUco", "grid": "Grid", "charuco": "ChArUco"}
 LABEL_TEMPLATE = "#{ids}"           # an empty label text
-LABEL_CAP = (0.12, 2.5, 12.0)       # height 0: 0.12 x the short side, within 2.5 .. 12 mm
+LABEL_CAP = _RF.LABEL_CAP          # height 0: 0.12 x the short side, within 2.5 .. 12 mm
 CAP_EM = _SH.CAP_EM                 # Helvetica's cap height / em (core.sheet prints the label with it)
 ND = 6                              # JSON numbers: 1e-6 mm
+ND_DIM = 9                          # a dimension's endpoints (plan_dims)
 
 
 def _r(v) -> float:
@@ -259,7 +263,7 @@ def _rect_loop(r):
 def label_text(template: str, kind: str, dictionary: str, ids: list) -> str:
     """The label's text with its placeholders: {id} {first} {last} {ids}
     ("0-5"; a single's "3") {dict} ("4X4_50") {type} ("ArUco", "Grid",
-    "ChArUco"). An empty text is LABEL_TEMPLATE."""
+    "ChArUco"). An empty text is LABEL_TEMPLATE. "\\n" breaks lines."""
     ids = list(ids) or [0]
     first, last = ids[0], ids[-1]
     words = {"id": str(first), "first": str(first), "last": str(last),
@@ -271,46 +275,66 @@ def label_text(template: str, kind: str, dictionary: str, ids: list) -> str:
 
 def label_height(lab: dict, w: float, h: float) -> float:
     hm = float(lab.get("height_mm") or 0.0)
-    if hm > 0:
-        return hm
-    k, lo, hi = LABEL_CAP
-    return min(hi, max(lo, k * min(w, h)))
+    return hm if hm > 0 else _RF.auto_cap(w, h)
 
 
 def text_width(text: str, cap_mm: float) -> float:
     """The label's width (mm) in Helvetica at a cap height (core.sheet's metrics)."""
-    font_pt = cap_mm / CAP_EM * _SH.MM_TO_PT
-    return _SH.text_width_mm(text, font_pt)
+    return _RF.sans_width(text, cap_mm)
 
 
-def label_spot(side: str, gap: float, cap: float, width: float, w: float, h: float):
-    """The text's centre beside a w x h box centred at 0 (its own frame): the
-    middle of `side`, `gap` out from the edge to the text."""
-    if side == "above":
-        return 0.0, h / 2.0 + gap + cap / 2.0
-    if side == "left":
-        return -(w / 2.0 + gap + width / 2.0), 0.0
-    if side == "right":
-        return w / 2.0 + gap + width / 2.0, 0.0
-    return 0.0, -(h / 2.0 + gap + cap / 2.0)
+def font_of(preset: dict) -> str:
+    """How the label is drawn: ordinary text on an inkjet page ("sans"), the
+    blocky pixel font a nozzle prints ("pixel", Zach 2026-10-18: "If 3D
+    printing the label text should be very blocky")."""
+    return "sans" if (preset or {}).get("method") == "inkjet" else "pixel"
 
 
-def placed_label(req: dict, kind: str, dictionary: str, ids: list):
+def _line_mm(preset: dict) -> float:
+    pr = preset or {}
+    return float(pr.get("line_mm") or pr.get("nozzle_mm") or 0.0)
+
+
+def label_fill(req: dict, kind: str, dictionary: str, ids: list):
+    """The rectangle filled (core.rect_fill): the label's band, the box the
+    marker fills; None when the label is off."""
     lab = req.get("label") or {}
     if not lab.get("on"):
         return None
     rect = req["rect"]
-    w, h = float(rect["w"]), float(rect["h"])
-    text = label_text(lab.get("text") or "", kind, dictionary, ids)
-    cap = label_height(lab, w, h)
-    u, v = label_spot(lab.get("side") or "below", float(lab.get("gap_mm") or 0.0), cap,
-                      text_width(text, cap), w, h)
+    pr = req.get("preset") or {}
+    # WHY offset_mm in the rectangle's own frame (it was the sketch's while the
+    # label sat outside): Zach's "you set the origin of the label" -- an offset
+    # inside the sticker, so the label stays where it was when the rectangle turns
+    return _RF.fill(float(rect["w"]), float(rect["h"]),
+                    label_text(lab.get("text") or "", kind, dictionary, ids),
+                    font=font_of(pr), cap_mm=float(lab.get("height_mm") or 0.0),
+                    side=lab.get("side") or "below", gap_mm=float(lab.get("gap_mm") or 0.0),
+                    offset=tuple(float(v) for v in (lab.get("offset_mm") or [0.0, 0.0])),
+                    line_mm=_line_mm(pr))
+
+
+def rect_matrix(rect: dict):
+    """The rectangle's own frame (centre 0, unturned) -> the sketch, 4x4."""
     c, s = _cs(float(rect.get("angle_deg") or 0.0))
-    off = lab.get("offset_mm") or [0.0, 0.0]
-    at = [_r(rect["cx"] + c * u - s * v + float(off[0])),
-          _r(rect["cy"] + s * u + c * v + float(off[1]))]
-    return {"text": text, "at": at, "height_mm": _r(cap),
-            "angle_deg": _r(float(rect.get("angle_deg") or 0.0))}
+    return [c, -s, 0.0, float(rect["cx"]), s, c, 0.0, float(rect["cy"]),
+            0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+
+
+def placed_label(req: dict, kind: str, dictionary: str, ids: list, fl=None):
+    """The contract's PlacedLabel: inside the rectangle, its text block's
+    centre `at` (the band's centre + offset_mm, both in the rectangle's own
+    frame), its band `box`, and the pixel font's ink as `polygons`."""
+    fl = fl or label_fill(req, kind, dictionary, ids)
+    if fl is None:
+        return None
+    rect = req["rect"]
+    R = rect_matrix(rect)
+    return {"text": "\n".join(fl.lines), "at": _pt(R, *fl.at), "height_mm": _r(fl.cap),
+            "angle_deg": _r(float(rect.get("angle_deg") or 0.0)), "lines": list(fl.lines),
+            "font": fl.font,
+            "polygons": [{"outer": _loop(R, _rect_loop(r), True), "holes": []} for r in fl.ink],
+            "box": _loop(R, _rect_loop(fl.band), True)}
 
 
 # ------------------------------------------------------------------ the calls
@@ -368,11 +392,123 @@ def inscribe(profile: dict, holes: str = "avoid"):
             "w": _r(x1 - x0), "h": _r(y1 - y0), "angle_deg": _r(got["angle_deg"])}
 
 
+def _ids_guess(m: dict) -> list:
+    """The ids a request prints before it is planned (the label's text needs
+    them to size its band): the counts are typed (`settings.force`)."""
+    first = int(m.get("first_id") or 0)
+    cols, rows = int(m.get("cols") or 1), int(m.get("rows") or 1)
+    n = {"single": 1, "grid": cols * rows}.get(m.get("type"), (cols * rows) // 2)
+    return list(range(first, first + max(1, n)))
+
+
+def _planned(req: dict):
+    """(the core's TagPlan dict, the request's issues, the rectangle's
+    core.rect_fill.Fill or None) of a PlanRequest. With the label on the
+    marker is planned in the box the label leaves (Fill.box), so Auto sizes
+    it to that box; the core's words about "the W × H mm rectangle" then
+    name that box."""
+    issues = []
+    lab = req.get("label") or {}
+    if not lab.get("on"):
+        return plan_tag(spec_of(req, issues)).data, issues, None
+    m = req["marker"]
+    ids = _ids_guess(m)
+    for _k in range(2):                            # again only when the ids were guessed wrong
+        fl = label_fill(req, m["type"], m["dictionary"], ids)
+        bw, bh = (_r(v) for v in fl.box_size)
+        issues = []
+        d = plan_tag(spec_of(dict(req, rect=dict(req["rect"], w=bw, h=bh)), issues)).data
+        if not d["ok"] or list(d["ids"]) == ids:
+            break
+        ids = list(d["ids"])
+
+    def beside(mt):                                # the core's size of its target, any format
+        a, b = float(mt.group(1)), float(mt.group(2))
+        same = abs(a - bw) < 0.05 + 1e-9 and abs(b - bh) < 0.05 + 1e-9
+        return f"{mt.group(1)} × {mt.group(2)} mm beside the label" if same else mt.group(0)
+    for w in d["warnings"]:
+        w["text"] = re.sub(r"\b(\d+(?:\.\d+)?) × (\d+(?:\.\d+)?) mm (?:rectangle|target|face)\b",
+                           beside, w["text"])
+    issues += [{"field": f, "level": lv, "text": t} for f, lv, t in fl.issues]
+    return d, issues, fl
+
+
 def _plan(req: dict):
     """(the core's TagPlan dict, the request's issues) of a PlanRequest."""
-    issues = []
-    spec = spec_of(req, issues)
-    return plan_tag(spec).data, issues
+    d, issues, _fl = _planned(req)
+    return d, issues
+
+
+def _local(d: dict, fl, flip: bool):
+    """The plan's pattern frame -> the rectangle's own frame (centre 0,
+    unturned): the marker centred on the box the label leaves."""
+    su, sv = fl.box_centre if fl is not None else (0.0, 0.0)
+    return sketch_of_pattern({"cx": su, "cy": sv, "angle_deg": 0.0}, d, flip)
+
+
+def _bbox(M, pts):
+    q = [(M[0] * u + M[1] * v + M[3], M[4] * u + M[5] * v + M[7]) for u, v in pts]
+    return (min(p[0] for p in q), min(p[1] for p in q), max(p[0] for p in q), max(p[1] for p in q))
+
+
+def _square(r, side: float) -> bool:
+    return abs(r[2] - r[0] - side) < 1e-6 and abs(r[3] - r[1] - side) < 1e-6
+
+
+def origin_square(m: dict, d: dict, frame: list, issues: list) -> list:
+    """`marker.origin_square` (ChArUco): OpenCV's board frame moved to that
+    square's centre (core.rect_fill.square_origin); out of range = an error
+    on its row and the corner kept."""
+    sq = m.get("origin_square")
+    if sq is None:
+        return frame
+    if d["layout"]["kind"] != "charuco":
+        issues.append({"field": "marker.origin_square", "level": "info",
+                       "text": "an origin in a square is for a ChArUco board: the origin stays"})
+        return frame
+    mk = d["marker"]
+    cols, rows = int(mk["cols"]), int(mk["rows"])
+    ok = (isinstance(sq, (list, tuple)) and len(sq) == 2
+          and all(isinstance(v, int) and not isinstance(v, bool) for v in sq)
+          and 0 <= sq[0] < cols and 0 <= sq[1] < rows)
+    if not ok:
+        issues.append({"field": "marker.origin_square", "level": "error",
+                       "text": f"square {sq!r} is not on the {cols} × {rows} board (column 0..{cols - 1}, "
+                               f"row 0..{rows - 1} from OpenCV's origin corner): the origin stays at "
+                               "the corner"})
+        return frame
+    return _RF.square_origin(frame, sq[0], sq[1], mk["square_length_m"] * 1000.0)
+
+
+def plan_dims(req: dict, d: dict, fl, L, lay: dict) -> list:
+    """The contract's `dims` (core.rect_fill.dimensions), measured on the
+    drawn geometry in the rectangle's frame (L: pattern -> that frame), placed
+    in the sketch."""
+    rect = req["rect"]
+    w, h = float(rect["w"]), float(rect["h"])
+    kind = lay["kind"]
+    mk = d["marker"]
+    boxes = [_bbox(L, poly[0]) for poly in _ME.top(d).get("black", [])]
+    L_mm = mk["marker_length_m"] * 1000.0
+    S_mm = mk.get("square_length_m", 0.0) * 1000.0 if kind == "charuco" else 0.0
+    lab = req.get("label") or {}
+    off = [float(v) for v in (lab.get("offset_mm") or [0.0, 0.0])]
+    got = _RF.dimensions(
+        w, h, _bbox(L, _rect_loop(d["guides"]["sticker"])),
+        markers=[b for b in boxes if _square(b, L_mm)], marker_mm=_r(L_mm),
+        squares=[b for b in boxes if _square(b, S_mm)] if kind == "charuco" else (),
+        checker_mm=_r(lay["square_mm"]) if kind == "charuco" else 0.0,
+        separation_mm=_r(lay["separation_mm"]) if kind == "grid" else 0.0,
+        spot=fl.spot if fl is not None else None, at=fl.at if fl is not None else None,
+        offset_mm=math.hypot(*off) if fl is not None else 0.0)
+    R = rect_matrix(rect)
+    # WHY 1e-9 for the endpoints (the plan's numbers are 1e-6): a dimension
+    # reads |b - a|, and two points each rounded to 1e-6 on a turned
+    # rectangle put that distance up to ~1.4e-6 off the value it shows
+    pt = lambda u, v: [round(R[0] * u + R[1] * v + R[3], ND_DIM) + 0.0,
+                       round(R[4] * u + R[5] * v + R[7], ND_DIM) + 0.0]
+    return [{"field": g["field"], "value_mm": _r(g["value_mm"]), "a": pt(*g["a"]),
+             "b": pt(*g["b"]), "offset_mm": _r(g["offset_mm"])} for g in got]
 
 
 def _summary(kind, dictionary, ids, lay, outer_mm) -> str:
@@ -385,7 +521,7 @@ def _summary(kind, dictionary, ids, lay, outer_mm) -> str:
 
 
 def plan(req: dict) -> dict:
-    d, issues = _plan(req)
+    d, issues, fl = _planned(req)
     m = req["marker"]
     face = bool(req.get("reference_face"))
     flip = bool(m.get("flip")) and not face
@@ -403,7 +539,10 @@ def plan(req: dict) -> dict:
     kind = d["layout"]["kind"]
     lay = d["layout"]
     mk = d["marker"]
-    M = sketch_of_pattern(req["rect"], d, flip)
+    L = _local(d, fl, flip)
+    # WHY two ways: with the label off the matrix is exactly today's, so
+    # those plans keep every number byte for byte (only cut and dims are new)
+    M = sketch_of_pattern(req["rect"], d, flip) if fl is None else _mul(rect_matrix(req["rect"]), L)
     black = []
     for poly in _ME.top(d).get("black", []):
         black.append({"outer": _loop(M, poly[0], True), "holes": [_loop(M, hl, False)
@@ -412,15 +551,23 @@ def plan(req: dict) -> dict:
     outer_mm = [_r(sticker[2] - sticker[0]), _r(sticker[3] - sticker[1])]
     modules = _D.dictionary_info(mk["dictionary"])["modules"]
     marker_mm = mk["marker_length_m"] * 1000.0
-    origin = [_r(v) for v in _mul(M, d["frames"]["opencv"])]
+    origin = [_r(v) for v in _mul(M, origin_square(m, d, d["frames"]["opencv"], issues))]
     ids = list(d["ids"])
+    rect = req["rect"]
+    w, h = float(rect["w"]), float(rect["h"])
+    overflow = _r(max(d.get("overflow_mm") or [0.0]))
+    if fl is not None:                             # measured against the rectangle, not the box
+        u0, v0, u1, v1 = _bbox(L, _rect_loop(sticker))
+        overflow = _r(max(0.0, u1 - w / 2.0, -w / 2.0 - u0, v1 - h / 2.0, -h / 2.0 - v0))
     return {"ok": True, "ids": ids, "black": black, "outer": _loop(M, _rect_loop(sticker), True),
+            "cut": _loop(rect_matrix(rect), _rect_loop((-w / 2.0, -h / 2.0, w / 2.0, h / 2.0)), True),
             "outer_mm": outer_mm, "marker_mm": _r(marker_mm),
             "checker_mm": _r(lay["square_mm"]) if kind == "charuco" else 0.0,
             "separation_mm": _r(lay["separation_mm"]) if kind == "grid" else 0.0,
             "cols": int(lay["cols"]), "rows": int(lay["rows"]), "cell_mm": _r(marker_mm / modules),
-            "auto": bool(m.get("auto")), "overflow_mm": _r(max(d.get("overflow_mm") or [0.0])),
-            "origin": origin, "label": placed_label(req, kind, mk["dictionary"], ids),
+            "auto": bool(m.get("auto")), "overflow_mm": overflow,
+            "origin": origin, "label": placed_label(req, kind, mk["dictionary"], ids, fl),
+            "dims": plan_dims(req, d, fl, L, lay),
             "summary": _summary(kind, mk["dictionary"], ids, lay, outer_mm),
             "warnings": issues}
 
@@ -469,37 +616,61 @@ def suggest(req: dict) -> list:
     return out
 
 
+def sticker_parts(req: dict, planned=None):
+    """The sticker as the page prints it, in the rectangle's own frame (mm,
+    y up, its centre 0, unturned; the marker's turn as the sketch has it,
+    never Flip): {"w_mm", "h_mm", "cut": the rectangle {"outer", "holes"},
+    "ink": the marker's black [[outer, hole, ...], ...], "label_ink": the
+    pixel label's, "texts": the sans label's lines [{"text", "at" (its cap
+    box's centre; baseline at - cap / 2), "cap_mm"}], "font"}, or None when
+    the plan is refused. core.sheet's PrintItem takes cut / ink as cut_mm /
+    ink_mm (the sticker frame is any frame they share). `planned`: _planned(req)
+    when the caller has it."""
+    d, _issues, fl = planned or _planned(req)
+    if not d["ok"]:
+        return None
+    w, h = float(req["rect"]["w"]), float(req["rect"]["h"])
+    L = _local(d, fl, False)
+    one = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+    ink = [[_loop(L, poly[0], True)] + [_loop(L, hl, False) for hl in poly[1:]]
+           for poly in _ME.top(d).get("black", [])]
+    return {"w_mm": _r(w), "h_mm": _r(h),
+            "cut": {"outer": _loop(one, _rect_loop((-w / 2.0, -h / 2.0, w / 2.0, h / 2.0)), True),
+                    "holes": []},
+            "ink": ink,
+            "label_ink": [[_loop(one, _rect_loop(r), True)] for r in (fl.ink if fl else [])],
+            "texts": [{"text": t.text, "at": [_r(t.at[0]), _r(t.at[1])], "cap_mm": _r(t.cap)}
+                      for t in (fl.runs if fl else [])],
+            "font": fl.font if fl else None}
+
+
 def svg(req: dict) -> str:
-    """One marker at true size (mm units) in its own frame, the label beside
-    its outline on the label's side (the print; the sketch's label is
+    """One marker at true size (mm units). Label off: the marker in its own
+    frame (plan.exports.to_svg). Label on: the whole sticker, the rectangle,
+    with the label inside it (sticker_parts; the sketch's label is
     plan().label)."""
-    d, _issues = _plan(req)
+    got = _planned(req)
+    d = got[0]
     if not d["ok"]:
         raise ValueError("nothing to draw: " + "; ".join(d["errors"]))
-    body = _X.to_svg(d)
-    lab = placed_label(req, d["layout"]["kind"], d["marker"]["dictionary"], d["ids"])
-    if lab is None:
-        return body
-    u0, v0, u1, v1 = _X.view_rect(d)
-    lb = req["label"]
-    cap = lab["height_mm"]
-    wd = text_width(lab["text"], cap)
-    cu, cv = label_spot(lb.get("side") or "below", float(lb.get("gap_mm") or 0.0), cap, wd,
-                        u1 - u0, v1 - v0)
-    cu, cv = cu + (u0 + u1) / 2.0, cv + (v0 + v1) / 2.0
-    x0, x1 = min(u0, cu - wd / 2.0), max(u1, cu + wd / 2.0)
-    y0, y1 = min(v0, cv - cap / 2.0), max(v1, cv + cap / 2.0)
-    font_mm = cap / CAP_EM
+    if got[2] is None:
+        return _X.to_svg(d)
+    sp = sticker_parts(req, got)
+    w, h = sp["w_mm"], sp["h_mm"]
     f = _f
-    text = (f'<text data-label="1" x="{f(cu)}" y="{f(-(cv - cap / 2.0))}" '
-            f'font-family="Helvetica, Arial, sans-serif" font-size="{f(font_mm)}" '
-            f'text-anchor="middle" fill="#000000">{_xml(lab["text"])}</text>')
-    head = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{f(x1 - x0)}mm" '
-            f'height="{f(y1 - y0)}mm" viewBox="{f(x0)} {f(-y1)} {f(x1 - x0)} {f(y1 - y0)}">')
-    inner = body[body.index(">") + 1:body.rindex("</svg>")]
-    bg = (f'<rect x="{f(x0)}" y="{f(-y1)}" width="{f(x1 - x0)}" height="{f(y1 - y0)}" '
-          'fill="#ffffff"/>')
-    return head + bg + inner + text + "</svg>"
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{f(w)}mm" height="{f(h)}mm" '
+           f'viewBox="{f(-w / 2.0)} {f(-h / 2.0)} {f(w)} {f(h)}">',
+           f'<title>{d["marker"]["dictionary"]} #{d["ids"][0]}</title>',
+           f'<rect x="{f(-w / 2.0)}" y="{f(-h / 2.0)}" width="{f(w)}" height="{f(h)}" fill="#ffffff"/>',
+           f'<path data-layer="black" fill="#000000" fill-rule="evenodd" d="{_X.path_d(sp["ink"])}"/>']
+    if sp["label_ink"]:
+        out.append(f'<path data-label="1" fill="#000000" fill-rule="evenodd" '
+                   f'd="{_X.path_d(sp["label_ink"])}"/>')
+    for t in sp["texts"]:
+        out.append(f'<text data-label="1" x="{f(t["at"][0])}" y="{f(-(t["at"][1] - t["cap_mm"] / 2.0))}" '
+                   f'font-family="Helvetica, Arial, sans-serif" font-size="{f(t["cap_mm"] / CAP_EM)}" '
+                   f'text-anchor="middle" fill="#000000">{_xml(t["text"])}</text>')
+    return "".join(out) + "</svg>"
 
 
 def _xml(t: str) -> str:
