@@ -23,8 +23,8 @@ Commands: `sps status`, `sps open`, `sps open --preview`, `sps promote`, `sps ro
   `preview.command` is the adapter's own `serve.mjs` with `--vite-root {checkout}/web` (CONTRACT §10.3), and the
   Stable build is the adapter's `build.mjs --root {source}/web` (`stable.output` is `web/dist`).
 - **Ports.** 5382 / 5383 / 5384 sit beside the web app's own 5380 (`npm run dev`) and 5381 (`vite preview`), so
-  "538x is the online Studio". 5370 is on `tools/check.py`'s never-ours list (`OTHER_TOOLS`) and 5371 is Zach's
-  preview of another tool, so neither is taken; 5360 / 5361 are the old local Studio and its e2e. Checked free with
+  "538x is the online Studio". 5370 is on `tools/check.py`'s never-ours list (`OTHER_TOOLS`) and `docs/STATUS.md` calls 5371
+  "Zach's preview" (something else of his, left alone), so neither is taken; 5360 / 5361 are the old local Studio and its e2e. Checked free with
   `ss -ltn` and against every other app's `stable-preview.json` on 2026-10-18. Lanes keep the default 5400-5499.
 - **`pack-core` before Vite, and again when Python changes.** `web/public/py/` and `web/public/pyodide/` are
   gitignored build products, so a fresh checkout has none. Stable: the first `stable.build` step runs
