@@ -3,15 +3,19 @@
 // millimetres; pan with the middle or right button or Space-drag, zoom at
 // the cursor, F fits. Every feature's marker, outline, Joint Origin and
 // label are drawn as its plan() returned them: no marker geometry is made
-// here. The outer dimension and the turn arc belong to the feature in focus.
+// here. The turn arc belongs to the feature in focus; the selected feature's
+// dimensions (./Dims.tsx) are typed into in place.
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import type { MarkerPlan, Vec2 } from "../core/contract";
-import { featureOfRect, featureRect, getFeature, type Feature } from "../model/doc";
+import {
+  featureOfRect, featureRect, getFeature, isSet, resetField, setField, updateFeature, type Feature,
+} from "../model/doc";
 import {
   boxOf, fromLocal, handlePoint, HANDLES, loopD, niceStep, rectFromCorners, toLocal, toScreen, toWorld, zoomAt,
   type Handle,
 } from "../model/geom";
-import { activeFeatureId, useStudio } from "../store";
+import { activeFeatureId, selectedFeatureId, useStudio } from "../store";
+import { DimEditor, Dims, isRectDim, layoutDims, type LaidDim } from "./Dims";
 import {
   circleFrom, hitTest, inShape, moveShape, plainRect, profileLoops, resizeShape, sameProfile, shapeLoop, type Hit, type Shape,
 } from "./model";
@@ -41,6 +45,7 @@ export function Viewport() {
   const [hover, setHover] = useState<Hit>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [labelAt, setLabelAt] = useState<{ fid: string; at: Vec2 } | null>(null);
+  const [dimEdit, setDimEdit] = useState<{ fid: string; field: string } | null>(null);
   const space = useRef(false);
   const fitted = useRef(false);
 
@@ -294,35 +299,52 @@ export function Viewport() {
   const activeId = activeFeatureId({ doc, sel, panel });
   const featureRects = new Set(doc.features.map((f) => f.rectId));
 
-  let dims: ReactElement | null = null;
+  // the selected feature's dimensions (the panel's feature, or the one the selection names)
+  const dimFid = panel.open ? panel.featureId : selectedFeatureId(doc, sel);
+  const dimOf = drawn.find((d) => d.f.id === dimFid);
+  const laid: LaidDim[] = dimOf ? layoutDims(dimOf.f, dimOf.rect, dimOf.plan, scr, z) : [];
+  const editDim = dimEdit && dimEdit.fid === dimFid ? laid.find((d) => d.field === dimEdit.field) ?? null : null;
+
+  /** A value typed into a dimension: the marker's sizes through the same
+   *  setField / resetField as the panel's rows (the panel's feature through the
+   *  store's actions, so its row and the dimension agree), the rectangle's W / H
+   *  about its centre as ShapeDims does. An empty value returns it to driven. */
+  const commitDim = (fid: string, field: string, text: string) => {
+    setDimEdit(null);
+    const st = useStudio.getState();
+    const f = getFeature(st.doc, fid);
+    const t = text.trim().replace(",", ".");
+    if (!f) return;
+    if (isRectDim(field)) {
+      const r = featureRect(st.doc, f);
+      const v = Number(t);
+      if (r && t !== "" && Number.isFinite(v) && v >= 0.5) st.updateShape({ ...r, [field === "rect.w" ? "w" : "h"]: v });
+      return;
+    }
+    const mine = st.panel.open && st.panel.featureId === fid;
+    if (t === "") {
+      if (!isSet(f, field)) return;
+      if (mine) st.resetField(field);
+      else st.setDoc(updateFeature(st.doc, fid, (g) => resetField(g, field)));
+      return;
+    }
+    const v = Number(t);
+    if (!Number.isFinite(v) || v < (field === "marker.marker_mm" ? 0.1 : 0)) return;
+    if (mine) st.setField(field, v);
+    else st.setDoc(updateFeature(st.doc, fid, (g) => setField(g, field, v)));
+  };
+
   let arc: ReactElement | null = null;
   const triads: ReactElement[] = [];
   const labels: ReactElement[] = [];
   for (const { f, rect: fRect, plan } of drawn) {
-    // the outline in the rectangle's frame: for the dimension and the turn arc
+    // the outline in the rectangle's frame: for the turn arc and the Joint Origin's size
     const lp = plan.outer.map((p) => toLocal(fRect, p));
     const b = boxOf(lp);
     const ow = plan.outer_mm[0], oh = plan.outer_mm[1];
     const turned = f.marker.turn === 90 || f.marker.turn === 270;
     const [dw, dh] = turned ? [oh, ow] : [ow, oh];
     if (f.id === activeId) {
-      const off = 16 / z;
-      const A = scr(fromLocal(fRect, [b.x1 + off, b.y0])), B = scr(fromLocal(fRect, [b.x1 + off, b.y1]));
-      const C = scr(fromLocal(fRect, [b.x0, b.y1 + off])), D = scr(fromLocal(fRect, [b.x1, b.y1 + off]));
-      const e0 = scr(fromLocal(fRect, [b.x1 + 3 / z, b.y0])), e1 = scr(fromLocal(fRect, [b.x1 + 3 / z, b.y1]));
-      const f0 = scr(fromLocal(fRect, [b.x0, b.y1 + 3 / z])), f1 = scr(fromLocal(fRect, [b.x1, b.y1 + 3 / z]));
-      dims = (
-        <g className={`dim${plan.overflow_mm > 0 ? " bad" : ""}`} data-dim="outer" data-feature={f.id} data-outer-w={dw} data-outer-h={dh}>
-          <line x1={e0[0] + 2} y1={e0[1]} x2={A[0] + 4} y2={A[1]} className="ext" />
-          <line x1={e1[0] + 2} y1={e1[1]} x2={B[0] + 4} y2={B[1]} className="ext" />
-          <line x1={A[0]} y1={A[1]} x2={B[0]} y2={B[1]} markerStart="url(#arr)" markerEnd="url(#arr)" />
-          <text x={(A[0] + B[0]) / 2 + 6} y={(A[1] + B[1]) / 2 + 4}>{fmt(dh)}</text>
-          <line x1={f0[0]} y1={f0[1] - 2} x2={C[0]} y2={C[1] - 4} className="ext" />
-          <line x1={f1[0]} y1={f1[1] - 2} x2={D[0]} y2={D[1] - 4} className="ext" />
-          <line x1={C[0]} y1={C[1]} x2={D[0]} y2={D[1]} markerStart="url(#arr)" markerEnd="url(#arr)" />
-          <text x={(C[0] + D[0]) / 2} y={C[1] - 6} textAnchor="middle">outer {fmt(dw)} × {fmt(dh)}</text>
-        </g>
-      );
       // the turn arc: over the top of the marker, a handle in its middle
       const mc = fromLocal(fRect, [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2]);
       const rr = Math.min(b.x1 - b.x0, b.y1 - b.y0) * 0.42;
@@ -431,7 +453,7 @@ export function Viewport() {
           ))}
         </g>
         {draft}
-        {dims}
+        {dimOf && <Dims fid={dimOf.f.id} dims={laid} editing={editDim?.field ?? null} onEdit={(field) => setDimEdit({ fid: dimOf.f.id, field })} />}
         {triads}
         {arc}
         {labels}
@@ -441,6 +463,10 @@ export function Viewport() {
           {ticks}
         </g>
       </svg>
+      {editDim && dimFid && (
+        <DimEditor key={`${dimFid}:${editDim.field}`} dim={editDim}
+          onCommit={(t) => commitDim(dimFid, editDim.field, t)} onCancel={() => setDimEdit(null)} />
+      )}
       {panel.selector && (
         <div className="vp-hint" data-testid="selector-hint">
           {panel.selector === "rect" ? "Select a rectangle (its edge) or a profile (inside a region)" : "Select a profile (click inside a region)"}
