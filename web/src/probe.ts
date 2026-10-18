@@ -4,7 +4,8 @@
 import { callsInFlight, coreKind, coreStatus } from "./coreSource";
 import { toScreen } from "./model/geom";
 import { plannerBusy } from "./planner";
-import { useStudio } from "./store";
+import { getFeature } from "./model/doc";
+import { activeFeatureId, useStudio } from "./store";
 
 export interface Probe {
   kind: "real" | "mock";
@@ -15,12 +16,16 @@ export interface Probe {
   printHook: (() => void) | null;
 }
 
+/** `feature` and `plan` are the feature in focus (the panel's, the selected
+ *  one, else the last made) and its plan; `plans` has every feature's. */
 function snapshot() {
   const s = useStudio.getState();
+  const active = activeFeatureId(s);
   return {
     core: coreStatus(), doc: s.doc, sel: s.sel, tool: s.tool, camera: s.camera, view: s.view,
-    panel: { open: s.panel.open, tab: s.panel.tab, selector: s.panel.selector, collapsed: s.panel.collapsed },
-    plan: s.plan, suggestions: s.suggestions, modal: s.modal, inscribing: s.inscribing,
+    panel: { open: s.panel.open, featureId: s.panel.featureId, tab: s.panel.tab, selector: s.panel.selector, collapsed: s.panel.collapsed },
+    feature: getFeature(s.doc, active), plan: active ? s.plans[active] ?? null : null, plans: s.plans,
+    suggestions: s.suggestions, modal: s.modal, inscribing: s.inscribing,
   };
 }
 

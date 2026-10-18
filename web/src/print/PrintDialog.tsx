@@ -1,4 +1,5 @@
-// Export › Print…: the preset's page from core.sheet() at true scale (CSS
+// Export › Print…: every feature on the preset's page from core.sheet() (one
+// sheet item per feature, model/doc.ts sheetItems), at true scale (CSS
 // millimetres are real millimetres at 100 % zoom), with a 50 mm scale bar
 // to measure on screen (the core's page carries its own bar for paper). Print opens the browser's dialog on a print-only page (the
 // sheet's SVG at 100 %, @page sized to the paper); Download PDF / SVG save
@@ -9,7 +10,7 @@ import { Button, Dialog, Messages, SegmentedRow } from "@bam/ui";
 import type { Sheet } from "../core/contract";
 import { core } from "../coreSource";
 import { downloadBase64, downloadText, slug } from "../io/files";
-import { planRequest } from "../model/doc";
+import { sheetItems } from "../model/doc";
 import { useStudio } from "../store";
 
 const MM_PX = 96 / 25.4;
@@ -37,16 +38,16 @@ export function PrintDialog() {
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"actual" | "fit">("actual");
   const [printing, setPrinting] = useState(false);
-  const req = open ? planRequest(doc) : null;
-  const key = req ? JSON.stringify(req) : "";
+  const items = open ? sheetItems(doc) : [];
+  const key = JSON.stringify(items);
 
   useEffect(() => {
     if (!open) { setSheet(null); setError(null); return; }
-    if (!req) { setError("Nothing to print yet: make an ArUco Extrude (A) first."); return; }
+    if (!items.length) { setError("Nothing to print yet: make an ArUco Extrude (A) first."); return; }
     let live = true;
     setSheet(null);
     setError(null);
-    core.sheet({ items: [req], cut_lines: true }).then((s) => { if (live) setSheet(s); }).catch((e) => { if (live) setError((e as Error).message); });
+    core.sheet({ items, cut_lines: true }).then((s) => { if (live) setSheet(s); }).catch((e) => { if (live) setError((e as Error).message); });
     return () => { live = false; };
   }, [open, key]);
 

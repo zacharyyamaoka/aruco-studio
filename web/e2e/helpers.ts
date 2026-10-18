@@ -57,10 +57,10 @@ export async function dragWorld(page: Page, from: [number, number], to: [number,
   await page.mouse.up();
 }
 
-/** The feature's rectangle (mm) from the probe. */
+/** The rectangle (mm) of the feature in focus (the probe's `feature`). */
 export async function featureRect(page: Page): Promise<Shape> {
   const s = await state(page);
-  const id = s.doc.feature?.rectId;
+  const id = s.feature?.rectId;
   const r = s.doc.shapes.find((x: Shape) => x.id === id);
   expect(r, "the feature has a rectangle").toBeTruthy();
   return r;

@@ -72,7 +72,7 @@ test.describe(`online Studio (${CORE} core)`, () => {
     await expect(issue.first()).toBeVisible();
     await expect(page.locator('[data-row="marker.marker_mm"]')).toHaveClass(/has-error/);
     const s = await state(page);
-    expect(s.doc.feature.marker).toMatchObject({ auto: false, marker_mm: 80 });
+    expect(s.feature.marker).toMatchObject({ auto: false, marker_mm: 80 });
     expect(s.plan.overflow_mm).toBeGreaterThan(0);
     const r = await featureRect(page);
     const rect = (await page.locator(`[data-shape="${r.id}"]`).boundingBox())!;

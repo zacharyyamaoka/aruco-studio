@@ -1,15 +1,19 @@
-// The ArUco Extrude panel (Fusion's feature dialog): the selection rows
-// (Profile, Rectangle), the Preset first, then Marker | Label. Every row
-// shows its own issues from plan().warnings under it. Manual values always
+// The ArUco Extrude panel (Fusion's feature dialog) for the feature it
+// edits: the selection rows (Profile, Rectangle), the Preset first, then
+// Marker | Label. Every row shows its own issues from plan().warnings under
+// it. Every value is driven (grey: the core's, a rule's or the default) or
+// set (typed: normal, with ↺); ../ui/DrivenField.tsx. Manual values always
 // go through; the plan flags what does not fit, it never refuses.
-import { FieldRow, Glyph, Messages, NumberField, SegmentedRow, Select, Switch, Tabs, TextField, Button, type Issue as KitIssue, type Opt } from "@bam/ui";
+import { FieldRow, Glyph, Messages, SegmentedRow, Select, Switch, Tabs, TextField, Button, type Issue as KitIssue, type Opt } from "@bam/ui";
 import { X } from "lucide-react";
 import type { Issue, MarkerParams } from "../core/contract";
-import { idRange } from "../model/doc";
+import { DEFAULT_MARKER, featureNumber, getFeature, idRange, isSet, typeCounts } from "../model/doc";
 import { samePreset, myPresets } from "../presets/local";
 import { useStudio } from "../store";
+import { DrivenChoice, DrivenField } from "../ui/DrivenField";
 import { FloatingPanel } from "../ui/FloatingPanel";
 import { routeIssues, shownRows, tabLevel } from "./issues";
+import { SuggestSelect } from "./SuggestSelect";
 
 const TYPES: Opt[] = [
   { value: "single", label: "Single", icon: "single", hint: "Single marker" },
@@ -47,88 +51,100 @@ function SelRow({ path, label, count, active, onActivate, onClear, issues, icon,
   );
 }
 
+/** What drives a field while it is driven (the tooltip). */
+const DEFAULT = "default";
+
 export function ExtrudePanel() {
   const st = useStudio();
-  const { doc, plan, panel, suggestions, info, builtins } = st;
-  const f = doc.feature;
+  const { doc, plans, panel, suggestions, info, builtins } = st;
+  const f = getFeature(doc, panel.featureId);
   if (!panel.open || !f) return null;
   const m = f.marker, l = f.label;
+  const plan = plans[f.id] ?? null;
+  const planError = st.planErrors[f.id] ?? null;
   const refFace = !!f.profile;
   const shown = shownRows(m, l.on, refFace);
-  const routed = routeIssues(plan && f.rectId ? plan.warnings : [], shown);
+  const issues: Issue[] = plan && f.rectId ? [...plan.warnings] : [];
+  // WHY: the contract hands the core a typed checker only with a typed marker
+  // size (web_api.spec_of), so say so rather than show a value that is not drawn
+  if (m.type === "charuco" && isSet(f, "marker.checker_mm") && !isSet(f, "marker.marker_mm")) {
+    issues.push({ field: "marker.checker_mm", level: "warn", text: "Used only with a set Marker size: the board fills the rectangle" });
+  }
+  const routed = routeIssues(issues, shown);
   const iss = (p: string) => kit(routed[p]);
+  const bad = (p: string) => !!routed[p]?.some((i) => i.level === "error");
   const library = [...builtins, ...myPresets()].find((p) => p.id === doc.preset?.id);
   const modified = !!doc.preset && !!library && !samePreset(library, doc.preset);
   const dicts: Opt[] = (info?.dictionaries.map((d) => ({ value: d.name, label: d.name.replace("DICT_", ""), hint: `${d.capacity} ids` }))
     ?? FALLBACK_DICTS.map((d) => ({ value: d, label: d.replace("DICT_", "") })));
-  const set = <K extends keyof MarkerParams>(k: K, v: MarkerParams[K]) => st.setMarker(k, v);
-  const showPlan = plan && f.rectId;
+  const showPlan = plan && f.rectId ? plan : null;
   const profileHasHoles = !!f.profile?.holes.length;
+  /** The props every driven field shares: its state, set and reset. */
+  const drv = (path: string) => ({ path, driven: !isSet(f, path), onSet: (v: unknown) => st.setField(path, v), onReset: () => st.resetField(path) });
+  const fills = "fills the rectangle";
+  const [dc, dr] = typeCounts(m.type);
+  const counts = `default for ${m.type === "grid" ? "a grid" : "a ChArUco board"} (${dc} × ${dr})`;
 
   const markerTab = (
     <div data-tab-body="marker">
       <FieldRow path="marker.type" label="Type" issues={iss("marker.type")}>
-        <SegmentedRow path="marker.type" value={m.type} options={TYPES} onChange={(v) => set("type", v as MarkerParams["type"])} />
+        <DrivenChoice {...drv("marker.type")} value={m.type} driver={`${DEFAULT} (single)`}>
+          <SegmentedRow path="marker.type" value={m.type} options={TYPES} onChange={(v) => st.setField("marker.type", v as MarkerParams["type"])} />
+        </DrivenChoice>
       </FieldRow>
       <FieldRow path="marker.dictionary" label="Dictionary" issues={iss("marker.dictionary")}>
-        <Select path="marker.dictionary" value={m.dictionary} options={dicts} onChange={(v) => set("dictionary", String(v))} />
+        <DrivenChoice {...drv("marker.dictionary")} value={m.dictionary} driver={`${DEFAULT} (${DEFAULT_MARKER.dictionary.replace("DICT_", "")})`}>
+          <Select path="marker.dictionary" value={m.dictionary} options={dicts} onChange={(v) => st.setField("marker.dictionary", String(v))} />
+        </DrivenChoice>
       </FieldRow>
       <FieldRow path="marker.first_id" label={m.type === "single" ? "ID" : "First ID"} issues={iss("marker.first_id")}>
-        <NumberField path="marker.first_id" value={m.first_id} int min={0} onCommit={(v) => set("first_id", v)} />
-        <span className="range" data-testid="id-range">{idRange(m, showPlan ? plan.ids : undefined)}</span>
+        <DrivenField {...drv("marker.first_id")} value={m.first_id} driver={DEFAULT} int min={0} bad={bad("marker.first_id")} />
+        <span className="range" data-testid="id-range">{idRange(m, showPlan ? showPlan.ids : undefined)}</span>
       </FieldRow>
       <FieldRow path="marker.marker_mm" label="Marker" issues={iss("marker.marker_mm")}>
-        <NumberField path="marker.marker_mm" value={m.auto && showPlan ? plan.marker_mm : m.marker_mm} unit="mm" min={0.1} step={0.5}
-          onCommit={(v) => set("marker_mm", v)} />
-        <Switch path="marker.auto" value={m.auto} label="Auto" title="Auto: fill the rectangle" onChange={(v) => set("auto", v)} />
+        <DrivenField {...drv("marker.marker_mm")} value={!m.auto ? m.marker_mm : showPlan ? showPlan.marker_mm : m.marker_mm}
+          driver={fills} unit="mm" min={0.1} step={0.5} bad={bad("marker.marker_mm")} />
       </FieldRow>
       {m.type === "charuco" && (
         <FieldRow path="marker.checker_mm" label="Checker" issues={iss("marker.checker_mm")}>
-          <NumberField path="marker.checker_mm" value={m.auto && showPlan ? plan.checker_mm : m.checker_mm} unit="mm" min={0} step={0.5}
-            placeholder={showPlan ? String(plan.checker_mm) : "auto"} onCommit={(v) => set("checker_mm", v)} />
+          <DrivenField {...drv("marker.checker_mm")} value={m.checker_mm > 0 ? m.checker_mm : showPlan ? showPlan.checker_mm : null}
+            driver={m.auto ? fills : "core rule: the smallest 0.5 mm square that leaves the marker one module of white"}
+            unit="mm" min={0} step={0.5} bad={bad("marker.checker_mm")} />
         </FieldRow>
       )}
       {m.type === "grid" && (
-        <FieldRow path="marker.separation_mm" label="Separation" issues={iss("marker.separation_mm")}
-          title="The gap between markers; 0 = the core's rule">
-          <NumberField path="marker.separation_mm" value={m.separation_mm || null} unit="mm" min={0} step={0.5}
-            placeholder={showPlan ? `${plan.separation_mm} (rule)` : "rule"} onCommit={(v) => set("separation_mm", v)} />
+        <FieldRow path="marker.separation_mm" label="Separation" issues={iss("marker.separation_mm")} title="The gap between markers">
+          <DrivenField {...drv("marker.separation_mm")} value={m.separation_mm > 0 ? m.separation_mm : showPlan ? showPlan.separation_mm : null}
+            driver="core rule: the grid's gap rule, from the marker size" unit="mm" min={0} step={0.5} bad={bad("marker.separation_mm")} />
         </FieldRow>
       )}
       {m.type !== "single" && (
         <FieldRow path="marker.cols" label="Columns × Rows" issues={iss("marker.cols")}>
-          <NumberField path="marker.cols" value={m.cols} int min={1} max={50} onCommit={(v) => set("cols", v)} />
+          <DrivenField {...drv("marker.cols")} value={m.cols} driver={counts} int min={1} max={50} bad={bad("marker.cols")} />
           <span className="times">×</span>
-          <NumberField path="marker.rows" value={m.rows} int min={1} max={50} onCommit={(v) => set("rows", v)} />
+          <DrivenField {...drv("marker.rows")} value={m.rows} driver={counts} int min={1} max={50} bad={bad("marker.cols")} />
         </FieldRow>
       )}
-      <div className="row kit-field suggest" data-row="marker.suggest">
-        <div className="row-main kit-row"><label className="row-label"><span className="row-text">Suggest</span></label>
-          <div className="row-ctl muted">{suggestions.length ? "pick one: Auto turns off" : f.rectId ? "…" : "needs a rectangle"}</div></div>
-        <ul className="suggest-list" data-testid="suggestions">
-          {suggestions.map((s, i) => {
-            const now = !m.auto && s.params.cols === m.cols && s.params.rows === m.rows && Math.abs(s.params.marker_mm - m.marker_mm) < 1e-6;
-            return (
-              <li key={i}>
-                <button type="button" className={`sugg${now ? " on" : ""}`} data-testid="suggestion" data-label={s.label} onClick={() => st.pick(s)}>
-                  <span className="sugg-label">{s.label}</span><span className="sugg-reason">{s.reason}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-        <Messages path="marker.suggest" issues={iss("marker.suggest")} />
-      </div>
+      <FieldRow path="marker.suggest" label="Suggest" issues={iss("marker.suggest")} title="Good value sets for this rectangle: picking one sets them">
+        <SuggestSelect suggestions={suggestions} empty={f.rectId ? "…" : "needs a rectangle"} onPick={st.pick}
+          current={m.auto ? -1 : suggestions.findIndex((s) => s.params.cols === m.cols && s.params.rows === m.rows && Math.abs(s.params.marker_mm - m.marker_mm) < 1e-6)} />
+      </FieldRow>
       <FieldRow path="marker.turn" label="Turn" issues={iss("marker.turn")}>
-        <SegmentedRow path="marker.turn" compact value={m.turn} options={TURNS} onChange={(v) => set("turn", Number(v) as MarkerParams["turn"])} />
+        <DrivenChoice {...drv("marker.turn")} value={m.turn} driver={`${DEFAULT} (0°)`}>
+          <SegmentedRow path="marker.turn" compact value={m.turn} options={TURNS} onChange={(v) => st.setField("marker.turn", Number(v) as MarkerParams["turn"])} />
+        </DrivenChoice>
       </FieldRow>
       {!refFace && (
         <FieldRow path="marker.flip" label="Flip" issues={iss("marker.flip")} title="Mirror: no reference face sets which side is up">
-          <Switch path="marker.flip" value={m.flip} onChange={(v) => set("flip", v)} />
+          <DrivenChoice {...drv("marker.flip")} value={m.flip} driver={`${DEFAULT} (off)`}>
+            <Switch path="marker.flip" value={m.flip} onChange={(v) => st.setField("marker.flip", v)} />
+          </DrivenChoice>
         </FieldRow>
       )}
       <FieldRow path="marker.corner_mark" label="Corner mark" issues={iss("marker.corner_mark")}>
-        <SegmentedRow path="marker.corner_mark" value={m.corner_mark} options={CORNERS} onChange={(v) => set("corner_mark", v as MarkerParams["corner_mark"])} />
+        <DrivenChoice {...drv("marker.corner_mark")} value={m.corner_mark} driver={`${DEFAULT} (none)`}>
+          <SegmentedRow path="marker.corner_mark" value={m.corner_mark} options={CORNERS} onChange={(v) => st.setField("marker.corner_mark", v as MarkerParams["corner_mark"])} />
+        </DrivenChoice>
       </FieldRow>
     </div>
   );
@@ -136,23 +152,27 @@ export function ExtrudePanel() {
   const labelTab = (
     <div data-tab-body="label">
       <FieldRow path="label.on" label="On" issues={iss("label.on")}>
-        <Switch path="label.on" value={l.on} onChange={(v) => st.setLabel("on", v)} />
+        <DrivenChoice {...drv("label.on")} value={l.on} driver={`${DEFAULT} (on)`}>
+          <Switch path="label.on" value={l.on} onChange={(v) => st.setField("label.on", v)} />
+        </DrivenChoice>
       </FieldRow>
       {l.on && (
         <>
           <FieldRow path="label.text" label="Text" issues={iss("label.text")}>
-            <TextField path="label.text" value={l.text} onCommit={(v) => st.setLabel("text", v)} placeholder="#{ids}" />
+            <TextField path="label.text" value={l.text} onCommit={(v) => st.setField("label.text", v)} placeholder="#{ids}" />
           </FieldRow>
-          <div className="hint-line">{"{id} {first} {last} {ids} {dict} {type}"}{showPlan && plan.label ? ` → “${plan.label.text}”` : ""}</div>
-          <FieldRow path="label.height_mm" label="Height" issues={iss("label.height_mm")} title="Cap height; 0 = from the rectangle">
-            <NumberField path="label.height_mm" value={l.height_mm || null} unit="mm" min={0} step={0.5}
-              placeholder={showPlan && plan.label ? `${plan.label.height_mm} (auto)` : "auto"} onCommit={(v) => st.setLabel("height_mm", v)} />
+          <div className="hint-line">{"{id} {first} {last} {ids} {dict} {type}"}{showPlan && showPlan.label ? ` → “${showPlan.label.text}”` : ""}</div>
+          <FieldRow path="label.height_mm" label="Height" issues={iss("label.height_mm")} title="Cap height">
+            <DrivenField {...drv("label.height_mm")} value={l.height_mm > 0 ? l.height_mm : showPlan?.label ? showPlan.label.height_mm : null}
+              driver="core rule: 0.12 × the rectangle's short side, 2.5 to 12 mm" unit="mm" min={0} step={0.5} bad={bad("label.height_mm")} />
           </FieldRow>
           <FieldRow path="label.side" label="Side" issues={iss("label.side")}>
-            <SegmentedRow path="label.side" compact value={l.side} options={SIDES} onChange={(v) => st.setLabel("side", v as typeof l.side)} />
+            <DrivenChoice {...drv("label.side")} value={l.side} driver={`${DEFAULT} (below)`}>
+              <SegmentedRow path="label.side" compact value={l.side} options={SIDES} onChange={(v) => st.setField("label.side", v as typeof l.side)} />
+            </DrivenChoice>
           </FieldRow>
           <FieldRow path="label.gap_mm" label="Gap" issues={iss("label.gap_mm")}>
-            <NumberField path="label.gap_mm" value={l.gap_mm} unit="mm" min={0} step={0.5} onCommit={(v) => st.setLabel("gap_mm", v)} />
+            <DrivenField {...drv("label.gap_mm")} value={l.gap_mm} driver={DEFAULT} unit="mm" min={0} step={0.5} bad={bad("label.gap_mm")} />
           </FieldRow>
           <FieldRow path="label.offset_mm" label="Offset" issues={iss("label.offset_mm")} title="Drag the text on the sketch to move it">
             <span className="muted" data-testid="label-offset">{l.offset_mm[0]}, {l.offset_mm[1]} mm</span>
@@ -166,7 +186,7 @@ export function ExtrudePanel() {
   );
 
   return (
-    <FloatingPanel title="ArUco Extrude" icon={<Glyph name="extrude" />} collapsed={panel.collapsed} onCollapse={st.collapse} testid="extrude-panel"
+    <FloatingPanel title={`ArUco Extrude ${featureNumber(doc, f.id)}`} icon={<Glyph name="extrude" />} collapsed={panel.collapsed} onCollapse={st.collapse} testid="extrude-panel"
       footer={
         <>
           <Button variant="primary" onClick={st.ok} testid="panel-ok" disabled={!f.rectId}>OK</Button>
@@ -202,7 +222,7 @@ export function ExtrudePanel() {
         ]} />
       <div className="tab-body">{panel.tab === "marker" ? markerTab : labelTab}</div>
       <div className="summary" data-testid="plan-summary">
-        <div className="summary-line">{st.inscribing ? "Inscribing a rectangle…" : !f.rectId ? "Select a rectangle or a face" : showPlan ? plan.summary : st.planError ? `Plan failed: ${st.planError}` : "Planning…"}</div>
+        <div className="summary-line">{st.inscribing ? "Inscribing a rectangle…" : !f.rectId ? "Select a rectangle or a face" : showPlan ? showPlan.summary : planError ? `Plan failed: ${planError}` : "Planning…"}</div>
         <Messages path="summary" issues={kit(routed.summary)} />
       </div>
     </FloatingPanel>

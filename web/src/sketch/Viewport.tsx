@@ -1,25 +1,26 @@
 // The sketch viewport: renders the sketch model (./model.ts) and what the
 // core planned, and turns pointer events into the store's actions. y up,
 // millimetres; pan with the middle or right button or Space-drag, zoom at
-// the cursor, F fits. The marker, its outline, the Joint Origin and the
-// label are drawn as plan() returned them: no marker geometry is made here.
+// the cursor, F fits. Every feature's marker, outline, Joint Origin and
+// label are drawn as its plan() returned them: no marker geometry is made
+// here. The outer dimension and the turn arc belong to the feature in focus.
 import { useEffect, useRef, useState, type ReactElement } from "react";
-import type { Vec2 } from "../core/contract";
-import { featureRect } from "../model/doc";
+import type { MarkerPlan, Vec2 } from "../core/contract";
+import { featureOfRect, featureRect, getFeature, type Feature } from "../model/doc";
 import {
   boxOf, fromLocal, handlePoint, HANDLES, loopD, niceStep, rectFromCorners, toLocal, toScreen, toWorld, zoomAt,
   type Handle,
 } from "../model/geom";
-import { useStudio } from "../store";
+import { activeFeatureId, useStudio } from "../store";
 import {
-  circleFrom, hitTest, inShape, moveShape, profileLoops, resizeShape, sameProfile, shapeLoop, type Hit, type Shape,
+  circleFrom, hitTest, inShape, moveShape, plainRect, profileLoops, resizeShape, sameProfile, shapeLoop, type Hit, type Shape,
 } from "./model";
 
 type Drag =
   | { kind: "pan"; sx: number; sy: number; cx: number; cy: number }
   | { kind: "move"; id: string; from: Vec2; orig: Shape; moved: boolean }
   | { kind: "resize"; id: string; handle: Handle; orig: Shape }
-  | { kind: "label"; from: Vec2; orig: Vec2; at: Vec2 }
+  | { kind: "label"; fid: string; from: Vec2; orig: Vec2; at: Vec2 }
   | { kind: "draw"; tool: "rect" | "circle"; a: Vec2; b: Vec2 };
 
 const EDGE_PX = 6;
@@ -35,11 +36,11 @@ export function Viewport() {
   const view = useStudio((s) => s.view);
   const sel = useStudio((s) => s.sel);
   const tool = useStudio((s) => s.tool);
-  const plan = useStudio((s) => s.plan);
+  const plans = useStudio((s) => s.plans);
   const panel = useStudio((s) => s.panel);
   const [hover, setHover] = useState<Hit>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
-  const [labelAt, setLabelAt] = useState<Vec2 | null>(null);
+  const [labelAt, setLabelAt] = useState<{ fid: string; at: Vec2 } | null>(null);
   const space = useRef(false);
   const fitted = useRef(false);
 
@@ -82,6 +83,25 @@ export function Viewport() {
     };
   }, []);
 
+  // WHY (2026-10-18 review): on a phone the panel (and the toolbar above it)
+  // docks over the bottom of the canvas, so when it opens on a feature (and again once that feature first
+  // plans) the canvas fits the marker into the part above the panel
+  const editId = panel.open ? panel.featureId : null;
+  const editRect = editId ? doc.features.find((f) => f.id === editId)?.rectId ?? null : null;
+  const editPlanned = !!(editId && plans[editId]);
+  useEffect(() => {
+    if (!editId || !editRect || !window.matchMedia?.("(max-width: 640px)").matches) return;
+    const raf = requestAnimationFrame(() => {
+      const vp = host.current?.getBoundingClientRect();
+      if (!vp) return;
+      // what covers the canvas from below: the panel and the toolbar above it
+      const tops = ['[data-testid="extrude-panel"]', '[data-testid="toolbar"]']
+        .map((q) => document.querySelector(q)?.getBoundingClientRect().top ?? vp.bottom);
+      useStudio.getState().fitFeature(editId, RULER, Math.max(0, vp.bottom - Math.min(...tops)));
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [editId, editRect, editPlanned]);
+
   // Esc while drawing drops the draft (the app's Esc does the rest)
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === "Escape") setDrag((d) => (d?.kind === "draw" ? null : d)); };
@@ -96,6 +116,16 @@ export function Viewport() {
   const world = (e: { clientX: number; clientY: number }): Vec2 => toWorld(camera, w, h, local(e));
   const scr = (p: Vec2): Vec2 => toScreen(camera, w, h, p);
 
+  /** The shape the handles and a drag inside act on: the selected shape, or
+   *  the selected feature's rectangle. */
+  const selectedShape = (): Shape | undefined => {
+    const st = useStudio.getState();
+    const s = st.sel;
+    if (s?.kind === "shape") return st.doc.shapes.find((x) => x.id === s.id);
+    if (s?.kind === "feature" || s?.kind === "origin" || s?.kind === "text") return featureRect(st.doc, getFeature(st.doc, s.id)) ?? undefined;
+    return undefined;
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
     const st = useStudio.getState();
     const target = e.target as Element;
@@ -107,15 +137,19 @@ export function Viewport() {
     if (e.button !== 0) return;
     const p = world(e);
     const hEl = target.closest("[data-handle]");
-    if (hEl && st.sel?.kind === "shape") {
-      const orig = st.doc.shapes.find((s) => s.id === (st.sel as { id: string }).id);
+    if (hEl) {
+      const orig = selectedShape();
       if (orig) setDrag({ kind: "resize", id: orig.id, handle: hEl.getAttribute("data-handle") as Handle, orig });
       return;
     }
-    if (target.closest("[data-turn]")) { st.turn(); return; }
-    if (target.closest("[data-label]") && st.plan?.label && st.doc.feature) {
-      setDrag({ kind: "label", from: p, orig: st.doc.feature.label.offset_mm, at: st.plan.label.at });
-      st.select({ kind: "text", id: "label" });
+    const turnEl = target.closest("[data-turn]");
+    if (turnEl) { st.turn(turnEl.getAttribute("data-feature") ?? undefined); return; }
+    const labelEl = target.closest("[data-label]");
+    const lf = labelEl ? getFeature(st.doc, labelEl.getAttribute("data-feature")) : null;
+    const lp = lf ? st.plans[lf.id]?.label : null;
+    if (lf && lp) {
+      setDrag({ kind: "label", fid: lf.id, from: p, orig: lf.label.offset_mm, at: lp.at });
+      st.select({ kind: "text", id: lf.id });
       return;
     }
     if (tool === "rect" || tool === "circle") {
@@ -123,29 +157,49 @@ export function Viewport() {
       return;
     }
     const hit = hitTest(st.doc.shapes, p, EDGE_PX / z);
-    const selShape = st.sel?.kind === "shape" ? st.doc.shapes.find((s) => s.id === (st.sel as { id: string }).id) : undefined;
+    const selShape = selectedShape();
+    const move = (sh: Shape) => setDrag({ kind: "move", id: sh.id, from: p, orig: sh, moved: false });
+    // WHY WYSIWYG (Zach, 2026-10-18): "just clicking the marker on the screen is
+    // what brings up the relevant inspector window". A click on a marker, on
+    // its rectangle's edge or inside that rectangle selects the feature and
+    // opens its panel; a press-drag moves the rectangle. Empty canvas closes it.
+    const markerId = st.panel.selector ? null : target.closest("[data-marker]")?.getAttribute("data-marker");
+    const markerRect = markerId ? featureRect(st.doc, getFeature(st.doc, markerId)) : null;
+    if (markerId && markerRect) {
+      st.inspect(markerId);
+      move(markerRect);
+      return;
+    }
     if (hit?.kind === "edge") {
       const s = st.doc.shapes.find((x) => x.id === hit.id)!;
-      if (st.panel.open && s.kind === "rect" && st.panel.selector !== "profile") st.useRect(s.id);
-      else st.select({ kind: "shape", id: s.id });
-      setDrag({ kind: "move", id: s.id, from: p, orig: s, moved: false });
+      if (st.panel.selector === "rect" && s.kind === "rect") st.useRect(s.id);
+      else if (st.panel.selector) return;
+      else {
+        const owner = featureOfRect(st.doc, s.id);
+        if (owner) st.inspect(owner.id);
+        else { if (st.panel.open) st.ok(); st.select({ kind: "shape", id: s.id }); }
+      }
+      move(s);
       return;
     }
     // inside the selected shape: drag it (as after picking it in a CAD)
     if (selShape && inShape(selShape, p)) {
-      setDrag({ kind: "move", id: selShape.id, from: p, orig: selShape, moved: false });
+      move(selShape);
       return;
     }
     if (hit?.kind === "region") {
-      if (st.panel.open && st.panel.selector === "profile" && st.doc.feature?.rectId) {
-        st.setDoc({ ...st.doc, feature: { ...st.doc.feature, profile: hit.ref } });
-        st.setSelector(null);
+      if (st.panel.open && st.panel.selector === "profile" && getFeature(st.doc, st.panel.featureId)?.rectId) st.setProfile(hit.ref);
+      else if (st.panel.open && st.panel.selector) void st.useProfile(hit.ref);
+      else {
+        const plain = plainRect(st.doc.shapes, hit.ref);
+        const owner = plain ? featureOfRect(st.doc, plain.id) : null;
+        if (owner && plain) { st.inspect(owner.id); move(plain); return; }
+        if (st.panel.open) st.ok();
         st.select({ kind: "profile", ref: hit.ref });
-      } else if (st.panel.open && st.panel.selector) void st.useProfile(hit.ref);
-      else st.select({ kind: "profile", ref: hit.ref });
+      }
       return;
     }
-    if (!st.panel.selector) st.select(null);
+    st.closePanel();
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -169,8 +223,8 @@ export function Viewport() {
     } else if (drag.kind === "resize") st.updateShape(resizeShape(drag.orig, drag.handle, p));
     else if (drag.kind === "label") {
       const dx = p[0] - drag.from[0], dy = p[1] - drag.from[1];
-      setLabelAt([drag.at[0] + dx, drag.at[1] + dy]);
-      st.setLabel("offset_mm", [+(drag.orig[0] + dx).toFixed(1), +(drag.orig[1] + dy).toFixed(1)]);
+      setLabelAt({ fid: drag.fid, at: [drag.at[0] + dx, drag.at[1] + dy] });
+      st.setLabel("offset_mm", [+(drag.orig[0] + dx).toFixed(1), +(drag.orig[1] + dy).toFixed(1)], drag.fid);
     }
   };
 
@@ -230,55 +284,63 @@ export function Viewport() {
     const pr = ref && profileLoops(shapes, ref);
     return pr ? pr.loops.map(sl).join("") : "";
   };
-  const selId = sel?.kind === "shape" ? sel.id : null;
-  const selShape = selId ? shapes.find((s) => s.id === selId) : undefined;
-  const fRect = featureRect(doc);
-  const showPlan = plan && fRect;
+  const selShape = selectedShape();
+  const selId = selShape?.id ?? null;
+  // every feature that has a rectangle and a plan; the one in focus gets the
+  // outer dimension and the turn arc
+  const drawn = doc.features
+    .map((f) => ({ f, rect: featureRect(doc, f), plan: plans[f.id] as MarkerPlan | undefined }))
+    .filter((d): d is { f: Feature; rect: NonNullable<ReturnType<typeof featureRect>>; plan: MarkerPlan } => !!d.rect && !!d.plan);
+  const activeId = activeFeatureId({ doc, sel, panel });
+  const featureRects = new Set(doc.features.map((f) => f.rectId));
 
-  // the outline in the rectangle's frame: for the dimension and the turn arc
   let dims: ReactElement | null = null;
   let arc: ReactElement | null = null;
-  let triad: ReactElement | null = null;
-  if (showPlan && plan) {
+  const triads: ReactElement[] = [];
+  const labels: ReactElement[] = [];
+  for (const { f, rect: fRect, plan } of drawn) {
+    // the outline in the rectangle's frame: for the dimension and the turn arc
     const lp = plan.outer.map((p) => toLocal(fRect, p));
     const b = boxOf(lp);
-    const off = 16 / z;
-    const A = scr(fromLocal(fRect, [b.x1 + off, b.y0])), B = scr(fromLocal(fRect, [b.x1 + off, b.y1]));
-    const C = scr(fromLocal(fRect, [b.x0, b.y1 + off])), D = scr(fromLocal(fRect, [b.x1, b.y1 + off]));
-    const e0 = scr(fromLocal(fRect, [b.x1 + 3 / z, b.y0])), e1 = scr(fromLocal(fRect, [b.x1 + 3 / z, b.y1]));
-    const f0 = scr(fromLocal(fRect, [b.x0, b.y1 + 3 / z])), f1 = scr(fromLocal(fRect, [b.x1, b.y1 + 3 / z]));
     const ow = plan.outer_mm[0], oh = plan.outer_mm[1];
-    const turned = plan && (doc.feature?.marker.turn === 90 || doc.feature?.marker.turn === 270);
+    const turned = f.marker.turn === 90 || f.marker.turn === 270;
     const [dw, dh] = turned ? [oh, ow] : [ow, oh];
-    dims = (
-      <g className={`dim${plan.overflow_mm > 0 ? " bad" : ""}`} data-dim="outer" data-outer-w={dw} data-outer-h={dh}>
-        <line x1={e0[0] + 2} y1={e0[1]} x2={A[0] + 4} y2={A[1]} className="ext" />
-        <line x1={e1[0] + 2} y1={e1[1]} x2={B[0] + 4} y2={B[1]} className="ext" />
-        <line x1={A[0]} y1={A[1]} x2={B[0]} y2={B[1]} markerStart="url(#arr)" markerEnd="url(#arr)" />
-        <text x={(A[0] + B[0]) / 2 + 6} y={(A[1] + B[1]) / 2 + 4}>{fmt(dh)}</text>
-        <line x1={f0[0]} y1={f0[1] - 2} x2={C[0]} y2={C[1] - 4} className="ext" />
-        <line x1={f1[0]} y1={f1[1] - 2} x2={D[0]} y2={D[1] - 4} className="ext" />
-        <line x1={C[0]} y1={C[1]} x2={D[0]} y2={D[1]} markerStart="url(#arr)" markerEnd="url(#arr)" />
-        <text x={(C[0] + D[0]) / 2} y={C[1] - 6} textAnchor="middle">outer {fmt(dw)} × {fmt(dh)}</text>
-      </g>
-    );
-    // the turn arc: over the top of the marker, a handle in its middle
-    const mc = fromLocal(fRect, [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2]);
-    const rr = Math.min(b.x1 - b.x0, b.y1 - b.y0) * 0.42;
-    const ang = (fRect.angle_deg * Math.PI) / 180;
-    const pt = (a: number) => scr([mc[0] + rr * Math.cos(a + ang), mc[1] + rr * Math.sin(a + ang)]);
-    const a0 = pt((55 * Math.PI) / 180), a1 = pt((125 * Math.PI) / 180), hp = pt(Math.PI / 2);
-    const R = rr * z;
-    if (R > 14) {
-      arc = (
-        <g className="turn" data-turn="1" data-testid="turn-arc">
-          <title>Turn 90° (now {doc.feature?.marker.turn ?? 0}°)</title>
-          <path d={`M${a0[0]} ${a0[1]}A${R} ${R} 0 0 0 ${a1[0]} ${a1[1]}`} className="turn-path" />
-          <path d={`M${a0[0]} ${a0[1]}A${R} ${R} 0 0 0 ${a1[0]} ${a1[1]}`} className="turn-hit" />
-          <circle cx={hp[0]} cy={hp[1]} r={7} className="turn-knob" />
-          <circle cx={hp[0]} cy={hp[1]} r={2.5} className="turn-dot" />
+    if (f.id === activeId) {
+      const off = 16 / z;
+      const A = scr(fromLocal(fRect, [b.x1 + off, b.y0])), B = scr(fromLocal(fRect, [b.x1 + off, b.y1]));
+      const C = scr(fromLocal(fRect, [b.x0, b.y1 + off])), D = scr(fromLocal(fRect, [b.x1, b.y1 + off]));
+      const e0 = scr(fromLocal(fRect, [b.x1 + 3 / z, b.y0])), e1 = scr(fromLocal(fRect, [b.x1 + 3 / z, b.y1]));
+      const f0 = scr(fromLocal(fRect, [b.x0, b.y1 + 3 / z])), f1 = scr(fromLocal(fRect, [b.x1, b.y1 + 3 / z]));
+      dims = (
+        <g className={`dim${plan.overflow_mm > 0 ? " bad" : ""}`} data-dim="outer" data-feature={f.id} data-outer-w={dw} data-outer-h={dh}>
+          <line x1={e0[0] + 2} y1={e0[1]} x2={A[0] + 4} y2={A[1]} className="ext" />
+          <line x1={e1[0] + 2} y1={e1[1]} x2={B[0] + 4} y2={B[1]} className="ext" />
+          <line x1={A[0]} y1={A[1]} x2={B[0]} y2={B[1]} markerStart="url(#arr)" markerEnd="url(#arr)" />
+          <text x={(A[0] + B[0]) / 2 + 6} y={(A[1] + B[1]) / 2 + 4}>{fmt(dh)}</text>
+          <line x1={f0[0]} y1={f0[1] - 2} x2={C[0]} y2={C[1] - 4} className="ext" />
+          <line x1={f1[0]} y1={f1[1] - 2} x2={D[0]} y2={D[1] - 4} className="ext" />
+          <line x1={C[0]} y1={C[1]} x2={D[0]} y2={D[1]} markerStart="url(#arr)" markerEnd="url(#arr)" />
+          <text x={(C[0] + D[0]) / 2} y={C[1] - 6} textAnchor="middle">outer {fmt(dw)} × {fmt(dh)}</text>
         </g>
       );
+      // the turn arc: over the top of the marker, a handle in its middle
+      const mc = fromLocal(fRect, [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2]);
+      const rr = Math.min(b.x1 - b.x0, b.y1 - b.y0) * 0.42;
+      const ang = (fRect.angle_deg * Math.PI) / 180;
+      const pt = (a: number) => scr([mc[0] + rr * Math.cos(a + ang), mc[1] + rr * Math.sin(a + ang)]);
+      const a0 = pt((55 * Math.PI) / 180), a1 = pt((125 * Math.PI) / 180), hp = pt(Math.PI / 2);
+      const R = rr * z;
+      if (R > 14) {
+        arc = (
+          <g className="turn" data-turn="1" data-feature={f.id} data-testid="turn-arc">
+            <title>Turn 90° (now {f.marker.turn}°)</title>
+            <path d={`M${a0[0]} ${a0[1]}A${R} ${R} 0 0 0 ${a1[0]} ${a1[1]}`} className="turn-path" />
+            <path d={`M${a0[0]} ${a0[1]}A${R} ${R} 0 0 0 ${a1[0]} ${a1[1]}`} className="turn-hit" />
+            <circle cx={hp[0]} cy={hp[1]} r={7} className="turn-knob" />
+            <circle cx={hp[0]} cy={hp[1]} r={2.5} className="turn-dot" />
+          </g>
+        );
+      }
     }
     const fr = plan.origin.length === 16 ? { o: [plan.origin[3], plan.origin[7]] as Vec2, x: [plan.origin[0], plan.origin[4]] as Vec2, y: [plan.origin[1], plan.origin[5]] as Vec2 } : null;
     if (fr) {
@@ -287,26 +349,24 @@ export function Viewport() {
       const nx = Math.hypot(fr.x[0], fr.x[1]) || 1, ny = Math.hypot(fr.y[0], fr.y[1]) || 1;
       const X: Vec2 = [o[0] + (fr.x[0] / nx) * L, o[1] - (fr.x[1] / nx) * L];
       const Y: Vec2 = [o[0] + (fr.y[0] / ny) * L, o[1] - (fr.y[1] / ny) * L];
-      triad = (
-        <g className={`triad${sel?.kind === "origin" ? " on" : ""}`} data-origin={`${fr.o[0]},${fr.o[1]}`}>
+      triads.push(
+        <g key={f.id} className={`triad${sel?.kind === "origin" && sel.id === f.id ? " on" : ""}`} data-origin={`${fr.o[0]},${fr.o[1]}`} data-feature={f.id}>
           <line x1={o[0]} y1={o[1]} x2={X[0]} y2={X[1]} className="ax-x" />
           <line x1={o[0]} y1={o[1]} x2={Y[0]} y2={Y[1]} className="ax-y" />
           <circle cx={o[0]} cy={o[1]} r={3.5} className="ax-o" />
-        </g>
+        </g>,
       );
     }
-  }
-
-  // the label: sketch text, its centre where the core put it (or where it is being dragged)
-  let label: ReactElement | null = null;
-  if (showPlan && plan?.label && plan.label.text) {
-    const at = scr(labelAt ?? plan.label.at);
-    const fs = Math.max(6, (plan.label.height_mm / 0.7) * z);
-    label = (
-      <text className={`label${sel?.kind === "text" ? " on" : ""}`} data-label="1" data-testid="label-text"
-        x={at[0]} y={at[1]} fontSize={fs} textAnchor="middle" dominantBaseline="central"
-        transform={plan.label.angle_deg ? `rotate(${-plan.label.angle_deg} ${at[0]} ${at[1]})` : undefined}>{plan.label.text}</text>
-    );
+    // the label: sketch text, its centre where the core put it (or where it is being dragged)
+    if (plan.label && plan.label.text) {
+      const at = scr(labelAt?.fid === f.id ? labelAt.at : plan.label.at);
+      const fs = Math.max(6, (plan.label.height_mm / 0.7) * z);
+      labels.push(
+        <text key={f.id} className={`label${sel?.kind === "text" && sel.id === f.id ? " on" : ""}`} data-label="1" data-feature={f.id} data-testid="label-text"
+          x={at[0]} y={at[1]} fontSize={fs} textAnchor="middle" dominantBaseline="central"
+          transform={plan.label.angle_deg ? `rotate(${-plan.label.angle_deg} ${at[0]} ${at[1]})` : undefined}>{plan.label.text}</text>,
+      );
+    }
   }
 
   // the draft being drawn
@@ -341,10 +401,6 @@ export function Viewport() {
     <div ref={host} className="viewport" data-testid="viewport" data-tool={tool} style={{ cursor }}
       onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
       onPointerLeave={() => !drag && setHover(null)}
-      onDoubleClick={(e) => {
-        const t = e.target as Element;
-        if (t.closest("[data-marker-black],[data-marker-outline]")) useStudio.getState().editFeature();
-      }}
       onContextMenu={(e) => e.preventDefault()}>
       <svg ref={svg} width={w} height={h} className="vp-svg" data-zoom={z}>
         <defs>
@@ -357,28 +413,28 @@ export function Viewport() {
           <path d={regionsD} fillRule="evenodd" className="regions" data-regions="1" />
           {hoverRef && !sameProfile(hoverRef, selRef) && <path d={profD(hoverRef)} fillRule="evenodd" className="region-hover" data-hover-profile={hoverRef.outer} />}
           {selRef && <path d={profD(selRef)} fillRule="evenodd" className="region-sel" data-sel-profile={selRef.outer} />}
-          {showPlan && plan && (
-            <g className={`marker${sel?.kind === "feature" ? " on" : ""}`} data-marker="1">
+          {drawn.map(({ f, plan }) => (
+            <g key={f.id} className={`marker${sel?.kind === "feature" && sel.id === f.id ? " on" : ""}`} data-marker={f.id}>
               <path d={sl(plan.outer)} className={`outline${plan.overflow_mm > 0 ? " bad" : ""}`} data-marker-outline="1"
                 data-overflow={plan.overflow_mm} />
               <path d={plan.black.map((p) => sl(p.outer) + p.holes.map(sl).join("")).join("")} fillRule="evenodd" className="black" data-marker-black="1" />
             </g>
-          )}
+          ))}
           {shapes.map((s) => (
             <path key={s.id} d={sl(shapeLoop(s))} data-shape={s.id} data-kind={s.kind}
               className={[
                 "edge",
                 s.id === selId && "on",
                 hover?.kind === "edge" && hover.id === s.id && "hover",
-                fRect?.id === s.id && "marker-rect",
+                featureRects.has(s.id) && "marker-rect",
               ].filter(Boolean).join(" ")} />
           ))}
         </g>
         {draft}
         {dims}
-        {triad}
+        {triads}
         {arc}
-        {label}
+        {labels}
         <g className="handles">{handles}</g>
         <g className="ruler">
           <rect x={0} y={0} width={w} height={RULER} className="ruler-bg" />

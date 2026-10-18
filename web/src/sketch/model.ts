@@ -3,9 +3,9 @@
 //
 // WHY one seam: the viewport only renders this model and turns pointer
 // events into its actions, so the canvas can be swapped (Zach is weighing
-// tldraw, 2026-10-18) without touching the panel, the presets, the timeline
-// or Print. Nothing outside web/src/sketch/ and Viewport.tsx knows how a
-// shape is drawn or picked.
+// tldraw, 2026-10-18) without touching the panel, the presets or Print.
+// Nothing outside web/src/sketch/ and Viewport.tsx knows how a shape is
+// drawn or picked.
 //
 // Fusion's selection: a click on a shape's EDGE picks the shape (a picked
 // rectangle is the marker rectangle); a click INSIDE a region picks the
@@ -31,9 +31,9 @@ export interface ProfileRef { outer: string; holes: string[] }
 export type Selection =
   | { kind: "shape"; id: string }
   | { kind: "profile"; ref: ProfileRef }
-  | { kind: "text"; id: string }
-  | { kind: "feature" }
-  | { kind: "origin" }
+  | { kind: "text"; id: string }          // a feature's label: id = the feature's
+  | { kind: "feature"; id: string }
+  | { kind: "origin"; id: string }        // a feature's Joint Origin
   | { kind: "sketch" }
   | null;
 

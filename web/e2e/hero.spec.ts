@@ -58,9 +58,15 @@ test("hero · plate → face → A → Grid → a suggestion → drag → Print�
   await idle(page);
   await page.waitForTimeout(BEAT * 1.5);
 
-  // a suggestion (the second: a different layout than auto's)
+  // a suggestion from the dropdown (the second: a different layout than auto's)
+  const trigger = page.getByTestId("suggest-trigger");
+  await expect(trigger).toBeEnabled();
+  await glide(...(await centre(trigger)));
+  await page.waitForTimeout(BEAT / 2);
+  await trigger.click();
   const sugg = page.getByTestId("suggestion");
   await expect(sugg.first()).toBeVisible();
+  await page.waitForTimeout(BEAT);
   const pick = (await sugg.count()) > 1 ? sugg.nth(1) : sugg.first();
   await glide(...(await centre(pick)));
   await page.waitForTimeout(BEAT / 2);

@@ -1,11 +1,12 @@
 // The online Studio's screen (docs/design/online_studio_v1.md, "The screen"):
-// the top bar, the sketch viewport with its toolbar, the floating ArUco
-// Extrude panel, the timeline; the presets modal, Print and Examples.
+// the top bar, the sketch viewport with its toolbar (bottom centre), the
+// floating ArUco Extrude panel; the presets modal, Print and Examples.
+// WHY no timeline (Zach, 2026-10-18): "too specific to CAD … just clicking the
+// marker on the screen is what brings up the relevant inspector window".
 import { useEffect } from "react";
 import { TooltipProvider } from "@bam/ui";
 import { ExamplesDialog } from "./app/ExamplesDialog";
 import { openPrint } from "./app/commands";
-import { Timeline } from "./app/Timeline";
 import { Toolbar } from "./app/Toolbar";
 import { TopBar } from "./app/TopBar";
 import { onCoreStatus, coreStatus } from "./coreSource";
@@ -78,7 +79,6 @@ export function App() {
           <ExtrudePanel />
           {note && <div className="toast" role="status" data-testid="note">{note}</div>}
         </main>
-        <Timeline />
       </div>
       <PresetsModal />
       <PrintDialog />
