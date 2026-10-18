@@ -46,6 +46,11 @@ export async function exportPdf(): Promise<void> {
   }
 }
 
+/** Verify (the simulated camera bench): its dialog is web/src/verify's. */
+export function openVerify(): void {
+  st().openModal("verify");
+}
+
 export function openPrint(): void {
   if (!sheetItems(st().doc).length) { st().say("Nothing to print yet: make an ArUco Extrude (A) first."); return; }
   st().openModal("print");

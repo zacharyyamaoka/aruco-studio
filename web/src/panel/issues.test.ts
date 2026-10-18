@@ -21,6 +21,10 @@ describe("per-row issues", () => {
     expect(routeIssues([I("marker.rows")], shown)["marker.cols"]).toHaveLength(1);
     expect(shown).toContain("marker.separation_mm");
   });
+  it("a board's origin square has its own row; elsewhere it goes to Type", () => {
+    expect(routeIssues([I("marker.origin_square")], shownRows({ ...DEFAULT_MARKER, type: "charuco" }, true, false))["marker.origin_square"]).toHaveLength(1);
+    expect(routeIssues([I("marker.origin_square", "info")], shownRows(DEFAULT_MARKER, true, false))["marker.type"]).toHaveLength(1);
+  });
   it("preset.* goes to the Preset row, tag and unknowns to the summary", () => {
     const r = routeIssues([I("preset.page"), I("tag"), I("nonsense")], shownRows(DEFAULT_MARKER, true, false));
     expect(r.preset).toHaveLength(1);

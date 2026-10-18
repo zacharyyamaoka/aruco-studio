@@ -83,7 +83,10 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     // no timeline: a click on a marker opens that feature's panel
     await expect(page.getByTestId("timeline")).toHaveCount(0);
     await expect(page.getByTestId("extrude-panel")).toHaveCount(0);
-    for (const [f, n, first] of [[f1, 1, "0"], [f2, 2, "5"], [f1, 1, "0"]] as const) {
+    // f1's id is driven: auto id's (core.assign_ids), the one its plan prints
+    const id1 = String(s.plans[f1].ids[0]);
+    expect(s.doc.features[0].marker.first_id).toBe(Number(id1));
+    for (const [f, n, first] of [[f1, 1, id1], [f2, 2, "5"], [f1, 1, id1]] as const) {
       await clickMarker(page, f);
       await expect(page.getByTestId("extrude-panel")).toBeVisible();
       await expect(page.getByTestId("extrude-panel")).toContainText(`ArUco Extrude ${n}`);
@@ -103,7 +106,7 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     const sheet = page.locator('[data-testid="print-page"] svg');
     await expect(sheet).toBeVisible({ timeout: 45_000 });
     const texts = await sheet.locator("text").allTextContents();
-    expect(texts).toContain("#0");
+    expect(texts).toContain(`#${id1}`);
     expect(texts).toContain("#5");
     await page.screenshot({ path: path.join(SHOTS, "two-features-print.png") });
   });
@@ -150,8 +153,10 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     expect(v0).toBeCloseTo(s.plan.marker_mm, 4);
     expect(s.feature.marker.auto).toBe(true);
 
-    // a set row: First ID 3
+    // a set row: First ID 3 (its driven value is auto id's)
     const first = page.locator('input[data-path="marker.first_id"]');
+    const autoId = await first.inputValue();
+    expect(Number(autoId)).toBe(s.plan.ids[0]);
     await first.fill("3");
     await first.press("Enter");
     await idle(page);
@@ -210,7 +215,7 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     await first.press("Enter");
     await idle(page);
     await expect(page.locator('[data-drv="marker.first_id"]')).toHaveAttribute("data-driven", "1");
-    await expect(first).toHaveValue("0");
+    await expect(first).toHaveValue(autoId);
     expect(await colour(page, "marker.first_id")).toBe(drivenColour);
   });
 

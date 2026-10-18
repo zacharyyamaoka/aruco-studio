@@ -1,30 +1,44 @@
 // The ArUco Extrude panel (Fusion's feature dialog) for the feature it
-// edits: the selection rows (Profile, Rectangle), the Preset first, then
-// Marker | Label. Every row shows its own issues from plan().warnings under
-// it. Every value is driven (grey: the core's, a rule's or the default) or
-// set (typed: normal, with ↺); ../ui/DrivenField.tsx. Manual values always
-// go through; the plan flags what does not fit, it never refuses.
-import { FieldRow, Glyph, Messages, SegmentedRow, Select, Switch, Tabs, TextField, Button, type Issue as KitIssue, type Opt } from "@bam/ui";
+// edits. It opens beside the clicked marker (V1 "Click-to-inspect",
+// 2026-10-18) and follows it; on a phone it docks to the bottom. The Preset
+// first, the selection rows (Profile, Rectangle), then Marker | Label. Every
+// row shows its own issues from plan().warnings -- and the id's from auto
+// id -- under it. Every value is driven (grey: the core's, a rule's, auto id's
+// or the default) or set (typed: normal, with ↺); ../ui/DrivenField.tsx.
+// Manual values always go through; the plan flags what does not fit, it
+// never refuses.
+// WHY words, not icons, on the segmented choices (Zach, 2026-10-18: "I like
+// the use of text instead of icons here").
+import { FieldRow, Glyph, Messages, NumberField, SegmentedRow, Select, Switch, Tabs, TextField, Button, type Issue as KitIssue, type Opt } from "@bam/ui";
 import { X } from "lucide-react";
 import type { Issue, MarkerParams } from "../core/contract";
-import { DEFAULT_MARKER, featureNumber, getFeature, idRange, isSet, typeCounts } from "../model/doc";
+import { DEFAULT_MARKER, featureNumber, featureRect, getFeature, idRange, isSet, typeCounts } from "../model/doc";
+import { boxOf, toScreen } from "../model/geom";
 import { samePreset, myPresets } from "../presets/local";
+import { shapeLoop } from "../sketch/model";
 import { useStudio } from "../store";
+import type { Box } from "../ui/anchor";
 import { DrivenChoice, DrivenField } from "../ui/DrivenField";
 import { FloatingPanel } from "../ui/FloatingPanel";
+import { TextArea } from "../ui/TextArea";
 import { routeIssues, shownRows, tabLevel } from "./issues";
 import { SuggestSelect } from "./SuggestSelect";
 
 const TYPES: Opt[] = [
-  { value: "single", label: "Single", icon: "single", hint: "Single marker" },
-  { value: "grid", label: "Grid", icon: "grid", hint: "Grid of markers" },
-  { value: "charuco", label: "ChArUco", icon: "charuco", hint: "ChArUco board" },
+  { value: "single", label: "Single", hint: "Single marker" },
+  { value: "grid", label: "Grid", hint: "Grid of markers" },
+  { value: "charuco", label: "ChArUco", hint: "ChArUco board" },
 ];
 const TURNS: Opt[] = [0, 90, 180, 270].map((t) => ({ value: t, label: `${t}°`, hint: `Turn ${t}°` }));
 const CORNERS: Opt[] = [
-  { value: "none", label: "None", icon: "cm-none", hint: "No corner mark" },
-  { value: "triangle", label: "Triangle", icon: "cm-tri", hint: "A triangle in the quiet zone's top-left corner" },
+  { value: "none", label: "None", hint: "No corner mark" },
+  { value: "triangle", label: "Triangle", hint: "A triangle in the quiet zone's top-left corner" },
 ];
+const ORIGINS: Opt[] = [
+  { value: "corner", label: "Board corner", hint: "The Joint Origin at OpenCV's board corner" },
+  { value: "square", label: "Square", hint: "The Joint Origin at the centre of one board square" },
+];
+const PLACEHOLDERS = "{id} {first} {last} {ids} {dict} {type}";
 const SIDES: Opt[] = ["below", "above", "left", "right"].map((s) => ({ value: s, label: s[0].toUpperCase() + s.slice(1) }));
 /** The core's issues in the kit's shape (an object literal per issue). */
 const kit = (xs: Issue[] | undefined): KitIssue[] => (xs ?? []).map((i) => ({ field: i.field, level: i.level, text: i.text }));
@@ -70,6 +84,8 @@ export function ExtrudePanel() {
   if (m.type === "charuco" && isSet(f, "marker.checker_mm") && !isSet(f, "marker.marker_mm")) {
     issues.push({ field: "marker.checker_mm", level: "warn", text: "Used only with a set Marker size: the board fills the rectangle" });
   }
+  // auto id's issues for this feature (Issue.key): a collision, a full dictionary
+  for (const i of st.idIssues) if (i.key === f.key) issues.push({ ...i, field: "marker.first_id" });
   const routed = routeIssues(issues, shown);
   const iss = (p: string) => kit(routed[p]);
   const bad = (p: string) => !!routed[p]?.some((i) => i.level === "error");
@@ -84,6 +100,19 @@ export function ExtrudePanel() {
   const fills = "fills the rectangle";
   const [dc, dr] = typeCounts(m.type);
   const counts = `default for ${m.type === "grid" ? "a grid" : "a ChArUco board"} (${dc} × ${dr})`;
+  const square = m.origin_square ?? null;
+  const offsetDriver = "the preset spot (Side); drag the text on the sketch to move it";
+
+  // what the panel opens beside: the rectangle, the marker and its label
+  // band, on screen; the other markers' boxes it keeps clear where it can
+  const screenBox = (id: string): Box | null => {
+    const g = getFeature(doc, id), rect = featureRect(doc, g), p = plans[id];
+    if (!rect) return null;
+    const pts = [...shapeLoop(rect), ...(p ? p.outer : []), ...(p?.label?.box ?? [])];
+    return boxOf(pts.map((q) => toScreen(st.camera, st.view.w, st.view.h, q)));
+  };
+  const anchor = screenBox(f.id);
+  const others = doc.features.filter((g) => g.id !== f.id).map((g) => screenBox(g.id)).filter((b): b is Box => !!b);
 
   const markerTab = (
     <div data-tab-body="marker">
@@ -98,7 +127,8 @@ export function ExtrudePanel() {
         </DrivenChoice>
       </FieldRow>
       <FieldRow path="marker.first_id" label={m.type === "single" ? "ID" : "First ID"} issues={iss("marker.first_id")}>
-        <DrivenField {...drv("marker.first_id")} value={m.first_id} driver={DEFAULT} int min={0} bad={bad("marker.first_id")} />
+        <DrivenField {...drv("marker.first_id")} value={m.first_id} driver={`auto id: from the key "${f.key}", unique in this document`}
+          int min={0} bad={bad("marker.first_id")} />
         <span className="range" data-testid="id-range">{idRange(m, showPlan ? showPlan.ids : undefined)}</span>
       </FieldRow>
       <FieldRow path="marker.marker_mm" label="Marker" issues={iss("marker.marker_mm")}>
@@ -110,6 +140,23 @@ export function ExtrudePanel() {
           <DrivenField {...drv("marker.checker_mm")} value={m.checker_mm > 0 ? m.checker_mm : showPlan ? showPlan.checker_mm : null}
             driver={m.auto ? fills : "core rule: the smallest 0.5 mm square that leaves the marker one module of white"}
             unit="mm" min={0} step={0.5} bad={bad("marker.checker_mm")} />
+        </FieldRow>
+      )}
+      {m.type === "charuco" && (
+        <FieldRow path="marker.origin_square" label="Origin" issues={iss("marker.origin_square")} title="Where the Joint Origin sits on the board">
+          <DrivenChoice path="marker.origin_square" driven={!isSet(f, "marker.origin_square")} value={square ? "square" : "corner"}
+            driver={`${DEFAULT} (OpenCV's board corner)`} onReset={() => st.resetField("marker.origin_square")}
+            onSet={(v) => (v === "square" ? st.setField("marker.origin_square", square ?? [0, 0]) : st.resetField("marker.origin_square"))}>
+            <SegmentedRow path="marker.origin_square" compact value={square ? "square" : "corner"} options={ORIGINS}
+              onChange={(v) => (v === "square" ? st.setField("marker.origin_square", [0, 0]) : st.resetField("marker.origin_square"))} />
+          </DrivenChoice>
+        </FieldRow>
+      )}
+      {m.type === "charuco" && square && (
+        <FieldRow path="marker.origin_square.at" label="Column, row" title="The square, 0-based from OpenCV's origin corner">
+          <NumberField path="marker.origin_square.col" value={square[0]} int min={0} onCommit={(v) => st.setField("marker.origin_square", [v, square[1]])} />
+          <span className="times">,</span>
+          <NumberField path="marker.origin_square.row" value={square[1]} int min={0} onCommit={(v) => st.setField("marker.origin_square", [square[0], v])} />
         </FieldRow>
       )}
       {m.type === "grid" && (
@@ -143,9 +190,15 @@ export function ExtrudePanel() {
       )}
       <FieldRow path="marker.corner_mark" label="Corner mark" issues={iss("marker.corner_mark")}>
         <DrivenChoice {...drv("marker.corner_mark")} value={m.corner_mark} driver={`${DEFAULT} (none)`}>
-          <SegmentedRow path="marker.corner_mark" value={m.corner_mark} options={CORNERS} onChange={(v) => st.setField("marker.corner_mark", v as MarkerParams["corner_mark"])} />
+          <SegmentedRow path="marker.corner_mark" compact value={m.corner_mark} options={CORNERS} onChange={(v) => st.setField("marker.corner_mark", v as MarkerParams["corner_mark"])} />
         </DrivenChoice>
       </FieldRow>
+      <details className="adv" data-testid="panel-advanced">
+        <summary>Advanced</summary>
+        <FieldRow path="feature.key" label="Key" title="Auto id hashes this stable key to the first id; keys are unique in the document">
+          <TextField path="feature.key" value={f.key} onCommit={st.setKey} placeholder={f.id} />
+        </FieldRow>
+      </details>
     </div>
   );
 
@@ -158,27 +211,31 @@ export function ExtrudePanel() {
       </FieldRow>
       {l.on && (
         <>
-          <FieldRow path="label.text" label="Text" issues={iss("label.text")}>
-            <TextField path="label.text" value={l.text} onCommit={(v) => st.setField("label.text", v)} placeholder="#{ids}" />
+          <FieldRow path="label.text" label="Text" issues={iss("label.text")} className="tall">
+            <TextArea path="label.text" value={l.text} onCommit={(v) => st.setField("label.text", v)} placeholder="#{ids}" />
           </FieldRow>
-          <div className="hint-line">{"{id} {first} {last} {ids} {dict} {type}"}{showPlan && showPlan.label ? ` → “${showPlan.label.text}”` : ""}</div>
-          <FieldRow path="label.height_mm" label="Height" issues={iss("label.height_mm")} title="Cap height">
-            <DrivenField {...drv("label.height_mm")} value={l.height_mm > 0 ? l.height_mm : showPlan?.label ? showPlan.label.height_mm : null}
-              driver="core rule: 0.12 × the rectangle's short side, 2.5 to 12 mm" unit="mm" min={0} step={0.5} bad={bad("label.height_mm")} />
-          </FieldRow>
+          <div className="hint-line" data-testid="label-placeholders">
+            {PLACEHOLDERS} · Enter: a new line{showPlan?.label ? ` → “${(showPlan.label.lines ?? [showPlan.label.text]).join(" / ")}”` : ""}
+          </div>
           <FieldRow path="label.side" label="Side" issues={iss("label.side")}>
             <DrivenChoice {...drv("label.side")} value={l.side} driver={`${DEFAULT} (below)`}>
               <SegmentedRow path="label.side" compact value={l.side} options={SIDES} onChange={(v) => st.setField("label.side", v as typeof l.side)} />
             </DrivenChoice>
           </FieldRow>
+          <FieldRow path="label.offset_mm" label="Offset X" issues={iss("label.offset_mm")} title="From the preset spot; drag the text on the sketch to move it">
+            <DrivenField path="label.offset_mm.x" value={l.offset_mm[0]} driven={l.offset_mm[0] === 0} driver={offsetDriver} unit="mm" step={0.5}
+              onSet={(v) => st.setLabel("offset_mm", [v, l.offset_mm[1]])} onReset={() => st.setLabel("offset_mm", [0, l.offset_mm[1]])} />
+          </FieldRow>
+          <FieldRow path="label.offset_mm.y" label="Offset Y" title="From the preset spot; drag the text on the sketch to move it">
+            <DrivenField path="label.offset_mm.y" value={l.offset_mm[1]} driven={l.offset_mm[1] === 0} driver={offsetDriver} unit="mm" step={0.5}
+              onSet={(v) => st.setLabel("offset_mm", [l.offset_mm[0], v])} onReset={() => st.setLabel("offset_mm", [l.offset_mm[0], 0])} />
+          </FieldRow>
+          <FieldRow path="label.height_mm" label="Height" issues={iss("label.height_mm")} title="Cap height">
+            <DrivenField {...drv("label.height_mm")} value={l.height_mm > 0 ? l.height_mm : showPlan?.label ? showPlan.label.height_mm : null}
+              driver="core rule: 0.12 × the rectangle's short side, 2.5 to 12 mm" unit="mm" min={0} step={0.5} bad={bad("label.height_mm")} />
+          </FieldRow>
           <FieldRow path="label.gap_mm" label="Gap" issues={iss("label.gap_mm")}>
             <DrivenField {...drv("label.gap_mm")} value={l.gap_mm} driver={DEFAULT} unit="mm" min={0} step={0.5} bad={bad("label.gap_mm")} />
-          </FieldRow>
-          <FieldRow path="label.offset_mm" label="Offset" issues={iss("label.offset_mm")} title="Drag the text on the sketch to move it">
-            <span className="muted" data-testid="label-offset">{l.offset_mm[0]}, {l.offset_mm[1]} mm</span>
-            {(l.offset_mm[0] !== 0 || l.offset_mm[1] !== 0) && (
-              <Button size="sm" variant="ghost" onClick={() => st.setLabel("offset_mm", [0, 0])}>Reset</Button>
-            )}
           </FieldRow>
         </>
       )}
@@ -187,12 +244,23 @@ export function ExtrudePanel() {
 
   return (
     <FloatingPanel title={`ArUco Extrude ${featureNumber(doc, f.id)}`} icon={<Glyph name="extrude" />} collapsed={panel.collapsed} onCollapse={st.collapse} testid="extrude-panel"
+      anchor={anchor} anchorKey={f.id} avoid={others} width={320}
       footer={
         <>
           <Button variant="primary" onClick={st.ok} testid="panel-ok" disabled={!f.rectId}>OK</Button>
           <Button onClick={st.cancel} testid="panel-cancel">Cancel</Button>
         </>
       }>
+      <FieldRow path="preset" label="Preset" issues={iss("preset")}>
+        <button type="button" className="preset-pick" data-testid="panel-preset" onClick={() => st.openModal("presets")}
+          title="How it is made: open the presets">
+          <Glyph name={doc.preset?.method === "print3d" ? "print3d" : "inkjet"} />
+          <span className="preset-name">{doc.preset ? doc.preset.name : "Loading…"}{modified && <i className="modified"> (modified)</i>}</span>
+        </button>
+        <button type="button" className="kit-ib" title="Presets…" aria-label="Presets" data-testid="panel-preset-more" onClick={() => st.openModal("presets")}>
+          <Glyph name="dots" />
+        </button>
+      </FieldRow>
       <SelRow path="profile" label="Profile" icon="profile" testid="sel-profile" count={f.profile ? 1 : 0} emptyText="None (optional)"
         active={panel.selector === "profile"} issues={iss("profile")}
         onActivate={() => st.setSelector(panel.selector === "profile" ? null : "profile")} onClear={st.clearProfile} />
@@ -205,20 +273,10 @@ export function ExtrudePanel() {
             onChange={(v) => void st.setHoles(v as "avoid" | "ignore")} />
         </FieldRow>
       )}
-      <FieldRow path="preset" label="Preset" issues={iss("preset")}>
-        <button type="button" className="preset-pick" data-testid="panel-preset" onClick={() => st.openModal("presets")}
-          title="How it is made: open the presets">
-          <Glyph name={doc.preset?.method === "print3d" ? "print3d" : "inkjet"} />
-          <span className="preset-name">{doc.preset ? doc.preset.name : "Loading…"}{modified && <i className="modified"> (modified)</i>}</span>
-        </button>
-        <button type="button" className="kit-ib" title="Presets…" aria-label="Presets" data-testid="panel-preset-more" onClick={() => st.openModal("presets")}>
-          <Glyph name="dots" />
-        </button>
-      </FieldRow>
       <Tabs value={panel.tab} onChange={(t) => st.setTab(t as "marker" | "label")}
         tabs={[
-          { id: "marker", name: "Marker", icon: "marker", level: tabLevel(routed, "marker.") },
-          { id: "label", name: "Label", icon: "label", level: tabLevel(routed, "label.") },
+          { id: "marker", name: "Marker", level: tabLevel(routed, "marker.") },
+          { id: "label", name: "Label", level: tabLevel(routed, "label.") },
         ]} />
       <div className="tab-body">{panel.tab === "marker" ? markerTab : labelTab}</div>
       <div className="summary" data-testid="plan-summary">

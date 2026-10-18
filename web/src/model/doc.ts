@@ -3,7 +3,7 @@
 // store (../store.ts) calls these; vitest covers them. Saved as
 // `.arucostudio-web.json` (format "arucostudio-web", version 2; a version 1
 // file, which held one feature, is migrated on open).
-import type { IdItem, LabelParams, MarkerParams, MarkerType, PlanRequest, Preset, Suggestion, Turn } from "../core/contract";
+import type { IdItem, IdRequest, IdResult, LabelParams, MarkerParams, MarkerType, PlanRequest, Preset, Suggestion, Turn } from "../core/contract";
 import { rectOf, type ProfileRef, type RectShape, type Shape } from "../sketch/model";
 
 export type Holes = "avoid" | "ignore";
@@ -140,6 +140,7 @@ const ENCODED: Record<string, (f: Feature) => boolean> = {
   "marker.checker_mm": (f) => f.marker.checker_mm > 0,  // driven = 0
   "marker.separation_mm": (f) => f.marker.separation_mm > 0,
   "label.height_mm": (f) => f.label.height_mm > 0,
+  "marker.origin_square": (f) => f.marker.origin_square != null,   // driven = null: OpenCV's board corner
 };
 
 /** The fields a row can set that the contract has no driven encoding for. */
@@ -192,6 +193,7 @@ export function resetField(f: Feature, path: string): Feature {
   if (path === "marker.checker_mm") return { ...f, marker: { ...f.marker, checker_mm: 0 } };
   if (path === "marker.separation_mm") return { ...f, marker: { ...f.marker, separation_mm: 0 } };
   if (path === "label.height_mm") return { ...f, label: { ...f.label, height_mm: 0 } };
+  if (path === "marker.origin_square") return { ...f, marker: { ...f.marker, origin_square: null } };
   const [part, key] = path.split(".") as ["marker" | "label", string];
   const set = unmark(f.set, [path]);
   if (part === "label") return { ...f, label: { ...f.label, [key]: drivenValue(f.marker, path) }, set };
@@ -221,12 +223,12 @@ export function setMarker(m: MarkerParams, key: keyof MarkerParams, value: unkno
 }
 
 /** Switching the type starts the new type over: its counts (a grid 2 × 2,
- *  ChArUco 5 × 4 squares, a single 1 × 1), the size, checker and separation
- *  are driven again. */
+ *  ChArUco 5 × 4 squares, a single 1 × 1), the size, checker, separation
+ *  and a board's origin square are driven again. */
 export function setType(m: MarkerParams, type: MarkerType): MarkerParams {
   if (type === m.type) return m;
   const [cols, rows] = typeCounts(type);
-  return { ...m, type, cols, rows, auto: true, checker_mm: 0, separation_mm: 0 };
+  return { ...m, type, cols, rows, auto: true, checker_mm: 0, separation_mm: 0, origin_square: null };
 }
 
 export function nextTurn(t: Turn): Turn {
@@ -270,6 +272,35 @@ export function idItems(doc: Doc): IdItem[] {
     key: f.key, type: f.marker.type, dictionary: f.marker.dictionary, count: idCount(f.marker),
     first_id: isSet(f, "marker.first_id") ? f.marker.first_id : null,
   }));
+}
+
+/** Auto id's request: every feature, and the ids already given out. */
+export function idRequest(doc: Doc): IdRequest {
+  return { items: idItems(doc), ledger: doc.id_ledger };
+}
+
+/** Auto id's answer into the document: each driven feature's first id is
+ *  the one assigned (a typed one is left as typed), and the ledger is the
+ *  core's (a removed feature's entry is gone from it). The same document
+ *  when nothing changed. `res.items` is in the order of idItems(doc). */
+export function applyIds(doc: Doc, res: IdResult): Doc {
+  let changed = false;
+  const features = doc.features.map((f, i) => {
+    const a = res.items[i];
+    if (!a || a.key !== f.key || isSet(f, "marker.first_id") || a.first_id === f.marker.first_id) return f;
+    changed = true;
+    return { ...f, marker: { ...f.marker, first_id: a.first_id } };
+  });
+  const same = JSON.stringify(sortedLedger(doc.id_ledger)) === JSON.stringify(sortedLedger(res.ledger));
+  if (!changed && same) return doc;
+  return { ...doc, features, id_ledger: same ? doc.id_ledger : { ...res.ledger } };
+}
+
+const sortedLedger = (l: Record<string, number>) => Object.keys(l).sort().map((k) => [k, l[k]]);
+
+/** The feature (other than `id`) whose key is already `key`, if any: keys are unique. */
+export function keyOwner(doc: Doc, id: string, key: string): Feature | null {
+  return doc.features.find((f) => f.id !== id && f.key === key) ?? null;
 }
 
 // ------------------------------------------------------------ the file

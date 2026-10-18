@@ -1,5 +1,6 @@
-// The top bar: the name, File and Export, the preset chip (opens the
-// presets modal), the core chip, the theme, the GitHub link.
+// The top bar: the name, File and Export, the Download for CAD menu, the
+// preset chip (opens the presets modal), the core chip, the theme, the
+// GitHub link.
 import { Glyph, Menu, MenuItem, MenuSeparator, useTheme } from "@bam/ui";
 import { LoaderCircle, Moon, Sun } from "lucide-react";
 import { coreKind, useCoreStatus } from "../coreSource";
@@ -28,6 +29,21 @@ export function CoreChip() {
   );
 }
 
+/** Download for CAD (Zach, 2026-10-18: "we want it ready to drop into a cad
+ *  program"): the doors to the CAD add-ins. Neither is packaged yet, so both
+ *  are shown disabled, "coming soon", and link nowhere. */
+function CadMenu() {
+  const none = () => {};
+  return (
+    <Menu icon="cube" label="Download for CAD" testid="menu-cad" align="end">
+      <MenuItem icon="cube" testid="cad-fusion" disabled onClick={none} hint="coming soon"
+        label={<span className="cad-item"><b>Fusion 360</b><span className="cad-note">the add-in is being rebuilt on this core</span></span>} />
+      <MenuItem icon="cube" testid="cad-onshape" disabled onClick={none} hint="coming soon"
+        label={<span className="cad-item"><b>Onshape</b></span>} />
+    </Menu>
+  );
+}
+
 export function TopBar() {
   const preset = useStudio((s) => s.doc.preset);
   const name = useStudio((s) => s.doc.name);
@@ -50,6 +66,7 @@ export function TopBar() {
       </Menu>
       <span className="doc-name" title="The document">{name}</span>
       <span className="grow" />
+      <CadMenu />
       <button type="button" className="chip-preset" data-testid="preset-chip" title="How it is made: the presets"
         onClick={() => st().openModal("presets")}>
         <Glyph name={preset?.method === "print3d" ? "print3d" : "inkjet"} />

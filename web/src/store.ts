@@ -2,10 +2,10 @@
 // camera, the panel, the modals, and what the core last answered. The
 // document's edits are the pure functions of model/doc.ts and sketch/model.ts.
 import { create } from "zustand";
-import type { CoreInfo, LabelParams, MarkerPlan, Preset, Suggestion } from "./core/contract";
+import type { CoreInfo, Issue, LabelParams, MarkerPlan, Preset, Suggestion } from "./core/contract";
 import { core } from "./coreSource";
 import {
-  addFeature, addShape, deleteShape, emptyDoc, featureOfRect, featureRect, getFeature, newFeature, newId, nextTurn, pickSuggestion,
+  addFeature, addShape, deleteShape, emptyDoc, featureOfRect, featureRect, getFeature, keyOwner, newFeature, newId, nextTurn, pickSuggestion,
   removeFeature, resetField, setField, setShape, updateFeature, type Doc, type Feature, type Holes,
 } from "./model/doc";
 import { fitBox, type Camera } from "./model/geom";
@@ -40,6 +40,8 @@ export interface Studio {
   /** each feature's last plan, by feature id (kept drawn while the next computes) */
   plans: Record<string, MarkerPlan>;
   planErrors: Record<string, string>;
+  /** auto id's last warnings (core.assign_ids): each names its feature by Issue.key */
+  idIssues: Issue[];
   /** for the feature the panel edits */
   suggestions: Suggestion[];
   info: CoreInfo | null;
@@ -78,6 +80,9 @@ export interface Studio {
   resetField: (path: string) => void;
   /** a label value that has no row (the drag's offset_mm); the panel's feature unless named */
   setLabel: <K extends keyof LabelParams>(key: K, value: LabelParams[K], featureId?: string) => void;
+  /** the panel feature's stable key (auto id hashes it); empty = its id again.
+   *  Keys are unique: one another feature has is refused with a note. */
+  setKey: (key: string) => void;
   pick: (s: Suggestion) => void;
   turn: (featureId?: string) => void;
   setTab: (t: Tab) => void;
@@ -142,6 +147,7 @@ export const useStudio = create<Studio>((set, get) => {
     modal: null,
     plans: {},
     planErrors: {},
+    idIssues: [],
     suggestions: [],
     info: null,
     builtins: [],
@@ -151,7 +157,7 @@ export const useStudio = create<Studio>((set, get) => {
     setDoc: (doc) => set({ doc }),
     loadDoc: (doc) => {
       const preset = doc.preset ?? get().doc.preset;
-      set({ doc: { ...doc, preset }, sel: null, panel: PANEL0, plans: {}, planErrors: {}, suggestions: [], tool: "select" });
+      set({ doc: { ...doc, preset }, sel: null, panel: PANEL0, plans: {}, planErrors: {}, idIssues: [], suggestions: [], tool: "select" });
       get().fit();
     },
     newDoc: (exampleId) => {
@@ -278,6 +284,14 @@ export const useStudio = create<Studio>((set, get) => {
     setLabel: (key, value, featureId) => set({
       doc: updateFeature(get().doc, featureId ?? get().panel.featureId, (f) => ({ ...f, label: { ...f.label, [key]: value } })),
     }),
+    setKey: (key) => {
+      const f = editing();
+      if (!f) return;
+      const k = key.trim() || f.id;
+      const other = keyOwner(get().doc, f.id, k);
+      if (other) { set({ note: `Key "${k}" is taken by another marker: keys are unique.` }); return; }
+      edit((g) => ({ ...g, key: k }));
+    },
     pick: (s) => edit((f) => pickSuggestion(f, s)),
     turn: (featureId) => set({
       doc: updateFeature(get().doc, featureId ?? activeFeatureId(get()), (f) => setField(f, "marker.turn", nextTurn(f.marker.turn))),

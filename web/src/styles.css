@@ -26,6 +26,10 @@ body { font: 12px/1.35 var(--font); background: var(--bg); color: var(--text); o
 .chip-core.st-error { color: var(--bad); }
 .chip-core.st-error .dot { background: var(--bad); }
 a.kit-ib { text-decoration: none; }
+/* Download for CAD: two doors, both coming soon */
+.kit-menu-item:has(.cad-item) { height: auto; min-height: 26px; padding: 5px 8px; }
+.cad-item { display: flex; flex-direction: column; gap: 1px; }
+.cad-note { color: var(--muted); font-size: 11px; }
 
 /* ------------------------------------------------------------ the stage and viewport */
 .stage { position: relative; overflow: hidden; background: var(--canvas); min-height: 0; }
@@ -84,6 +88,14 @@ a.kit-ib { text-decoration: none; }
 .toolbar { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; align-items: center; gap: 2px; padding: 3px; background: var(--panel);
   border: 1px solid var(--line); border-radius: 9px; box-shadow: var(--shadow-sm); }
 .toolbar .tb-sep { width: 1px; height: 22px; background: var(--line-soft); margin: 0 2px; }
+/* a tool: its icon, its name, its key (words, not icons only: Zach, 2026-10-18) */
+.tb-tool { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 8px; border: 1px solid transparent; border-radius: 7px;
+  background: none; color: var(--text); font: inherit; white-space: nowrap; cursor: pointer; }
+.tb-tool:hover { background: var(--hover); }
+.tb-tool.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.tb-tool.on .kit-glyph { --accent: currentColor; }
+.tb-key { font: 600 9px/1 var(--mono); color: var(--muted); padding: 2px 3px; border: 1px solid var(--line-soft); border-radius: 3px; background: var(--panel-2); }
+.tb-tool.on .tb-key { color: #fff; background: rgba(0, 0, 0, 0.22); border-color: rgba(255, 255, 255, 0.35); }
 
 /* the selected shape's size */
 .dims-box { position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: var(--panel);
@@ -106,6 +118,7 @@ a.kit-ib { text-decoration: none; }
 .fpanel-body { overflow-y: auto; overflow-x: hidden; flex: 1; min-height: 0; padding: 4px 0; }
 .fpanel-foot { display: flex; justify-content: flex-end; gap: 6px; padding: 7px 10px; border-top: 1px solid var(--line-soft); background: var(--panel-2); }
 .fpanel .kit-tabs { margin-top: 4px; }
+.fpanel .kit-tab { height: 30px; }
 .fpanel .tab-body { padding: 4px 0; }
 .selrow { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; height: var(--ctl); padding: 0 7px; border: 1px solid var(--line);
   border-radius: var(--radius-sm); background: var(--field); color: var(--muted); font: inherit; cursor: pointer; text-align: left; }
@@ -119,6 +132,16 @@ a.kit-ib { text-decoration: none; }
 .preset-name .modified { color: var(--warn); font-style: normal; }
 .range { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .hint-line { padding: 0 10px 3px calc(40% + 10px); color: var(--muted); font-size: 10.5px; }
+/* the label's text: several lines (ui/TextArea.tsx) */
+.row.tall .kit-row, .row.tall .row-ctl { height: auto; align-items: start; }
+.row.tall .kit-row { padding: 2px 0; }
+.row.tall .row-label { padding-top: 4px; }
+.kit-textarea { flex: 1; min-width: 0; height: auto; min-height: 40px; padding: 3px 6px; resize: vertical; font: inherit; line-height: 1.35; }
+/* Advanced: the key auto id hashes */
+.adv { margin: 4px 10px 2px; border-top: 1px solid var(--line-soft); }
+.adv > summary { cursor: pointer; color: var(--muted); font-size: 11px; padding: 5px 0 3px; user-select: none; }
+.adv > summary:hover { color: var(--text); }
+.adv .kit-field { margin: 0 -10px; }
 /* Suggest: a dropdown whose options wrap (panel/SuggestSelect.tsx): the reason is shown whole */
 .sugg-popup { max-width: min(340px, calc(100vw - 16px)); }
 .sugg-item { display: flex; flex-direction: column; gap: 1px; padding: 4px 8px; border-radius: var(--radius-sm); cursor: default; outline: 0; user-select: none; }
@@ -190,6 +213,10 @@ a.kit-ib { text-decoration: none; }
   .print-sheet svg { display: block; width: 100%; height: 100%; }
 }
 
+/* a mid-width screen: the toolbar keeps its words, drops its keys, then its words (it must not run into the size box) */
+@media (max-width: 1180px) { .tb-key { display: none; } }
+@media (max-width: 980px) { .tb-tool .tb-name { display: none; } }
+
 /* ------------------------------------------------------------ narrow screens: the panel docks to the bottom */
 @media (max-width: 640px) {
   .topbar { gap: 2px; padding: 0 4px; }
@@ -207,6 +234,9 @@ a.kit-ib { text-decoration: none; }
   .stage:has(.fpanel:not(.collapsed)) .toolbar { bottom: calc(45vh + 8px); }
   .stage:has(.fpanel) .toast { bottom: calc(45vh + 60px); }
   .toolbar .kit-tool { width: 32px; height: 32px; }
+  .tb-tool { padding: 0 7px; }
+  .tb-tool .tb-name, .tb-tool .tb-key { display: none; }
+  [data-testid="menu-cad"] > span { display: none; }
   .dims-box { left: 6px; bottom: 6px; }
   .vp-hint { top: 24px; }
 }

@@ -4,9 +4,17 @@
 // A feature's last plan stays drawn while its next one computes, and an
 // answer for a request that is no longer current is dropped. Suggestions
 // follow the same way for the feature the panel edits.
-import type { PlanRequest } from "./core/contract";
+//
+// Auto id runs first: every feature's ids are assigned together
+// (core.assign_ids, with the document's ledger) whenever what they depend on
+// changes -- a feature added or removed, a type, count, dictionary, key or
+// typed id -- and the plans wait for the answer, so a marker is never drawn
+// with an id it is about to lose. The answer's driven ids and ledger go into
+// the document (model/doc.ts applyIds), so the plans, the sheet and the saved
+// file all carry them.
+import type { IdRequest, PlanRequest } from "./core/contract";
 import { core, onCoreStatus, coreStatus } from "./coreSource";
-import { getFeature, planRequest } from "./model/doc";
+import { applyIds, getFeature, idRequest, planRequest } from "./model/doc";
 import { useStudio } from "./store";
 
 const PLAN_MS = 30;
@@ -18,10 +26,13 @@ let suggestKey = "";
 let suggestTimer: ReturnType<typeof setTimeout> | null = null;
 let running = 0;
 const inflight = new Set<string>();
+/** the id request whose answer is in the document, and the one last sent */
+let idSettled = "";
+let idSent = "";
 
 /** True while a plan or suggestion is scheduled or running (the probe's idle). */
 export function plannerBusy(): boolean {
-  return planTimers.size > 0 || !!suggestTimer || running > 0;
+  return planTimers.size > 0 || !!suggestTimer || running > 0 || !!idSent;
 }
 
 function suggestInput(id: string, req: PlanRequest | null): string {
@@ -61,6 +72,51 @@ async function runSuggest(req: PlanRequest, key: string) {
   }
 }
 
+async function runAssign(req: IdRequest, key: string) {
+  running += 1;
+  try {
+    const res = await core.assign_ids(req);
+    if (key !== JSON.stringify(idRequest(useStudio.getState().doc))) return;   // the document moved on: its own call follows
+    const doc = applyIds(useStudio.getState().doc, res);
+    // WHY settled on the new ledger without a second call: with the ledger the
+    // core just returned, the same items keep the same ids (core/autoid.py)
+    idSettled = JSON.stringify(idRequest(doc));
+    useStudio.setState({ doc, idIssues: res.warnings });
+  } catch (e) {
+    // no auto id (the mock core, or a refused request): the typed / default ids plan as they are
+    if (key === JSON.stringify(idRequest(useStudio.getState().doc))) {
+      idSettled = key;
+      useStudio.setState({ idIssues: [{ field: "marker.first_id", level: "warn", text: `Auto id failed: ${(e as Error).message}` }] });
+    }
+  } finally {
+    running -= 1;
+    if (idSent === key) idSent = "";
+    schedule();
+  }
+}
+
+/** True when the document's ids are the ones auto id gave out; else asks for them. */
+function idsSettled(ready: boolean): boolean {
+  const s = useStudio.getState();
+  const req = idRequest(s.doc);
+  const key = JSON.stringify(req);
+  if (key === idSettled) return true;
+  if (!req.items.length) {
+    // nothing to number: the core would answer an empty ledger
+    idSettled = key;
+    if (Object.keys(s.doc.id_ledger).length || s.idIssues.length) {
+      useStudio.setState({ doc: { ...s.doc, id_ledger: {} }, idIssues: [] });
+      return false;
+    }
+    return true;
+  }
+  if (ready && key !== idSent) {
+    idSent = key;
+    void runAssign(req, key);
+  }
+  return false;
+}
+
 function clearTimer(id: string) {
   const t = planTimers.get(id);
   if (t) clearTimeout(t);
@@ -77,7 +133,8 @@ function schedule(force = false) {
   let dropped = false;
   for (const id of Object.keys(plans)) if (!live.has(id)) { delete plans[id]; dropped = true; }
 
-  for (const f of s.doc.features) {
+  const idsReady = idsSettled(ready);
+  for (const f of idsReady ? s.doc.features : []) {
     const req = planRequest(s.doc, f);
     const key = req ? JSON.stringify(req) : "";
     // unchanged, and drawn (or on its way, or failed): nothing to do. A plan
