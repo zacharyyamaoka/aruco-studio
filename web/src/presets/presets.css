@@ -1,0 +1,25 @@
+/* The presets modal (./PresetsModal.tsx) on the kit's library classes: the
+   filters live in the left bar under the search, the right is Info only. */
+.presets-lib { grid-template-columns: 210px minmax(0, 1fr) 300px; }
+.presets-lib .lib-tools { overflow-x: auto; }
+.presets-lib .tool-sep { width: 1px; height: 18px; background: var(--line-soft); margin: 0 4px; flex: none; }
+
+.pl-filters { display: flex; flex-direction: column; gap: 6px; padding: 2px 2px 8px; border-bottom: 1px solid var(--line-soft); }
+.pl-chips-title { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; }
+.pl-chips-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.pl-chip { height: 20px; padding: 0 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--field); color: var(--text);
+  font: inherit; font-size: 11px; cursor: pointer; }
+.pl-chip:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.pl-chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.pl-clear { align-self: flex-start; border: 0; background: none; padding: 0; color: var(--accent); font: inherit; font-size: 11px; cursor: pointer; }
+
+.pl-side-title { height: 34px; flex: none; display: flex; align-items: center; padding: 0 12px; border-bottom: 1px solid var(--line-soft);
+  font-weight: 600; color: var(--text); }
+.pl-side-body { flex: 1; min-height: 0; overflow: auto; padding: 8px 0; }
+.pl-pad { padding: 4px 12px; }
+.pl-info { display: flex; flex-direction: column; }
+.pl-info-head { display: flex; align-items: center; gap: 8px; min-height: 26px; padding: 0 10px 6px; }
+.pl-info-where { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 11px; }
+.pl-info-head .kit-btn { margin-left: auto; }
+.pl-info-note { padding: 8px 10px 0; font-size: 11px; }
+.pl-info .times { color: var(--muted); }

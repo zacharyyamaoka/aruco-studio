@@ -1,17 +1,19 @@
-// The presets modal (Fusion's "ArUco print presets"): the kit's LibraryShell
-// with Recent / My presets / Built-in, a search, cards with key numbers,
-// Filters and Info on the side, New / Duplicate / Edit / Delete, Import and
-// Export as JSON, Cancel / Select. Built-ins come from core.presets(); my
-// presets live in this browser (./local.ts).
-import { useMemo, useRef, useState } from "react";
-import { Button, Dialog, FieldRow, Glyph, LibraryShell, NumberField, SegmentedRow, Select, TextField, type LibCard } from "@bam/ui";
-import { Copy, Download, Pencil, Plus, Trash2, Upload } from "lucide-react";
-import type { Preset, Vec2 } from "../core/contract";
+// The presets modal (Fusion's "ArUco print presets"; Zach's 2026-10-18
+// review): the left bar finds (search, the Method / Paper / Nozzle chips,
+// Recent / My presets / Built-in), the middle shows the cards, the right is
+// the picked preset's Info, always open. A click picks a card and shows its
+// Info; a double-click or Select uses it. My presets are edited in place in
+// Info and saved in this browser (./local.ts); a built-in is read-only:
+// Duplicate to edit. New / Duplicate / Delete, Import and Export as JSON.
+import { useMemo, useRef, useState, type ReactNode } from "react";
+import { Button, FieldRow, Glyph, NumberField, SegmentedRow, Select, TextField } from "@bam/ui";
+import { Copy, Download, Plus, Trash2, Upload } from "lucide-react";
+import type { Preset } from "../core/contract";
 import { downloadText } from "../io/files";
 import { useStudio } from "../store";
+import { chipValues, filterPresets, infoRows, NO_FILTERS, PAGES, withField, type Filters, type InfoRow } from "./fields";
 import { blankPreset, exportJson, importJson, myPresets, presetNumbers, recentIds, saveMine } from "./local";
-
-const PAGES: Record<string, Vec2> = { Letter: [215.9, 279.4], A4: [210, 297], A3: [297, 420], A5: [148, 210], Legal: [215.9, 355.6] };
+import "./presets.css";
 
 function thumb(p: Preset): string {
   const mk = `<path fill-rule="evenodd" fill="#111" d="M0 0h24v24H0zM4 4h5v5H4zM13 9h5v5h-5zM4 14h4v4H4z"/>`;
@@ -29,68 +31,71 @@ function thumb(p: Preset): string {
 function Chips({ title, values, on, toggle }: { title: string; values: string[]; on: string[]; toggle: (v: string) => void }) {
   if (!values.length) return null;
   return (
-    <div className="chips">
-      <div className="chips-title">{title}</div>
-      <div className="chips-row">
+    <div className="pl-chips" data-chips={title}>
+      <div className="pl-chips-title">{title}</div>
+      <div className="pl-chips-row">
         {values.map((v) => (
-          <button type="button" key={v} className={`chip${on.includes(v) ? " on" : ""}`} data-chip={v} onClick={() => toggle(v)}>{v}</button>
+          <button type="button" key={v} className={`pl-chip${on.includes(v) ? " on" : ""}`} data-chip={v} aria-pressed={on.includes(v)}
+            onClick={() => toggle(v)}>{v}</button>
         ))}
       </div>
     </div>
   );
 }
 
-function PresetForm({ draft, onChange }: { draft: Preset; onChange: (p: Preset) => void }) {
-  const num = (k: keyof Preset, label: string, unit = "mm", int = false) => (
-    <FieldRow path={`preset.${k}`} label={label}>
-      <NumberField path={`preset.${k}`} value={(draft[k] as number | undefined) ?? null} unit={unit} int={int} min={0}
-        step={int ? 1 : 0.05} onCommit={(v) => onChange({ ...draft, [k]: v })} />
-    </FieldRow>
-  );
-  const pair = (k: "page_mm" | "bed_mm", label: string) => {
-    const v = draft[k] ?? [0, 0];
+/** The picked preset's every field, one row each: editable for my presets
+ *  (each commit saves), disabled for a built-in. */
+function PresetInfo({ p, onChange, onDuplicate }: { p: Preset; onChange: (p: Preset) => void; onDuplicate: () => void }) {
+  const ro = p.builtin;
+  const row = (r: InfoRow): ReactNode => {
+    if (r.kind === "page") {
+      return (
+        <FieldRow key={r.key} path="preset.page" label={r.label}>
+          <Select path="preset.page" value={p.page ?? "Custom"} disabled={ro} testid="preset-page"
+            options={[...Object.keys(PAGES), "Custom"].map((x) => ({ value: x, label: x }))}
+            onChange={(x) => onChange(withField(p, "page", String(x)))} />
+        </FieldRow>
+      );
+    }
+    if (r.kind === "pair") {
+      const v = p[r.key] ?? [0, 0];
+      return (
+        <FieldRow key={r.key} path={`preset.${r.key}`} label={r.label}>
+          <NumberField path={`preset.${r.key}.0`} value={p[r.key]?.[0]} unit={r.unit} min={1} disabled={ro} placeholder="—"
+            onCommit={(x) => onChange(withField(p, r.key, [x, v[1]]))} />
+          <span className="times">×</span>
+          <NumberField path={`preset.${r.key}.1`} value={p[r.key]?.[1]} unit={r.unit} min={1} disabled={ro} placeholder="—"
+            onCommit={(y) => onChange(withField(p, r.key, [v[0], y]))} />
+        </FieldRow>
+      );
+    }
     return (
-      <FieldRow path={`preset.${k}`} label={label}>
-        <NumberField path={`preset.${k}.0`} value={v[0]} unit="mm" min={1} onCommit={(x) => onChange({ ...draft, [k]: [x, v[1]] })} />
-        <span className="times">×</span>
-        <NumberField path={`preset.${k}.1`} value={v[1]} unit="mm" min={1} onCommit={(y) => onChange({ ...draft, [k]: [v[0], y] })} />
+      <FieldRow key={r.key} path={`preset.${r.key}`} label={r.label} title={r.hint}>
+        <NumberField path={`preset.${r.key}`} value={p[r.key] ?? null} unit={r.unit} int={r.int} min={0} step={r.step} disabled={ro} placeholder="—"
+          onCommit={(v) => onChange(withField(p, r.key, v))} />
       </FieldRow>
     );
   };
   return (
-    <div className="preset-form" data-testid="preset-form">
+    <div className="pl-info" data-testid="preset-info" data-preset={p.id} data-readonly={ro ? "1" : undefined}>
+      <div className="pl-info-head">
+        <span className="pl-info-where"><Glyph name={p.builtin ? "cube" : "star"} size={12} />{p.builtin ? "Built-in" : "My preset"}</span>
+        {ro && (
+          <Button size="sm" variant="primary" icon={<Copy size={13} />} testid="preset-dup-edit" onClick={onDuplicate}
+            title="Built-ins are fixed: edit a copy of it in My presets">Duplicate to edit</Button>
+        )}
+      </div>
       <FieldRow path="preset.name" label="Name">
-        <TextField path="preset.name" value={draft.name} onCommit={(v) => onChange({ ...draft, name: v || draft.name })} />
+        <TextField path="preset.name" value={p.name} disabled={ro} testid="preset-name"
+          onCommit={(v) => onChange({ ...p, name: v.trim() || p.name })} />
       </FieldRow>
       <FieldRow path="preset.method" label="Method">
-        <SegmentedRow path="preset.method" value={draft.method} compact
+        <SegmentedRow path="preset.method" value={p.method} compact disabled={ro}
           options={[{ value: "inkjet", label: "Inkjet", icon: "inkjet" }, { value: "print3d", label: "3D print", icon: "print3d" }]}
-          onChange={(m) => onChange({ ...blankPreset(m as Preset["method"]), id: draft.id, name: draft.name })} />
+          onChange={(m) => m !== p.method && onChange({ ...blankPreset(m as Preset["method"]), id: p.id, name: p.name })} />
       </FieldRow>
-      {draft.method === "inkjet" ? (
-        <>
-          <FieldRow path="preset.page" label="Paper">
-            <Select path="preset.page" value={draft.page ?? "Custom"}
-              options={[...Object.keys(PAGES), "Custom"].map((p) => ({ value: p, label: p }))}
-              onChange={(p) => onChange({ ...draft, page: String(p), page_mm: PAGES[String(p)] ?? draft.page_mm })} />
-          </FieldRow>
-          {pair("page_mm", "Page")}
-          {num("margin_mm", "Margin")}
-          {num("thickness_mm", "Thickness")}
-          {num("dpi", "Resolution", "dpi", true)}
-        </>
-      ) : (
-        <>
-          {num("nozzle_mm", "Nozzle")}
-          {num("line_mm", "Line width")}
-          {num("first_line_mm", "First line")}
-          {num("layer_mm", "Layer")}
-          {num("first_layer_mm", "First layer")}
-          {pair("bed_mm", "Bed")}
-        </>
-      )}
-      {num("min_cell_mm", "Min cell")}
-      {num("cell_step_mm", "Cell step")}
+      {infoRows(p.method).map(row)}
+      {ro && <div className="pl-info-note muted">Built-in presets are fixed.</div>}
     </div>
   );
 }
@@ -110,112 +115,110 @@ function PresetsLibrary() {
   const [coll, setColl] = useState<string>("builtin");
   const [search, setSearch] = useState("");
   const [picked, setPicked] = useState<string | null>(current?.id ?? null);
-  const [side, setSide] = useState<"filters" | "info">("filters");
-  const [filters, setFilters] = useState<{ method: string[]; paper: string[]; nozzle: string[] }>({ method: [], paper: [], nozzle: [] });
-  const [editing, setEditing] = useState<{ draft: Preset; isNew: boolean } | null>(null);
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [note, setNote] = useState<string | null>(null);
   const file = useRef<HTMLInputElement>(null);
 
   const all = useMemo(() => [...builtins, ...mine], [builtins, mine]);
   const recent = recentIds().map((id) => all.find((p) => p.id === id)).filter((p): p is Preset => !!p);
   const base = coll === "recent" ? recent : coll === "mine" ? mine : builtins;
-  const methodName = (m: string) => (m === "inkjet" ? "Inkjet" : "3D print");
-  const list = base.filter((p) => {
-    if (search && !`${p.name} ${presetNumbers(p)}`.toLowerCase().includes(search.toLowerCase())) return false;
-    if (filters.method.length && !filters.method.includes(methodName(p.method))) return false;
-    if (filters.paper.length && !(p.page && filters.paper.includes(p.page))) return false;
-    if (filters.nozzle.length && !(p.nozzle_mm && filters.nozzle.includes(`${p.nozzle_mm} mm`))) return false;
-    return true;
-  });
+  const list = filterPresets(base, search, filters);
+  const chips = chipValues(all);
   const sel = all.find((p) => p.id === picked) ?? null;
-  const cards: LibCard[] = list.map((p) => ({
-    id: p.id, name: p.name, subtitle: presetNumbers(p), thumb: thumb(p),
-    where: <><Glyph name={p.builtin ? "cube" : "star"} size={12} />{p.builtin ? "Built-in" : "My preset"}</>,
-    mark: p.id === current?.id ? "current" : undefined,
-  }));
-  const toggle = (k: keyof typeof filters) => (v: string) =>
+  const toggle = (k: keyof Filters) => (v: string) =>
     setFilters((f) => ({ ...f, [k]: f[k].includes(v) ? f[k].filter((x) => x !== v) : [...f[k], v] }));
   const nFilters = filters.method.length + filters.paper.length + filters.nozzle.length;
-  const uniq = (xs: (string | undefined)[]) => [...new Set(xs.filter((x): x is string => !!x))];
 
   const storeMine = (next: Preset[]) => { setMine(next); saveMine(next); };
+  const add = (p: Preset) => { storeMine([...mine, p]); setColl("mine"); setPicked(p.id); };
+  const edit = (p: Preset) => {
+    const d = { ...p, builtin: false };
+    storeMine(mine.map((x) => (x.id === d.id ? d : x)));
+    if (current?.id === d.id) setPreset(d);
+  };
+  const duplicate = () => sel && add(blankPreset(sel.method, sel));
   const choose = (id: string | null) => {
     const p = all.find((x) => x.id === id);
     if (!p) return;
     setPreset(p);
     close();
   };
-
-  const info = sel && (
-    <dl className="preset-info" data-testid="preset-info">
-      <div className="kv"><dt>Name</dt><dd>{sel.name}</dd></div>
-      <div className="kv"><dt>Method</dt><dd>{methodName(sel.method)}</dd></div>
-      {Object.entries(sel).filter(([k]) => !["id", "name", "method", "builtin"].includes(k)).map(([k, v]) => (
-        <div key={k} className="kv"><dt>{k.replace(/_mm$/, " (mm)").replace(/_/g, " ")}</dt><dd>{Array.isArray(v) ? v.join(" × ") : String(v)}</dd></div>
-      ))}
-    </dl>
-  );
+  const colls = [
+    { id: "recent", name: "Recent", icon: "clock", count: recent.length },
+    { id: "mine", name: "My presets", icon: "star", count: mine.length },
+    { id: "builtin", name: "Built-in", icon: "cube", count: builtins.length },
+  ];
 
   return (
-    <>
-      <LibraryShell
-        testid="presets-modal"
-        title={<><Glyph name="library" />ArUco print presets</>}
-        collections={[
-          { id: "recent", name: "Recent", icon: "clock", count: recent.length },
-          { id: "mine", name: "My presets", icon: "star", count: mine.length },
-          { id: "builtin", name: "Built-in", icon: "cube", count: builtins.length },
-        ]}
-        coll={coll} onColl={setColl} search={search} onSearch={setSearch}
-        cards={cards} picked={picked} onPick={setPicked} onOpen={(id) => choose(id)}
-        empty={coll === "mine" ? "No presets of your own yet: New, or Duplicate a built-in." : builtins.length ? "Nothing matches." : "Loading the core's presets…"}
-        notes={note}
-        tools={
-          <>
+    <div className="modal-back kit-backdrop-solid" data-testid="presets-modal" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+      <div className="library kit-library presets-lib" role="dialog" aria-label="ArUco print presets">
+        <div className="lib-title"><Glyph name="library" />ArUco print presets
+          <button className="kit-ib close" title="Close" aria-label="Close" onClick={close}><Glyph name="close" /></button></div>
+        <aside className="lib-nav" data-testid="presets-nav">
+          <label className="search"><Glyph name="search" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search" data-testid="lib-search" /></label>
+          <div className="pl-filters" data-testid="preset-filters">
+            <Chips title="Method" values={chips.method} on={filters.method} toggle={toggle("method")} />
+            <Chips title="Paper" values={chips.paper} on={filters.paper} toggle={toggle("paper")} />
+            <Chips title="Nozzle" values={chips.nozzle} on={filters.nozzle} toggle={toggle("nozzle")} />
+            {nFilters > 0 && <button type="button" className="pl-clear" data-testid="preset-clear-filters" onClick={() => setFilters(NO_FILTERS)}>Clear filters</button>}
+          </div>
+          <ul className="colls">
+            {colls.map((c) => (
+              <li key={c.id} className={c.id === coll ? "on" : ""} data-coll={c.id} onClick={() => setColl(c.id)}>
+                <Glyph name={c.icon} /><span>{c.name}</span><span className="n">{c.count}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="notes">{note}</div>
+        </aside>
+        <main className="lib-main">
+          <div className="lib-tools">
             <Button variant="ghost" size="sm" icon={<Plus size={13} />} testid="preset-new"
-              onClick={() => setEditing({ draft: blankPreset(filters.method.includes("3D print") ? "print3d" : "inkjet"), isNew: true })}>New</Button>
-            <Button variant="ghost" size="sm" icon={<Copy size={13} />} testid="preset-dup" disabled={!sel}
-              onClick={() => sel && setEditing({ draft: blankPreset(sel.method, sel), isNew: true })}>Duplicate</Button>
-            <Button variant="ghost" size="sm" icon={<Pencil size={13} />} testid="preset-edit" disabled={!sel || sel.builtin}
-              title={sel?.builtin ? "Built-ins are fixed: Duplicate it" : undefined}
-              onClick={() => sel && setEditing({ draft: { ...sel }, isNew: false })}>Edit</Button>
+              onClick={() => add(blankPreset(filters.method.length === 1 && filters.method[0] === "3D print" ? "print3d" : "inkjet"))}>New</Button>
+            <Button variant="ghost" size="sm" icon={<Copy size={13} />} testid="preset-dup" disabled={!sel} onClick={duplicate}>Duplicate</Button>
             <Button variant="ghost" size="sm" icon={<Trash2 size={13} />} testid="preset-delete" disabled={!sel || sel.builtin}
+              title={sel?.builtin ? "Built-ins are fixed" : undefined}
               onClick={() => { if (sel) { storeMine(mine.filter((p) => p.id !== sel.id)); setPicked(null); } }}>Delete</Button>
             <span className="tool-sep" />
             <Button variant="ghost" size="sm" icon={<Upload size={13} />} testid="preset-import" onClick={() => file.current?.click()}>Import</Button>
             <Button variant="ghost" size="sm" icon={<Download size={13} />} testid="preset-export" disabled={!mine.length}
               onClick={() => downloadText("my-aruco-presets.json", exportJson(mine), "application/json")}>Export</Button>
-            {nFilters > 0 && <Button variant="ghost" size="sm" onClick={() => setFilters({ method: [], paper: [], nozzle: [] })}>Clear filters</Button>}
-          </>
-        }
-        count={<span className="muted">{list.length} of {base.length}</span>}
-        side={
-          <>
-            <div className="side-tabs">
-              <button type="button" className={side === "filters" ? "on" : ""} onClick={() => setSide("filters")}>Filters</button>
-              <button type="button" className={side === "info" ? "on" : ""} onClick={() => setSide("info")}>Info</button>
-            </div>
-            <div className="side-body">
-              {side === "filters" ? (
-                <>
-                  <Chips title="Method" values={uniq(all.map((p) => methodName(p.method)))} on={filters.method} toggle={toggle("method")} />
-                  <Chips title="Paper" values={uniq(all.map((p) => p.page))} on={filters.paper} toggle={toggle("paper")} />
-                  <Chips title="Nozzle" values={uniq(all.map((p) => (p.nozzle_mm ? `${p.nozzle_mm} mm` : undefined)))} on={filters.nozzle} toggle={toggle("nozzle")} />
-                </>
-              ) : info ?? <div className="muted pad">Pick a preset to see its numbers.</div>}
-            </div>
-          </>
-        }
-        foot={
-          <>
-            <span className="muted">{sel ? sel.name : "No preset picked"}</span>
             <span className="grow" />
-            <Button onClick={close} testid="presets-cancel">Cancel</Button>
-            <Button variant="primary" onClick={() => choose(picked)} disabled={!sel} testid="presets-select">Select</Button>
-          </>
-        }
-        onClose={close}
-      />
+            <span className="muted">{list.length} of {base.length}</span>
+          </div>
+          <div className="cards" role="listbox" aria-label="Presets">
+            {!list.length && (
+              <div className="empty">{coll === "mine" && !mine.length ? "No presets of your own yet: New, or Duplicate a built-in."
+                : builtins.length ? "Nothing matches." : "Loading the core's presets…"}</div>
+            )}
+            {list.map((p) => (
+              <div key={p.id} className={`card${p.id === picked ? " on" : ""}`} role="option" aria-selected={p.id === picked}
+                data-card={p.id} data-mark={p.id === current?.id ? "current" : undefined}
+                onClick={() => setPicked(p.id)} onDoubleClick={() => choose(p.id)}>
+                {p.id === current?.id && <span className="card-mark" data-testid="card-mark">current</span>}
+                <div className="thumb" dangerouslySetInnerHTML={{ __html: thumb(p) }} />
+                <div className="name">{p.name}</div>
+                <div className="sub">{presetNumbers(p)}</div>
+                <div className="where"><Glyph name={p.builtin ? "cube" : "star"} size={12} />{p.builtin ? "Built-in" : "My preset"}</div>
+              </div>
+            ))}
+          </div>
+        </main>
+        <aside className="lib-side" data-testid="presets-side">
+          <div className="pl-side-title">Info</div>
+          <div className="pl-side-body">
+            {sel ? <PresetInfo key={sel.id} p={sel} onChange={edit} onDuplicate={duplicate} />
+              : <div className="muted pl-pad">Pick a preset to see its numbers.</div>}
+          </div>
+        </aside>
+        <footer className="lib-foot">
+          <span className="muted">{sel ? sel.name : "No preset picked"}</span>
+          <span className="grow" />
+          <Button onClick={close} testid="presets-cancel">Cancel</Button>
+          <Button variant="primary" onClick={() => choose(picked)} disabled={!sel} testid="presets-select">Select</Button>
+        </footer>
+      </div>
       <input ref={file} type="file" accept="application/json,.json" hidden data-testid="preset-import-file"
         onChange={async (e) => {
           const fl = e.target.files?.[0];
@@ -230,24 +233,6 @@ function PresetsLibrary() {
             setNote(`Import failed: ${(err as Error).message}`);
           }
         }} />
-      <Dialog open={!!editing} onClose={() => setEditing(null)} title={editing?.isNew ? "New preset" : "Edit preset"} icon="library"
-        testid="preset-dialog" width={380}
-        footer={
-          <>
-            <Button onClick={() => setEditing(null)}>Cancel</Button>
-            <Button variant="primary" testid="preset-save" onClick={() => {
-              if (!editing) return;
-              const d = { ...editing.draft, builtin: false };
-              storeMine(editing.isNew ? [...mine, d] : mine.map((p) => (p.id === d.id ? d : p)));
-              setColl("mine");
-              setPicked(d.id);
-              if (current?.id === d.id) setPreset(d);
-              setEditing(null);
-            }}>Save</Button>
-          </>
-        }>
-        {editing && <PresetForm draft={editing.draft} onChange={(draft) => setEditing({ ...editing, draft })} />}
-      </Dialog>
-    </>
+    </div>
   );
 }
