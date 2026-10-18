@@ -1,8 +1,8 @@
 // The commands the top bar, the toolbar and the keys share.
 import { core } from "../coreSource";
 import { downloadBase64, downloadText, pickFile, slug } from "../io/files";
-import { parseDoc, planRequest, serialise } from "../model/doc";
-import { useStudio } from "../store";
+import { getFeature, parseDoc, planRequest, serialise, sheetItems } from "../model/doc";
+import { activeFeatureId, useStudio } from "../store";
 
 const st = () => useStudio.getState();
 
@@ -23,8 +23,9 @@ export async function openDoc(): Promise<void> {
   }
 }
 
+/** Export › SVG: the marker in focus (the panel's, the selected one, else the last made). */
 export async function exportSvg(): Promise<void> {
-  const req = planRequest(st().doc);
+  const req = planRequest(st().doc, getFeature(st().doc, activeFeatureId(st())));
   if (!req) { st().say("Nothing to export yet: make an ArUco Extrude (A) first."); return; }
   try {
     downloadText(`${slug(st().doc.name)}-marker.svg`, await core.svg(req), "image/svg+xml");
@@ -33,11 +34,12 @@ export async function exportSvg(): Promise<void> {
   }
 }
 
+/** Export › PDF: the preset's page with every feature, as Print lays it out. */
 export async function exportPdf(): Promise<void> {
-  const req = planRequest(st().doc);
-  if (!req) { st().say("Nothing to export yet: make an ArUco Extrude (A) first."); return; }
+  const items = sheetItems(st().doc);
+  if (!items.length) { st().say("Nothing to export yet: make an ArUco Extrude (A) first."); return; }
   try {
-    const sheet = await core.sheet({ items: [req], cut_lines: true });
+    const sheet = await core.sheet({ items, cut_lines: true });
     downloadBase64(`${slug(st().doc.name)}.pdf`, sheet.pdf_base64, "application/pdf");
   } catch (e) {
     st().say(`PDF export failed: ${(e as Error).message}`);
@@ -45,6 +47,6 @@ export async function exportPdf(): Promise<void> {
 }
 
 export function openPrint(): void {
-  if (!planRequest(st().doc)) { st().say("Nothing to print yet: make an ArUco Extrude (A) first."); return; }
+  if (!sheetItems(st().doc).length) { st().say("Nothing to print yet: make an ArUco Extrude (A) first."); return; }
   st().openModal("print");
 }

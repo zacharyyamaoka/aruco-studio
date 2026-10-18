@@ -72,6 +72,11 @@ The UI never computes marker geometry. It draws what `plan` returns, in the sket
 
 **Orchestrator:** this spec, the contract, `web/package.json` and the lockfile, `wrangler.jsonc`, the deploy, the report.
 
+## Many features, driven vs set (lane doc, 2026-10-18)
+
+- **A document holds N ArUco Extrude features** (`web/src/model/doc.ts`, file version 2; a version 1 file migrates on open). Each has a stable `id` (made once, saved) and a `key` (the id by default: what auto id hashes), its own rectangle, marker, label and `set` list; the document has `id_ledger` (key -> first id; wave 2 fills it). A on a rectangle that has a feature opens it; A on a new rectangle or profile makes one. Each feature plans on its own; Print and Export › PDF send every feature as a sheet item; the timeline lists ArUco Extrude N / Joint Origin N per feature; Delete removes a feature and keeps its rectangle. This replaces "the UI prints one feature" below.
+- **Driven vs set replaces the Auto switch** (Zach: "just show the actual value but make it kinda like grey outed"). Every value row is driven (the actual value, muted, its driver in the tooltip: the plan's size, a core rule, or the default) or set (typed, normal text, ↺ back to driven; red when the core flags it). The contract's encodings carry it: a driven size is `auto: true`; a driven checker, separation or label height is 0; the rest are listed in `Feature.set`. `web/src/ui/DrivenField.tsx`. This replaces "Auto on / turns Auto off" in flow 5.
+
 ## Not in v1
 
 DXF import of faces; the live camera verifier (Pyodide ships OpenCV, so it can run in the browser later); 3D view; many markers on one page from many features (the sheet call supports it, the UI prints one feature); PrusaSlicer sync (desktop only).

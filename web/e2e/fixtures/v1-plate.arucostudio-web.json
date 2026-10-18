@@ -1,0 +1,86 @@
+{
+  "format": "arucostudio-web",
+  "version": 1,
+  "name": "Old plate",
+  "shapes": [
+    {
+      "kind": "rect",
+      "id": "plate",
+      "cx": 60,
+      "cy": 40,
+      "w": 120,
+      "h": 80,
+      "angle_deg": 0
+    },
+    {
+      "kind": "circle",
+      "id": "plate-h1",
+      "cx": 25,
+      "cy": 55,
+      "r": 10
+    },
+    {
+      "kind": "circle",
+      "id": "plate-h2",
+      "cx": 95,
+      "cy": 25,
+      "r": 10
+    },
+    {
+      "kind": "rect",
+      "id": "r1",
+      "cx": 60,
+      "cy": 40,
+      "w": 30,
+      "h": 30,
+      "angle_deg": 0
+    }
+  ],
+  "feature": {
+    "rectId": "r1",
+    "profile": null,
+    "holes": "avoid",
+    "marker": {
+      "type": "grid",
+      "dictionary": "DICT_5X5_100",
+      "first_id": 4,
+      "auto": true,
+      "marker_mm": 30,
+      "checker_mm": 0,
+      "separation_mm": 0,
+      "cols": 2,
+      "rows": 2,
+      "turn": 0,
+      "flip": false,
+      "quiet_modules": 1,
+      "corner_mark": "none"
+    },
+    "label": {
+      "on": true,
+      "text": "#{ids}",
+      "height_mm": 0,
+      "side": "below",
+      "gap_mm": 3,
+      "offset_mm": [
+        0,
+        0
+      ]
+    }
+  },
+  "preset": {
+    "id": "builtin:inkjet-letter-vinyl",
+    "name": "Inkjet · Letter vinyl",
+    "builtin": true,
+    "min_cell_mm": 1,
+    "cell_step_mm": 0.042333,
+    "method": "inkjet",
+    "page": "Letter",
+    "page_mm": [
+      215.9,
+      279.4
+    ],
+    "margin_mm": 10,
+    "thickness_mm": 0.1,
+    "dpi": 600
+  }
+}

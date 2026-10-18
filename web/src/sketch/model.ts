@@ -31,9 +31,9 @@ export interface ProfileRef { outer: string; holes: string[] }
 export type Selection =
   | { kind: "shape"; id: string }
   | { kind: "profile"; ref: ProfileRef }
-  | { kind: "text"; id: string }
-  | { kind: "feature" }
-  | { kind: "origin" }
+  | { kind: "text"; id: string }          // a feature's label: id = the feature's
+  | { kind: "feature"; id: string }
+  | { kind: "origin"; id: string }        // a feature's Joint Origin
   | { kind: "sketch" }
   | null;
 

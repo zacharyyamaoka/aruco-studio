@@ -124,7 +124,19 @@ a.kit-ib { text-decoration: none; }
 .sugg:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
 .sugg.on { border-color: var(--accent); background: var(--accent-soft); }
 .sugg-label { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.sugg-reason { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the reason wraps: its text is shown whole, never clipped */
+.sugg-reason { flex: 1; min-width: 0; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+/* driven vs set (ui/DrivenField.tsx): a driven value is the actual one, muted; a set one is normal text with ↺ */
+.kit-num.drv.driven input { color: var(--muted); }
+.kit-num.drv.set input { color: var(--text); }
+.kit-num.drv.bad input { color: var(--bad); }
+.drv-reset { flex: none; min-width: 18px; width: 18px; font-size: 13px; line-height: 1; color: var(--muted); }
+.drv-reset:hover { color: var(--accent); }
+.drv-choice { display: flex; align-items: center; flex: 1; min-width: 0; }
+.drv-choice > .kit-select { flex: 1; }
+.drv-choice.driven .kit-seg-btn.on { background: color-mix(in srgb, var(--muted) 16%, var(--field)); color: var(--muted); font-weight: 400; }
+.drv-choice.driven .kit-select-label { color: var(--muted); }
+.drv-choice.driven .kit-switch { opacity: 0.6; }
 .summary { margin: 4px 10px 2px; padding-top: 6px; border-top: 1px solid var(--line-soft); }
 .summary-line { color: var(--text); font-size: 11.5px; margin-bottom: 3px; overflow-wrap: anywhere; }
 
@@ -193,7 +205,8 @@ a.kit-ib { text-decoration: none; }
   .topbar .kit-menu-trigger { padding: 0 5px; }
   .chip-preset { max-width: 110px; }
   .chip-core .chip-text { display: none; }
-  .fpanel { position: fixed; left: 0 !important; right: 0 !important; top: auto !important; bottom: 0; width: auto !important; max-height: 55vh;
+  /* about 45 % of the screen: the canvas fits the marker above it (Viewport) */
+  .fpanel { position: fixed; left: 0 !important; right: 0 !important; top: auto !important; bottom: 0; width: auto !important; max-height: 45vh;
     border-radius: 10px 10px 0 0; }
   .fpanel-head { cursor: default; }
   .toolbar { top: 22px; left: 6px; }
