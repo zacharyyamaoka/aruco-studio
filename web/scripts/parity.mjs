@@ -84,7 +84,13 @@ const api = py.pyimport("aruco_studio.web_api");
 console.log(`parity: Pyodide ${py.version} + ${path.relative(root, packed.outFile)} loaded in ${Math.round(performance.now() - t0)} ms; CPython ${PY}`);
 
 const presets = JSON.parse(api.call("presets", "{}")).result;
-const list = cases(presets);
+const extra = [];
+const dir = path.join(here, "parity.d");     // a lane's own cases, one file each
+for (const f of (fs.existsSync(dir) ? fs.readdirSync(dir) : []).filter((x) => x.endsWith(".mjs")).sort()) {
+  const mod = await import(path.join(dir, f));
+  extra.push(...mod.default(presets, { marker, label, rect }));
+}
+const list = [...cases(presets), ...extra];
 const calls = list.map(([, name, payload]) => [name, JSON.stringify(payload)]);
 const t1 = performance.now();
 const inPyodide = calls.map(([n, p]) => api.call(n, p));

@@ -78,4 +78,7 @@ export const core: CoreApi = {
   suggest: (req) => send("suggest", req),
   svg: (req) => send("svg", req),
   sheet: (req) => send("sheet", req),
+  verify: (req, view) => send("verify", { req, view }),
+  readable: (req, camera) => send("readable", { req, camera }),
+  assign_ids: (req) => send("assign_ids", req),
 };

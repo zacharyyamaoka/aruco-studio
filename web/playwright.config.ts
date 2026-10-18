@@ -6,7 +6,7 @@
 // against a deployed site instead (e.g. https://arucostudio.com): no server.
 import { defineConfig } from "@playwright/test";
 
-const PORT = 5381;
+const PORT = Number(process.env.E2E_PORT || 5381);   // a lane in a worktree takes its own
 const LIVE = process.env.E2E_BASE_URL;
 
 export default defineConfig({
@@ -24,7 +24,7 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: LIVE ? undefined : {
-    command: process.env.E2E_SERVER ?? "npm run build && npm run preview",
+    command: process.env.E2E_SERVER ?? `npm run build && npx vite preview --host 127.0.0.1 --port ${PORT} --strictPort`,
     url: `http://127.0.0.1:${PORT}`,
     reuseExistingServer: false,
     timeout: 300_000,

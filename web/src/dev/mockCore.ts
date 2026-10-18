@@ -320,5 +320,9 @@ export function createMockCore(onReady: () => void, delay = 900): CoreApi {
     suggest: (req) => call(() => suggestOf(req)),
     svg: (req) => call(() => svgOf(planOf(req)).svg),
     sheet: (req) => call(() => sheetOf(req)),
+    // the dispatch of 2026-10-18 adds these; lanes give the mock real answers if they need them
+    verify: () => Promise.reject(new Error("mock core: verify not mocked")),
+    readable: () => Promise.reject(new Error("mock core: readable not mocked")),
+    assign_ids: () => Promise.reject(new Error("mock core: assign_ids not mocked")),
   };
 }

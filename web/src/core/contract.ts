@@ -101,7 +101,7 @@ export type IssueLevel = "info" | "warn" | "error";
 /** field: "marker.<key>", "label.<key>", "rect", "preset" or "tag" (the whole
  *  marker). The panel shows each issue under its row (per-line validation).
  *  Nothing is refused: an over-size marker is drawn and flagged "error" (red). */
-export interface Issue { field: string; level: IssueLevel; text: string }
+export interface Issue { field: string; level: IssueLevel; text: string; key?: string /* which item, in multi-item calls */ }
 
 export interface PlacedLabel {
   text: string;
@@ -141,9 +141,16 @@ export interface Suggestion {
   params: Pick<MarkerParams, "cols" | "rows" | "marker_mm" | "checker_mm" | "separation_mm">;
 }
 
+/** Auto layout (Zach, 2026-10-18): "tight" packs the stickers edge to edge so
+ *  neighbours share cut lines (the fewest cuts); "spaced" is the same packing
+ *  with gap_mm of padding round every sticker. */
+export type SheetMode = "tight" | "spaced";
+
 export interface SheetRequest {
   items: PlanRequest[];      // every marker to print, each with its own label
   cut_lines: boolean;
+  mode?: SheetMode;          // default "spaced"
+  gap_mm?: number;           // spaced only; default the core's
 }
 
 /** True-scale pages for the preset's paper. svg pages use mm units. */
@@ -152,6 +159,75 @@ export interface Sheet {
   svg: string[];
   pdf_base64: string;
   warnings: Issue[];
+  cuts?: number;             // straight cuts to free every sticker (a shared edge counts once)
+  fill?: number;             // 0..1: sticker area / printable area, over all pages
+}
+
+/** Verify accuracy: a simulated camera looks at the marker as planned. */
+export interface Camera {
+  distance_mm: number;       // marker to camera
+  resolution: Vec2;          // sensor width, height in px
+  hfov_deg: number;          // horizontal field of view
+}
+
+/** One simulated view. Every knob 0 = a perfect view. */
+export interface ViewConditions {
+  camera: Camera;
+  tilt_deg: number;          // rotation about the marker's x axis (perspective)
+  yaw_deg: number;           // rotation about the marker's y axis
+  blur_px: number;           // Gaussian blur sigma, sensor px
+  noise: number;             // 0..1 sensor grain
+  glare: number;             // 0..1 a specular patch's strength
+  occlusion: number;         // 0..1 share of the marker covered by dirt / a finger
+  seed: number;              // makes noise, glare and occlusion repeatable
+}
+
+export interface VerifyResult {
+  ok: boolean;               // every printed id found and no wrong id
+  found: number[];
+  missing: number[];
+  wrong: number[];           // detected ids the marker does not print
+  px_per_cell: number;       // one module's size on the sensor
+  pose_error_mm: number | null;   // board / marker pose vs truth (null = not estimated)
+  pose_error_deg: number | null;
+  image_png_base64: string;  // the simulated view with the detections drawn
+  notes: string[];
+}
+
+/** The calculator: will this camera read this marker at this distance? */
+export interface Readability {
+  px_per_cell: number;
+  max_distance_mm: number;   // the farthest the camera still reads it (head on)
+  verdict: "good" | "marginal" | "poor";
+  text: string;              // one plain line: why
+}
+
+/** Auto id (Zach, 2026-10-18): a stable key per marker feature, hashed to a
+ *  preferred first id; unique across the document by default; a typed id wins. */
+export interface IdItem {
+  key: string;               // stable: never changes for this marker (the feature's id by default)
+  type: MarkerType;
+  dictionary: string;
+  count: number;             // markers this feature prints (cols × rows for a grid; ChArUco's count)
+  first_id: number | null;   // null = driven (auto); a number = set by hand
+}
+
+export interface IdAssignment {
+  key: string;
+  first_id: number;
+  ids: number[];
+  driven: boolean;           // true = chosen by the core, false = as typed
+}
+
+export interface IdRequest {
+  items: IdItem[];
+  ledger?: Record<string, number>;   // key -> first id already given out: those never move
+}
+
+export interface IdResult {
+  items: IdAssignment[];
+  ledger: Record<string, number>;    // the updated ledger to store in the document
+  warnings: Issue[];         // e.g. a typed id that collides; Issue.key names the item
 }
 
 export interface DictionaryInfo { name: string; capacity: number; bits: number }
@@ -174,6 +250,11 @@ export interface CoreApi {
   /** one marker at true size (mm units), with its label */
   svg(req: PlanRequest): Promise<string>;
   sheet(req: SheetRequest): Promise<Sheet>;
+  /** render the plan as a camera would see it and run OpenCV's detector on it
+   *  (OpenCV loads on the first call) */
+  verify(req: PlanRequest, view: ViewConditions): Promise<VerifyResult>;
+  readable(req: PlanRequest, camera: Camera): Promise<Readability>;
+  assign_ids(req: IdRequest): Promise<IdResult>;
 }
 
 export type CoreState = "loading" | "ready" | "error";

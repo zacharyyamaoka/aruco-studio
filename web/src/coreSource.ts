@@ -53,4 +53,5 @@ function counted<K extends keyof CoreApi>(name: K): CoreApi[K] {
 export const core: CoreApi = {
   info: counted("info"), presets: counted("presets"), inscribe: counted("inscribe"), plan: counted("plan"),
   suggest: counted("suggest"), svg: counted("svg"), sheet: counted("sheet"),
+  verify: counted("verify"), readable: counted("readable"), assign_ids: counted("assign_ids"),
 };

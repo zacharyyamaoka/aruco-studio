@@ -50,7 +50,7 @@ from .plan import exports as _X
 from .plan import mesh as _ME
 from .scene import sheet as _SS
 
-API = ("info", "presets", "inscribe", "plan", "suggest", "svg", "sheet")
+API = ("info", "presets", "inscribe", "plan", "suggest", "svg", "sheet", "verify", "readable", "assign_ids")
 
 # core key path -> the contract's field (contract.ts Issue.field)
 FIELDS = {"numbers.size": "marker.marker_mm", "numbers.square": "marker.checker_mm",
@@ -569,6 +569,13 @@ def call(name: str, payload_json: str) -> str:
             out = inscribe(p.get("profile") or {}, p.get("holes") or "avoid")
         elif name == "sheet":
             out = sheet(p, p.get("date"))
+        elif name in ("verify", "readable"):
+            from . import web_verify               # numpy + OpenCV: imported on first use only
+            out = (web_verify.verify(p["req"], p["view"]) if name == "verify"
+                   else web_verify.readable(p["req"], p["camera"]))
+        elif name == "assign_ids":
+            from . import web_ids
+            out = web_ids.assign_ids(p)
         else:
             out = {"plan": plan, "suggest": suggest, "svg": svg}[name](p)
         return json.dumps({"result": out}, sort_keys=True, separators=(",", ":"),
