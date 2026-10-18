@@ -12,6 +12,7 @@ Public at https://github.com/zacharyyamaoka/aruco-studio (no licence chosen yet)
 | Tests | `npm --prefix web test` (vitest); `npm --prefix web run test:parity` (Pyodide = CPython, byte for byte); `npm --prefix web run e2e` (Playwright on the static build); `.venv/bin/python -m pytest tests/web` |
 | Check the live site | `E2E_BASE_URL=https://arucostudio.com npm --prefix web run e2e -- --project=e2e` |
 | Deploy | `npm --prefix web run deploy` (build + `wrangler deploy`; wrangler is logged in per machine) |
+| Run it locally, Stable + Preview | `sps open` (Stable, http://127.0.0.1:5382), `sps open --preview` (live `main`, http://127.0.0.1:5383), `sps promote` (Make Stable), `sps rollback`, `sps stop --all`; from a worktree `sps dev` (a lane on 5400-5499). Needs the main checkout on `main`. WHY and how: `docs/STABLE_PREVIEW.md` |
 
 **The local Studio (`studio/`, kept as it is):** `npm --prefix studio run studio`, then open http://127.0.0.1:5360 (it builds the web app and serves it with the API; Ctrl+C stops it). How to use it: `docs/STUDIO.md`.
 
