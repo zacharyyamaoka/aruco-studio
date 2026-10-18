@@ -355,9 +355,17 @@ def inscribe(profile: dict, holes: str = "avoid"):
                                  for lp in loops])
     if got is None:
         return None
-    return {"cx": _r(got["cx"] * 1000.0), "cy": _r(got["cy"] * 1000.0),
-            "w": _r(got["w"] * 1000.0), "h": _r(got["h"] * 1000.0),
-            "angle_deg": _r(got["angle_deg"])}
+    # WHY snap inward to 0.1 mm: the search returns sizes like 49.9646 mm, and
+    # the rectangle becomes an ordinary sketch rectangle Zach reads and edits
+    # (and a CAD sketch dimension). Moving each edge inward to the 0.1 mm grid
+    # keeps it inside the profile and gives numbers a person would type.
+    cx, cy, w, h = (got[k] * 1000.0 for k in ("cx", "cy", "w", "h"))
+    x0, x1 = math.ceil((cx - w / 2.0) * 10.0 - 1e-9) / 10.0, math.floor((cx + w / 2.0) * 10.0 + 1e-9) / 10.0
+    y0, y1 = math.ceil((cy - h / 2.0) * 10.0 - 1e-9) / 10.0, math.floor((cy + h / 2.0) * 10.0 + 1e-9) / 10.0
+    if x1 <= x0 or y1 <= y0:
+        return None
+    return {"cx": _r((x0 + x1) / 2.0), "cy": _r((y0 + y1) / 2.0),
+            "w": _r(x1 - x0), "h": _r(y1 - y0), "angle_deg": _r(got["angle_deg"])}
 
 
 def _plan(req: dict):

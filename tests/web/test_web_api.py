@@ -377,3 +377,16 @@ def test_sheet_prints_the_label_at_the_sketch_labels_size():
              if t == W.plan(r)["label"]["text"]]
     assert sizes, "the label is on the page"
     assert sizes[0] * W.CAP_EM == pytest.approx(cap, abs=1e-3)
+
+
+def test_inscribed_rectangle_edges_sit_on_the_tenth_mm_grid_inside_the_profile():
+    disc = lambda cx, cy, r, n=72: [[cx + r * math.cos(-2 * math.pi * k / n),
+                                     cy + r * math.sin(-2 * math.pi * k / n)] for k in range(n)]
+    plate = {"loops": [[[-60, -40], [60, -40], [60, 40], [-60, 40]], disc(-35, 0, 10), disc(35, 0, 10)]}
+    raw = W._A.largest_clear_rect([[(u / 1000.0, v / 1000.0) for u, v in lp] for lp in plate["loops"]])
+    r = W.inscribe(plate, "avoid")
+    for edge in (r["cx"] - r["w"] / 2, r["cx"] + r["w"] / 2, r["cy"] - r["h"] / 2, r["cy"] + r["h"] / 2):
+        assert abs(edge * 10 - round(edge * 10)) < 1e-6, edge
+    # inward only: inside the core's own clear rectangle
+    assert r["w"] <= raw["w"] * 1000 + 1e-9 and r["h"] <= raw["h"] * 1000 + 1e-9
+    assert r["cx"] - r["w"] / 2 >= raw["cx"] * 1000 - raw["w"] * 500 - 1e-9
