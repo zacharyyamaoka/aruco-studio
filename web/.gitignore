@@ -1,0 +1,7 @@
+node_modules/
+dist/
+public/py/
+public/pyodide/
+test-results/
+playwright-report/
+.wrangler/

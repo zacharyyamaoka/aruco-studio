@@ -1,0 +1,19 @@
+// Cloudflare deploy of the online Studio: a static-assets Worker serving dist/
+// (no server code; the Python core runs in the visitor's browser).
+// `npm --prefix web run deploy` builds and uploads. The custom domains attach
+// automatically: arucostudio.com's zone is on the same Cloudflare account.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "aruco-studio",
+  "compatibility_date": "2026-10-18",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  // WHY workers_dev on: aruco-studio.<account>.workers.dev keeps working if DNS breaks.
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "arucostudio.com", "custom_domain": true },
+    { "pattern": "www.arucostudio.com", "custom_domain": true }
+  ]
+}
