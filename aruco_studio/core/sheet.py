@@ -150,6 +150,11 @@ class PrintItem:
     # CAD label is, so it is never shrunk or cut short to fit the sticker.
     caption_cap_mm: Optional[float] = None
     caption_gap_mm: Optional[float] = None
+    # The online Studio (2026-10-18): the label INSIDE the sticker, as ordinary
+    # text runs in the sticker's own frame [{"text", "at": [u, v] (the cap
+    # box's centre), "cap_mm"}]. With it the sticker has no caption under it:
+    # the label is part of the sticker, as it is in the CAD (WYSIWYG).
+    texts_mm: Optional[list] = None
     made_by: str = ""               # "sticker" / "print3d" (a paper proof)
     name: str = ""                  # the tag's name
     ids: List[int] = field(default_factory=list)
@@ -1162,7 +1167,7 @@ def ink_of(item: PrintItem) -> list:
 
 
 def _caption(item: PrintItem, width: float, settings: SheetSettings):
-    if settings.mode == "tight" or not settings.labels:
+    if settings.mode == "tight" or not settings.labels or item.texts_mm is not None:
         return [], LABEL_FONT_PT, 0.0
     text = item.caption or (identity_label(item) + (f" · {item.name}" if item.name else ""))
     lines = [text]
@@ -1386,7 +1391,9 @@ def _guillotine_pages(prepared, settings, gap, x0, y0, area_w, area_h, page_w, p
     for k, p in enumerate(prepared):
         u0, v0, u1, v1 = p["box"]
         opts = []
-        for rot in (0, 90):
+        # WHY a sticker with text runs is not turned: its label reads as the
+        # CAD's does, and centred text along a turned sticker is not drawn yet
+        for rot in ((0,) if p["item"].texts_mm else (0, 90)):
             w, h = (v1 - v0, u1 - u0) if rot else (u1 - u0, v1 - v0)
             cw, ch, lines, font = _cell(p["item"], w, h, settings)
             if cw <= area_w + _EPS and ch <= area_h + _EPS:
@@ -1512,6 +1519,14 @@ def _draw_sticker(pg: _Ops, p: StickerPlace, s: SheetSettings):
     pg.sticker(p)
     ink = [[[p.to_page(u, v) for u, v in lp] for lp in poly] for poly in ink_of(item)]
     pg.fill_polys(ink, 0.0)
+    for t in item.texts_mm or ():                 # the label inside the sticker
+        cap = float(t["cap_mm"])
+        size = cap / CAP_EM * MM_TO_PT
+        x, y = p.to_page(float(t["at"][0]), float(t["at"][1]) - cap / 2.0)   # the baseline's middle
+        if p.rotation == 90:                       # only when it is longer than the page
+            pg.text_up(x, y + text_width_mm(t["text"], size) / 2.0, t["text"], size)
+        else:
+            pg.text(x, y, t["text"], size, "center")
     o = outline_of(item)
     loops = [[p.to_page(u, v) for u, v in o["outer"]]]
     loops += [[p.to_page(u, v) for u, v in hl] for hl in o.get("holes", [])]

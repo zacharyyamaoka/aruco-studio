@@ -11,8 +11,10 @@ along its height (before the sketch's angle; the caller places it).
     label on    a band on `side` holds the text: its depth is the text block
                 (lines x cap + the line gaps) across the band, the rectangle's
                 whole width / height along it; `gap_mm` separates it from
-                the box the marker fills (`Fill.box`); the text's preset
-                spot is the band's centre, `offset` moves it from there
+                the box the marker fills (`Fill.box`); the band also holds
+                EDGE x cap of white from the cut line and, for sans,
+                DESCENT x cap below the last baseline; the text's preset
+                spot is the text block's centre, `offset` moves it from there
     font        "sans" (inkjet: ordinary text the page prints, `Fill.runs`)
                 or "pixel" (3D print: core.label's pixel font of 2026-10-10,
                 its ink as boxes, `Fill.ink`; one pixel = a whole number of
@@ -38,6 +40,13 @@ SIDES = ("below", "above", "left", "right")
 FONTS = ("sans", "pixel")
 LABEL_CAP = (0.12, 2.5, 12.0)       # Auto cap: 0.12 x the short side, within 2.5 .. 12 mm
 LINE_GAP = _AL.LINE_GAP_PX / _AL.GLYPH_ROWS     # between lines, x the cap (the pixel font's 2 px of 5)
+# WHY a margin and descender room (2026-10-18): the band started at the cut
+# line, so a sans label's baseline sat ON it and "part" lost its "p" to the
+# knife. The text keeps EDGE x cap of white from the rectangle's edge, and a
+# sans label keeps DESCENT x cap below its last baseline (Helvetica's
+# descender, 0.207 em, is 0.29 of its 0.718 em cap). The pixel font has none.
+EDGE = LINE_GAP
+DESCENT = 0.3
 MIN_BOX_MM = 0.1                    # the marker's box never goes below this (a refusal plans)
 DIM_STEP = (0.1, 2.0, 8.0)          # dimension rings: 0.1 x the short side, within 2 .. 8 mm
 TOL = 1e-6
@@ -88,7 +97,7 @@ class Fill:
     stroke: float                    # pixel: one pixel; sans: 0
     band: Rect                       # the label's band
     box: Rect                        # what the marker fills
-    spot: Pt                         # the preset spot: the band's centre
+    spot: Pt                         # the preset spot: the text block's centre in the band
     at: Pt                           # the text block's centre (spot + offset)
     block: Tuple[float, float]       # the text block's width, height
     runs: List[Run] = field(default_factory=list)     # sans
@@ -145,15 +154,22 @@ def fill(w: float, h: float, text: str, *, font: str = "sans", cap_mm: float = 0
         bw = max(sans_width(t, cap) for t in lines)
         bh = len(lines) * cap + (len(lines) - 1) * LINE_GAP * cap
     gap = max(0.0, float(gap_mm or 0.0))
+    pad = EDGE * cap                                # white between the text and the cut line
+    desc = DESCENT * cap if font == "sans" else 0.0  # below the last baseline
     x0, y0, x1, y1 = -w / 2.0, -h / 2.0, w / 2.0, h / 2.0
+    deep, wide = bh + desc + pad, bw + pad          # the band across the rectangle's side
     if side == "below":
-        band, box = (x0, y0, x1, y0 + bh), (x0, y0 + bh + gap, x1, y1)
+        band, box = (x0, y0, x1, y0 + deep), (x0, y0 + deep + gap, x1, y1)
+        mid = (0.0, y0 + pad + desc + bh / 2.0)
     elif side == "above":
-        band, box = (x0, y1 - bh, x1, y1), (x0, y0, x1, y1 - bh - gap)
+        band, box = (x0, y1 - deep, x1, y1), (x0, y0, x1, y1 - deep - gap)
+        mid = (0.0, y1 - pad - bh / 2.0)
     elif side == "left":
-        band, box = (x0, y0, x0 + bw, y1), (x0 + bw + gap, y0, x1, y1)
+        band, box = (x0, y0, x0 + wide, y1), (x0 + wide + gap, y0, x1, y1)
+        mid = (x0 + pad + bw / 2.0, desc / 2.0)
     else:
-        band, box = (x1 - bw, y0, x1, y1), (x0, y0, x1 - bw - gap, y1)
+        band, box = (x1 - wide, y0, x1, y1), (x0, y0, x1 - wide - gap, y1)
+        mid = (x1 - pad - bw / 2.0, desc / 2.0)
     along, room, word = (bw, w, "wider") if side in ("below", "above") else (bh, h, "taller")
     if along > room + TOL:
         issues.append(("label.text", "warn",
@@ -164,7 +180,7 @@ def fill(w: float, h: float, text: str, *, font: str = "sans", cap_mm: float = 0
                        "rectangle (a smaller label or gap, or a bigger rectangle)"))
         box = {"below": (x0, y1 - MIN_BOX_MM, x1, y1), "above": (x0, y0, x1, y0 + MIN_BOX_MM),
                "left": (x1 - MIN_BOX_MM, y0, x1, y1), "right": (x0, y0, x0 + MIN_BOX_MM, y1)}[side]
-    spot = ((band[0] + band[2]) / 2.0, (band[1] + band[3]) / 2.0)
+    spot = mid                                      # the text block's centre, inside the band
     off = offset or (0.0, 0.0)
     at = (spot[0] + float(off[0]), spot[1] + float(off[1]))
     runs: List[Run] = []

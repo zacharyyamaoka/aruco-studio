@@ -722,9 +722,13 @@ def sheet(req: dict, date=None) -> dict:
                f"{idw} · {_AL.dict_short(d['marker']['dictionary'])} · "
                f"{_mm(d['marker']['marker_length_m'] * 1000.0)} mm")
         p.key, p.caption = f"m{i + 1}", cap
-        if lab:                                    # WYSIWYG: the sketch label's size and gap
-            p.caption_cap_mm = lab["height_mm"]
-            p.caption_gap_mm = float((it.get("label") or {}).get("gap_mm") or 0.0)
+        if lab:
+            # WYSIWYG (Zach, 2026-10-18): the sticker is the whole marker
+            # rectangle, with the label inside it as the sketch has it
+            sp = sticker_parts(it)
+            p.cut_mm = sp["cut"]
+            p.ink_mm = sp["ink"] + sp["label_ink"]
+            p.texts_mm = sp["texts"]
         items.append(p)
         if not is_box(p.cut_mm):
             warnings.append({"field": "tag", "level": "info",

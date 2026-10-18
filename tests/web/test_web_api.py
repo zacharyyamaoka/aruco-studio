@@ -260,13 +260,15 @@ def test_label_text_and_default_spot():
     assert lab["text"] == "Grid 4X4_50 4-9 (4..9) #4"
     cap = 40.0 * 0.12
     assert lab["height_mm"] == pytest.approx(cap)
-    # INSIDE the rectangle (Zach, 2026-10-18): the centre of a cap-deep band
-    # on its bottom edge
-    assert lab["at"] == [pytest.approx(10.0), pytest.approx(20.0 - 20.0 + cap / 2.0)]
+    # INSIDE the rectangle (Zach, 2026-10-18), in the band on its bottom edge:
+    # EDGE x cap of white and DESCENT x cap of descender room under the text
+    from aruco_studio.core import rect_fill as RF
+    low = 20.0 - 20.0 + (RF.EDGE + RF.DESCENT) * cap
+    assert lab["at"] == [pytest.approx(10.0), pytest.approx(low + cap / 2.0)]
     moved = W.plan(req({"type": "single"}, label={"on": True, "side": "above", "height_mm": 3.0,
                                                   "offset_mm": [1.0, -1.0]}))["label"]
     assert moved["text"] == "#0" and moved["height_mm"] == 3.0
-    assert moved["at"] == [pytest.approx(1.0), pytest.approx(10.0 - 1.5 - 1.0)]
+    assert moved["at"] == [pytest.approx(1.0), pytest.approx(10.0 - RF.EDGE * 3.0 - 1.5 - 1.0)]
     assert W.plan(req())["label"] is None
 
 

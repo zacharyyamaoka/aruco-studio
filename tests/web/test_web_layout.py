@@ -72,7 +72,12 @@ def test_twelve_40_mm_stickers_tight_on_letter_are_one_page_cut_as_a_grid():
                   "2026-10-18")
     ps = placed(got)
     assert got["pages"] == 1 and len(ps) == 12 and inside(ps)
-    assert "part 3</text>" not in got["svg"][0]                 # tight drops the captions
+    # The label is part of the sticker now (Zach, 2026-10-18: "the label should
+    # go inside of the marker rectangle"): printed in tight mode too, inside it
+    m = re.search(r'<text[^>]* x="([\d.]+)" y="([\d.]+)"[^>]*>part 3</text>', got["svg"][0])
+    assert m, "part 3's label is on the page"
+    tx, ty = float(m.group(1)), float(m.group(2))
+    assert any(p["box"][0] < tx < p["box"][2] and p["box"][1] < ty < p["box"][3] for p in ps)
     xs = sorted({round(p["box"][0], 3) for p in ps})
     ys = sorted({round(p["box"][1], 3) for p in ps})
     assert len(xs) * len(ys) == 12                              # a full grid

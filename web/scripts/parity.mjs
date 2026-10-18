@@ -40,7 +40,7 @@ function cases(presets) {
     ["plan charuco 5x4 auto", "plan", req({ type: "charuco", cols: 5, rows: 4 }, { w: 80, h: 60 })],
     ["plan charuco manual 9 / 13 mm", "plan", req({ type: "charuco", cols: 4, rows: 3, auto: false, marker_mm: 9, checker_mm: 13 }, { w: 80, h: 60 })],
     ["plan charuco 10 / 13 mm (no white round the marker: refused)", "plan", req({ type: "charuco", cols: 4, rows: 3, auto: false, marker_mm: 10, checker_mm: 13 }, { w: 80, h: 60 })],
-    ["plan single flip + corner mark + label", "plan", req({ flip: true, first_id: 7, corner_mark: "triangle" }, { w: 30, h: 30, angle_deg: 12.5 }, { on: true, text: "{type} {dict} #{id}", side: "right" })],
+    ["plan single flip + corner mark + label", "plan", req({ flip: true, first_id: 7, corner_mark: "triangle" }, { w: 60, h: 40, angle_deg: 12.5 }, { on: true, text: "#{id}\n{dict}", side: "right" })],
     ["plan grid on a face, 3D printed (A4 unused)", "plan", req({ type: "grid", cols: 2, rows: 2 }, { w: 50, h: 50 }, {}, d3, true)],
     ["plan refused (100 markers on DICT_4X4_50)", "plan", req({ type: "grid", cols: 10, rows: 10 }, { w: 200, h: 200 }, {}, a4)],
     ["inscribe avoid", "inscribe", { profile: plate, holes: "avoid" }],

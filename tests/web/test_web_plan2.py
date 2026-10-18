@@ -104,8 +104,19 @@ def test_side_puts_the_band_on_that_side(side):
     else:
         assert (c0, c1) == (pytest.approx(y0), pytest.approx(y1))
         assert (o0 >= b1 + 3.0 - 1e-6) if side == "left" else (o1 <= b0 - 3.0 + 1e-6)
-    # the text sits at the band's centre
-    assert p["label"]["at"] == [pytest.approx((b0 + b1) / 2.0), pytest.approx((c0 + c1) / 2.0)]
+    # the text sits in the band, EDGE x cap of white from the cut line, and a
+    # sans label below keeps DESCENT x cap under its baseline (2026-10-18: a
+    # label flush with the cut line lost its descenders to the knife)
+    cap = p["label"]["height_mm"]
+    ax, ay = p["label"]["at"]
+    assert b0 - 1e-6 <= ax <= b1 + 1e-6 and c0 - 1e-6 <= ay - cap / 2.0 and ay + cap / 2.0 <= c1 + 1e-6
+    pad, desc = RF.EDGE * cap, RF.DESCENT * cap
+    if side == "below":
+        assert ay - cap / 2.0 == pytest.approx(y0 + pad + desc, abs=1e-6)
+    elif side == "above":
+        assert ay + cap / 2.0 == pytest.approx(y1 - pad, abs=1e-6)
+    else:
+        assert (ax - b0 if side == "left" else b1 - ax) > pad
 
 
 @pytest.mark.parametrize("pre", [INK, P3D], ids=["inkjet", "3d"])
@@ -130,7 +141,8 @@ def test_multi_line_labels():
     h1 = box([one["box"]])[3] - box([one["box"]])[1]
     h2 = box([two["box"]])[3] - box([two["box"]])[1]
     assert h2 > h1
-    assert h2 == pytest.approx(2 * two["height_mm"] + RF.LINE_GAP * two["height_mm"], abs=1e-6)
+    cap2 = two["height_mm"]
+    assert h2 == pytest.approx((2 + RF.LINE_GAP + RF.EDGE + RF.DESCENT) * cap2, abs=1e-6)
     p3 = W.plan(req(label={"on": True, "text": "AB\nC\nD"}, pre=P3D))["label"]
     assert p3["lines"] == ["AB", "C", "D"]
     ys = sorted({round(q["outer"][0][1], 6) for q in p3["polygons"]})
@@ -159,17 +171,18 @@ def test_the_font_follows_the_method():
 
 def test_a_typed_marker_too_big_for_the_box_is_flagged_against_the_rectangle():
     """30 mm (outline 40 mm) in 40 x 40 with a 5 mm label and a 1 mm gap: the
-    marker is centred on the 40 x 34 box the label leaves, so its outline
-    pokes 3 mm past the rectangle's top; the words name that box."""
+    band is 5 + its edge margin 2 + descender room 1.5 = 8.5 mm, so the marker
+    is centred on the 40 x 30.5 box the label leaves, and its outline pokes
+    4.75 mm past the rectangle's top; the words name that box."""
     loose = preset("Inkjet · Letter vinyl") | {"cell_step_mm": 0.0}
     p = W.plan(req({"auto": False, "marker_mm": 30.0}, {"w": 40.0, "h": 40.0},
                    {"on": True, "text": "#{id}", "height_mm": 5.0, "gap_mm": 1.0}, loose))
     assert p["marker_mm"] == 30.0 and p["outer_mm"] == [40.0, 40.0]
     o = box([p["outer"]])
-    assert o[3] == pytest.approx(23.0, abs=1e-6)
-    assert p["overflow_mm"] == pytest.approx(3.0, abs=1e-6)
+    assert o[3] == pytest.approx(24.75, abs=1e-6)
+    assert p["overflow_mm"] == pytest.approx(4.75, abs=1e-6)
     red = [w for w in p["warnings"] if w["field"] == "marker.marker_mm" and w["level"] == "error"]
-    assert red and "6.0 mm taller than the 40 × 34 mm beside the label" in red[0]["text"]
+    assert red and "9.5 mm taller than the 40 × 30.5 mm beside the label" in red[0]["text"]
     big = W.plan(req({"auto": False, "marker_mm": 45.0}, {"w": 40.0, "h": 40.0},
                      {"on": True, "height_mm": 5.0, "gap_mm": 1.0, "side": "left"}, loose))
     o = box([big["outer"]])                                     # measured against the rectangle
@@ -391,7 +404,7 @@ def test_sticker_parts_are_the_rectangle_with_its_label_inside():
     assert [t["text"] for t in sp["texts"]] == ["#0-3", "lid"]
     p = W.plan(r)
     cap = p["label"]["height_mm"]
-    band = (-20.0, -30.0, 20.0, -30.0 + 2 * cap + RF.LINE_GAP * cap)
+    band = (-20.0, -30.0, 20.0, -30.0 + (2 + RF.LINE_GAP + RF.EDGE + RF.DESCENT) * cap)
     for t in sp["texts"]:
         assert t["cap_mm"] == cap
         assert band[1] - 1e-6 <= t["at"][1] - cap / 2.0 and t["at"][1] + cap / 2.0 <= band[3] + 1e-6
