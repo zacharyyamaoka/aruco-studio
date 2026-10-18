@@ -390,3 +390,13 @@ def test_inscribed_rectangle_edges_sit_on_the_tenth_mm_grid_inside_the_profile()
     # inward only: inside the core's own clear rectangle
     assert r["w"] <= raw["w"] * 1000 + 1e-9 and r["h"] <= raw["h"] * 1000 + 1e-9
     assert r["cx"] - r["w"] / 2 >= raw["cx"] * 1000 - raw["w"] * 500 - 1e-9
+
+
+def test_an_inkjet_marker_is_not_linted_for_an_fdm_nozzle():
+    # Zach, 2026-10-18: the Letter vinyl preset said "module 0.97 mm < 1.2 mm:
+    # hard to print with a 0.4 mm nozzle". A 3D-printed marker still says it.
+    small = {"type": "grid", "cols": 5, "rows": 4, "auto": False, "marker_mm": 5.8}
+    ink = W.plan(req(marker=small, rect={"w": 90, "h": 40}))
+    assert not [w for w in ink["warnings"] if "nozzle" in w["text"]], ink["warnings"]
+    fdm = W.plan(req(marker=small, rect={"w": 90, "h": 40}, pre=preset("Default")))
+    assert [w for w in fdm["warnings"] if "0.4 mm nozzle" in w["text"]], fdm["warnings"]

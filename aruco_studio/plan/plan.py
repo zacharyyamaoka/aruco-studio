@@ -416,6 +416,12 @@ def _plan(spec: TagSpec, base=None) -> TagPlan:
     return build(spec, s, n, ev, optical, issues, make=make)
 
 
+# autosize's printability note is about an FDM nozzle (MIN_MODULE_M: three
+# 0.4 mm lines). WHY dropped for a sticker: Zach, 2026-10-18 -- an inkjet
+# preset said "hard to print with a 0.4 mm nozzle". A sticker's own minimum
+# is its preset's cell rule ("cell minimum: ..."), which still shows.
+FDM_NOZZLE_NOTE = "hard to print with a 0.4 mm nozzle"
+
 # the rows a sticker does not have (its heights are fixed): their notes go
 STICKER_QUIET = ("numbers.white_offset", "numbers.white_height", "numbers.black_offset",
                  "numbers.black_height", "settings.mode", "settings.op", "settings.pin")
@@ -647,7 +653,8 @@ def build(spec: TagSpec, s: dict, n: dict, ev: dict, optical=None, issues=(),
                    fusion={"make": make.to_dict()} if sticker else None)
     found = issues_of(ev, s, n, spec)
     if sticker:
-        found = [i for i in found if i.field not in STICKER_QUIET]
+        found = [i for i in found if i.field not in STICKER_QUIET
+                 and FDM_NOZZLE_NOTE not in i.text]
     found += extra_issues(spec, s, ev, fr, make, guides)
     found += sticker_issues(spec, ev, fr, make, guides)
     found += overflow_issues(spec, ev)
