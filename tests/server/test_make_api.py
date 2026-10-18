@@ -60,8 +60,9 @@ def test_a_sticker_preset_makes_a_sticker(client):
     p = client.post("/api/plan", json=sp).json()
     assert p["ok"] and p["made_by"] == "sticker" and p["parts"] == ["sticker", "ink"]
     assert p["frames"]["detector_z_mm"] == pytest.approx(0.11)
-    # Default: a 3D tag that says so
-    d = client.post("/api/new", json={"layout": "single", "target_key": "box40"}).json()
+    # Default (named: a new tag naming no preset is a vinyl sticker since CF-13): a 3D tag that says so
+    d = client.post("/api/new", json={"layout": "single", "target_key": "box40",
+                                      "preset": "Default"}).json()
     assert d["settings"]["make"] == {"rule": 1, "by": "print3d"}
     # made_by overrides the preset (scripts)
     o = client.post("/api/new", json={"layout": "grid", "target_key": "box40",

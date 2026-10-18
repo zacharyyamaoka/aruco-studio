@@ -128,6 +128,23 @@ export function renameSel(sel: string[], from: string, to: string): string[] {
   return sel.map((n) => (n === from ? to : n));
 }
 
+// ------------------------------------------------------ the new-tag preset
+
+/** The preset the new-tag form starts on before the server says
+ *  (2026-10-17, CF-13: tags are printed by inkjet on vinyl only). The one
+ *  home of the rule is the core: core.presets.NEW_TAG_PRESET, which
+ *  GET /api/presets names as `new_tag` (POST /api/new uses it too). */
+export const NEW_TAG_PRESET = "Inkjet · Letter vinyl";
+
+/** The new-tag form's first preset: the server's `new_tag` when it is
+ *  listed, else NEW_TAG_PRESET when listed, else "Default" (the 3D one). */
+export function newTagPreset(items: { name: string }[], named?: string | null): string {
+  const has = (n: string | null | undefined) => !!n && items.some((p) => p.name === n);
+  if (has(named)) return named!;
+  if (has(NEW_TAG_PRESET)) return NEW_TAG_PRESET;
+  return "Default";
+}
+
 // ------------------------------------------------------------- messages
 
 /** The Issues a field shows: those on its key path or below it. */

@@ -71,6 +71,10 @@ measure yours; page margins 10 mm); the two "Sticker · ..." built-ins stay
 for the files that name them (`LEGACY_STICKERS`: the Studio lists them
 only for a tag that already has one). The stock is the paper thickness;
 the page, margins and dpi are the paper size, the page margins and the dots.
+A brand-new tag that names no preset is made under `NEW_TAG_PRESET`
+("Inkjet · Letter vinyl", `new_tag_preset()`: CF-13, inkjet on vinyl is the
+only way tags are made now); a stored tag, a design file's sugar and a
+frozen copy read as before.
 
 Reads are tolerant: a missing file is no presets; a broken one is no
 presets plus a note, and the next save first moves it aside
@@ -95,6 +99,7 @@ from . import slabs as _slabs_module
 SCHEMA = "bam_aruco_presets/1"
 FILE_NAME = "aruco_presets.json"
 DEFAULT = "Default"
+NEW_TAG_PRESET = "Inkjet · Letter vinyl"   # vinyl_preset("letter"): what a new tag gets (CF-13)
 THIS_TAG = "This tag"                      # the edit dialog's own values (never a preset)
 IMPORT = "Import from PrusaSlicer…"
 MODIFIED = " (modified)"
@@ -555,6 +560,17 @@ def vinyl_preset(page="letter", dpi=600):
     p["profile"].update(name=f"Inkjet printer, {pg} vinyl sticker paper, {dpi} dpi",
                         stock_mm=VINYL_STOCK_MM, make_rule=2)
     return normalise(p)
+
+
+def new_tag_preset():
+    """The preset a brand-new tag is made under when nothing names one
+    (2026-10-17, CF-13: Zach prints tags only by inkjet on vinyl):
+    NEW_TAG_PRESET, the built-in vinyl_preset("letter") -- make rule 2,
+    vinyl 0.10 mm, Letter, 600 dpi. A fresh copy each call. Only new tags
+    (the Studio's POST /api/new and its new-tag form, the Fusion dialog's
+    first run): a stored tag, a design file's sugar (its file's preset,
+    "Default" when absent) and a frozen copy read exactly as before."""
+    return copy.deepcopy(vinyl_preset("letter"))
 
 
 def sticker_builtins():

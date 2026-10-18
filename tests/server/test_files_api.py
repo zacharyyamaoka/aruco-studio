@@ -72,7 +72,7 @@ def test_the_sheet_dialog_exports_the_sheet_only_and_reveal_says_the_folder(clie
     shutil.copy(EX / "sticker_sheet.arucostudio.json", p)
     assert client.post("/api/design/open", json={"path": str(p)}).status_code == 200
     sp = client.post("/api/new", json={"layout": "single", "target_key": "box40",
-                                       "thickness_mm": 3}).json()             # a 3D tag beside them
+                                       "thickness_mm": 3, "preset": "Default"}).json()  # a 3D tag beside them
     assert client.post("/api/scene/tags", json={"spec": sp, "name": "solid", "x_mm": 200}).status_code == 200
     r = client.post("/api/scene/export/print", json={"sheet_only": True}).json()
     rel = sorted(Path(w).relative_to(r["dir"]).as_posix() for w in r["written"])

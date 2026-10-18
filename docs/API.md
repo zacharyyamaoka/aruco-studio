@@ -118,7 +118,7 @@ The rules: the server's own writes are atomic, and their sha256 is remembered be
 
 | Route | Does |
 |---|---|
-| `POST /api/new` | `{layout, target_key?, thickness_mm?, target?, preset?, marker_id?}`: a fresh tag's TagSpec as today's dialog stores it (`origin_v`, the label's `rule`, `cells` from the preset, Auto Extrude resolved against the target) |
+| `POST /api/new` | `{layout, target_key?, thickness_mm?, target?, preset?, marker_id?, made_by?}`: a fresh tag's TagSpec as today's dialog stores it (`origin_v`, the label's `rule`, `cells` from the preset, Auto Extrude resolved against the target). Naming no `preset` and no `made_by` (2026-10-17, CF-13): the new-tag preset `core.presets.NEW_TAG_PRESET`, "Inkjet · Letter vinyl" (a vinyl sticker, make rule 2; `GET /api/presets` names it as `new_tag`); `preset: "Default"` gives the 3D tag it gave before |
 | `POST /api/target` | `{shape: box / disc / face, key?, w_mm, h_mm, r_mm, holes: [[x, y, d]], thickness_mm}`: the target editor's Target. Since M8a it is made as a design shape (`rect`, `circle` or the face's `loops`, with `circle` holes; circles stroked at the 0.05 mm chord tolerance) and compiled as a tag on its top; a hole outside the shape: 422 on `holes[k]` |
 | `POST /api/preset/apply` | `{spec, name or preset}`: the spec with the preset's print settings (layout, ids, size, Origin, target kept) |
 | `POST /api/preset/of` | `{spec}`: `{preset, matches}`: the tag's print settings as a preset, and the catalog preset it equals |

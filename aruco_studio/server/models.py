@@ -220,7 +220,8 @@ class OverrideIn(BaseModel):
 class NewTagIn(BaseModel):
     """A fresh tag's spec (server/newtag.py): a layout on a target from the
     palette (`target_key`, `thickness_mm`) or a typed `target`, under a
-    preset (its name; Default when empty)."""
+    preset (its name; when empty and no `made_by`, the new-tag preset
+    core.presets.NEW_TAG_PRESET, "Inkjet · Letter vinyl", 2026-10-17)."""
     model_config = ConfigDict(extra="forbid")
     layout: Literal["single", "grid", "charuco"] = "single"
     target_key: Optional[StrictStr] = None
