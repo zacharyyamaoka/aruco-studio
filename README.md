@@ -4,7 +4,16 @@ Zach's fiducial-marker project: one pure core plans every tag, and thin shells (
 
 Public at https://github.com/zacharyyamaoka/aruco-studio (no licence chosen yet). Read `docs/BRIEF.md`, then `docs/ARCHITECTURE.md` and `docs/PLAN.md`. Since 2026-10-17 the focus is 2D: inkjet stickers on vinyl (`docs/feedback/2026-10-17-markers-core-first.md`, CF-13); the Studio opens on a gallery of golden examples, and the Fusion add-in runs on this core (vendored).
 
-**Run the Studio with one command:** `npm --prefix studio run studio`, then open http://127.0.0.1:5360 (it builds the web app and serves it with the API; Ctrl+C stops it). How to use it: `docs/STUDIO.md`.
+**The online Studio (since 2026-10-18): https://arucostudio.com.** A static site in `web/`; the same Python core runs in the browser (Pyodide), so there is no server. The marker rectangle is the entry point: draw one, or pick a face and the core inscribes one. Spec: `docs/design/online_studio_v1.md`; the UI <-> core contract: `web/src/core/contract.ts`; the facade: `aruco_studio/web_api.py`.
+
+| Do (online Studio) | Command |
+|---|---|
+| Dev (hot reload) | `npm --prefix web run dev`, open http://127.0.0.1:5380 (first time: `npm --prefix web ci`) |
+| Tests | `npm --prefix web test` (vitest); `npm --prefix web run test:parity` (Pyodide = CPython, byte for byte); `npm --prefix web run e2e` (Playwright on the static build); `.venv/bin/python -m pytest tests/web` |
+| Check the live site | `E2E_BASE_URL=https://arucostudio.com npm --prefix web run e2e -- --project=e2e` |
+| Deploy | `npm --prefix web run deploy` (build + `wrangler deploy`; wrangler is logged in per machine) |
+
+**The local Studio (`studio/`, kept as it is):** `npm --prefix studio run studio`, then open http://127.0.0.1:5360 (it builds the web app and serves it with the API; Ctrl+C stops it). How to use it: `docs/STUDIO.md`.
 
 | Do | Command |
 |---|---|
