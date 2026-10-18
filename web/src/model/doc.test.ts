@@ -3,8 +3,8 @@ import type { Preset, Suggestion } from "../core/contract";
 import { rectShape } from "../sketch/model";
 import v1Fixture from "../../e2e/fixtures/v1-plate.arucostudio-web.json?raw";
 import {
-  DEFAULT_MARKER, addFeature, addShape, deleteShape, emptyDoc, featureNumber, featureOfRect, idCount, idItems, idRange, isSet, newFeature,
-  nextTurn, parseDoc, pickSuggestion, planRequest, removeFeature, resetField, serialise, setField, setMarker, setType, sheetItems,
+  DEFAULT_MARKER, addFeature, addShape, applyIds, deleteShape, emptyDoc, featureNumber, featureOfRect, idCount, idItems, idRange, idRequest,
+  isSet, keyOwner, newFeature, nextTurn, parseDoc, pickSuggestion, planRequest, removeFeature, resetField, serialise, setField, setMarker, setType, sheetItems,
 } from "./doc";
 
 const preset: Preset = { id: "builtin:x", name: "X", method: "inkjet", builtin: true, page: "A4", page_mm: [210, 297] };
@@ -159,6 +159,56 @@ describe("the document", () => {
     expect(d.features[0].marker).toMatchObject({ type: "grid", dictionary: "DICT_4X4_50", auto: true });
     expect(d.features[0]).toMatchObject({ id: "fx", key: "fx", set: [] });
     expect(d.id_ledger).toEqual({});
+  });
+});
+
+describe("auto id", () => {
+  const two = () => addFeature(addFeature(emptyDoc("D"), newFeature("r1", null, "f1")), setField(newFeature("r2", null, "f2"), "marker.first_id", 9));
+
+  it("the request: a driven first id is null, a typed one kept, with the ledger", () => {
+    const d = { ...two(), id_ledger: { f1: 3 } };
+    expect(idRequest(d)).toEqual({
+      items: [
+        { key: "f1", type: "single", dictionary: "DICT_4X4_50", count: 1, first_id: null },
+        { key: "f2", type: "single", dictionary: "DICT_4X4_50", count: 1, first_id: 9 },
+      ],
+      ledger: { f1: 3 },
+    });
+  });
+
+  it("the answer: a driven feature takes its id, a typed one keeps its own, the ledger is the core's", () => {
+    const d = two();
+    const out = applyIds(d, {
+      items: [{ key: "f1", first_id: 31, ids: [31], driven: true }, { key: "f2", first_id: 9, ids: [9], driven: false }],
+      ledger: { f1: 31 }, warnings: [],
+    });
+    expect(out.features.map((f) => f.marker.first_id)).toEqual([31, 9]);
+    expect(isSet(out.features[0], "marker.first_id")).toBe(false);
+    expect(out.id_ledger).toEqual({ f1: 31 });
+    // the same answer again: the same document (no re-plan)
+    expect(applyIds(out, { items: [{ key: "f1", first_id: 31, ids: [31], driven: true }, { key: "f2", first_id: 9, ids: [9], driven: false }], ledger: { f1: 31 }, warnings: [] })).toBe(out);
+  });
+
+  it("a removed feature's ledger entry goes when the core drops it", () => {
+    const d = { ...removeFeature(two(), "f1"), id_ledger: { f1: 31, f2: 4 } };
+    const out = applyIds(d, { items: [{ key: "f2", first_id: 9, ids: [9], driven: false }], ledger: { f2: 4 }, warnings: [] });
+    expect(out.id_ledger).toEqual({ f2: 4 });
+  });
+
+  it("keys are unique: the owner of a key", () => {
+    const d = two();
+    expect(keyOwner(d, "f1", "f2")?.id).toBe("f2");
+    expect(keyOwner(d, "f2", "f2")).toBeNull();
+  });
+
+  it("a board's origin square is driven at null (the corner), set as typed, and a new type drops it", () => {
+    const c = setField(newFeature("r1", null, "f1"), "marker.type", "charuco");
+    expect(isSet(c, "marker.origin_square")).toBe(false);
+    const s = setField(c, "marker.origin_square", [1, 1]);
+    expect(s.marker.origin_square).toEqual([1, 1]);
+    expect(isSet(s, "marker.origin_square")).toBe(true);
+    expect(resetField(s, "marker.origin_square").marker.origin_square).toBeNull();
+    expect(setField(s, "marker.type", "grid").marker.origin_square).toBeNull();
   });
 });
 

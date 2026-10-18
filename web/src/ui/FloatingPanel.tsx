@@ -1,20 +1,45 @@
 // A floating command panel (Fusion's feature dialog): a title bar you drag
-// it by, a collapse chevron, the body, a footer. It starts at the top-right
-// of its container and stays inside it. Narrow screens dock it to the
-// bottom (styles.css), where it does not drag. The kit has no floating
-// panel, so it is here; it uses only the kit's tokens.
-import { useEffect, useRef, useState, type ReactNode } from "react";
+// it by, a collapse chevron, the body, a footer. Given an `anchor` (the box
+// of what it edits, in its container's pixels) it opens beside that box and
+// follows it (./anchor.ts); without one it starts at the top-right of its
+// container. A drag takes over until the anchor's key changes. It stays
+// inside its container. Narrow screens dock it to the bottom (styles.css),
+// where it neither drags nor anchors. The kit has no floating panel, so it
+// is here; it uses only the kit's tokens.
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@bam/ui";
+import { placeBeside, type Box, type Placement } from "./anchor";
 
-export function FloatingPanel({ title, icon, children, footer, collapsed, onCollapse, testid, width = 300 }: {
+export function FloatingPanel({ title, icon, children, footer, collapsed, onCollapse, testid, width = 300, anchor, anchorKey, avoid }: {
   title: ReactNode; icon?: ReactNode; children: ReactNode; footer?: ReactNode; collapsed: boolean;
   onCollapse: (c: boolean) => void; testid?: string; width?: number;
+  /** the box to open beside (container px), or null for the default spot */
+  anchor?: Box | null;
+  /** what the anchor is (the feature's id): a new one forgets a drag */
+  anchorKey?: string | null;
+  /** boxes it should rather not cover (the other markers) */
+  avoid?: Box[];
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  // null: the default spot (top-right, by CSS); a drag sets left / top in px
+  // null: the anchored or default spot; a drag sets left / top in px
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [auto, setAuto] = useState<Placement | null>(null);
   const drag = useRef<{ dx: number; dy: number } | null>(null);
+
+  useEffect(() => { setPos(null); }, [anchorKey]);
+
+  // beside the anchor, measured after every render: the panel's own height
+  // changes with its tab and rows (set only when it moved, so no loop)
+  useLayoutEffect(() => {
+    const el = ref.current, host = el?.offsetParent as HTMLElement | null;
+    if (!el || !host || !anchor || pos || docked()) { if (auto) setAuto(null); return; }
+    const body = el.querySelector<HTMLElement>(".fpanel-body");
+    const natural = el.offsetHeight - (body?.clientHeight ?? 0) + (body?.scrollHeight ?? 0);
+    const p = placeBeside(anchor, { w: el.offsetWidth, h: natural }, { w: host.clientWidth, h: host.clientHeight }, {}, avoid);
+    const near = (a: number, b: number | undefined) => b !== undefined && Math.abs(a - b) < 0.5;
+    if (!auto || !near(p.x, auto.x) || !near(p.y, auto.y) || !near(p.maxH, auto.maxH) || p.side !== auto.side) setAuto(p);
+  });
 
   // keep a dragged panel inside its container when the window shrinks
   useEffect(() => {
@@ -32,11 +57,11 @@ export function FloatingPanel({ title, icon, children, footer, collapsed, onColl
     };
   };
 
-  const docked = () => typeof window !== "undefined" && window.matchMedia?.("(max-width: 640px)").matches;
-
+  const at = pos ?? (auto ? { x: auto.x, y: auto.y } : null);
   return (
-    <div ref={ref} className={cn("fpanel", collapsed && "collapsed", pos && "moved")} data-testid={testid} data-collapsed={collapsed ? "1" : "0"}
-      style={pos ? { left: pos.x, top: pos.y, width } : { width }}>
+    <div ref={ref} className={cn("fpanel", collapsed && "collapsed", at && "moved")} data-testid={testid} data-collapsed={collapsed ? "1" : "0"}
+      data-anchored={!pos && auto ? auto.side : undefined}
+      style={at ? { left: at.x, top: at.y, width, ...(!pos && auto ? { maxHeight: auto.maxH } : {}) } : { width }}>
       <div className="fpanel-head"
         onPointerDown={(e) => {
           if ((e.target as Element).closest("button") || docked()) return;
@@ -60,4 +85,8 @@ export function FloatingPanel({ title, icon, children, footer, collapsed, onColl
       {footer && <div className="fpanel-foot">{footer}</div>}
     </div>
   );
+}
+
+function docked(): boolean {
+  return typeof window !== "undefined" && !!window.matchMedia?.("(max-width: 640px)").matches;
 }

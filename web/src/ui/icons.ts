@@ -20,6 +20,7 @@ export const GLYPHS: Record<string, string> = {
   circle: `<circle cx="8" cy="8" r="5.5" fill="none" ${S} stroke-width="1.3"/><circle cx="8" cy="8" r="1" fill="${A}"/><path d="M8 8h5.5" stroke="${A}"/>`,
   pointer: `<path d="M3.5 2l9 5-4 1.2 2.6 4.3-1.6.9-2.6-4.3L4 11.8z" fill="currentColor"/>`,
   fit: `<path d="M1.5 5V1.5H5M11 1.5h3.5V5M14.5 11v3.5H11M5 14.5H1.5V11" fill="none" ${S} stroke-width="1.3"/><rect x="5" y="5" width="6" height="6" fill="currentColor" opacity=".6"/>`,
+  verify: `<path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z" fill="none" ${S} stroke-width="1.2"/><circle cx="8" cy="8" r="2.2" fill="${A}"/>`,
   print: `<path d="M4.5 1.5h7v4h-7zM4.5 10h7v4.5h-7z" fill="none" ${S}/><path d="M4.5 12H2V5.5h12V12h-2.5" fill="none" ${S}/>`,
   "cm-none": `<path d="M2.5 2.5h11v11h-11z" fill="none" ${S}/>`,
   "cm-tri": `<path d="M2.5 2.5h11v11h-11z" fill="none" ${S}/><path d="M3.5 3.5h4l-4 4z" fill="currentColor"/>`,
