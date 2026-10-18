@@ -11,3 +11,6 @@ reports/spec.html
 .studio_data/
 scenes/
 .audit/
+
+# heavy report pages that inline captures / video (docs/build_online_studio_report.py)
+reports/media/
