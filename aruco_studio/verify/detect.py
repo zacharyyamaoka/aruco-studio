@@ -63,14 +63,16 @@ def expected_charuco_mm(plan: dict) -> List[tuple]:
     return list(_L.charuco_corners_mm(spec_of(plan)))
 
 
-def detect(img: np.ndarray, plan: dict) -> dict:
-    """{ids, corners {id: [[x, y] x 4]} px, charuco_ids, charuco_corners px}."""
+def detect(img: np.ndarray, plan: dict, params=None) -> dict:
+    """{ids, corners {id: [[x, y] x 4]} px, charuco_ids, charuco_corners px}.
+    `params`: the DetectorParameters (parameters() by default)."""
     spec = plan["marker"]
     d = dictionary(spec["dictionary"])
+    params = params if params is not None else parameters()
     out = {"ids": [], "corners": {}, "charuco_ids": [], "charuco_corners": []}
     if spec["layout"] == "charuco":
         board = board_of(spec, d)
-        cd = cv2.aruco.CharucoDetector(board, cv2.aruco.CharucoParameters(), parameters())
+        cd = cv2.aruco.CharucoDetector(board, cv2.aruco.CharucoParameters(), params)
         ch_c, ch_ids, m_c, m_ids = cd.detectBoard(img)
         if m_ids is not None:
             for c, i in zip(m_c, np.asarray(m_ids).ravel()):
@@ -79,7 +81,7 @@ def detect(img: np.ndarray, plan: dict) -> dict:
             out["charuco_ids"] = [int(i) for i in np.asarray(ch_ids).ravel()]
             out["charuco_corners"] = np.asarray(ch_c).reshape(-1, 2).tolist()
     else:
-        det = cv2.aruco.ArucoDetector(d, parameters())
+        det = cv2.aruco.ArucoDetector(d, params)
         corners, ids, _rej = det.detectMarkers(img)
         if ids is not None:
             for c, i in zip(corners, np.asarray(ids).ravel()):

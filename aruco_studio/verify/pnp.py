@@ -35,11 +35,12 @@ def marker_points(board, corners, ids):
     return np.concatenate(obj), np.concatenate(imgp)
 
 
-def solve(img, spec: dict, K):
+def solve(img, spec: dict, K, params=None):
     """-> (T_cam_target 4x4 in metres, info) or (None, info). REF
-    tools/verify_aruco_jo_pnp.solve."""
+    tools/verify_aruco_jo_pnp.solve. `params`: the DetectorParameters
+    (parameters() by default)."""
     layout = spec.get("layout", "single")
-    d, p = dictionary(spec["dictionary"]), parameters()
+    d, p = dictionary(spec["dictionary"]), (params if params is not None else parameters())
     info = {"layout": layout}
     if layout == "charuco":
         board = board_of(spec, d)
