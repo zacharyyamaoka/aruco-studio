@@ -170,7 +170,7 @@ a.kit-ib { text-decoration: none; }
 .print-stage { margin: 0 14px; max-height: 62vh; overflow: auto; background: var(--canvas); border-radius: 6px; padding: 12px; }
 .print-page { background: #fff; box-shadow: var(--shadow); }
 .print-page svg { display: block; width: 100%; height: 100%; }
-.scalebar { margin-top: 4mm; color: #1c222b; }
+.scalebar { margin: 0 0 4mm; color: #1c222b; }
 .print-stage .scalebar { color: var(--text); }
 .scalebar-ticks { position: relative; height: 3mm; border-bottom: 0.3mm solid currentColor; }
 .scalebar-ticks i { position: absolute; bottom: 0; width: 0.3mm; height: 1.5mm; background: currentColor; transform: translateX(-50%); }
@@ -184,7 +184,6 @@ a.kit-ib { text-decoration: none; }
   #print-root { display: block !important; }
   .print-sheet { position: relative; overflow: hidden; page-break-after: always; break-after: page; }
   .print-sheet svg { display: block; width: 100%; height: 100%; }
-  .print-bar { position: absolute; }
 }
 
 /* ------------------------------------------------------------ narrow screens: the panel docks to the bottom */

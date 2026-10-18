@@ -1,6 +1,6 @@
 // Export › Print…: the preset's page from core.sheet() at true scale (CSS
 // millimetres are real millimetres at 100 % zoom), with a 50 mm scale bar
-// to measure. Print opens the browser's dialog on a print-only page (the
+// to measure on screen (the core's page carries its own bar for paper). Print opens the browser's dialog on a print-only page (the
 // sheet's SVG at 100 %, @page sized to the paper); Download PDF / SVG save
 // the core's own files.
 import { useEffect, useState } from "react";
@@ -69,7 +69,7 @@ export function PrintDialog() {
 
   return (
     <>
-      <Dialog open={open} onClose={() => useStudio.getState().openModal(null)} title="Print" icon="print" testid="print-dialog" width={680}
+      <Dialog open={open} onClose={() => useStudio.getState().openModal(null)} title="Print" icon="print" testid="print-dialog" width={860}
         footer={
           <>
             <SegmentedRow compact value={mode} onChange={(v) => setMode(v as "actual" | "fit")} testid="print-mode"
@@ -91,9 +91,9 @@ export function PrintDialog() {
           {sheet && (
             <div className="print-scaled" style={{ width: pw * MM_PX * k, height: (ph + 16) * MM_PX * k }}>
               <div style={{ transform: `scale(${k})`, transformOrigin: "0 0", width: `${pw}mm` }}>
+                  <ScaleBar />
                 <div className="print-page" data-testid="print-page" data-page-mm={`${pw}x${ph}`} style={{ width: `${pw}mm`, height: `${ph}mm` }}
                   dangerouslySetInnerHTML={{ __html: page }} />
-                <ScaleBar />
               </div>
             </div>
           )}
@@ -106,7 +106,6 @@ export function PrintDialog() {
           {sheet.svg.map((s, i) => (
             <div key={i} className="print-sheet" style={{ width: `${pw}mm`, height: `${ph}mm` }}>
               <div dangerouslySetInnerHTML={{ __html: s }} />
-              {i === 0 && <div className="print-bar" style={{ right: `${doc.preset?.margin_mm ?? 6}mm`, bottom: `${(doc.preset?.margin_mm ?? 6) + 2}mm` }}><ScaleBar /></div>}
             </div>
           ))}
         </div>,
