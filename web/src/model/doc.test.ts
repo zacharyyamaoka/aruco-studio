@@ -135,10 +135,11 @@ describe("the document", () => {
     expect(d.shapes.map((s) => s.id)).toEqual(["r1", "r2"]);
   });
 
-  it("deleting a feature's rectangle leaves the feature without one", () => {
-    const d = deleteShape(addFeature(base, newFeature("r1", { outer: "p", holes: ["r1"] }, "fa")), "r1");
+  it("deleting a feature's rectangle deletes the feature; a profile that named a shape loses it", () => {
+    const d = deleteShape(addFeature(addFeature(base, newFeature("r1", null, "fa")), newFeature("r2", { outer: "p", holes: ["r1"] }, "fb")), "r1");
     expect(d.shapes).toHaveLength(1);
-    expect(d.features[0]).toMatchObject({ rectId: null, profile: null });
+    expect(d.features.map((f) => f.id)).toEqual(["fb"]);
+    expect(d.features[0]).toMatchObject({ rectId: "r2", profile: null });
   });
 
   it("saves and reads back (version 2, with the ledger)", () => {

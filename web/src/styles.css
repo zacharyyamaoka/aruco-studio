@@ -8,7 +8,7 @@ body { font: 12px/1.35 var(--font); background: var(--bg); color: var(--text); o
 .spin { animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.app { display: grid; grid-template-rows: 40px minmax(0, 1fr) 34px; height: 100vh; height: 100dvh; width: 100%; overflow: hidden; }
+.app { display: grid; grid-template-rows: 40px minmax(0, 1fr); height: 100vh; height: 100dvh; width: 100%; overflow: hidden; }
 
 /* ------------------------------------------------------------ the top bar */
 .topbar { display: flex; align-items: center; gap: 4px; padding: 0 8px; background: var(--panel); border-bottom: 1px solid var(--line); min-width: 0; }
@@ -79,8 +79,9 @@ a.kit-ib { text-decoration: none; }
   color: var(--text); padding: 4px 10px; border-radius: 12px; box-shadow: var(--shadow-sm); pointer-events: none; white-space: nowrap; max-width: calc(100% - 24px);
   overflow: hidden; text-overflow: ellipsis; }
 
-/* the toolbar: a floating strip at the viewport's top-left */
-.toolbar { position: absolute; top: 26px; left: 10px; display: flex; align-items: center; gap: 2px; padding: 3px; background: var(--panel);
+/* the toolbar: a floating strip at the viewport's bottom centre (Zach, 2026-10-18:
+   "The off center tool bar should be center at top or bottom") */
+.toolbar { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; align-items: center; gap: 2px; padding: 3px; background: var(--panel);
   border: 1px solid var(--line); border-radius: 9px; box-shadow: var(--shadow-sm); }
 .toolbar .tb-sep { width: 1px; height: 22px; background: var(--line-soft); margin: 0 2px; }
 
@@ -91,7 +92,7 @@ a.kit-ib { text-decoration: none; }
 .dims-box .dims-name { color: var(--muted); }
 .dims-x, .times { color: var(--muted); }
 
-.toast { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); background: var(--text); color: var(--panel); padding: 6px 12px;
+.toast { position: absolute; left: 50%; bottom: 62px; transform: translateX(-50%); background: var(--text); color: var(--panel); padding: 6px 12px;
   border-radius: 6px; box-shadow: var(--shadow); max-width: calc(100% - 24px); }
 
 /* ------------------------------------------------------------ the floating panel */
@@ -118,14 +119,14 @@ a.kit-ib { text-decoration: none; }
 .preset-name .modified { color: var(--warn); font-style: normal; }
 .range { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .hint-line { padding: 0 10px 3px calc(40% + 10px); color: var(--muted); font-size: 10.5px; }
-.suggest-list { list-style: none; margin: 0 0 4px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.sugg { width: 100%; display: flex; align-items: baseline; gap: 8px; padding: 3px 7px; border: 1px solid var(--line-soft); border-radius: var(--radius-sm);
-  background: var(--field); color: var(--text); font: inherit; cursor: pointer; text-align: left; }
-.sugg:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
-.sugg.on { border-color: var(--accent); background: var(--accent-soft); }
-.sugg-label { font-variant-numeric: tabular-nums; white-space: nowrap; }
-/* the reason wraps: its text is shown whole, never clipped */
-.sugg-reason { flex: 1; min-width: 0; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+/* Suggest: a dropdown whose options wrap (panel/SuggestSelect.tsx): the reason is shown whole */
+.sugg-popup { max-width: min(340px, calc(100vw - 16px)); }
+.sugg-item { display: flex; flex-direction: column; gap: 1px; padding: 4px 8px; border-radius: var(--radius-sm); cursor: default; outline: 0; user-select: none; }
+.sugg-item + .sugg-item { margin-top: 1px; }
+.sugg-item[data-highlighted] { background: var(--accent-soft); }
+.sugg-item[data-selected] .sugg-label { color: var(--accent); font-weight: 600; }
+.sugg-label { font-variant-numeric: tabular-nums; }
+.sugg-reason { color: var(--muted); font-size: 11px; white-space: normal; overflow-wrap: anywhere; }
 /* driven vs set (ui/DrivenField.tsx): a driven value is the actual one, muted; a set one is normal text with ↺ */
 .kit-num.drv.driven input { color: var(--muted); }
 .kit-num.drv.set input { color: var(--text); }
@@ -139,15 +140,6 @@ a.kit-ib { text-decoration: none; }
 .drv-choice.driven .kit-switch { opacity: 0.6; }
 .summary { margin: 4px 10px 2px; padding-top: 6px; border-top: 1px solid var(--line-soft); }
 .summary-line { color: var(--text); font-size: 11.5px; margin-bottom: 3px; overflow-wrap: anywhere; }
-
-/* ------------------------------------------------------------ the timeline */
-.timeline { display: flex; align-items: center; gap: 8px; padding: 0 10px; background: var(--panel); border-top: 1px solid var(--line); min-width: 0; overflow-x: auto; }
-.tl-label { color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
-.tl-track { display: flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--line-soft); border-radius: 6px; background: var(--panel-2); }
-.tl-item { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 7px; border: 1px solid transparent; border-radius: 4px;
-  background: transparent; color: var(--text); font: inherit; cursor: pointer; white-space: nowrap; }
-.tl-item:hover { background: var(--hover); }
-.tl-item.on { background: var(--accent-soft); border-color: var(--accent); }
 
 /* ------------------------------------------------------------ the presets modal */
 .chips { margin-bottom: 10px; }
@@ -209,9 +201,12 @@ a.kit-ib { text-decoration: none; }
   .fpanel { position: fixed; left: 0 !important; right: 0 !important; top: auto !important; bottom: 0; width: auto !important; max-height: 45vh;
     border-radius: 10px 10px 0 0; }
   .fpanel-head { cursor: default; }
-  .toolbar { top: 22px; left: 6px; }
+  /* above the docked panel (45 vh open, its 31 px head collapsed) */
+  .toolbar { bottom: 8px; }
+  .stage:has(.fpanel) .toolbar { bottom: calc(31px + 8px); }
+  .stage:has(.fpanel:not(.collapsed)) .toolbar { bottom: calc(45vh + 8px); }
+  .stage:has(.fpanel) .toast { bottom: calc(45vh + 60px); }
   .toolbar .kit-tool { width: 32px; height: 32px; }
   .dims-box { left: 6px; bottom: 6px; }
-  .tl-label { display: none; }
-  .vp-hint { top: 64px; }
+  .vp-hint { top: 24px; }
 }

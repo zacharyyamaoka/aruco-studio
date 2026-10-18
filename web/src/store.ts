@@ -85,6 +85,11 @@ export interface Studio {
   ok: () => void;
   cancel: () => void;
   editFeature: (id?: string) => void;
+  /** a click on a marker (or its rectangle): select that feature and open
+   *  its panel; a panel open on another feature closes first (OK) */
+  inspect: (id: string) => void;
+  /** a click on empty canvas: the panel closes (OK) and nothing is selected */
+  closePanel: () => void;
 
   setPreset: (p: Preset) => void;
   openModal: (m: Modal) => void;
@@ -159,8 +164,11 @@ export const useStudio = create<Studio>((set, get) => {
     updateShape: (s) => set({ doc: setShape(get().doc, s) }),
     deleteSelection: () => {
       const { sel, doc, panel } = get();
-      if (sel?.kind === "shape") set({ doc: deleteShape(doc, sel.id), sel: null });
-      else if (sel?.kind === "feature" || sel?.kind === "origin") {
+      if (sel?.kind === "shape") {
+        // a feature filling it goes with it
+        const gone = featureOfRect(doc, sel.id)?.id;
+        set({ doc: deleteShape(doc, sel.id), sel: null, ...(gone && panel.featureId === gone ? { panel: PANEL0 } : {}) });
+      } else if (sel?.kind === "feature" || sel?.kind === "origin") {
         // the feature goes; its rectangle stays in the sketch
         set({ doc: removeFeature(doc, sel.id), sel: null, ...(panel.featureId === sel.id ? { panel: PANEL0 } : {}) });
       }
@@ -171,7 +179,9 @@ export const useStudio = create<Studio>((set, get) => {
       const { doc, view, plans } = get();
       let b = sketchBox(doc.shapes);
       for (const plan of Object.values(plans)) {
-        for (const [x, y] of plan.outer) b = b ? { x0: Math.min(b.x0, x), y0: Math.min(b.y0, y), x1: Math.max(b.x1, x), y1: Math.max(b.y1, y) } : { x0: x, y0: y, x1: x, y1: y };
+        // the outline and the label's centre a cap height either side
+        const lab = plan.label ? [[plan.label.at[0], plan.label.at[1] - plan.label.height_mm], [plan.label.at[0], plan.label.at[1] + plan.label.height_mm]] : [];
+        for (const [x, y] of [...plan.outer, ...lab]) b = b ? { x0: Math.min(b.x0, x), y0: Math.min(b.y0, y), x1: Math.max(b.x1, x), y1: Math.max(b.y1, y) } : { x0: x, y0: y, x1: x, y1: y };
       }
       set({ camera: fitBox(b ?? { x0: -50, y0: -50, x1: 50, y1: 50 }, view.w, view.h, view.w < 640 ? 28 : 84) });
     },
@@ -195,10 +205,13 @@ export const useStudio = create<Studio>((set, get) => {
     // A on a rectangle (or a plain rectangle's profile) that already has a
     // feature opens that feature; A on a new rectangle or profile makes a new
     // one; A on a selected feature opens it; A on nothing makes a new one that
-    // waits for a rectangle.
+    // waits for a rectangle. A panel open on another feature closes first (OK).
     extrude: async () => {
-      const { panel, sel, doc } = get();
-      if (panel.open) return;
+      if (get().panel.open) {
+        if (get().panel.selector || selectedFeatureId(get().doc, get().sel) === get().panel.featureId) return;
+        get().ok();
+      }
+      const { sel, doc } = get();
       const owner = selectedFeatureId(doc, sel);
       if (owner) { get().editFeature(owner); return; }
       const f = newFeature(null, null);
@@ -211,7 +224,7 @@ export const useStudio = create<Studio>((set, get) => {
       const other = featureOfRect(get().doc, id);
       if (other && other.id !== get().panel.featureId) { set({ note: "That rectangle already has an ArUco Extrude: double-click it to edit." }); return; }
       edit((f) => ({ ...f, rectId: id }));
-      set({ sel: { kind: "shape", id }, panel: { ...get().panel, selector: null } });
+      set({ sel: { kind: "feature", id: get().panel.featureId! }, panel: { ...get().panel, selector: null } });
     },
     useProfile: async (ref) => {
       const { doc } = get();
@@ -220,7 +233,7 @@ export const useStudio = create<Studio>((set, get) => {
         const other = featureOfRect(doc, plain.id);
         if (other && other.id !== get().panel.featureId) { set({ note: "That rectangle already has an ArUco Extrude: double-click it to edit." }); return; }
         edit((f) => ({ ...f, rectId: plain.id, profile: null }));
-        set({ sel: { kind: "shape", id: plain.id }, panel: { ...get().panel, selector: null } });
+        set({ sel: { kind: "feature", id: get().panel.featureId! }, panel: { ...get().panel, selector: null } });
         return;
       }
       const loops = profileLoops(doc.shapes, ref);
@@ -238,7 +251,7 @@ export const useStudio = create<Studio>((set, get) => {
         const prev = f.profile && f.rectId && f.profile.outer === ref.outer ? featureRect(cur, f) : null;
         const shape: Shape = { kind: "rect", id: prev?.id ?? newId("r"), ...rect };
         const next = prev ? setShape(cur, shape) : addShape(cur, shape);
-        set({ doc: updateFeature(next, fid, (g) => ({ ...g, rectId: shape.id, profile: ref })), sel: { kind: "shape", id: shape.id } });
+        set({ doc: updateFeature(next, fid, (g) => ({ ...g, rectId: shape.id, profile: ref })), sel: { kind: "feature", id: fid } });
       } catch (e) {
         set({ note: `Inscribe failed: ${(e as Error).message}` });
       } finally {
@@ -247,7 +260,7 @@ export const useStudio = create<Studio>((set, get) => {
     },
     setProfile: (ref) => {
       edit((f) => ({ ...f, profile: ref }));
-      set({ panel: { ...get().panel, selector: null }, sel: { kind: "profile", ref } });
+      set({ panel: { ...get().panel, selector: null }, sel: { kind: "feature", id: get().panel.featureId! } });
     },
     setSelector: (selector) => set({ panel: { ...get().panel, selector } }),
     clearRect: () => {
@@ -287,6 +300,17 @@ export const useStudio = create<Studio>((set, get) => {
       if (!f || panel.open) return;
       open(doc, f, false);
       set({ sel: { kind: "feature", id: f.id } });
+    },
+
+    inspect: (id) => {
+      const { panel } = get();
+      if (panel.open && panel.featureId === id) { set({ sel: { kind: "feature", id } }); return; }
+      if (panel.open) get().ok();
+      get().editFeature(id);
+    },
+    closePanel: () => {
+      if (get().panel.open) get().ok();
+      set({ sel: null });
     },
 
     setPreset: (p) => {

@@ -13,6 +13,7 @@ import { useStudio } from "../store";
 import { DrivenChoice, DrivenField } from "../ui/DrivenField";
 import { FloatingPanel } from "../ui/FloatingPanel";
 import { routeIssues, shownRows, tabLevel } from "./issues";
+import { SuggestSelect } from "./SuggestSelect";
 
 const TYPES: Opt[] = [
   { value: "single", label: "Single", icon: "single", hint: "Single marker" },
@@ -124,24 +125,10 @@ export function ExtrudePanel() {
           <DrivenField {...drv("marker.rows")} value={m.rows} driver={counts} int min={1} max={50} bad={bad("marker.cols")} />
         </FieldRow>
       )}
-      <div className="row kit-field suggest" data-row="marker.suggest">
-        <div className="row-main kit-row"><label className="row-label"><span className="row-text">Suggest</span></label>
-          <div className="row-ctl muted">{suggestions.length ? "pick one: it sets the size" : f.rectId ? "…" : "needs a rectangle"}</div></div>
-        <ul className="suggest-list" data-testid="suggestions">
-          {suggestions.map((s, i) => {
-            const now = !m.auto && s.params.cols === m.cols && s.params.rows === m.rows && Math.abs(s.params.marker_mm - m.marker_mm) < 1e-6;
-            return (
-              <li key={i}>
-                <button type="button" className={`sugg${now ? " on" : ""}`} data-testid="suggestion" data-label={s.label} title={`${s.label}: ${s.reason}`}
-                  onClick={() => st.pick(s)}>
-                  <span className="sugg-label">{s.label}</span><span className="sugg-reason" data-testid="suggestion-reason">{s.reason}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-        <Messages path="marker.suggest" issues={iss("marker.suggest")} />
-      </div>
+      <FieldRow path="marker.suggest" label="Suggest" issues={iss("marker.suggest")} title="Good value sets for this rectangle: picking one sets them">
+        <SuggestSelect suggestions={suggestions} empty={f.rectId ? "…" : "needs a rectangle"} onPick={st.pick}
+          current={m.auto ? -1 : suggestions.findIndex((s) => s.params.cols === m.cols && s.params.rows === m.rows && Math.abs(s.params.marker_mm - m.marker_mm) < 1e-6)} />
+      </FieldRow>
       <FieldRow path="marker.turn" label="Turn" issues={iss("marker.turn")}>
         <DrivenChoice {...drv("marker.turn")} value={m.turn} driver={`${DEFAULT} (0°)`}>
           <SegmentedRow path="marker.turn" compact value={m.turn} options={TURNS} onChange={(v) => st.setField("marker.turn", Number(v) as MarkerParams["turn"])} />

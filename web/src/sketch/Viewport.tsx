@@ -6,14 +6,14 @@
 // here. The outer dimension and the turn arc belong to the feature in focus.
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import type { MarkerPlan, Vec2 } from "../core/contract";
-import { featureRect, getFeature, type Feature } from "../model/doc";
+import { featureOfRect, featureRect, getFeature, type Feature } from "../model/doc";
 import {
   boxOf, fromLocal, handlePoint, HANDLES, loopD, niceStep, rectFromCorners, toLocal, toScreen, toWorld, zoomAt,
   type Handle,
 } from "../model/geom";
 import { activeFeatureId, useStudio } from "../store";
 import {
-  circleFrom, hitTest, inShape, moveShape, profileLoops, resizeShape, sameProfile, shapeLoop, type Hit, type Shape,
+  circleFrom, hitTest, inShape, moveShape, plainRect, profileLoops, resizeShape, sameProfile, shapeLoop, type Hit, type Shape,
 } from "./model";
 
 type Drag =
@@ -83,8 +83,8 @@ export function Viewport() {
     };
   }, []);
 
-  // WHY (2026-10-18 review): on a phone the panel docks over the bottom of the
-  // canvas, so when it opens on a feature (and again once that feature first
+  // WHY (2026-10-18 review): on a phone the panel (and the toolbar above it)
+  // docks over the bottom of the canvas, so when it opens on a feature (and again once that feature first
   // plans) the canvas fits the marker into the part above the panel
   const editId = panel.open ? panel.featureId : null;
   const editRect = editId ? doc.features.find((f) => f.id === editId)?.rectId ?? null : null;
@@ -93,10 +93,11 @@ export function Viewport() {
     if (!editId || !editRect || !window.matchMedia?.("(max-width: 640px)").matches) return;
     const raf = requestAnimationFrame(() => {
       const vp = host.current?.getBoundingClientRect();
-      const pn = document.querySelector('[data-testid="extrude-panel"]')?.getBoundingClientRect();
-      const tb = document.querySelector('[data-testid="toolbar"]')?.getBoundingClientRect();
       if (!vp) return;
-      useStudio.getState().fitFeature(editId, tb ? Math.max(0, tb.bottom - vp.top) : 0, pn ? Math.max(0, vp.bottom - pn.top) : 0);
+      // what covers the canvas from below: the panel and the toolbar above it
+      const tops = ['[data-testid="extrude-panel"]', '[data-testid="toolbar"]']
+        .map((q) => document.querySelector(q)?.getBoundingClientRect().top ?? vp.bottom);
+      useStudio.getState().fitFeature(editId, RULER, Math.max(0, vp.bottom - Math.min(...tops)));
     });
     return () => cancelAnimationFrame(raf);
   }, [editId, editRect, editPlanned]);
@@ -115,6 +116,16 @@ export function Viewport() {
   const world = (e: { clientX: number; clientY: number }): Vec2 => toWorld(camera, w, h, local(e));
   const scr = (p: Vec2): Vec2 => toScreen(camera, w, h, p);
 
+  /** The shape the handles and a drag inside act on: the selected shape, or
+   *  the selected feature's rectangle. */
+  const selectedShape = (): Shape | undefined => {
+    const st = useStudio.getState();
+    const s = st.sel;
+    if (s?.kind === "shape") return st.doc.shapes.find((x) => x.id === s.id);
+    if (s?.kind === "feature" || s?.kind === "origin" || s?.kind === "text") return featureRect(st.doc, getFeature(st.doc, s.id)) ?? undefined;
+    return undefined;
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
     const st = useStudio.getState();
     const target = e.target as Element;
@@ -126,8 +137,8 @@ export function Viewport() {
     if (e.button !== 0) return;
     const p = world(e);
     const hEl = target.closest("[data-handle]");
-    if (hEl && st.sel?.kind === "shape") {
-      const orig = st.doc.shapes.find((s) => s.id === (st.sel as { id: string }).id);
+    if (hEl) {
+      const orig = selectedShape();
       if (orig) setDrag({ kind: "resize", id: orig.id, handle: hEl.getAttribute("data-handle") as Handle, orig });
       return;
     }
@@ -146,26 +157,49 @@ export function Viewport() {
       return;
     }
     const hit = hitTest(st.doc.shapes, p, EDGE_PX / z);
-    const selShape = st.sel?.kind === "shape" ? st.doc.shapes.find((s) => s.id === (st.sel as { id: string }).id) : undefined;
+    const selShape = selectedShape();
+    const move = (sh: Shape) => setDrag({ kind: "move", id: sh.id, from: p, orig: sh, moved: false });
+    // WHY WYSIWYG (Zach, 2026-10-18): "just clicking the marker on the screen is
+    // what brings up the relevant inspector window". A click on a marker, on
+    // its rectangle's edge or inside that rectangle selects the feature and
+    // opens its panel; a press-drag moves the rectangle. Empty canvas closes it.
+    const markerId = st.panel.selector ? null : target.closest("[data-marker]")?.getAttribute("data-marker");
+    const markerRect = markerId ? featureRect(st.doc, getFeature(st.doc, markerId)) : null;
+    if (markerId && markerRect) {
+      st.inspect(markerId);
+      move(markerRect);
+      return;
+    }
     if (hit?.kind === "edge") {
       const s = st.doc.shapes.find((x) => x.id === hit.id)!;
-      if (st.panel.open && s.kind === "rect" && st.panel.selector !== "profile") st.useRect(s.id);
-      else st.select({ kind: "shape", id: s.id });
-      setDrag({ kind: "move", id: s.id, from: p, orig: s, moved: false });
+      if (st.panel.selector === "rect" && s.kind === "rect") st.useRect(s.id);
+      else if (st.panel.selector) return;
+      else {
+        const owner = featureOfRect(st.doc, s.id);
+        if (owner) st.inspect(owner.id);
+        else { if (st.panel.open) st.ok(); st.select({ kind: "shape", id: s.id }); }
+      }
+      move(s);
       return;
     }
     // inside the selected shape: drag it (as after picking it in a CAD)
     if (selShape && inShape(selShape, p)) {
-      setDrag({ kind: "move", id: selShape.id, from: p, orig: selShape, moved: false });
+      move(selShape);
       return;
     }
     if (hit?.kind === "region") {
       if (st.panel.open && st.panel.selector === "profile" && getFeature(st.doc, st.panel.featureId)?.rectId) st.setProfile(hit.ref);
       else if (st.panel.open && st.panel.selector) void st.useProfile(hit.ref);
-      else st.select({ kind: "profile", ref: hit.ref });
+      else {
+        const plain = plainRect(st.doc.shapes, hit.ref);
+        const owner = plain ? featureOfRect(st.doc, plain.id) : null;
+        if (owner && plain) { st.inspect(owner.id); move(plain); return; }
+        if (st.panel.open) st.ok();
+        st.select({ kind: "profile", ref: hit.ref });
+      }
       return;
     }
-    if (!st.panel.selector) st.select(null);
+    st.closePanel();
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -250,8 +284,8 @@ export function Viewport() {
     const pr = ref && profileLoops(shapes, ref);
     return pr ? pr.loops.map(sl).join("") : "";
   };
-  const selId = sel?.kind === "shape" ? sel.id : null;
-  const selShape = selId ? shapes.find((s) => s.id === selId) : undefined;
+  const selShape = selectedShape();
+  const selId = selShape?.id ?? null;
   // every feature that has a rectangle and a plan; the one in focus gets the
   // outer dimension and the turn arc
   const drawn = doc.features
@@ -367,11 +401,6 @@ export function Viewport() {
     <div ref={host} className="viewport" data-testid="viewport" data-tool={tool} style={{ cursor }}
       onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
       onPointerLeave={() => !drag && setHover(null)}
-      onDoubleClick={(e) => {
-        const t = e.target as Element;
-        const id = t.closest("[data-marker-black],[data-marker-outline]")?.closest("[data-marker]")?.getAttribute("data-marker");
-        if (id) useStudio.getState().editFeature(id);
-      }}
       onContextMenu={(e) => e.preventDefault()}>
       <svg ref={svg} width={w} height={h} className="vp-svg" data-zoom={z}>
         <defs>

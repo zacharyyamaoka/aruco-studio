@@ -10,7 +10,7 @@ export const GLYPHS: Record<string, string> = {
   single: `<path fill-rule="evenodd" fill="currentColor" d="M2.5 2.5h11v11h-11zM5 5h2.5v2.5H5zM8.5 7.5H11V10H8.5zM5 9.5h2v1.5H5z"/>`,
   grid: `<path fill="currentColor" d="M1.5 1.5h5.5v5.5H1.5zM9 1.5h5.5v5.5H9zM1.5 9h5.5v5.5H1.5zM9 9h5.5v5.5H9z"/><path fill="var(--field)" d="M3.5 3.5h1.5v1.5H3.5zM11 4h1.5v1.5H11zM4 11h1.5v1.5H4zM11.5 11h1.5v1.5h-1.5z"/>`,
   charuco: `<path fill="none" ${S} d="M1.5 1.5h13v13h-13z"/><path fill="currentColor" d="M1.5 1.5h4.3v4.3H1.5zM10.2 1.5h4.3v4.3h-4.3zM5.8 5.8h4.4v4.4H5.8zM1.5 10.2h4.3v4.3H1.5zM10.2 10.2h4.3v4.3h-4.3z"/>`,
-  // the timeline: a sketch, the ArUco Extrude, the Joint Origin
+  // a sketch, the ArUco Extrude, the Joint Origin
   sketch: `<path d="M2.5 4.5h11v8h-11z" fill="none" stroke="${A}" stroke-width="1.2"/><path d="M5 2v2.5M11 2v2.5" ${S}/><circle cx="2.5" cy="12.5" r="1.2" fill="${A}"/>`,
   extrude: `<path d="M2 11.5l6 3 6-3-6-3z" fill="${A}" fill-opacity=".35" stroke="${A}"/><path d="M5 2.5h6v6H5z" fill="currentColor"/><path d="M6.5 4h1.5v1.5H6.5zM8.5 6h1v1h-1z" fill="var(--panel)"/><path d="M8 8.5v3" ${S}/>`,
   joint: `<circle cx="8" cy="8" r="5.5" fill="none" ${S}/><circle cx="8" cy="8" r="2" fill="${A}"/><path d="M8 2.5v3M8 10.5v3M2.5 8h3M10.5 8h3" ${S}/>`,

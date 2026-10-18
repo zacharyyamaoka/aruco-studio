@@ -75,15 +75,12 @@ export function setShape(doc: Doc, s: Shape): Doc {
   return { ...doc, shapes: doc.shapes.map((x) => (x.id === s.id ? s : x)) };
 }
 
-/** Delete a shape; a feature that fills it loses its rectangle, and a
- *  profile that named it is no longer its reference. */
+/** Delete a shape; a feature that fills it goes with it (a feature is
+ *  reached by clicking its marker: one without a rectangle could not be),
+ *  and a profile that named it is no longer a reference. */
 export function deleteShape(doc: Doc, id: string): Doc {
-  const features = doc.features.map((f) => {
-    let g = f;
-    if (g.rectId === id) g = { ...g, rectId: null };
-    if (g.profile && (g.profile.outer === id || g.profile.holes.includes(id))) g = { ...g, profile: null };
-    return g;
-  });
+  const features = doc.features.filter((f) => f.rectId !== id).map((f) =>
+    f.profile && (f.profile.outer === id || f.profile.holes.includes(id)) ? { ...f, profile: null } : f);
   return { ...doc, shapes: doc.shapes.filter((x) => x.id !== id), features };
 }
 
@@ -117,7 +114,7 @@ export function removeFeature(doc: Doc, id: string): Doc {
   return { ...doc, features: doc.features.filter((f) => f.id !== id) };
 }
 
-/** A feature's number in the timeline: "ArUco Extrude 2" (1-based, in order). */
+/** A feature's number: "ArUco Extrude 2" (1-based, in the order made). */
 export function featureNumber(doc: Doc, id: string): number {
   return doc.features.findIndex((f) => f.id === id) + 1;
 }
@@ -262,7 +259,7 @@ export function planRequest(doc: Doc, f: Feature | null): PlanRequest | null {
   };
 }
 
-/** Print's sheet: one item per feature that plans, in the timeline's order. */
+/** Print's sheet: one item per feature that plans, in the order made. */
 export function sheetItems(doc: Doc): PlanRequest[] {
   return doc.features.map((f) => planRequest(doc, f)).filter((r): r is PlanRequest => !!r);
 }
