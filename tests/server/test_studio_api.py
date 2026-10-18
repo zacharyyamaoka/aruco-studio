@@ -29,7 +29,8 @@ def client(tmp_path, monkeypatch):
 def test_new_tag_is_what_todays_dialog_stores(client):
     from aruco_studio.core import autosize, label, origin, presets
     for layout in ("single", "grid", "charuco"):
-        sp = client.post("/api/new", json={"layout": layout, "target_key": "box40"}).json()
+        sp = client.post("/api/new", json={"layout": layout, "target_key": "box40",
+                                           "preset": "Default"}).json()   # today's 3D dialog (CF-13: named)
         s, n = sp["settings"], sp["numbers"]
         assert s["layout"] == layout and s["v"] == 2
         assert s["origin_v"] == origin.ORIGIN_RULE
@@ -43,7 +44,7 @@ def test_new_tag_is_what_todays_dialog_stores(client):
         assert p["ok"], p["errors"]
         assert not any(w["level"] == "error" for w in p["warnings"])
     no_body = client.post("/api/new", json={"layout": "single", "target_key": "box40",
-                                            "thickness_mm": 0.0}).json()
+                                            "thickness_mm": 0.0, "preset": "Default"}).json()
     assert no_body["settings"]["mode"] == "both"            # Auto without a body
     typed = client.post("/api/new", json={"layout": "grid", "target": {
         "kind": "face", "w_mm": 90.0, "h_mm": 60.0, "has_body": False}}).json()
@@ -56,7 +57,7 @@ def test_new_tag_is_what_todays_dialog_stores(client):
 def test_preset_apply_and_back(client):
     from aruco_studio.core import presets as P
     sp = client.post("/api/new", json={"layout": "grid", "target_key": "plate_hole",
-                                       "marker_id": 7}).json()
+                                       "marker_id": 7, "preset": "Default"}).json()
     sp["settings"]["turn"] = 90
     sp["numbers"]["size"] = 12.0
     cat = client.get("/api/presets").json()["items"]
@@ -76,7 +77,7 @@ def test_preset_apply_and_back(client):
 
 
 def test_library_state_select_edit_recent(client):
-    sp = client.post("/api/new", json={"layout": "single"}).json()
+    sp = client.post("/api/new", json={"layout": "single", "preset": "Default"}).json()
     client.post("/api/scene/tags", json={"spec": sp, "x_mm": 0.0, "y_mm": 0.0})
     st = client.get("/api/library", params={"tag": "tag1"}).json()
     ids = {c["id"]: c for c in st["cards"]}

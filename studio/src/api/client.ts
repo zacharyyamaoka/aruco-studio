@@ -101,7 +101,7 @@ export const api = {
     return r.blob();
   },
   // presets and the library
-  presets: () => get<{ items: PresetItem[]; last: string | null; notes: string[]; file: string; collections?: PresetCollection[] }>("/api/presets"),
+  presets: () => get<{ items: PresetItem[]; last: string | null; notes: string[]; file: string; collections?: PresetCollection[]; new_tag?: string }>("/api/presets"),
   presetSaveAs: (name: string, preset: Preset) => post<{ name: string }>("/api/presets", { name, preset }),
   presetDelete: (name: string) => del<{ deleted: string }>(`/api/presets/${q(name)}`),
   presetApply: (spec: TagSpec, name: string, preset?: Preset) =>

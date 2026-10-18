@@ -17,13 +17,27 @@ const PY = path.join(ROOT, ".venv", "Scripts", "python.exe");
  *  gallery (N-3, 2026-10-17) drive. gallery.spec.ts runs without it. */
 export const STUDIO_URL = "/?draw=1";
 
+/** The preset the tests' new tags are made with. The new-tag form starts
+ *  on "Inkjet · Letter vinyl" since 2026-10-17 (CF-13); the tests written
+ *  before it drive 3D tags, so `fresh` / `freshFile` name the 3D "Default"
+ *  explicitly, as a pick in the form would (newtag.spec.ts: the vinyl
+ *  default itself; pass `null` to keep it). */
+export const TEST_NEW_PRESET = "Default";
+
+/** The new-tag form's preset, as a pick in it sets it. */
+export async function pickNewPreset(page: Page, name: string) {
+  await page.evaluate((n) => (window as any).__studio.store.getState().setNew("newPreset", n), name);
+  await idle(page);
+}
+
 /** A fresh scene on the server, the app loaded on it. */
-export async function fresh(page: Page, name = "e2e") {
+export async function fresh(page: Page, name = "e2e", preset: string | null = TEST_NEW_PRESET) {
   const r = await page.request.post(`${API}/api/scene/new`, { data: { name } });
   expect(r.ok()).toBeTruthy();
   await page.goto(STUDIO_URL);
   await expect(page.locator('.app[data-ready="1"]')).toBeVisible();
   await idle(page);
+  if (preset) await pickNewPreset(page, preset);
 }
 
 export async function idle(page: Page) {
@@ -64,7 +78,8 @@ export const FILES = path.join(ROOT, "e2e", ".tmp", "files");
 
 /** A fresh design file on disk (empty, or `text`), opened in the server,
  *  the app loaded on it: -> its path. */
-export async function freshFile(page: Page, name: string, text?: string): Promise<string> {
+export async function freshFile(page: Page, name: string, text?: string,
+  preset: string | null = TEST_NEW_PRESET): Promise<string> {
   fs.mkdirSync(FILES, { recursive: true });
   const file = path.join(FILES, `${name}-${Date.now()}.arucostudio.json`);
   fs.writeFileSync(file, text ?? JSON.stringify({ schema: "arucostudio.scene/2", name, sketches: [], features: [] }, null, 1) + "\n", "utf-8");
@@ -73,6 +88,7 @@ export async function freshFile(page: Page, name: string, text?: string): Promis
   await page.goto(STUDIO_URL);
   await expect(page.locator('.app[data-ready="1"]')).toBeVisible();
   await idle(page);
+  if (preset) await pickNewPreset(page, preset);
   return file;
 }
 
