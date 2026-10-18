@@ -56,7 +56,7 @@ import zlib
 from dataclasses import dataclass, field
 from typing import Dict, List, NamedTuple, Optional, Tuple
 
-from . import board as aruco_board, dictionary as aruco_dict
+from . import board as aruco_board, dictionary as aruco_dict, pack as _pack
 
 MM_TO_PT = 72.0 / 25.4
 
@@ -173,6 +173,8 @@ class SheetSettings:
                                    # marks) | "tight" (shared cut lines, guillotine shelves)
     sticker_margin_mm: float = 0.0  # 2026-10-17 (Q7): white paper round each sticker, its
                                     # cut line that much out (layout_stickers); 0 = as planned
+    packer: str = "shelf"          # 2026-10-18, layout_stickers: "shelf" (M6a's shelves) |
+                                   # "guillotine" (core.pack: auto layout, stickers may turn)
 
 
 class RejectedItem(NamedTuple):
@@ -972,6 +974,13 @@ def render_pdf(items: List[PrintItem], settings: Optional[SheetSettings] = None)
 # Never mirrored: the sheet shows the sticker as seen from above.
 # The PDF and the SVG are drawn from ONE list of page operations, so their
 # numbers are the same.
+#
+# packer "guillotine" (auto layout, Zach 2026-10-18; the online Studio's):
+# core.pack instead of the shelves, in both modes -- tight with gap 0 (shared
+# cut lines), spaced with gap_mm round every cell (sticker + caption). Any
+# sticker may turn 90 degrees when that packs better (its ink and outline
+# turn with it: StickerPlace.to_page). No shelves, so no "row N" words;
+# cuts() counts core.pack.count_cuts on each page.
 
 CROP_MM = 2.0                  # a crop mark's length (spaced), outside the corner
 CROP_OFF_MM = 0.5              # its gap from the corner
@@ -1028,12 +1037,19 @@ class StickerLayout:
         return [p for page in self.pages for p in page]
 
     def cuts(self) -> int:
-        """Straight cuts to free every sticker (tight: shelves stacked, so a
+        """Straight cuts to free every sticker. packer "guillotine": core.pack's
+        count on each page (a cut line counts once however many stickers it
+        frees: a c x r grid, edge to edge, takes (c + 1) + (r + 1)). The
+        shelves (tight: shelves stacked, so a
         page of k shelves has k + 1 long cuts; a shelf of c stickers c + 1
         short ones). Spaced (audit nit A6, 2026-10-17): a guillotine count on
         each page -- every straight cut that crosses no sticker, across the
         piece it is made in, so stickers in line share one (four 30 mm
         stickers in a row: 10, not 4 per sticker = 16)."""
+        if getattr(self.settings, "packer", "shelf") == "guillotine":
+            page_box = (0.0, 0.0) + tuple(self.page_mm)
+            return sum(_pack.count_cuts([(p.x_mm, p.y_mm, p.x_mm + p.w_mm, p.y_mm + p.h_mm)
+                                         for p in page], page_box) for page in self.pages)
         if self.settings.mode != "tight":
             n = 0
             for pi, page in enumerate(self.pages):
@@ -1047,6 +1063,18 @@ class StickerLayout:
             if sh:
                 n += len(sh) + 1 + sum(len(s["keys"]) + 1 for s in sh)
         return n
+
+    def fill(self) -> float:
+        """Sticker area (each cut outline, holes out) / printable area, over
+        all pages; 0 with no page."""
+        if not self.pages:
+            return 0.0
+        area = 0.0
+        for p in self.placed:
+            o = outline_of(p.item)
+            area += abs(_loop_area(o["outer"])) - sum(abs(_loop_area(h))
+                                                       for h in o.get("holes", []))
+        return area / (len(self.pages) * self.printable_mm[2] * self.printable_mm[3])
 
 
 _CUT_TOL = 1e-6
@@ -1094,6 +1122,11 @@ def _turn_box(box, rot):
     us = [p[0] for p in pts]
     vs = [p[1] for p in pts]
     return (min(us), min(vs), max(us), max(vs))
+
+
+def _loop_area(lp) -> float:
+    return sum(float(lp[i - 1][0]) * float(lp[i][1]) - float(lp[i][0]) * float(lp[i - 1][1])
+               for i in range(len(lp))) / 2.0
 
 
 def _loop_box(lp):
@@ -1284,6 +1317,12 @@ def layout_stickers(items: List[PrintItem], settings: Optional[SheetSettings] = 
                          "h": bh, "cell_w": max(bw, max([text_width_mm(t, font) for t in lines],
                                                         default=0.0) if lines else bw),
                          "cell_h": bh + cap_h, "lines": lines, "font": font})
+    if getattr(settings, "packer", "shelf") == "guillotine":
+        pages = _guillotine_pages(prepared, settings, gap, x0, y0, area_w, area_h, page_w,
+                                  page_h)
+        return StickerLayout(settings=settings, page_mm=(page_w, page_h),
+                             printable_mm=(x0, y0, area_w, area_h), pages=pages,
+                             rejected=rejected, ruler=ruler, warnings=warnings, shelves=[])
     if tight:
         prepared.sort(key=lambda p: (-round(p["h"], 6), -round(p["w"], 6), p["index"]))
     else:
@@ -1331,6 +1370,48 @@ def layout_stickers(items: List[PrintItem], settings: Optional[SheetSettings] = 
                          ruler=ruler, warnings=warnings, shelves=shelves)
 
 
+def _cell(item: PrintItem, w: float, h: float, settings: SheetSettings):
+    """A sticker's cell as placed w x h: (cell w, cell h, caption lines, font)."""
+    lines, font, cap_h = _caption(item, w, settings)
+    tw = max([text_width_mm(t, font) for t in lines], default=0.0)
+    return max(w, tw), h + cap_h, lines, font
+
+
+def _guillotine_pages(prepared, settings, gap, x0, y0, area_w, area_h, page_w, page_h):
+    """packer "guillotine": every prepared sticker's cell (either way round
+    that fits the printable area) through core.pack -> pages of StickerPlace.
+    The sticker sits at the top of its cell, centred across it (the caption
+    under it), as the shelves place it."""
+    boxes, ways = [], []
+    for k, p in enumerate(prepared):
+        u0, v0, u1, v1 = p["box"]
+        opts = []
+        for rot in (0, 90):
+            w, h = (v1 - v0, u1 - u0) if rot else (u1 - u0, v1 - v0)
+            cw, ch, lines, font = _cell(p["item"], w, h, settings)
+            if cw <= area_w + _EPS and ch <= area_h + _EPS:
+                opts.append((rot, w, h, cw, ch, lines, font))
+        if not opts:                      # the shelves' own check passed: keep their way
+            opts = [(p["rot"], p["w"], p["h"], p["cell_w"], p["cell_h"], p["lines"], p["font"])]
+        ways.append(opts)
+        first = opts[0]
+        boxes.append(_pack.Box(k, first[3], first[4], turn=len(opts) > 1,
+                               turned=(opts[1][3], opts[1][4]) if len(opts) > 1 else None))
+    got = _pack.pack(boxes, area_w, area_h, gap=gap,
+                     stock=(-x0, -y0, page_w - x0, page_h - y0))
+    pages: List[List[StickerPlace]] = [[] for _ in range(got.bins)]
+    for pl in got.places:
+        p = prepared[pl.key]
+        rot, w, h, cw, _ch, lines, font = ways[pl.key][1 if pl.turned else 0]
+        pages[pl.bin].append(StickerPlace(
+            item=p["item"], page=pl.bin, x_mm=x0 + pl.x + (cw - w) / 2.0, y_mm=y0 + pl.y,
+            w_mm=w, h_mm=h, rotation=rot, box=p["box"], caption_lines=lines, caption_pt=font,
+            caption_gap_mm=_caption_gap(p["item"])))
+    for page in pages:
+        page.sort(key=lambda q: (q.y_mm, q.x_mm))
+    return pages
+
+
 def _r4(v):
     return round(float(v), 4) + 0.0
 
@@ -1353,6 +1434,8 @@ def sticker_summary(layout: StickerLayout) -> dict:
         extra["sticker_margin_mm"] = _r4(s.sticker_margin_mm)     # outline_mm is the grown one
     if not s.cut_marks:
         extra["cut_lines"] = False
+    if getattr(s, "packer", "shelf") != "shelf":
+        extra["packer"] = s.packer
     return {
         **extra,
         "schema": "arucostudio.sheet/1", "mode": s.mode, "page": s.page,

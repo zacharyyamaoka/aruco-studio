@@ -514,7 +514,25 @@ def sheet(req: dict, date=None) -> dict:
     """Every item on the first item's preset's page (core.sheet's sticker
     sheet: true size, cut lines, the scale bars), each captioned with its
     label's text. -> {"pages", "svg": [one SVG per page, mm], "pdf_base64",
-    "warnings"}. `date`: the footer's (ISO); today's by default."""
+    "warnings", "cuts", "fill"}. `date`: the footer's (ISO); today's by
+    default.
+
+    Auto layout (Zach, 2026-10-18): core.pack's guillotine packer
+    (SheetSettings.packer "guillotine"), stickers turned 90 degrees when that
+    packs better. `mode` "tight" packs edge to edge (shared cut lines, no
+    captions), "spaced" (default) keeps `gap_mm` (default the core's
+    SheetSettings.gap_mm) round every sticker and its caption. `cuts`: the
+    straight cuts that free every sticker on all pages; `fill`: sticker area
+    / printable area over all pages."""
+    def is_box(cut) -> bool:
+        # a sticker's cut outline is its own bounding box (no holes)
+        pts = (cut or {}).get("outer") or []
+        if not cut or not pts:
+            return True
+        xs = {round(float(q[0]), ND) for q in pts}
+        ys = {round(float(q[1]), ND) for q in pts}
+        return not cut.get("holes") and len(pts) == 4 and len(xs) == 2 and len(ys) == 2
+
     items, warnings = [], []
     first = None
     for i, it in enumerate(req.get("items") or []):
@@ -537,11 +555,19 @@ def sheet(req: dict, date=None) -> dict:
             p.caption_cap_mm = lab["height_mm"]
             p.caption_gap_mm = float((it.get("label") or {}).get("gap_mm") or 0.0)
         items.append(p)
+        if not is_box(p.cut_mm):
+            warnings.append({"field": "tag", "level": "info",
+                             "text": f"item {i + 1} is packed by its bounding box: its outline "
+                                     "is not a rectangle"})
     pr = (first or {}).get("preset") or {}
     page = _page_key(pr, []) if pr.get("method") == "inkjet" else "letter"
     margin = float(pr["margin_mm"]) if pr.get("margin_mm") is not None else _MK.PAGE_MARGIN_MM
-    st = _SH.SheetSettings(page=page, landscape=False, mode="spaced", margin_mm=margin,
-                           title="ArUco Studio", cut_marks=bool(req.get("cut_lines", True)))
+    mode = req.get("mode") or "spaced"
+    gap = req.get("gap_mm")
+    gap = _SH.SheetSettings.gap_mm if gap is None else float(gap)
+    st = _SH.SheetSettings(page=page, landscape=False, mode=mode, gap_mm=gap, margin_mm=margin,
+                           title="ArUco Studio", cut_marks=bool(req.get("cut_lines", True)),
+                           packer="guillotine")
     lay = _SH.layout_stickers(items, st)
     date = date or datetime.date.today().isoformat()
     whole = _SH.render_sticker_svg(lay, date=date)
@@ -557,7 +583,9 @@ def sheet(req: dict, date=None) -> dict:
         warnings.append({"field": "preset", "level": "warn", "text": t})
     pdf = _SH.render_sticker_pdf(lay, date=date)
     return {"pages": lay.page_count, "svg": pages,
-            "pdf_base64": base64.b64encode(pdf).decode("ascii"), "warnings": warnings}
+            "pdf_base64": base64.b64encode(pdf).decode("ascii"), "warnings": warnings,
+            "cuts": lay.cuts(), "fill": _r(lay.fill())}
+
 
 
 def call(name: str, payload_json: str) -> str:
