@@ -40,7 +40,7 @@ Commands: `sps status`, `sps open`, `sps open --preview`, `sps promote`, `sps ro
 - **Stable's `_build.json` has no git describe.** The release snapshot is not a git repository, so the core's
   version reads `0.1.0` without a commit suffix (Preview and lanes have it). The chip names the commit anyway.
 - **`snapshot.exclude`** keeps what the online build never reads (`docs/`, `reports/`, `tests/`, `e2e/`,
-  `goldens/`, `examples/`, `tools/`, the server/adapters/verify halves of `aruco_studio/`, and the old local Studio's
+  `goldens/`, `examples/`, `tools/`, the server/adapters halves of `aruco_studio/` (not `verify/`: the browser core packs it since 2026-10-18), and the old local Studio's
   own files under `studio/`, but not `studio/packages/bam-ui`) out of the snapshot AND the fingerprint, so a docs
   or old-Studio commit does not read "Stable is behind". `snapshot.link` is `web/node_modules` (the default,
   `node_modules`, would not match the nested folder).

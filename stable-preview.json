@@ -26,7 +26,6 @@
   "snapshot": {
     "exclude": [
       "/docs/", "/reports/", "/tests/", "/e2e/", "/goldens/", "/examples/", "/tools/", "/web/e2e/",
-      "/aruco_studio/server/", "/aruco_studio/adapters/", "/aruco_studio/verify/", "/aruco_studio/__main__.py",
       "/studio/src/", "/studio/scripts/", "/studio/index.html", "/studio/package.json", "/studio/package-lock.json",
       "/studio/tsconfig*.json", "/studio/vite.config.ts", "/studio/vitest.config.ts",
       "/README.md", "/pyproject.toml", "/requirements.txt", "/.gitattributes"
