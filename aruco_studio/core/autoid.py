@@ -31,9 +31,12 @@ DICT_4X4_1000, so the two share ids; 4x4 and 5x5 never collide).
        copy's, and is handed out only when nothing else is free.
 
 `reserved` (IdRequest.reserved, the Fusion adapter's N-6 ask): ids that are
-never handed out -- markers already printed by an older tool. One list for
-every family (id 3 reserved is 3 in DICT_4X4_* and in DICT_5X5_*). A driven
-item never takes one (a ledger id that now covers one moves, with a
+never handed out -- markers already printed by an older tool. A list
+reserves its ids in every family (id 3 reserved is 3 in DICT_4X4_* and in
+DICT_5X5_*); a map {family: [id, ...]} (N-8) only in the families it names
+-- numbering.family's names ("aruco4x4", "DICT_APRILTAG_36h11"), "4x4" short
+for "aruco4x4"; an unknown family is a ValueError, never a silent no-op. A
+driven item never takes one (a ledger id that now covers one moves, with a
 warning); a typed id on one keeps its number and gets an error, as two typed
 ranges that overlap do. Not covered: per-copy ids for the occurrences of one
 component -- every item here is one feature with one block of ids.
@@ -59,7 +62,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 from . import dictionary as _D
 from .autosize import CAPACITIES
@@ -154,14 +157,56 @@ def reserved_of(reserved) -> List[int]:
     return sorted(out)
 
 
+def families() -> List[str]:
+    """Every dictionary family (numbering.family), sorted."""
+    return sorted({family(d) for d in _D.DICTIONARY_NAMES})
+
+
+def family_of_key(key) -> str:
+    """A reserved map's key as its family: a numbering.family name, or
+    "4x4" ("4X4") for "aruco4x4"; anything else raises ValueError."""
+    known = families()
+    if isinstance(key, str):
+        if key in known:
+            return key
+        m = re.fullmatch(r"(\d)[xX]\1", key)
+        if m and f"aruco{m.group(1)}x{m.group(1)}" in known:
+            return f"aruco{m.group(1)}x{m.group(1)}"
+    raise ValueError(f"reserved: family {key!r} is not one of {', '.join(known)} "
+                     "(or 4x4 .. 7x7)")
+
+
+def reserved_in(reserved) -> Dict[Optional[str], Set[int]]:
+    """{family: its reserved ids} from a list (key None: every family) or a
+    map {family: [id, ...]} (family_of_key); ids checked as reserved_of."""
+    if isinstance(reserved, dict):
+        out: Dict[Optional[str], Set[int]] = {}
+        for k, ids in reserved.items():
+            if not isinstance(ids, (list, tuple)):
+                raise ValueError(f"reserved[{k!r}]: a list of ids, got {ids!r}")
+            out.setdefault(family_of_key(k), set()).update(reserved_of(ids))
+        return out
+    return {None: set(reserved_of(reserved))}
+
+
 def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None) -> dict:
     """{items: [{key, first_id, ids, driven}] in the request's order, ledger:
     the updated {key: first id}, warnings: [Issue with key]} (contract
     IdResult). An item that cannot get ids (out of its dictionary, or the
     dictionary is full) comes back with ids [] and an error. `reserved`:
-    ids never handed out, in any family (see the module's words)."""
+    ids never handed out, a list in every family or a map per family (see
+    the module's words)."""
     its = [item_of(d) for d in (items or [])]
-    res = set(reserved_of(reserved))
+    by_family = reserved_in(reserved)
+    every = by_family.get(None, set())
+
+    res_cache: Dict[str, Set[int]] = {}
+
+    def res_of(fam: str) -> Set[int]:
+        got = res_cache.get(fam)
+        if got is None:
+            got = res_cache[fam] = every | by_family.get(fam, set())
+        return got
     seen = set()
     for it in its:
         if it.key in seen:
@@ -202,6 +247,7 @@ def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None) -> dic
         return 0 <= start and start + it.count <= it.capacity
 
     def on_reserved(it: Item, start: int) -> List[int]:
+        res = res_of(it.family)
         return [start + k for k in range(it.count) if start + k in res]
 
     def ids_words(ids: List[int]) -> str:
@@ -285,7 +331,8 @@ def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None) -> dic
                                        f"takes {_label(start, it.count)}, held for "
                                        f"{', '.join(whose)} (typed now)"))
         if start is None:
-            bigger = _bigger(it, {**{i: "reserved" for i in res}, **claims.get(it.family, {})})
+            bigger = _bigger(it, {**{i: "reserved" for i in res_of(it.family)},
+                                  **claims.get(it.family, {})})
             need = "id" if it.count == 1 else f"block of {it.count} ids"
             warnings.append(_issue("error", it.key,
                                    f"{it.dictionary} is full ({it.capacity} ids): no free {need} "

@@ -1656,24 +1656,29 @@ def _pdf_ops(pg: _Ops) -> bytes:
     return "\n".join(out).encode("ascii")
 
 
-def _pdf_doc(pages: List[bytes], page_mm, title: str, print_scaling: bool = False) -> bytes:
+def _pdf_doc(pages: List[bytes], page_mm, title: str, print_scaling: bool = False,
+             print_dialog: bool = False) -> bytes:
     """PDF 1.4 bytes from page content streams (render_layout_pdf's file).
     `print_scaling`: the catalog render_layout_pdf writes (REF's): /Version
     /1.6 and /ViewerPreferences << /PrintScaling /None >>, so the viewer's
-    print dialog starts at Actual size, not "fit"."""
+    print dialog starts at Actual size, not "fit". `print_dialog`: the
+    catalog's /OpenAction is the named action /Print, so the viewer opens
+    its print dialog when the file opens (nothing prints until the user
+    presses Print; a viewer that ignores it only shows the sheet)."""
     page_w, page_h = page_mm
     objects: List[bytes] = []
 
     def add(body: bytes) -> int:
         objects.append(body)
         return len(objects)
+    opens = b" /OpenAction << /S /Named /N /Print >>" if print_dialog else b""
     if print_scaling:
         # /Version: PrintScaling is PDF 1.6; the catalog's version overrides
         # the header's (PDF 1.4 section 3.6.1), as in render_layout_pdf
         add(b"<< /Type /Catalog /Version /1.6 /Pages 2 0 R "
-            b"/ViewerPreferences << /PrintScaling /None >> >>")
+            b"/ViewerPreferences << /PrintScaling /None >>" + opens + b" >>")
     else:
-        add(b"<< /Type /Catalog /Pages 2 0 R >>")
+        add(b"<< /Type /Catalog /Pages 2 0 R" + opens + b" >>")
     add(b"")
     font = add(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica "
                b"/Encoding /WinAnsiEncoding >>")
@@ -1705,10 +1710,12 @@ def _pdf_doc(pages: List[bytes], page_mm, title: str, print_scaling: bool = Fals
 
 
 def render_sticker_pdf(layout: StickerLayout, date: Optional[str] = None,
-                       print_scaling: bool = False) -> bytes:
+                       print_scaling: bool = False, print_dialog: bool = False) -> bytes:
     """The sticker sheet as PDF 1.4 (vectors; the MediaBox is the page, so a
     viewer's default scale is 1:1). `print_scaling`: the catalog also asks
-    the print dialog for 100 % (/PrintScaling /None, _pdf_doc)."""
+    the print dialog for 100 % (/PrintScaling /None, _pdf_doc).
+    `print_dialog`: it opens the print dialog when it opens (_pdf_doc;
+    SheetRequest.print_dialog, opt-in like print_scaling)."""
     # WHY opt-in, not on by default: every sheet.pdf written so far (the
     # Studio's print bundle, the server's /api sheet, the tests that pin two
     # renders equal) keeps its bytes; the online Studio's facade
@@ -1718,7 +1725,7 @@ def render_sticker_pdf(layout: StickerLayout, date: Optional[str] = None,
     total = max(1, layout.page_count)
     pages = [_pdf_ops(sticker_page_ops(layout, i, date)) for i in range(total)]
     return _pdf_doc(pages, layout.page_mm, layout.settings.title or "ArUco sticker sheet",
-                    print_scaling=print_scaling)
+                    print_scaling=print_scaling, print_dialog=print_dialog)
 
 
 def _xml(t: str) -> str:
