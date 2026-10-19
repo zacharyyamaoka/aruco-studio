@@ -694,7 +694,9 @@ def sheet(req: dict, date=None) -> dict:
     captions), "spaced" (default) keeps `gap_mm` (default the core's
     SheetSettings.gap_mm) round every sticker and its caption. `cuts`: the
     straight cuts that free every sticker on all pages; `fill`: sticker area
-    / printable area over all pages."""
+    / printable area over all pages. `objective` (core.pack): "fewest_sheets"
+    (default: the fewest pages, then the fewest cuts) or "fewest_cuts" (the
+    fewest cuts, never on fewer pages than fewest_sheets)."""
     def is_box(cut) -> bool:
         # a sticker's cut outline is its own bounding box (no holes)
         pts = (cut or {}).get("outer") or []
@@ -742,7 +744,8 @@ def sheet(req: dict, date=None) -> dict:
     gap = _SH.SheetSettings.gap_mm if gap is None else float(gap)
     st = _SH.SheetSettings(page=page, landscape=False, mode=mode, gap_mm=gap, margin_mm=margin,
                            title="ArUco Studio", cut_marks=bool(req.get("cut_lines", True)),
-                           packer="guillotine")
+                           packer="guillotine",
+                           objective=req.get("objective") or "fewest_sheets")
     lay = _SH.layout_stickers(items, st)
     date = date or datetime.date.today().isoformat()
     whole = _SH.render_sticker_svg(lay, date=date)

@@ -109,3 +109,30 @@ def test_a_sticker_longer_than_the_page_is_wide_turns():
 def test_rectangular_stickers_carry_no_bounding_box_note():
     got = W.sheet({"items": squares(3), "cut_lines": True}, "2026-10-18")
     assert not [w for w in got["warnings"] if "bounding box" in w["text"]]
+
+
+MIXED = [(40, 40), (40, 40), (30, 30), (30, 30), (50, 25), (25, 50), (90, 35), (35, 90), (70, 22),
+         (22, 70)]
+
+
+@pytest.mark.parametrize("mode", ["tight", "spaced"])
+def test_objective_fewest_cuts_never_cuts_more_and_never_takes_fewer_pages(mode):
+    # contract.ts SheetRequest.objective (Zach, 2026-10-18: "fewest cut lines"
+    # or "most compact (fewest number of sheets)"), default "fewest_sheets"
+    its = [req({"first_id": i}, rect={"w": w, "h": h}) for i, (w, h) in enumerate(MIXED)]
+    its += squares(6, side=30.0)
+    base = {"items": its, "cut_lines": True, "mode": mode}
+    default = W.sheet(base, "2026-10-18")
+    assert W.sheet({**base, "objective": "fewest_sheets"}, "2026-10-18") == default
+    cuts = W.sheet({**base, "objective": "fewest_cuts"}, "2026-10-18")
+    assert cuts["cuts"] < default["cuts"] and cuts["pages"] >= default["pages"]
+    ps = placed(cuts)
+    assert len(ps) == len(its) and inside(ps)
+    gap = 0.0 if mode == "tight" else SH.SheetSettings().gap_mm
+    assert min_apart(ps) >= gap - 1e-3
+    assert not [w for w in cuts["warnings"] if w["level"] == "error"]
+
+
+def test_an_unknown_objective_is_an_error():
+    with pytest.raises(ValueError, match="objective"):
+        W.sheet({"items": squares(2), "cut_lines": True, "objective": "cheapest"}, "2026-10-18")
