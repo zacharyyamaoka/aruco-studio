@@ -17,6 +17,22 @@ function GithubMark() {
   );
 }
 
+// The brand mark: the Extrude Cube, a marker with its corner cut on top of an
+// extruded block (the same drawing as public/icon.svg, without the tile).
+// WHY: Zach picked V18 + the "window" top on 2026-10-18 (reports/media/
+// logo-v18-picks-2026-10-18.html); the top pattern is checked not to decode
+// as any OpenCV dictionary, so do not redraw it as a real marker.
+function BrandCube() {
+  return (
+    <svg className="brand-cube" viewBox="10 7 44 50" width="16" height="18" aria-hidden="true">
+      <path className="cube-l" d="M11.45 21.41L30.9 32.64L30.9 55.09L11.45 43.86z" />
+      <path className="cube-r" d="M33.1 32.64L52.55 21.41L52.55 43.86L33.1 55.09z" />
+      <path className="cube-top" d="M32 8.27L51.45 19.5L32 30.73L12.55 19.5z" />
+      <path className="cube-ink" fillRule="evenodd" d="M32 11.41L43.2 17.88L43.2 21.12L32 27.59L18 19.5zM32 14.65L40.4 19.5L32 24.35L23.6 19.5z" />
+    </svg>
+  );
+}
+
 export function CoreChip() {
   const s = useCoreStatus();
   const text = s.state === "ready" ? (coreKind === "mock" ? "Mock core" : "Python ready") : s.state === "error" ? "Core failed" : "Core loading…";
@@ -51,7 +67,7 @@ export function TopBar() {
   const st = useStudio.getState;
   return (
     <header className="topbar" data-testid="topbar">
-      <span className="brand"><Glyph name="single" /><b>ArUco Studio</b></span>
+      <span className="brand"><BrandCube /><b>ArUco Studio</b></span>
       <Menu label="File" testid="menu-file">
         <MenuItem icon="sketch" label="New" testid="cmd-new" onClick={() => st().newDoc()} />
         <MenuItem icon="library" label="Examples…" testid="cmd-examples" onClick={() => st().openModal("examples")} />

@@ -13,6 +13,14 @@ body { font: 12px/1.35 var(--font); background: var(--bg); color: var(--text); o
 /* ------------------------------------------------------------ the top bar */
 .topbar { display: flex; align-items: center; gap: 4px; padding: 0 8px; background: var(--panel); border-bottom: 1px solid var(--line); min-width: 0; }
 .topbar .brand { display: inline-flex; align-items: center; gap: 6px; margin-right: 6px; white-space: nowrap; font-size: 13px; }
+/* The brand cube keeps the logo's own greys (public/icon.svg), lifted one step
+   in dark so its shaded faces stay visible on the dark panel. */
+.brand-cube { flex: none; --cube-l: #3a4250; --cube-r: #69727f; }
+:root[data-theme="dark"] .brand-cube { --cube-l: #6b7480; --cube-r: #9aa3ae; }
+.brand-cube .cube-l { fill: var(--cube-l); }
+.brand-cube .cube-r { fill: var(--cube-r); }
+.brand-cube .cube-top { fill: #ffffff; }
+.brand-cube .cube-ink { fill: #111418; }
 .topbar .doc-name { color: var(--muted); margin-left: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .chip-preset, .chip-core { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 12px;
   border: 1px solid var(--line); background: var(--field); color: var(--text); font: inherit; white-space: nowrap; min-width: 0; }
