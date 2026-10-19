@@ -28,6 +28,9 @@ type Drag =
   | { kind: "draw"; tool: "rect" | "circle"; a: Vec2; b: Vec2 };
 
 const EDGE_PX = 6;
+// WHY: the core stacks a label's lines (1 + LINE_GAP) caps apart
+// (aruco_studio/core/rect_fill.py LINE_GAP, the pixel font's 2 px of 5)
+const LINE_GAP = 0.4;
 const RULER = 18;
 
 const fmt = (v: number) => String(+v.toFixed(1));
@@ -379,15 +382,39 @@ export function Viewport() {
         </g>,
       );
     }
-    // the label: sketch text, its centre where the core put it (or where it is being dragged)
-    if (plan.label && plan.label.text) {
-      const at = scr(labelAt?.fid === f.id ? labelAt.at : plan.label.at);
-      const fs = Math.max(6, (plan.label.height_mm / 0.7) * z);
-      labels.push(
-        <text key={f.id} className={`label${sel?.kind === "text" && sel.id === f.id ? " on" : ""}`} data-label="1" data-feature={f.id} data-testid="label-text"
-          x={at[0]} y={at[1]} fontSize={fs} textAnchor="middle" dominantBaseline="central"
-          transform={plan.label.angle_deg ? `rotate(${-plan.label.angle_deg} ${at[0]} ${at[1]})` : undefined}>{plan.label.text}</text>,
-      );
+    // the label: sketch text, its centre where the core put it (or where it is
+    // being dragged); its lines stacked as the core stacks them, or, for a 3D
+    // print (the pixel font), the blocky ink the core drew
+    const pl = plan.label;
+    if (pl && pl.text) {
+      const at0 = scr(pl.at);
+      const at = scr(labelAt?.fid === f.id ? labelAt.at : pl.at);
+      const cls = `label${sel?.kind === "text" && sel.id === f.id ? " on" : ""}`;
+      // WHY inline pointer-events: the stylesheet lets only [data-label] itself take a press; here that is the group
+      const hit = { pointerEvents: "auto" as const };
+      if (pl.font === "pixel" && pl.polygons?.length) {
+        labels.push(
+          <g key={f.id} className={cls} data-label="1" data-feature={f.id} data-testid="label-text" data-font="pixel"
+            transform={`translate(${at[0] - at0[0]} ${at[1] - at0[1]})`}>
+            <path d={pl.polygons.map((p) => sl(p.outer) + p.holes.map(sl).join("")).join("")} fillRule="evenodd" data-label-ink="1" style={hit} />
+          </g>,
+        );
+      } else {
+        const lines = pl.lines?.length ? pl.lines : pl.text.split("\n");
+        const cap = pl.height_mm * z;
+        const pitch = (1 + LINE_GAP) * cap;
+        const fs = Math.max(6, cap / 0.7);
+        labels.push(
+          <g key={f.id} className={cls} data-label="1" data-feature={f.id} data-testid="label-text" data-font="sans"
+            transform={pl.angle_deg ? `rotate(${-pl.angle_deg} ${at[0]} ${at[1]})` : undefined}>
+            {lines.map((t, k) => (
+              // line k's cap centre is (n - 1) / 2 - k pitches above the block's centre; its baseline half a cap below that
+              <text key={k} data-label-line={k} x={at[0]} y={at[1] - ((lines.length - 1) / 2 - k) * pitch + cap / 2}
+                fontSize={fs} textAnchor="middle" style={hit}>{t}</text>
+            ))}
+          </g>,
+        );
+      }
     }
   }
 

@@ -282,4 +282,52 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
     await page.getByTestId("theme-toggle").click();
     await page.screenshot({ path: path.join(SHOTS, "dims-small-dark.png") });
   });
+
+  test("label · two lines stacked 1.4 caps apart, as the core stacks them; a 3D print draws the pixel ink", async ({ page }) => {
+    await openStudio(page);
+    await coreReady(page);
+    const doc = {
+      format: "arucostudio-web", version: 2, name: "Two lines", id_ledger: {}, preset: null,
+      shapes: [{ kind: "rect", id: "r1", cx: 0, cy: 0, w: 60, h: 60, angle_deg: 0 }],
+      features: [{ id: "f1", key: "f1", rectId: "r1", profile: null, holes: "avoid", marker: { type: "single" }, label: { on: true, text: "PLATE\n#{ids}" }, set: [] }],
+    };
+    await page.getByTestId("menu-file").click();
+    const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByTestId("cmd-open").click()]);
+    await chooser.setFiles({ name: "two-lines.arucostudio-web.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(doc)) });
+    await idle(page);
+    await expect.poll(async () => (await state(page)).plans.f1?.label?.lines).toEqual(["PLATE", "#0"]);
+    let s = await state(page);
+    const label = s.plans.f1.label;
+    expect(label.font).toBe("sans");
+
+    const lines = page.locator('[data-testid="label-text"] [data-label-line]');
+    await expect(lines).toHaveCount(2);
+    expect(await lines.allTextContents()).toEqual(["PLATE", "#0"]);
+    const [b0, b1] = [(await lines.nth(0).boundingBox())!, (await lines.nth(1).boundingBox())!];
+    expect(b0.height).toBeCloseTo(b1.height, 3);       // one font size: the boxes' tops are the baselines' pitch apart
+    const want = 1.4 * label.height_mm * s.camera.zoom;
+    expect(Math.abs(b1.y - b0.y - want), `pitch ${b1.y - b0.y} px vs ${want}`).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: path.join(SHOTS, "label-two-lines-light.png") });
+
+    // a 3D-print preset: the core's pixel font, drawn as its ink (no text)
+    await page.getByTestId("preset-chip").click();
+    const modal = page.getByTestId("presets-modal");
+    await modal.locator('[data-coll="builtin"]').click();
+    await modal.getByTestId("presets-nav").locator('[data-chip="3D print"]').click();
+    await modal.locator(".card[data-card]").first().click();
+    await page.getByTestId("presets-select").click();
+    await expect(modal).toHaveCount(0);
+    await idle(page);
+    await expect.poll(async () => (await state(page)).plans.f1?.label?.font).toBe("pixel");
+    s = await state(page);
+    const polys = s.plans.f1.label.polygons as { outer: number[][] }[];
+    expect(polys.length).toBeGreaterThan(0);
+    await expect(page.locator('[data-testid="label-text"] text')).toHaveCount(0);
+    const ink = (await page.locator('[data-testid="label-text"] [data-label-ink]').boundingBox())!;
+    const xs = polys.flatMap((p) => p.outer.map((q) => q[0])), ys = polys.flatMap((p) => p.outer.map((q) => q[1]));
+    const [x0, y1] = await toClient(page, Math.min(...xs), Math.max(...ys));
+    const [x1, y0] = await toClient(page, Math.max(...xs), Math.min(...ys));
+    for (const [got, exp] of [[ink.x, x0], [ink.y, y1], [ink.x + ink.width, x1], [ink.y + ink.height, y0]]) expect(Math.abs(got - exp)).toBeLessThan(1);
+    await page.screenshot({ path: path.join(SHOTS, "label-pixel-light.png") });
+  });
 });
