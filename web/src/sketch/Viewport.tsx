@@ -15,7 +15,7 @@ import {
   type Handle,
 } from "../model/geom";
 import { activeFeatureId, selectedFeatureId, useStudio } from "../store";
-import { DimEditor, Dims, isRectDim, layoutDims, type LaidDim } from "./Dims";
+import { DimEditor, Dims, layoutDims, type LaidDim } from "./Dims";
 import {
   circleFrom, hitTest, inShape, moveShape, plainRect, profileLoops, resizeShape, sameProfile, shapeLoop, type Hit, type Shape,
 } from "./model";
@@ -295,7 +295,7 @@ export function Viewport() {
   const selShape = selectedShape();
   const selId = selShape?.id ?? null;
   // every feature that has a rectangle and a plan; the one in focus gets the
-  // outer dimension and the turn arc
+  // turn arc
   const drawn = doc.features
     .map((f) => ({ f, rect: featureRect(doc, f), plan: plans[f.id] as MarkerPlan | undefined }))
     .filter((d): d is { f: Feature; rect: NonNullable<ReturnType<typeof featureRect>>; plan: MarkerPlan } => !!d.rect && !!d.plan);
@@ -310,20 +310,14 @@ export function Viewport() {
 
   /** A value typed into a dimension: the marker's sizes through the same
    *  setField / resetField as the panel's rows (the panel's feature through the
-   *  store's actions, so its row and the dimension agree), the rectangle's W / H
-   *  about its centre as ShapeDims does. An empty value returns it to driven. */
+   *  store's actions, so its row and the dimension agree). An empty value
+   *  returns it to driven. */
   const commitDim = (fid: string, field: string, text: string) => {
     setDimEdit(null);
     const st = useStudio.getState();
     const f = getFeature(st.doc, fid);
     const t = text.trim().replace(",", ".");
     if (!f) return;
-    if (isRectDim(field)) {
-      const r = featureRect(st.doc, f);
-      const v = Number(t);
-      if (r && t !== "" && Number.isFinite(v) && v >= 0.5) st.updateShape({ ...r, [field === "rect.w" ? "w" : "h"]: v });
-      return;
-    }
     const mine = st.panel.open && st.panel.featureId === fid;
     if (t === "") {
       if (!isSet(f, field)) return;
