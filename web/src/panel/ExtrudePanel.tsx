@@ -1,7 +1,8 @@
 // The ArUco Extrude panel (Fusion's feature dialog) for the feature it
 // edits. It opens beside the clicked marker (V1 "Click-to-inspect",
 // 2026-10-18) and follows it; on a phone it docks to the bottom. The Preset
-// first, the selection rows (Profile, Rectangle), then Marker | Label. Every
+// and the Trim first (they describe the sticker), the selection rows
+// (Profile, Rectangle), then Marker | Label. Every
 // row shows its own issues from plan().warnings -- and the id's from auto
 // id -- under it. Every value is driven (grey: the core's, a rule's, auto id's
 // or the default) or set (typed: normal, with ↺); ../ui/DrivenField.tsx.
@@ -11,8 +12,8 @@
 // the use of text instead of icons here").
 import { FieldRow, Glyph, Messages, NumberField, SegmentedRow, Select, Switch, Tabs, TextField, Button, type Issue as KitIssue, type Opt } from "@bam/ui";
 import { X } from "lucide-react";
-import type { Issue, MarkerParams } from "../core/contract";
-import { DEFAULT_MARKER, featureNumber, featureRect, getFeature, idRange, isSet, typeCounts } from "../model/doc";
+import type { Issue, MarkerParams, Trim } from "../core/contract";
+import { DEFAULT_MARKER, DEFAULT_TRIM, featureNumber, featureRect, getFeature, idRange, isSet, typeCounts } from "../model/doc";
 import { boxOf, toScreen } from "../model/geom";
 import { samePreset, myPresets } from "../presets/local";
 import { shapeLoop } from "../sketch/model";
@@ -37,6 +38,12 @@ const CORNERS: Opt[] = [
 const ORIGINS: Opt[] = [
   { value: "corner", label: "Board corner", hint: "The Joint Origin at OpenCV's board corner" },
   { value: "square", label: "Square", hint: "The Joint Origin at the centre of one board square" },
+];
+const NO_PROFILE = "Needs a profile: pick the face this rectangle was inscribed from (Profile)";
+const trims = (hasProfile: boolean): Opt[] => [
+  { value: "profile", label: "Profile", hint: hasProfile ? "The sticker is the whole profile (the face), its holes cut out" : NO_PROFILE, disabled: !hasProfile },
+  { value: "rectangle", label: "Rectangle", hint: "The sticker is the marker rectangle" },
+  { value: "marker", label: "Marker", hint: "The sticker is the marker and its quiet zone" },
 ];
 const PLACEHOLDERS = "{id} {first} {last} {ids} {dict} {type}";
 const SIDES: Opt[] = ["below", "above", "left", "right"].map((s) => ({ value: s, label: s[0].toUpperCase() + s.slice(1) }));
@@ -260,6 +267,11 @@ export function ExtrudePanel() {
         <button type="button" className="kit-ib" title="Presets…" aria-label="Presets" data-testid="panel-preset-more" onClick={() => st.openModal("presets")}>
           <Glyph name="dots" />
         </button>
+      </FieldRow>
+      <FieldRow path="trim" label="Trim" issues={iss("trim")} title="What the sticker is cut to: everything inside the cut is white">
+        <DrivenChoice {...drv("trim")} value={f.trim} driver={`${DEFAULT} (${DEFAULT_TRIM})`}>
+          <SegmentedRow path="trim" compact value={f.trim} options={trims(refFace)} onChange={(v) => st.setField("trim", v as Trim)} />
+        </DrivenChoice>
       </FieldRow>
       <SelRow path="profile" label="Profile" icon="profile" testid="sel-profile" count={f.profile ? 1 : 0} emptyText="None (optional)"
         active={panel.selector === "profile"} issues={iss("profile")}

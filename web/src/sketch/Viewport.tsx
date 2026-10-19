@@ -3,10 +3,11 @@
 // millimetres; pan with the middle or right button or Space-drag, zoom at
 // the cursor, F fits. Every feature's marker, outline, Joint Origin and
 // label are drawn as its plan() returned them: no marker geometry is made
-// here. The turn arc belongs to the feature in focus; the selected feature's
+// here. The sticker's white is the plan's cut_shape (the trim: the
+// rectangle, the profile with its holes, or the quiet zone), under the marker. The turn arc belongs to the feature in focus; the selected feature's
 // dimensions (./Dims.tsx) are typed into in place.
 import { useEffect, useRef, useState, type ReactElement } from "react";
-import type { MarkerPlan, Vec2 } from "../core/contract";
+import type { MarkerPlan, Polygon, Vec2 } from "../core/contract";
 import {
   featureOfRect, featureRect, getFeature, isSet, resetField, setField, updateFeature, type Feature,
 } from "../model/doc";
@@ -34,6 +35,14 @@ const LINE_GAP = 0.4;
 const RULER = 18;
 
 const fmt = (v: number) => String(+v.toFixed(1));
+// WHY inline (the stylesheet is not this lane's): the white is the paper's,
+// the outline only draws the quiet-zone edge over it (and still takes a click)
+const WHITE = { fill: "var(--t-white)", stroke: "none" };
+const OUTLINE = { fill: "transparent" };
+
+/** What the sticker is cut to: the plan's cut_shape, else (a core without
+ *  trim, the mock) its cut, else the marker's outline as before. */
+const cutShape = (p: MarkerPlan): Polygon => p.cut_shape ?? { outer: p.cut ?? p.outer, holes: [] };
 
 export function Viewport() {
   const host = useRef<HTMLDivElement>(null);
@@ -456,9 +465,16 @@ export function Viewport() {
           <path d={regionsD} fillRule="evenodd" className="regions" data-regions="1" />
           {hoverRef && !sameProfile(hoverRef, selRef) && <path d={profD(hoverRef)} fillRule="evenodd" className="region-hover" data-hover-profile={hoverRef.outer} />}
           {selRef && <path d={profD(selRef)} fillRule="evenodd" className="region-sel" data-sel-profile={selRef.outer} />}
+          <g className="whites">
+            {drawn.map(({ f, plan }) => {
+              const cs = cutShape(plan);
+              return <path key={f.id} d={sl(cs.outer) + cs.holes.map(sl).join("")} fillRule="evenodd" style={WHITE}
+                data-cut-white={f.id} data-trim={f.trim} />;
+            })}
+          </g>
           {drawn.map(({ f, plan }) => (
             <g key={f.id} className={`marker${sel?.kind === "feature" && sel.id === f.id ? " on" : ""}`} data-marker={f.id}>
-              <path d={sl(plan.outer)} className={`outline${plan.overflow_mm > 0 ? " bad" : ""}`} data-marker-outline="1"
+              <path d={sl(plan.outer)} className={`outline${plan.overflow_mm > 0 ? " bad" : ""}`} data-marker-outline="1" style={OUTLINE}
                 data-overflow={plan.overflow_mm} />
               <path d={plan.black.map((p) => sl(p.outer) + p.holes.map(sl).join("")).join("")} fillRule="evenodd" className="black" data-marker-black="1" />
             </g>
