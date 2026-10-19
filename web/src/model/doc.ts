@@ -3,8 +3,8 @@
 // store (../store.ts) calls these; vitest covers them. Saved as
 // `.arucostudio-web.json` (format "arucostudio-web", version 2; a version 1
 // file, which held one feature, is migrated on open).
-import type { IdItem, IdRequest, IdResult, LabelParams, MarkerParams, MarkerType, PlanRequest, Preset, Suggestion, Turn } from "../core/contract";
-import { rectOf, type ProfileRef, type RectShape, type Shape } from "../sketch/model";
+import type { IdItem, IdRequest, IdResult, LabelParams, MarkerParams, MarkerType, PlanRequest, Preset, Suggestion, Trim, Turn } from "../core/contract";
+import { profileLoops, rectOf, type ProfileRef, type RectShape, type Shape } from "../sketch/model";
 
 export type Holes = "avoid" | "ignore";
 
@@ -19,6 +19,9 @@ export interface Feature {
   rectId: string | null;
   profile: ProfileRef | null;
   holes: Holes;
+  /** what the sticker is cut to (contract Trim); "rectangle" by default,
+   *  driven until set ("trim" in `set`) */
+  trim: Trim;
   marker: MarkerParams;
   label: LabelParams;
   /** the fields typed by hand among those the contract has no driven
@@ -40,6 +43,11 @@ export interface Doc {
 
 export const DOC_VERSION = 2;
 
+export const TRIMS: readonly Trim[] = ["profile", "rectangle", "marker"];
+// WHY rectangle (Zach, 2026-10-18): "the desired use case usually is we draw
+// the outer allowed shape, and then we are expecting a sticker that is that shape"
+export const DEFAULT_TRIM: Trim = "rectangle";
+
 export const DEFAULT_MARKER: MarkerParams = {
   type: "single", dictionary: "DICT_4X4_50", first_id: 0, auto: true, marker_mm: 30, checker_mm: 0, separation_mm: 0,
   cols: 1, rows: 1, turn: 0, flip: false, quiet_modules: 1, corner_mark: "none",
@@ -57,7 +65,7 @@ export function newId(prefix = "s"): string {
 
 export function newFeature(rectId: string | null, profile: ProfileRef | null, id = newId("f")): Feature {
   return {
-    id, key: id, rectId, profile, holes: "avoid", marker: { ...DEFAULT_MARKER }, label: { ...DEFAULT_LABEL, offset_mm: [0, 0] }, set: [],
+    id, key: id, rectId, profile, holes: "avoid", trim: DEFAULT_TRIM, marker: { ...DEFAULT_MARKER }, label: { ...DEFAULT_LABEL, offset_mm: [0, 0] }, set: [],
   };
 }
 
@@ -174,6 +182,7 @@ const unmark = (set: string[], paths: string[]) => set.filter((p) => !paths.incl
  *  turns auto off; the typed size is drawn as typed, never clamped (the plan
  *  flags overflow). */
 export function setField(f: Feature, path: string, value: unknown): Feature {
+  if (path === "trim") return { ...f, trim: value as Trim, set: mark(f.set, path) };
   const [part, key] = path.split(".") as ["marker" | "label", string];
   if (part === "label") {
     return { ...f, label: { ...f.label, [key]: value }, set: (LISTED as readonly string[]).includes(path) ? mark(f.set, path) : f.set };
@@ -194,6 +203,7 @@ export function resetField(f: Feature, path: string): Feature {
   if (path === "marker.separation_mm") return { ...f, marker: { ...f.marker, separation_mm: 0 } };
   if (path === "label.height_mm") return { ...f, label: { ...f.label, height_mm: 0 } };
   if (path === "marker.origin_square") return { ...f, marker: { ...f.marker, origin_square: null } };
+  if (path === "trim") return { ...f, trim: DEFAULT_TRIM, set: unmark(f.set, [path]) };
   const [part, key] = path.split(".") as ["marker" | "label", string];
   const set = unmark(f.set, [path]);
   if (part === "label") return { ...f, label: { ...f.label, [key]: drivenValue(f.marker, path) }, set };
@@ -252,13 +262,19 @@ export function idRange(m: MarkerParams, ids?: number[]): string {
 
 // ------------------------------------------------------------ the requests
 
+/** The feature's plan request. Trim "profile" also sends the profile's loops
+ *  (as inscribe gets them); without them the core cuts to the rectangle and
+ *  says so. */
 export function planRequest(doc: Doc, f: Feature | null): PlanRequest | null {
   const r = featureRect(doc, f);
   if (!f || !r || !doc.preset) return null;
-  return {
-    rect: rectOf(r), marker: f.marker, label: f.label, preset: doc.preset,
+  const req: PlanRequest = {
+    trim: f.trim, rect: rectOf(r), marker: f.marker, label: f.label, preset: doc.preset,
     reference_face: !!f.profile,
   };
+  const profile = f.trim === "profile" && f.profile ? profileLoops(doc.shapes, f.profile) : null;
+  if (profile) req.profile = profile;
+  return req;
 }
 
 /** Print's sheet: one item per feature that plans, in the order made. */
@@ -318,6 +334,8 @@ function readFeature(raw: Record<string, unknown>): Feature {
   } as Feature;
   if (typeof f.key !== "string" || !f.key) f.key = f.id;
   if (!Array.isArray(f.set)) f.set = [];
+  // a file from before trim (2026-10-18), or an unknown one: the rectangle, driven
+  if (!TRIMS.includes(f.trim)) { f.trim = DEFAULT_TRIM; f.set = f.set.filter((p) => p !== "trim"); }
   return f;
 }
 

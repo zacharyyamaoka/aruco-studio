@@ -251,3 +251,49 @@ describe("version 1 files migrate", () => {
     expect(f.marker.marker_mm).toBe(12);
   });
 });
+
+describe("trim (2026-10-18)", () => {
+  const plate = { ...emptyDoc("p", [rectShape("p", 0, 0, 120, 80), { kind: "circle", id: "h", cx: 25, cy: 55, r: 10 }, rectShape("r1", 40, 20, 80, 60)]), preset };
+
+  it("a new feature is cut to the rectangle, driven; set and reset like any row", () => {
+    const f = newFeature("r1", null);
+    expect(f.trim).toBe("rectangle");
+    expect(isSet(f, "trim")).toBe(false);
+    const m = setField(f, "trim", "marker");
+    expect(m.trim).toBe("marker");
+    expect(isSet(m, "trim")).toBe(true);
+    const r = resetField(m, "trim");
+    expect(r.trim).toBe("rectangle");
+    expect(isSet(r, "trim")).toBe(false);
+  });
+
+  it("the request sends the trim, and for profile the profile's loops as inscribe gets them", () => {
+    const f = newFeature("r1", { outer: "p", holes: ["h"] });
+    const rq = planRequest(plate, f)!;
+    expect(rq.trim).toBe("rectangle");
+    expect(rq.profile).toBeUndefined();
+    const pq = planRequest(plate, setField(f, "trim", "profile"))!;
+    expect(pq.trim).toBe("profile");
+    expect(pq.profile!.loops).toHaveLength(2);
+    expect(pq.profile!.loops[0]).toEqual([[0, 0], [120, 0], [120, 80], [0, 80]]);
+    // no profile: the trim goes as it is, and the core says it cut to the rectangle
+    const np = planRequest(plate, setField(newFeature("r1", null), "trim", "profile"))!;
+    expect(np.trim).toBe("profile");
+    expect(np.profile).toBeUndefined();
+  });
+
+  it("files from before trim open on the rectangle, driven; a saved trim round-trips", () => {
+    const f = parseDoc(v1Fixture).features[0];
+    expect(f.trim).toBe("rectangle");
+    expect(isSet(f, "trim")).toBe(false);
+    const d = addFeature(plate, setField(newFeature("r1", null, "fm"), "trim", "marker"));
+    const back = parseDoc(serialise(d)).features[0];
+    expect(back.trim).toBe("marker");
+    expect(isSet(back, "trim")).toBe(true);
+    const raw = JSON.parse(serialise(d));
+    raw.features[0].trim = "bogus";
+    const bad = parseDoc(JSON.stringify(raw)).features[0];
+    expect(bad.trim).toBe("rectangle");
+    expect(isSet(bad, "trim")).toBe(false);
+  });
+});
