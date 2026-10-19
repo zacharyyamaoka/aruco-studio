@@ -194,3 +194,24 @@ def test_good_still_reads_in_the_field(limits):
         v = dict(V.FIELD_VIEW, seed=seed, camera=dict(CAM, distance_mm=V.FIELD_SHARE * lim))
         out = V.verify(single(), v)
         assert out["found"] == [0] and out["wrong"] == [], (seed, out)
+
+
+def test_a_two_line_label_sits_in_its_band_below_the_marker_and_is_all_in_view():
+    # 2026-10-18: Verify drew a two-line label as one line with "?" (Hershey's
+    # "\n") and over the marker (it planned the marker in the whole rectangle
+    # while the label sat in its band inside it).
+    r = single(mm=0.0, auto=True)
+    r = dict(r, rect={"cx": 0.0, "cy": 0.0, "w": 60.0, "h": 70.0, "angle_deg": 0.0},
+             label={"on": True, "text": "PLATE\n#{ids}", "height_mm": 6.0, "side": "below",
+                    "gap_mm": 2.0, "offset_mm": [0.0, 0.0]})
+    d = V._plan(r)
+    lab = V._label(r, d)
+    u0, v0, u1, v1 = d["guides"]["sticker"]                     # the marker's outline, pattern frame
+    lines = lab["text"].split("\n")
+    assert len(lines) == 2
+    top_of_text = lab["at"][1] + (len(lines) - 1) * 0.7 * lab["height_mm"] + lab["height_mm"] / 2.0
+    assert top_of_text <= v0 + 1e-6, "the label block clears the marker's outline"
+    corners = __import__("aruco_studio.verify.camera", fromlist=["x"]).label_corners(lab)
+    assert min(c[1] for c in corners) < lab["at"][1] - 1.4 * lab["height_mm"] / 2.0   # both lines in the crop
+    got = V.verify(r, view())
+    assert got["found"] == W.plan(r)["ids"] and not got["wrong"]

@@ -81,14 +81,17 @@ def _label(req: dict, d: dict):
     lab = _W.placed_label(req, d["layout"]["kind"], d["marker"]["dictionary"], d["ids"])
     if lab is None or flip:
         return None
-    M = np.array(_W.sketch_of_pattern(req["rect"], d, False), np.float64).reshape(4, 4)
+    # WHY the plan's own pattern -> sketch matrix (2026-10-18): with the label
+    # inside the rectangle the marker sits in the box the label leaves, not at
+    # the rectangle's centre; the rectangle's matrix put the label over it
+    M = np.array(_W.plan(req)["pattern_to_sketch"], np.float64).reshape(4, 4)
     Mi = np.linalg.inv(M)
     at = Mi @ np.array([lab["at"][0], lab["at"][1], 0.0, 1.0])
     a = math.radians(lab["angle_deg"])
     dr = Mi[:3, :3] @ np.array([math.cos(a), math.sin(a), 0.0])
     return {"text": lab["text"], "at": (float(at[0]), float(at[1])),
             "height_mm": float(lab["height_mm"]), "dir": (float(dr[0]), float(dr[1])),
-            "width_mm": _W.text_width(lab["text"], lab["height_mm"])}
+            "width_mm": max(_W.text_width(t, lab["height_mm"]) for t in lab["text"].split("\n"))}
 
 
 def cell_mm(d: dict) -> float:

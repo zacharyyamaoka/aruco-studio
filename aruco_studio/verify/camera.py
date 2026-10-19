@@ -158,18 +158,37 @@ def label_corners(label: dict):
     du, dv = du / n, dv / n
     # room for Hershey's letters, which run wider than the Helvetica width given
     hw = 0.65 * label["width_mm"] + 0.5 * label["height_mm"]
-    hh = label["height_mm"]
+    # a multi-line label is (lines - 1) pitches of 1.4 caps taller (_draw_label)
+    lines = max(1, len(str(label["text"]).split("\n")))
+    hh = label["height_mm"] + (lines - 1) * 0.7 * label["height_mm"]
     return [(cu + sx * hw * du - sy * hh * dv, cv + sx * hw * dv + sy * hh * du)
             for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
 
 
 def _draw_label(r: Raster, label: dict):
     """The label's text (Hershey simplex, black) drawn on the top view at
-    its cap height, along its baseline."""
-    text = str(label["text"])
-    cap_px = float(label["height_mm"]) * r.px_per_mm
-    if not text or cap_px < 1.0:
+    its cap height, along its baseline. A multi-line label draws each line
+    stacked 1.4 caps apart around the label's centre, first line on top, as
+    the core lays it out (rect_fill: (1 + LINE_GAP) x cap)."""
+    # WHY one putText per line (2026-10-18): Hershey draws "\n" as "?", so a
+    # two-line label rendered as one line with a "?" in the middle.
+    lines = [t for t in str(label["text"]).split("\n")]
+    cap_mm = float(label["height_mm"])
+    if not any(lines) or cap_mm * r.px_per_mm < 1.0:
         return
+    (cu, cv), (du, dv) = label["at"], label["dir"]
+    n = math.hypot(du, dv) or 1.0
+    du, dv = du / n, dv / n
+    upu, upv = -dv, du                               # the baseline's normal, up the text
+    pitch = 1.4 * cap_mm
+    for k, text in enumerate(lines):
+        off = ((len(lines) - 1) / 2.0 - k) * pitch
+        if text:
+            _draw_line(r, text, cap_mm, (cu + upu * off, cv + upv * off), (du, dv))
+
+
+def _draw_line(r: Raster, text: str, cap_mm: float, at, d):
+    cap_px = cap_mm * r.px_per_mm
     (_w1, h1), _b = cv2.getTextSize("H", cv2.FONT_HERSHEY_SIMPLEX, 1.0, 1)
     scale = cap_px / float(h1)
     thick = max(1, int(round(cap_px * 0.12)))
@@ -178,10 +197,8 @@ def _draw_label(r: Raster, label: dict):
     patch = np.full((th + base + 2 * pad, tw + 2 * pad), 255, np.uint8)
     cv2.putText(patch, text, (pad, pad + th), cv2.FONT_HERSHEY_SIMPLEX, scale, 0, thick,
                 cv2.LINE_AA)
-    (cu, cv), (du, dv) = label["at"], label["dir"]
-    n = math.hypot(du, dv) or 1.0
-    du, dv = du / n, dv / n
-    # patch px -> pattern mm: its middle at the label's centre, x along the baseline
+    (cu, cv), (du, dv) = at, d
+    # patch px -> pattern mm: its middle at the line's centre, x along the baseline
     k = 1.0 / r.px_per_mm                          # the patch is drawn at the top view's scale
     px0, py0 = patch.shape[1] / 2.0, (pad + th / 2.0)
     P2M = np.array([[k * du, k * dv, 0.0], [k * dv, -k * du, 0.0], [0.0, 0.0, 1.0]])
