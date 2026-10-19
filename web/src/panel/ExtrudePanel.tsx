@@ -13,7 +13,7 @@
 import { FieldRow, Glyph, Messages, NumberField, SegmentedRow, Select, Switch, Tabs, TextField, Button, type Issue as KitIssue, type Opt } from "@bam/ui";
 import { X } from "lucide-react";
 import type { Issue, MarkerParams, Trim } from "../core/contract";
-import { DEFAULT_MARKER, DEFAULT_TRIM, featureNumber, featureRect, getFeature, idRange, isSet, typeCounts } from "../model/doc";
+import { DEFAULT_MARKER, DEFAULT_TRIM, effectiveTrim, featureNumber, featureRect, getFeature, idRange, isSet, typeCounts } from "../model/doc";
 import { boxOf, toScreen } from "../model/geom";
 import { samePreset, myPresets } from "../presets/local";
 import { shapeLoop } from "../sketch/model";
@@ -268,9 +268,12 @@ export function ExtrudePanel() {
           <Glyph name="dots" />
         </button>
       </FieldRow>
-      <FieldRow path="trim" label="Trim" issues={iss("trim")} title="What the sticker is cut to: everything inside the cut is white">
-        <DrivenChoice {...drv("trim")} value={f.trim} driver={`${DEFAULT} (${DEFAULT_TRIM})`}>
-          <SegmentedRow path="trim" compact value={f.trim} options={trims(refFace)} onChange={(v) => st.setField("trim", v as Trim)} />
+      <FieldRow path="trim" label="Trim" title="What the sticker is cut to: everything inside the cut is white"
+        issues={f.trim !== effectiveTrim(f)
+          ? [...iss("trim"), { field: "trim", level: "info", text: "no profile now: cut to the rectangle until one is selected again" }]
+          : iss("trim")}>
+        <DrivenChoice {...drv("trim")} value={effectiveTrim(f)} driver={`${DEFAULT} (${DEFAULT_TRIM})`}>
+          <SegmentedRow path="trim" compact value={effectiveTrim(f)} options={trims(refFace)} onChange={(v) => st.setField("trim", v as Trim)} />
         </DrivenChoice>
       </FieldRow>
       <SelRow path="profile" label="Profile" icon="profile" testid="sel-profile" count={f.profile ? 1 : 0} emptyText="None (optional)"

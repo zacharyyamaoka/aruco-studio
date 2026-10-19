@@ -4,8 +4,7 @@ import { rectShape } from "../sketch/model";
 import v1Fixture from "../../e2e/fixtures/v1-plate.arucostudio-web.json?raw";
 import {
   DEFAULT_MARKER, addFeature, addShape, applyIds, deleteShape, emptyDoc, featureNumber, featureOfRect, idCount, idItems, idRange, idRequest,
-  isSet, keyOwner, newFeature, nextTurn, parseDoc, pickSuggestion, planRequest, removeFeature, resetField, serialise, setField, setMarker, setType, sheetItems,
-} from "./doc";
+  isSet, keyOwner, newFeature, nextTurn, parseDoc, pickSuggestion, planRequest, removeFeature, resetField, serialise, setField, setMarker, setType, sheetItems, effectiveTrim } from "./doc";
 
 const preset: Preset = { id: "builtin:x", name: "X", method: "inkjet", builtin: true, page: "A4", page_mm: [210, 297] };
 
@@ -276,10 +275,14 @@ describe("trim (2026-10-18)", () => {
     expect(pq.trim).toBe("profile");
     expect(pq.profile!.loops).toHaveLength(2);
     expect(pq.profile!.loops[0]).toEqual([[0, 0], [120, 0], [120, 80], [0, 80]]);
-    // no profile: the trim goes as it is, and the core says it cut to the rectangle
-    const np = planRequest(plate, setField(newFeature("r1", null), "trim", "profile"))!;
-    expect(np.trim).toBe("profile");
+    // no profile: the request is cut to the rectangle (the panel says so under
+    // Trim); the feature keeps its Profile choice for when one comes back
+    const nf = setField(newFeature("r1", null), "trim", "profile");
+    const np = planRequest(plate, nf)!;
+    expect(np.trim).toBe("rectangle");
     expect(np.profile).toBeUndefined();
+    expect(nf.trim).toBe("profile");
+    expect(effectiveTrim(nf)).toBe("rectangle");
   });
 
   it("files from before trim open on the rectangle, driven; a saved trim round-trips", () => {

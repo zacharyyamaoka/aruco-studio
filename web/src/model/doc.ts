@@ -269,12 +269,19 @@ export function planRequest(doc: Doc, f: Feature | null): PlanRequest | null {
   const r = featureRect(doc, f);
   if (!f || !r || !doc.preset) return null;
   const req: PlanRequest = {
-    trim: f.trim, rect: rectOf(r), marker: f.marker, label: f.label, preset: doc.preset,
+    trim: effectiveTrim(f), rect: rectOf(r), marker: f.marker, label: f.label, preset: doc.preset,
     reference_face: !!f.profile,
   };
-  const profile = f.trim === "profile" && f.profile ? profileLoops(doc.shapes, f.profile) : null;
+  const profile = req.trim === "profile" && f.profile ? profileLoops(doc.shapes, f.profile) : null;
   if (profile) req.profile = profile;
   return req;
+}
+
+/** The trim the core gets: a feature set to Profile whose profile was cleared
+ *  is cut to the rectangle (the panel says so under Trim); its own choice
+ *  stays, so picking a profile again brings Profile back. */
+export function effectiveTrim(f: Feature): Trim {
+  return f.trim === "profile" && !f.profile ? "rectangle" : f.trim;
 }
 
 /** Print's sheet: one item per feature that plans, in the order made. */
