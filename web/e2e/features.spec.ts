@@ -321,3 +321,26 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     await page.screenshot({ path: path.join(SHOTS, "phone-panel-fit.png") });
   });
 });
+
+// WHY (2026-10-18): the label commits ~120 ms after each keystroke; a click on
+// another marker inside that window used to land the keystrokes on the newly
+// selected marker. Each edit now belongs to the marker it was typed into.
+test("label keystrokes land on the marker they were typed into, even with an immediate click on another", async ({ page }) => {
+  await blank(page);
+  const r1 = await drawRect(page, [-60, -20], [-20, 20]);
+  const f1 = await extrudeOk(page);
+  await drawRect(page, [20, -20], [60, 20]);
+  const f2 = await extrudeOk(page);
+  await clickMarker(page, f1);                                   // marker 1's panel
+  await expect.poll(async () => (await state(page)).panel.featureId).toBe(f1);
+  await page.locator('[role=tab][data-tab="label"]').click();
+  const before2 = (await state(page)).doc.features.find((f: any) => f.id === f2).label.text;
+  await page.locator('textarea[data-path="label.text"]').fill("RACE");
+  await clickMarker(page, f2);                                   // marker 2, inside the 120 ms window
+  await idle(page);
+  await expect.poll(async () => (await state(page)).doc.features.find((f: any) => f.id === f1).label.text,
+    { timeout: 3000 }).toBe("RACE");
+  const s = await state(page);
+  expect(s.doc.features.find((f: any) => f.id === f2).label.text).toBe(before2);
+  expect(s.doc.features.find((f: any) => f.id === f1).rectId).toBe(r1);
+});

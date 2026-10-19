@@ -17,12 +17,12 @@ export function TextArea({ value, onCommit, path, placeholder, rows = 2, testid,
   const [text, setText] = useState(value);
   const [focus, setFocus] = useState(false);
   const start = useRef(value);
-  const pending = useRef<{ t: ReturnType<typeof setTimeout>; v: string } | null>(null);
+  const pending = useRef<{ t: ReturnType<typeof setTimeout>; v: string; to: (v: string) => void } | null>(null);
   const commit = useRef(onCommit);
   commit.current = onCommit;
   const cancel = () => { if (pending.current) clearTimeout(pending.current.t); pending.current = null; };
   /** commit what is waiting now (leaving the field) */
-  const flush = () => { const p = pending.current; cancel(); if (p) commit.current(p.v); };
+  const flush = () => { const p = pending.current; cancel(); if (p) p.to(p.v); };
   useEffect(() => { if (!focus) setText(value); }, [value, focus]);
   useEffect(() => flush, []);
   return (
@@ -34,7 +34,10 @@ export function TextArea({ value, onCommit, path, placeholder, rows = 2, testid,
         const v = e.target.value;
         setText(v);
         cancel();
-        pending.current = { t: setTimeout(() => { pending.current = null; commit.current(v); }, LIVE_MS), v };
+        // WHY the commit of THIS render, not the latest: clicking another marker
+        // within LIVE_MS must not land these keystrokes on the newly selected one
+        const to = commit.current;
+        pending.current = { t: setTimeout(() => { pending.current = null; to(v); }, LIVE_MS), v, to };
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) (e.target as HTMLTextAreaElement).blur();

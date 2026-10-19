@@ -212,7 +212,7 @@ export function ExtrudePanel() {
       {l.on && (
         <>
           <FieldRow path="label.text" label="Text" issues={iss("label.text")} className="tall">
-            <TextArea path="label.text" value={l.text} onCommit={(v) => st.setField("label.text", v)} placeholder="#{ids}" />
+            <TextArea path="label.text" value={l.text} onCommit={(v) => st.setLabel("text", v, f.id)} placeholder="#{ids}" />
           </FieldRow>
           <div className="hint-line" data-testid="label-placeholders">
             {PLACEHOLDERS} · Enter: a new line{showPlan?.label ? ` → “${(showPlan.label.lines ?? [showPlan.label.text]).join(" / ")}”` : ""}
