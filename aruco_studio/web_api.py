@@ -630,27 +630,86 @@ def plan_dims(req: dict, d: dict, fl, L, lay: dict) -> list:
              "b": pt(*g["b"]), "offset_mm": _r(g["offset_mm"])} for g in got]
 
 
-def cad_layers(d: dict, M, paper=None) -> list:
+FOLD_PARTS = ("pattern", "ink", "pocket", "recess")    # the footprint: a "sub" step is a notch in it
+
+
+def _box(lp):
+    return (min(q[0] for q in lp), min(q[1] for q in lp), max(q[0] for q in lp), max(q[1] for q in lp))
+
+
+def _notched(p: dict, tools: list) -> list:
+    """A pattern-frame polygon {outer, holes} less the cut tools that reach
+    into it (plan/region's exact boolean): [{outer, holes}], or [p] as it
+    is when no tool overlaps it."""
+    a = _box(p["outer"])
+    hit = [t for t in tools for b in [_box(t)] if b[0] < a[2] and a[0] < b[2] and b[1] < a[3] and a[1] < b[3]]
+    if not hit:
+        return [p]
+    from .plan import region as _RG
+    traps = _RG.boolean([[[p["outer"]] + list(p.get("holes", []))], [[t] for t in hit]],
+                        lambda f: f[0] and not f[1])
+    return [{"outer": q[0], "holes": q[1:]} for q in _RG.polygons(traps)]
+
+
+def cad_layers(d: dict, M, paper=None, label=None) -> list:
     """The contract's `layers`: the TagPlan's layers (plan/layers.py: REF's
     bodies in build order) placed in the sketch by M -- polygons as `black`,
     z along the sketch normal (Flip turns the marker over: [lo, hi] becomes
-    [-hi, -lo]). The web's settings (mode auto, corner mark none / triangle)
-    only build "add" steps; a "sub" step (a cut tool inside its part:
-    white mode, black_cut marks) has no place in the contract's shape and
-    is not sent. `paper` (sketch frame): the inkjet paper's polygon (the
+    [-hi, -lo]). `paper` (sketch frame): the inkjet paper's polygon (the
     `sticker` part), the plan's `cut_shape`, so CAD's white body is the
-    sticker as it is cut."""
+    sticker as it is cut.
+
+    A cut / keep layer names the layer it cuts `into` (TagPlan.combines:
+    the sticker's or the tile's own layer, "face" for the body under). A
+    "sub" step (a cut tool inside its part, which the contract has no
+    `step` for) is never sent as it is: in the footprint (FOLD_PARTS: a
+    ChArUco board's black_cut) it is taken out of the polygons its part
+    built before it, so the ink and its pocket / recess carry the notch; in
+    a tile (the white tile's corner cut) it is a cut layer into that tile.
+    `label` (the plan's PlacedLabel): the pixel font's ink is the layer
+    "label_ink", black, at the black's z; a sans label is text, no layer."""
+    layers = d["layers"]
+    first = {}
+    for L in layers:
+        if L["step"] == "add":
+            first.setdefault(L["part"], L["name"])
+    into = {}
+    for c in d.get("combines") or []:
+        if c.get("into"):
+            into[c["part"]] = "face" if c["into"] == "body" else first.get(c["into"], c["into"])
+
+    def placed(polys):
+        return [{"outer": _loop(M, p["outer"], True),
+                 "holes": [_loop(M, hl, False) for hl in p.get("holes", [])]} for p in polys]
     out = []
-    for L in d["layers"]:
-        if L["step"] != "add":
-            continue
+    for i, L in enumerate(layers):
         z = sorted(_r(M[10] * v + M[11]) for v in L["z"])
-        polys = ([paper] if paper is not None and L["part"] == "sticker" else
-                 [{"outer": _loop(M, p["outer"], True),
-                   "holes": [_loop(M, hl, False) for hl in p.get("holes", [])]}
-                  for p in L["polygons"]])
-        out.append({"name": L["name"], "part": L["part"], "colour": L["colour"], "op": L["op"],
-                    "z": z, "polygons": polys})
+        if L["step"] != "add":
+            if L["part"] in FOLD_PARTS:
+                continue                           # taken out of its part's polygons below
+            out.append({"name": L["name"], "part": L["part"], "colour": "none", "op": "cut",
+                        "z": z, "polygons": placed(L["polygons"]), "into": first[L["part"]]})
+            continue
+        if paper is not None and L["part"] == "sticker":
+            polys = [paper]
+        else:
+            polys = L["polygons"]
+            if L["part"] in FOLD_PARTS:
+                tools = [p["outer"] for S in layers[i + 1:] if S["step"] == "sub"
+                         and (S["part"], S["solid"]) == (L["part"], L["solid"]) for p in S["polygons"]]
+                if tools:
+                    polys = [q for p in polys for q in _notched(p, tools)]
+            polys = placed(polys)
+        row = {"name": L["name"], "part": L["part"], "colour": L["colour"], "op": L["op"],
+               "z": z, "polygons": polys}
+        if L["op"] != "add":
+            row["into"] = into[L["part"]]
+        out.append(row)
+    if label is not None and label.get("font") == "pixel" and label.get("polygons"):
+        z = next((R["z"] for R in out if R["colour"] == "black"), None)
+        if z is not None:
+            out.append({"name": "label_ink", "part": "label", "colour": "black", "op": "add",
+                        "z": list(z), "polygons": label["polygons"]})
     return out
 
 
@@ -659,7 +718,9 @@ def pattern_cells(d: dict) -> list:
     [u0, v0, u1, v1] (mm) in the PATTERN frame -- core.markers.cell_boxes,
     the boxes plan/layers.py extrudes for the cells (a board's squares and
     markers: core.board.black_rects_m). The corner triangle is not a box:
-    it is its own layer ("mark_triangle")."""
+    it is its own layer ("mark_triangle"). A ChArUco board's corner cut
+    (black_cut) is not one either: the cells are its squares before the
+    cut, and the black / the footprint layers carry the notch."""
     spec = _M.TagSpec.from_dict(d["marker"], lambda _t: None, "plan")
     if spec is None:
         return []
@@ -705,6 +766,7 @@ def plan(req: dict) -> dict:
                                                                   for hl in poly[1:]]})
     sticker = d["guides"]["sticker"]
     outer_mm = [_r(sticker[2] - sticker[0]), _r(sticker[3] - sticker[1])]
+    label = placed_label(req, kind, mk["dictionary"], list(d["ids"]), fl)
     modules = _D.dictionary_info(mk["dictionary"])["modules"]
     marker_mm = mk["marker_length_m"] * 1000.0
     origin = [_r(v) for v in _mul(M, origin_square(m, d, d["frames"]["opencv"], issues))]
@@ -732,10 +794,14 @@ def plan(req: dict) -> dict:
             "separation_mm": _r(lay["separation_mm"]) if kind == "grid" else 0.0,
             "cols": int(lay["cols"]), "rows": int(lay["rows"]), "cell_mm": _r(marker_mm / modules),
             "auto": bool(m.get("auto")), "overflow_mm": overflow,
-            "origin": origin, "label": placed_label(req, kind, mk["dictionary"], ids, fl),
+            "origin": origin, "label": label,
             "dims": plan_dims(req, d, fl, L, lay),
-            "layers": cad_layers(d, M, cut), "cells": pattern_cells(d),
-            "pattern_to_sketch": [_r(v) for v in M], "origin_z_mm": origin[11],
+            "layers": cad_layers(d, M, cut, label), "cells": pattern_cells(d),
+            # WHY full precision, the one field that is (every other number is
+            # 1e-6, ND): a CAD shell composes this matrix with its own frames
+            # and places every cell by it, so a rounded rotation (an error of
+            # 5e-7 per entry, ~5e-5 mm at 100 mm) would build up there
+            "pattern_to_sketch": [float(v) + 0.0 for v in M], "origin_z_mm": origin[11],
             "summary": _summary(kind, mk["dictionary"], ids, lay, outer_mm),
             "warnings": issues}
 
@@ -873,7 +939,8 @@ def sheet(req: dict, date=None) -> dict:
     fewest cuts, then the fewest pages). `placements`: where each printed
     request item landed (its index, page, box from the page's top-left in
     mm, y down, and its turn), in item order. The PDF asks the viewer to
-    print at 100 % (core.sheet.render_sticker_pdf print_scaling)."""
+    print at 100 % (core.sheet.render_sticker_pdf print_scaling), and with
+    `print_dialog` true to open the print dialog when it opens."""
     def is_box(cut) -> bool:
         # a sticker's cut outline is its own bounding box (no holes)
         pts = (cut or {}).get("outer") or []
@@ -941,7 +1008,8 @@ def sheet(req: dict, date=None) -> dict:
                          "text": f"{r.item.caption or r.item.key} is not printed: {r.reason}"})
     for t in lay.warnings:
         warnings.append({"field": "preset", "level": "warn", "text": t})
-    pdf = _SH.render_sticker_pdf(lay, date=date, print_scaling=True)
+    pdf = _SH.render_sticker_pdf(lay, date=date, print_scaling=True,
+                                 print_dialog=bool(req.get("print_dialog")))
     placements = sorted(({"item": index[p.item.key], "page": p.page, "x_mm": _r(p.x_mm),
                           "y_mm": _r(p.y_mm), "w_mm": _r(p.w_mm), "h_mm": _r(p.h_mm),
                           "rotation": int(p.rotation)} for p in lay.placed),

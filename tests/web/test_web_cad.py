@@ -209,7 +209,8 @@ def test_cells_through_pattern_to_sketch_reproduce_black(name):
 def test_pattern_to_sketch_is_the_frame_black_is_placed_with():
     r = CELL_CASES["grid turned 90, rotated rect, flipped"]
     d, _i = W._plan(r)
-    assert W.plan(r)["pattern_to_sketch"] == [W._r(v) for v in W.sketch_of_pattern(r["rect"], d, True)]
+    # full precision since barrier 6 (N-8): the matrix itself, not rounded to ND
+    assert W.plan(r)["pattern_to_sketch"] == W.sketch_of_pattern(r["rect"], d, True)
 
 
 def test_the_corner_triangle_is_black_but_not_a_cell():
