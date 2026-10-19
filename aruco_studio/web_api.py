@@ -696,7 +696,7 @@ def sheet(req: dict, date=None) -> dict:
     straight cuts that free every sticker on all pages; `fill`: sticker area
     / printable area over all pages. `objective` (core.pack): "fewest_sheets"
     (default: the fewest pages, then the fewest cuts) or "fewest_cuts" (the
-    fewest cuts, never on fewer pages than fewest_sheets)."""
+    fewest cuts, then the fewest pages)."""
     def is_box(cut) -> bool:
         # a sticker's cut outline is its own bounding box (no holes)
         pts = (cut or {}).get("outer") or []

@@ -125,7 +125,9 @@ def test_objective_fewest_cuts_never_cuts_more_and_never_takes_fewer_pages(mode)
     default = W.sheet(base, "2026-10-18")
     assert W.sheet({**base, "objective": "fewest_sheets"}, "2026-10-18") == default
     cuts = W.sheet({**base, "objective": "fewest_cuts"}, "2026-10-18")
-    assert cuts["cuts"] < default["cuts"] and cuts["pages"] >= default["pages"]
+    assert cuts["cuts"] <= default["cuts"] and cuts["pages"] >= default["pages"]
+    if mode == "spaced":            # a page more saves cuts here; tight: the same layout
+        assert cuts["cuts"] < default["cuts"] and cuts["pages"] > default["pages"]
     ps = placed(cuts)
     assert len(ps) == len(its) and inside(ps)
     gap = 0.0 if mode == "tight" else SH.SheetSettings().gap_mm

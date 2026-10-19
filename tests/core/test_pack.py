@@ -146,21 +146,37 @@ def test_pack_rejects_what_no_bin_holds_and_respects_turn():
     assert got.places[0][4:] == (45, 125, True)
 
 
-def test_fewest_cuts_lines_equal_boxes_up():
-    # 5 x (30 x 25) and 4 x (50 x 30) on a 120 x 100 bin: the most compact
-    # layout takes 11 cuts; packed as equal boxes together, turned to the
-    # same 30 mm width, four columns of a grid take 6
+def test_equal_boxes_line_up():
+    # 5 x (30 x 25) and 4 x (50 x 30) on a 120 x 100 bin: packed as equal
+    # boxes together, turned to the same 30 mm width, four columns of a grid
+    # take 6 cuts (the first variants' best took 11): both objectives
     boxes = [PK.Box(i, *((30, 25) if i % 2 == 0 else (50, 30))) for i in range(9)]
     sheets, cuts = PK.pack(boxes, 120, 100), PK.pack(boxes, 120, 100, objective="fewest_cuts")
     assert sheets == PK.pack(boxes, 120, 100, objective="fewest_sheets")
-    assert (sheets.bins, sheets.cuts) == (1, 11)
-    assert (cuts.bins, cuts.cuts) == (1, 6) and cuts.how.startswith("same size")
-    assert sorted(p.key for p in cuts.places) == list(range(9)) and not cuts.rejected
-    assert {round(p.w, 6) for p in cuts.places} == {30.0}
-    rects = [(p.x, p.y, p.x + p.w, p.y + p.h) for p in cuts.places]
-    assert PK.count_cuts(rects, (0, 0, 120, 100)) == 6
+    for got in (sheets, cuts):
+        assert (got.bins, got.cuts) == (1, 6) and got.how.startswith("same size")
+        assert sorted(p.key for p in got.places) == list(range(9)) and not got.rejected
+        assert {round(p.w, 6) for p in got.places} == {30.0}
+        rects = [(p.x, p.y, p.x + p.w, p.y + p.h) for p in got.places]
+        assert PK.count_cuts(rects, (0, 0, 120, 100)) == 6
     with pytest.raises(ValueError, match="objective"):
         PK.pack(boxes, 120, 100, objective="fewest_pages")
+
+
+def test_fewest_cuts_takes_a_bin_more_to_save_cuts():
+    # 3 x (50 x 20), 2 x (50 x 25), 2 x (60 x 60) on a 100 x 80 bin inside a
+    # 10 mm margin (its edges are cut): 2 bins in 17 cuts, or 3 in 15
+    sizes = [(50, 20), (50, 25), (60, 60)]
+    boxes = [PK.Box(i, *sizes[i % 3]) for i in range(7)]
+    stock = (-10, -10, 110, 90)
+    sheets = PK.pack(boxes, 100, 80, stock=stock)
+    cuts = PK.pack(boxes, 100, 80, stock=stock, objective="fewest_cuts")
+    assert (sheets.bins, sheets.cuts) == (2, 17)
+    assert (cuts.bins, cuts.cuts) == (3, 15)
+    for got in (sheets, cuts):
+        assert sorted(p.key for p in got.places) == list(range(7)) and not got.rejected
+        assert got.cuts == sum(PK.count_cuts([(p.x, p.y, p.x + p.w, p.y + p.h) for p in got.places
+                                              if p.bin == b], stock) for b in range(got.bins))
 
 
 def test_fewest_cuts_counts_what_is_cut_out_of_a_box():
@@ -334,17 +350,20 @@ def test_200_random_sets_are_valid_and_beat_the_shelves(capsys):
 # ------------------------------------------------------------ the objective
 
 # sha256 of the default (fewest_sheets) layouts of the 200 sets below, 50 at
-# a time, from main @ 184f107 before the objective existed: the default
-# stays as it was
+# a time. Re-pinned 2026-10-18 (lane sheet): fewest_sheets now tries the
+# variants fewest_cuts brought (every sticker turned the same way, equal
+# sizes together), which fit a page fewer on some sets (tight seed 21: 1, not
+# 2). The guillotine default is the online Studio's alone (the core's default
+# packer is still "shelf"), so moving it is fine (coordinator, 2026-10-18).
 DEFAULT_DIGEST = {
-    ("tight", 0): "892b7c0c326641c502e3f221724b6958e27ba1624fba1a1f9b7eed915891897e",
-    ("tight", 1): "8a730cfd8d4e90ba681c27057dd970e45b089084df203b501b1528dd3624c617",
-    ("tight", 2): "898325add393873366bf0a8117122f406d311595d1999774d3482fe9aed769aa",
-    ("tight", 3): "1026b548040374a38ef809d530906f9622364fa293e17c057edf0a141cd383fb",
-    ("spaced", 0): "730962ee8b339d02e7c9e064b8e9c3422f700729978e6fceb154a22270a4db05",
-    ("spaced", 1): "556142ec821f58a00a2336634c032fa76ca8eff7502a4d80122627de27ea9ebd",
-    ("spaced", 2): "099a079e0354a9a99aab44f2e482046e7f7381dc13b0c1c585e1f63f9424edf1",
-    ("spaced", 3): "05d3ca6a3560e68a14065b91ce41026d96f147e72665c8df30ea7bbb9ebc3807",
+    ("spaced", 0): "654fda294093f5162ee541a2a97ab0d17f536359eff04b60590cb55fa28c46f8",
+    ("spaced", 1): "4a591976044e9a41a83b6e7b32f987e8498a7b55bac678d539b6209dcf8809c5",
+    ("spaced", 2): "cf963e7feb54a3a99bb145e23572a051a79d75f4228e33b5ee8cbe8eed869f0b",
+    ("spaced", 3): "548267656235091a4485359c9b8a8362d66b0743e9f0d047c237b745601b48ff",
+    ("tight", 0): "ce70524d48e8aa6565a4ebcff11fac80e74a790dd9fcd247617cc68d4a66b9ec",
+    ("tight", 1): "074534dd6c3ebf2582a8a7bfe296013e4cb105b3286d9ad53d760c863e7a1fca",
+    ("tight", 2): "68ec419175ccc885d8a8426a143435e2d7cad9feb78831d883f2e824db230c78",
+    ("tight", 3): "f4406ffc6c5d72541290df74bfb512d7787e1bc5d50e1c94363e84af2de155cb",
 }
 
 
@@ -353,8 +372,10 @@ DEFAULT_DIGEST = {
 def test_200_random_sets_fewest_cuts_against_fewest_sheets(mode, block, capsys):
     """Zach, 2026-10-18: "two things to optimize for btw: one is fewest cut
     lines, one is most compact (fewest number of sheets)". Medians over all
-    200 (2026-10-18): tight 44 cuts both (11 sets fewer), spaced 66.5 -> 64
-    (127 sets fewer, 16 a page more)."""
+    200 (2026-10-18): tight 2 pages, 44 cuts both (no set differs: with no
+    captions the two rank the same layouts the same unless a page more saves
+    cuts, which it never did); spaced 3 pages, 65.5 -> 64 cuts (122 sets
+    fewer, 17 a page more)."""
     gap = 0.0 if mode == "tight" else GAP
     digest = hashlib.sha256()
     rows = {"fewest_sheets": [], "fewest_cuts": []}
@@ -382,5 +403,6 @@ def test_200_random_sets_fewest_cuts_against_fewest_sheets(mode, block, capsys):
     with capsys.disabled():
         print("\n| mode | seeds | objective | pages (sum) | median cuts | fewer cuts | more pages |\n"
               + "\n".join(table))
-    assert fewer > 0
+    if mode == "spaced":
+        assert fewer > 0
     assert digest.hexdigest() == DEFAULT_DIGEST[(mode, block)]
