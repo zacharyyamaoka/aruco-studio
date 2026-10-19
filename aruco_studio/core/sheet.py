@@ -180,6 +180,8 @@ class SheetSettings:
                                     # cut line that much out (layout_stickers); 0 = as planned
     packer: str = "shelf"          # 2026-10-18, layout_stickers: "shelf" (M6a's shelves) |
                                    # "guillotine" (core.pack: auto layout, stickers may turn)
+    objective: str = "fewest_sheets"  # 2026-10-18, packer "guillotine": core.pack's ranking,
+                                      # "fewest_sheets" (pages, then cuts) | "fewest_cuts"
 
 
 class RejectedItem(NamedTuple):
@@ -1402,10 +1404,13 @@ def _guillotine_pages(prepared, settings, gap, x0, y0, area_w, area_h, page_w, p
             opts = [(p["rot"], p["w"], p["h"], p["cell_w"], p["cell_h"], p["lines"], p["font"])]
         ways.append(opts)
         first = opts[0]
+        cut = [((o[3] - o[1]) / 2.0, 0.0, (o[3] + o[1]) / 2.0, o[2]) for o in opts[:2]]
         boxes.append(_pack.Box(k, first[3], first[4], turn=len(opts) > 1,
-                               turned=(opts[1][3], opts[1][4]) if len(opts) > 1 else None))
+                               turned=(opts[1][3], opts[1][4]) if len(opts) > 1 else None,
+                               cut=(cut[0], cut[-1])))
     got = _pack.pack(boxes, area_w, area_h, gap=gap,
-                     stock=(-x0, -y0, page_w - x0, page_h - y0))
+                     stock=(-x0, -y0, page_w - x0, page_h - y0),
+                     objective=getattr(settings, "objective", "fewest_sheets"))
     pages: List[List[StickerPlace]] = [[] for _ in range(got.bins)]
     for pl in got.places:
         p = prepared[pl.key]

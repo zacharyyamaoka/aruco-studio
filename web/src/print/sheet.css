@@ -1,0 +1,28 @@
+/* The Sheet dialog (V1 "Click-to-inspect"): the page on the left, the auto
+   layout, the core's numbers and Print / PDF / SVG on the right. */
+.sheet-dialog { height: calc(100vh - 48px); }
+.sheet-dialog .kit-dialog-body { padding: 0; display: flex; overflow: hidden; }
+.sheet-body { display: flex; flex: 1; min-width: 0; min-height: 0; }
+.sheet-view { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--canvas); }
+.sheet-view-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line-soft); background: var(--panel); }
+.sheet-paper { white-space: nowrap; }
+.sheet-tabs { display: inline-flex; gap: 2px; }
+.sheet-tabs button { height: var(--ctl); padding: 0 9px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent;
+  color: var(--muted); font: inherit; cursor: pointer; }
+.sheet-tabs button:hover { background: var(--hover); color: var(--text); }
+.sheet-tabs button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.sheet-stage.print-stage { flex: 1; margin: 0; max-height: none; border-radius: 0; padding: 16px; min-height: 0; }
+.sheet-body[data-busy="1"] .print-page { opacity: 0.6; transition: opacity 0.2s 0.15s; }
+.sheet-side { width: 300px; flex: none; overflow: auto; border-left: 1px solid var(--line-soft); background: var(--panel); padding-bottom: 12px; }
+.sheet-stage .print-scaled { margin: 0 auto; }
+.sheet-side .kit-section { border-top: 0; }
+.sheet-side .kit-row { grid-template-columns: 28% minmax(0, 72%); }
+.sheet-side .kit-seg-btn { white-space: nowrap; }
+.sheet-note { padding: 0 10px 4px; font-size: 11px; line-height: 1.4; }
+.sheet-side .kit-section .sheet-note { padding-left: calc(28% + 10px + var(--gap)); }
+.sheet-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 8px 10px 10px; border-bottom: 1px solid var(--line-soft); margin-bottom: 8px; }
+.sheet-stats div { background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: 6px; padding: 6px 8px; }
+.sheet-stats b { display: block; font-size: 16px; font-variant-numeric: tabular-nums; }
+.sheet-stats span { color: var(--muted); font-size: 10.5px; }
+.sheet-side .kit-msgs { padding: 0 10px 6px; }
+.sheet-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 10px 0; }

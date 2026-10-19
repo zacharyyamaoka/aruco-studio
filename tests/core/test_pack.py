@@ -7,6 +7,7 @@ stickers, written here and sharing nothing with core.pack."""
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import math
 import random
 import statistics
@@ -143,6 +144,34 @@ def test_pack_rejects_what_no_bin_holds_and_respects_turn():
     # a turned size of its own (a caption stays under the sticker)
     got = PK.pack([PK.Box("c", 120, 40, turned=(45, 125))], 100, 150)
     assert got.places[0][4:] == (45, 125, True)
+
+
+def test_fewest_cuts_lines_equal_boxes_up():
+    # 5 x (30 x 25) and 4 x (50 x 30) on a 120 x 100 bin: the most compact
+    # layout takes 11 cuts; packed as equal boxes together, turned to the
+    # same 30 mm width, four columns of a grid take 6
+    boxes = [PK.Box(i, *((30, 25) if i % 2 == 0 else (50, 30))) for i in range(9)]
+    sheets, cuts = PK.pack(boxes, 120, 100), PK.pack(boxes, 120, 100, objective="fewest_cuts")
+    assert sheets == PK.pack(boxes, 120, 100, objective="fewest_sheets")
+    assert (sheets.bins, sheets.cuts) == (1, 11)
+    assert (cuts.bins, cuts.cuts) == (1, 6) and cuts.how.startswith("same size")
+    assert sorted(p.key for p in cuts.places) == list(range(9)) and not cuts.rejected
+    assert {round(p.w, 6) for p in cuts.places} == {30.0}
+    rects = [(p.x, p.y, p.x + p.w, p.y + p.h) for p in cuts.places]
+    assert PK.count_cuts(rects, (0, 0, 120, 100)) == 6
+    with pytest.raises(ValueError, match="objective"):
+        PK.pack(boxes, 120, 100, objective="fewest_pages")
+
+
+def test_fewest_cuts_counts_what_is_cut_out_of_a_box():
+    # a box's `cut` (a sticker in its caption's cell) is what fewest_cuts
+    # counts: two 40 x 50 cells, each a 30 x 30 sticker at its top centre
+    cut = ((5.0, 0.0, 35.0, 30.0), (10.0, 0.0, 40.0, 30.0))
+    boxes = [PK.Box(i, 40, 50, turn=False, cut=cut) for i in range(2)]
+    got = PK.pack(boxes, 200, 100, objective="fewest_cuts")
+    rects = [(p.x + 5, p.y, p.x + 35, p.y + 30) for p in got.places]
+    assert got.cuts == PK.count_cuts(rects, (0, 0, 200, 100))
+    assert got.cuts != PK.pack(boxes, 200, 100).cuts      # the cells' own count
 
 
 def test_pack_is_deterministic_and_fills_bins():
@@ -300,3 +329,58 @@ def test_200_random_sets_are_valid_and_beat_the_shelves(capsys):
     for mode in rows:
         assert statistics.mean(x[2] for x in rows[mode]["guillotine"]) >= statistics.mean(
             x[2] for x in rows[mode]["shelf"])
+
+
+# ------------------------------------------------------------ the objective
+
+# sha256 of the default (fewest_sheets) layouts of the 200 sets below, 50 at
+# a time, from main @ 184f107 before the objective existed: the default
+# stays as it was
+DEFAULT_DIGEST = {
+    ("tight", 0): "892b7c0c326641c502e3f221724b6958e27ba1624fba1a1f9b7eed915891897e",
+    ("tight", 1): "8a730cfd8d4e90ba681c27057dd970e45b089084df203b501b1528dd3624c617",
+    ("tight", 2): "898325add393873366bf0a8117122f406d311595d1999774d3482fe9aed769aa",
+    ("tight", 3): "1026b548040374a38ef809d530906f9622364fa293e17c057edf0a141cd383fb",
+    ("spaced", 0): "730962ee8b339d02e7c9e064b8e9c3422f700729978e6fceb154a22270a4db05",
+    ("spaced", 1): "556142ec821f58a00a2336634c032fa76ca8eff7502a4d80122627de27ea9ebd",
+    ("spaced", 2): "099a079e0354a9a99aab44f2e482046e7f7381dc13b0c1c585e1f63f9424edf1",
+    ("spaced", 3): "05d3ca6a3560e68a14065b91ce41026d96f147e72665c8df30ea7bbb9ebc3807",
+}
+
+
+# WHY 50 sets a test: the 200 run in parallel (pytest-xdist); one test took 70 s
+@pytest.mark.parametrize("mode,block", sorted(DEFAULT_DIGEST))
+def test_200_random_sets_fewest_cuts_against_fewest_sheets(mode, block, capsys):
+    """Zach, 2026-10-18: "two things to optimize for btw: one is fewest cut
+    lines, one is most compact (fewest number of sheets)". Medians over all
+    200 (2026-10-18): tight 44 cuts both (11 sets fewer), spaced 66.5 -> 64
+    (127 sets fewer, 16 a page more)."""
+    gap = 0.0 if mode == "tight" else GAP
+    digest = hashlib.sha256()
+    rows = {"fewest_sheets": [], "fewest_cuts": []}
+    for seed in range(50 * block, 50 * block + 50):
+        page, its = random_set(seed)
+        sheets = lay(its, mode, page)                       # the default
+        cuts = lay(its, mode, page, objective="fewest_cuts")
+        for L in (sheets, cuts):
+            assert not problems(L, its, page, gap), (seed, mode, problems(L, its, page, gap))
+            assert L.cuts() == page_cuts(L)
+        assert cuts.cuts() <= sheets.cuts(), (seed, mode)
+        assert sheets.page_count <= cuts.page_count, (seed, mode)
+        rows["fewest_sheets"].append((sheets.page_count, sheets.cuts()))
+        rows["fewest_cuts"].append((cuts.page_count, cuts.cuts()))
+        digest.update(repr([(p.item.key, p.page, round(p.x_mm, 6), round(p.y_mm, 6),
+                             round(p.w_mm, 6), round(p.h_mm, 6), p.rotation)
+                            for p in sheets.placed]).encode())
+        digest.update(b"%d;" % sheets.cuts())
+    fewer = sum(1 for a, b in zip(rows["fewest_sheets"], rows["fewest_cuts"]) if b[1] < a[1])
+    more = sum(1 for a, b in zip(rows["fewest_sheets"], rows["fewest_cuts"]) if b[0] > a[0])
+    table = [f"| {mode} | {50 * block}-{50 * block + 49} | {name} | {sum(x[0] for x in r)} | "
+             f"{statistics.median(x[1] for x in r):g} | "
+             f"{(fewer if name == 'fewest_cuts' else '')} | {(more if name == 'fewest_cuts' else '')} |"
+             for name, r in rows.items()]
+    with capsys.disabled():
+        print("\n| mode | seeds | objective | pages (sum) | median cuts | fewer cuts | more pages |\n"
+              + "\n".join(table))
+    assert fewer > 0
+    assert digest.hexdigest() == DEFAULT_DIGEST[(mode, block)]
