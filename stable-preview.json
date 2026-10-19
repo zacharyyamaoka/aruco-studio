@@ -1,4 +1,5 @@
 {
+  "chip": {"avoid": ["[data-testid=\"toolbar\"]"]},
   "app": "aruco-studio",
   "name": "ArUco Studio",
   "icon": "web/public/icon.svg",
