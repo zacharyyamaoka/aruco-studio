@@ -118,10 +118,12 @@ def test_inkjet_layers_are_rule_2_paper_with_the_ink_pocketed_into_its_top_half(
     assert got == [("sticker", "sticker", "white", "add", [0.0, t]),
                    ("pocket", "pocket", "none", "cut", [t / 2.0, t]),
                    ("ink", "ink", "black", "add", [t / 2.0, t])]
-    # the paper is the white outline; the ink (and its pocket) is exactly the black
+    # the paper is the sticker as it is cut (cut_shape: the rectangle by default,
+    # trim 2026-10-18; it was the marker's outline); the ink (and its pocket) is
+    # exactly the black
     paper = layer(p, "sticker")["polygons"]
     assert len(paper) == 1 and paper[0]["holes"] == []
-    assert sorted(map(tuple, paper[0]["outer"])) == sorted(map(tuple, p["outer"]))
+    assert sorted(map(tuple, paper[0]["outer"])) == sorted(map(tuple, p["cut_shape"]["outer"]))
     for name in ("ink", "pocket"):
         assert poly_area(layer(p, name)["polygons"]) == pytest.approx(poly_area(p["black"]), abs=1e-6)
     for L in p["layers"]:

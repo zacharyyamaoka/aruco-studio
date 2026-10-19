@@ -27,6 +27,7 @@ Fusion composes a Joint Origin: core.geometry.jo_compose).
 | `label` on (2026-10-18) | core.rect_fill.fill: a band inside the rectangle on `label.side`; the marker is planned in the box it leaves (the target), centred there; "sans" text for an inkjet preset, the pixel font's ink for 3D |
 | `marker.origin_square` | core.rect_fill.square_origin on OpenCV's board frame |
 | `MarkerPlan.layers`, `cells`, `pattern_to_sketch`, `origin_z_mm` (CAD shells, N-6) | the TagPlan's `layers` placed like `black`; core.markers.cell_boxes; the matrix `black` is placed with; `origin`'s z (the printed surface: inkjet t, 3D the tile's top, on a face 0; Flip negates) |
+| `trim` (2026-10-18) -> `MarkerPlan.cut`, `cut_shape` | not the core's: the rectangle (default), `profile`'s loops as given, or `outer`; the plan is the same for all three. svg, sheet and the inkjet paper layer (`sticker`) are cut to it, white inside |
 
 Issue fields: the core's key paths renamed (FIELDS); the page lint ("Over
 the page ...") and the cell / make rows -> "preset"; target -> "rect".
@@ -73,6 +74,7 @@ CAP_EM = _SH.CAP_EM                 # Helvetica's cap height / em (core.sheet pr
 ND = 6                              # JSON numbers: 1e-6 mm
 ND_DIM = 9                          # a dimension's endpoints (plan_dims)
 SNAP_TOL_MM = 1e-6                  # inscribe: an edge this near a 0.1 mm grid line is on it
+TRIMS = ("profile", "rectangle", "marker")
 
 
 def _r(v) -> float:
@@ -439,6 +441,73 @@ def inscribe(profile: dict, holes: str = "avoid"):
             "w": _r(x1 - x0), "h": _r(y1 - y0), "angle_deg": _r(got["angle_deg"])}
 
 
+# ------------------------------------------------------------------ the trim
+
+def to_rect(rect: dict, loops) -> list:
+    """Sketch-frame loops in the rectangle's own frame (centre 0, unturned),
+    not rounded."""
+    c, s = _cs(float(rect.get("angle_deg") or 0.0))
+    cx, cy = float(rect["cx"]), float(rect["cy"])
+    return [[(c * (u - cx) + s * (v - cy), -s * (u - cx) + c * (v - cy)) for u, v in lp]
+            for lp in loops]
+
+
+def trim_of(req: dict, issues=None):
+    """(what the sticker is cut to, the profile's loops or None): `trim`
+    (default "rectangle"); "profile" with its loops (sketch frame, outer
+    counter-clockwise, holes clockwise), or the rectangle when the request
+    has no profile (said, on "tag"). Appends to `issues`: the rectangle
+    poking out of the profile ("rect"), a label left outside a
+    marker-trimmed sticker ("label.on")."""
+    issues = [] if issues is None else issues
+    t = req.get("trim") or "rectangle"
+    if t not in TRIMS:
+        issues.append({"field": "tag", "level": "warn",
+                       "text": f"trim {t!r} is not profile, rectangle or marker: the rectangle"})
+        t = "rectangle"
+    loops = None
+    if t == "profile":
+        loops = [[(float(u), float(v)) for u, v in lp]
+                 for lp in ((req.get("profile") or {}).get("loops") or []) if len(lp) >= 3]
+        if not loops:
+            issues.append({"field": "tag", "level": "info",
+                           "text": "trim to the profile needs the profile: the sticker is cut to "
+                                   "the rectangle"})
+            return "rectangle", None
+        loops = [lp if (_area2(lp) > 0) == (k == 0) else lp[::-1] for k, lp in enumerate(loops)]
+        rect = req["rect"]
+        # WHY the marker and label stay in the rectangle: the profile only
+        # moves the cut line, so a rectangle hanging off the profile puts
+        # them off the sticker
+        if not _A._rect_inside(to_rect(rect, loops), 0.0, 0.0, float(rect["w"]), float(rect["h"]),
+                               SNAP_TOL_MM):
+            issues.append({"field": "rect", "level": "warn",
+                           "text": "the rectangle pokes outside the profile: the sticker is cut "
+                                   "to the profile, so what hangs out is cut off"})
+    if t == "marker" and (req.get("label") or {}).get("on"):
+        issues.append({"field": "label.on", "level": "warn",
+                       "text": "the label is outside a marker-trimmed sticker: the sticker and "
+                               "its svg carry the marker only"})
+    return t, loops
+
+
+def cut_local(req: dict, d: dict, fl, trim: str, loops) -> dict:
+    """The sticker's cut {"outer", "holes"} in the rectangle's own frame (mm,
+    y up, its centre 0, unturned; never Flip, as sticker_parts): the
+    rectangle, the profile, or the marker's outline (the quiet-zone edge)."""
+    one = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+    if trim == "profile":
+        lp = to_rect(req["rect"], loops)
+        return {"outer": [[_r(u), _r(v)] for u, v in lp[0]],
+                "holes": [[[_r(u), _r(v)] for u, v in hl] for hl in lp[1:]]}
+    if trim == "marker":
+        return {"outer": _loop(_local(d, fl, False), _rect_loop(d["guides"]["sticker"]), True),
+                "holes": []}
+    w, h = float(req["rect"]["w"]), float(req["rect"]["h"])
+    return {"outer": _loop(one, _rect_loop((-w / 2.0, -h / 2.0, w / 2.0, h / 2.0)), True),
+            "holes": []}
+
+
 def _ids_guess(m: dict) -> list:
     """The ids a request prints before it is planned (the label's text needs
     them to size its band): the counts are typed (`settings.force`)."""
@@ -457,7 +526,9 @@ def _planned(req: dict):
     issues = []
     lab = req.get("label") or {}
     if not lab.get("on"):
-        return plan_tag(spec_of(req, issues)).data, issues, None
+        d = plan_tag(spec_of(req, issues)).data
+        trim_of(req, issues)
+        return d, issues, None
     m = req["marker"]
     ids = _ids_guess(m)
     for _k in range(2):                            # again only when the ids were guessed wrong
@@ -477,6 +548,7 @@ def _planned(req: dict):
         w["text"] = re.sub(r"\b(\d+(?:\.\d+)?) × (\d+(?:\.\d+)?) mm (?:rectangle|target|face)\b",
                            beside, w["text"])
     issues += [{"field": f, "level": lv, "text": t} for f, lv, t in fl.issues]
+    trim_of(req, issues)
     return d, issues, fl
 
 
@@ -558,24 +630,27 @@ def plan_dims(req: dict, d: dict, fl, L, lay: dict) -> list:
              "b": pt(*g["b"]), "offset_mm": _r(g["offset_mm"])} for g in got]
 
 
-def cad_layers(d: dict, M) -> list:
+def cad_layers(d: dict, M, paper=None) -> list:
     """The contract's `layers`: the TagPlan's layers (plan/layers.py: REF's
     bodies in build order) placed in the sketch by M -- polygons as `black`,
     z along the sketch normal (Flip turns the marker over: [lo, hi] becomes
     [-hi, -lo]). The web's settings (mode auto, corner mark none / triangle)
     only build "add" steps; a "sub" step (a cut tool inside its part:
     white mode, black_cut marks) has no place in the contract's shape and
-    is not sent."""
+    is not sent. `paper` (sketch frame): the inkjet paper's polygon (the
+    `sticker` part), the plan's `cut_shape`, so CAD's white body is the
+    sticker as it is cut."""
     out = []
     for L in d["layers"]:
         if L["step"] != "add":
             continue
         z = sorted(_r(M[10] * v + M[11]) for v in L["z"])
+        polys = ([paper] if paper is not None and L["part"] == "sticker" else
+                 [{"outer": _loop(M, p["outer"], True),
+                   "holes": [_loop(M, hl, False) for hl in p.get("holes", [])]}
+                  for p in L["polygons"]])
         out.append({"name": L["name"], "part": L["part"], "colour": L["colour"], "op": L["op"],
-                    "z": z,
-                    "polygons": [{"outer": _loop(M, p["outer"], True),
-                                  "holes": [_loop(M, hl, False) for hl in p.get("holes", [])]}
-                                 for p in L["polygons"]]})
+                    "z": z, "polygons": polys})
     return out
 
 
@@ -640,8 +715,18 @@ def plan(req: dict) -> dict:
     if fl is not None:                             # measured against the rectangle, not the box
         u0, v0, u1, v1 = _bbox(L, _rect_loop(sticker))
         overflow = _r(max(0.0, u1 - w / 2.0, -w / 2.0 - u0, v1 - h / 2.0, -h / 2.0 - v0))
-    return {"ok": True, "ids": ids, "black": black, "outer": _loop(M, _rect_loop(sticker), True),
-            "cut": _loop(rect_matrix(rect), _rect_loop((-w / 2.0, -h / 2.0, w / 2.0, h / 2.0)), True),
+    outer = _loop(M, _rect_loop(sticker), True)
+    trim, loops = trim_of(req)
+    if trim == "profile":                          # the sketch frame as given
+        cut = {"outer": [[_r(u), _r(v)] for u, v in loops[0]],
+               "holes": [[[_r(u), _r(v)] for u, v in hl] for hl in loops[1:]]}
+    elif trim == "marker":
+        cut = {"outer": [list(q) for q in outer], "holes": []}
+    else:
+        cut = {"outer": _loop(rect_matrix(rect), _rect_loop((-w / 2.0, -h / 2.0, w / 2.0, h / 2.0)),
+                              True), "holes": []}
+    return {"ok": True, "ids": ids, "black": black, "outer": outer,
+            "cut": [list(q) for q in cut["outer"]], "cut_shape": cut,
             "outer_mm": outer_mm, "marker_mm": _r(marker_mm),
             "checker_mm": _r(lay["square_mm"]) if kind == "charuco" else 0.0,
             "separation_mm": _r(lay["separation_mm"]) if kind == "grid" else 0.0,
@@ -649,7 +734,7 @@ def plan(req: dict) -> dict:
             "auto": bool(m.get("auto")), "overflow_mm": overflow,
             "origin": origin, "label": placed_label(req, kind, mk["dictionary"], ids, fl),
             "dims": plan_dims(req, d, fl, L, lay),
-            "layers": cad_layers(d, M), "cells": pattern_cells(d),
+            "layers": cad_layers(d, M, cut), "cells": pattern_cells(d),
             "pattern_to_sketch": [_r(v) for v in M], "origin_z_mm": origin[11],
             "summary": _summary(kind, mk["dictionary"], ids, lay, outer_mm),
             "warnings": issues}
@@ -702,49 +787,55 @@ def suggest(req: dict) -> list:
 def sticker_parts(req: dict, planned=None):
     """The sticker as the page prints it, in the rectangle's own frame (mm,
     y up, its centre 0, unturned; the marker's turn as the sketch has it,
-    never Flip): {"w_mm", "h_mm", "cut": the rectangle {"outer", "holes"},
-    "ink": the marker's black [[outer, hole, ...], ...], "label_ink": the
-    pixel label's, "texts": the sans label's lines [{"text", "at" (its cap
-    box's centre; baseline at - cap / 2), "cap_mm"}], "font"}, or None when
-    the plan is refused. core.sheet's PrintItem takes cut / ink as cut_mm /
-    ink_mm (the sticker frame is any frame they share). `planned`: _planned(req)
-    when the caller has it."""
+    never Flip): {"w_mm", "h_mm" (the cut's box), "cut": cut to the trim
+    {"outer", "holes"} (cut_local; white inside), "ink": the marker's black
+    [[outer, hole, ...], ...], "label_ink": the pixel label's, "texts": the
+    sans label's lines [{"text", "at" (its cap box's centre; baseline at -
+    cap / 2), "cap_mm"}], "font"}, or None when the plan is refused. A
+    marker-trimmed sticker has no label (it is outside the cut: trim_of
+    says so). core.sheet's PrintItem takes cut / ink as cut_mm / ink_mm (the
+    sticker frame is any frame they share). `planned`: _planned(req) when
+    the caller has it."""
     d, _issues, fl = planned or _planned(req)
     if not d["ok"]:
         return None
-    w, h = float(req["rect"]["w"]), float(req["rect"]["h"])
+    trim, loops = trim_of(req)
+    cut = cut_local(req, d, fl, trim, loops)
+    x0, y0, x1, y1 = _bbox([1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0], cut["outer"])
+    lab = fl if trim != "marker" else None
     L = _local(d, fl, False)
     one = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
     ink = [[_loop(L, poly[0], True)] + [_loop(L, hl, False) for hl in poly[1:]]
            for poly in _ME.top(d).get("black", [])]
-    return {"w_mm": _r(w), "h_mm": _r(h),
-            "cut": {"outer": _loop(one, _rect_loop((-w / 2.0, -h / 2.0, w / 2.0, h / 2.0)), True),
-                    "holes": []},
+    return {"w_mm": _r(x1 - x0), "h_mm": _r(y1 - y0), "cut": cut,
             "ink": ink,
-            "label_ink": [[_loop(one, _rect_loop(r), True)] for r in (fl.ink if fl else [])],
+            "label_ink": [[_loop(one, _rect_loop(r), True)] for r in (lab.ink if lab else [])],
             "texts": [{"text": t.text, "at": [_r(t.at[0]), _r(t.at[1])], "cap_mm": _r(t.cap)}
-                      for t in (fl.runs if fl else [])],
+                      for t in (lab.runs if lab else [])],
             "font": fl.font if fl else None}
 
 
 def svg(req: dict) -> str:
-    """One marker at true size (mm units). Label off: the marker in its own
-    frame (plan.exports.to_svg). Label on: the whole sticker, the rectangle,
-    with the label inside it (sticker_parts; the sketch's label is
-    plan().label)."""
+    """One sticker at true size (mm units), label on or off: its cut (the
+    trim: the rectangle, the profile, the marker) filled white with its
+    holes cut out, the black and the label inside it on top (sticker_parts,
+    the rectangle's own frame; the sketch's label is plan().label)."""
     got = _planned(req)
     d = got[0]
     if not d["ok"]:
         raise ValueError("nothing to draw: " + "; ".join(d["errors"]))
-    if got[2] is None:
-        return _X.to_svg(d)
     sp = sticker_parts(req, got)
+    cut = sp["cut"]
+    x0, y0, x1, y1 = _bbox([1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0], cut["outer"])
     w, h = sp["w_mm"], sp["h_mm"]
     f = _f
+    # WHY the white is drawn, not left to the paper (Zach, 2026-10-18): "When
+    # you export the marker it should always export with all of the white"
     out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{f(w)}mm" height="{f(h)}mm" '
-           f'viewBox="{f(-w / 2.0)} {f(-h / 2.0)} {f(w)} {f(h)}">',
+           f'viewBox="{f(x0)} {f(-y1)} {f(w)} {f(h)}">',
            f'<title>{d["marker"]["dictionary"]} #{d["ids"][0]}</title>',
-           f'<rect x="{f(-w / 2.0)}" y="{f(-h / 2.0)}" width="{f(w)}" height="{f(h)}" fill="#ffffff"/>',
+           f'<path data-layer="white" fill="#ffffff" fill-rule="evenodd" '
+           f'd="{_X.path_d([[cut["outer"]] + cut["holes"]])}"/>',
            f'<path data-layer="black" fill="#000000" fill-rule="evenodd" d="{_X.path_d(sp["ink"])}"/>']
     if sp["label_ink"]:
         out.append(f'<path data-label="1" fill="#000000" fill-rule="evenodd" '
@@ -796,7 +887,8 @@ def sheet(req: dict, date=None) -> dict:
     index = {}                                     # a PrintItem's key -> its request item
     first = None
     for i, it in enumerate(req.get("items") or []):
-        d, issues = _plan(it)
+        got = _planned(it)
+        d, issues = got[0], got[1]
         warnings += issues
         if not d["ok"]:
             warnings.append({"field": "tag", "level": "error",
@@ -812,12 +904,14 @@ def sheet(req: dict, date=None) -> dict:
                f"{_mm(d['marker']['marker_length_m'] * 1000.0)} mm")
         p.key, p.caption = f"m{i + 1}", cap
         index[p.key] = i
-        if lab:
-            # WYSIWYG (Zach, 2026-10-18): the sticker is the whole marker
-            # rectangle, with the label inside it as the sketch has it
-            sp = sticker_parts(it)
-            p.cut_mm = sp["cut"]
-            p.ink_mm = sp["ink"] + sp["label_ink"]
+        # WYSIWYG (Zach, 2026-10-18): every sticker, label on or off, is cut
+        # to its trim (the rectangle by default) with the label inside it as
+        # the sketch has it. A marker-trimmed sticker's label is outside it:
+        # spaced mode prints its text as the caption under it.
+        sp = sticker_parts(it, got)
+        p.cut_mm = sp["cut"]
+        p.ink_mm = sp["ink"] + sp["label_ink"]
+        if lab and trim_of(it)[0] != "marker":
             p.texts_mm = sp["texts"]
         items.append(p)
         if not is_box(p.cut_mm):
