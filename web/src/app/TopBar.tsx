@@ -17,18 +17,23 @@ function GithubMark() {
   );
 }
 
-// The brand mark: the Extrude Cube, a marker with its corner cut on top of an
-// extruded block (the same drawing as public/icon.svg, without the tile).
-// WHY: Zach picked V18 + the "window" top on 2026-10-18 (reports/media/
-// logo-v18-picks-2026-10-18.html); the top pattern is checked not to decode
-// as any OpenCV dictionary, so do not redraw it as a real marker.
+// The brand mark: the Extrude Cube, an extruded block with a marker-like
+// bitmap on top, drawn with no tile (the same paths as public/icon.svg).
+// WHY: Zach's round-3 pick on 2026-10-18 (reports/media/logo-cube-variants-
+// 2026-10-18.html). The top bitmap is checked not to decode as any OpenCV
+// dictionary, and the white halo keeps it readable on the dark theme; do not
+// swap in a real marker or drop the halo.
 function BrandCube() {
   return (
-    <svg className="brand-cube" viewBox="10 7 44 50" width="16" height="18" aria-hidden="true">
-      <path className="cube-l" d="M11.45 21.41L30.9 32.64L30.9 55.09L11.45 43.86z" />
-      <path className="cube-r" d="M33.1 32.64L52.55 21.41L52.55 43.86L33.1 55.09z" />
-      <path className="cube-top" d="M32 8.27L51.45 19.5L32 30.73L12.55 19.5z" />
-      <path className="cube-ink" fillRule="evenodd" d="M32 11.41L43.2 17.88L43.2 21.12L32 27.59L18 19.5zM32 14.65L40.4 19.5L32 24.35L23.6 19.5z" />
+    <svg className="brand-cube" viewBox="0 0 64 64" width="18" height="18" aria-hidden="true">
+      <path fill="#ffffff" stroke="#ffffff" strokeWidth="2.4" strokeLinejoin="round" d="M5.6 41.2L32 62L32 43.61L5.6 22.8z" />
+      <path fill="#ffffff" stroke="#ffffff" strokeWidth="2.4" strokeLinejoin="round" d="M58.4 41.2L32 62L32 43.61L58.4 22.8z" />
+      <path fill="#ffffff" stroke="#ffffff" strokeWidth="2.4" strokeLinejoin="round" d="M32 2L58.4 22.8L32 43.61L5.6 22.8z" />
+      <path fill="#3a4250" d="M5.6 41.2L32 62L32 43.61L5.6 22.8z" />
+      <path fill="#69727f" d="M58.4 41.2L32 62L32 43.61L58.4 22.8z" />
+      <path fill="#ffffff" d="M32 2L58.4 22.8L32 43.61L5.6 22.8z" />
+      <path fill="#ffffff" d="M32 2L58.4 22.8L32 43.61L5.6 22.8z" />
+      <path fill="#111418" d="M32 6.16L53.12 22.8L49.5 25.66L28.37 9.02zM28.59 8.85L32.21 11.71L28.48 14.65L24.85 11.79zM35.52 14.32L39.25 17.26L35.52 20.2L31.79 17.26zM46.08 22.64L49.71 25.5L45.98 28.44L42.35 25.58zM25.07 11.63L32.21 17.26L28.48 20.2L21.33 14.57zM35.52 19.86L39.25 22.8L35.52 25.75L31.79 22.8zM42.56 25.41L46.19 28.27L42.46 31.21L38.83 28.35zM21.54 14.4L25.17 17.26L21.44 20.2L17.81 17.34zM28.48 19.86L35.73 25.58L32 28.52L24.75 22.8zM39.04 28.19L42.67 31.04L38.93 33.98L35.31 31.13zM18.02 17.17L21.65 20.03L17.92 22.97L14.29 20.11zM24.96 22.64L28.69 25.58L24.96 28.52L21.23 25.58zM35.52 30.96L39.15 33.82L35.41 36.76L31.79 33.9zM14.5 19.95L35.63 36.59L32 39.45L10.88 22.8z" />
     </svg>
   );
 }
