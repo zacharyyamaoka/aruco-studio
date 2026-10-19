@@ -1,6 +1,7 @@
 // The selected feature's dimensions on the canvas (web/src/sketch/Dims.tsx):
-// drawn CAD-style from plan().dims, driven grey vs set solid (the panel's
-// isSet), typed into in place. Each check measures what is drawn: the arrow
+// drawn CAD-style from plan().dims, only the sizes the type takes (single:
+// marker; grid: marker, separation; ChArUco: checker, marker), driven grey vs
+// set solid (the panel's isSet), typed into in place. Each check measures what is drawn: the arrow
 // tips' client positions (each arrowhead path starts at its tip), the value
 // chips' boxes, the computed colours, and the probe's numbers. Screenshots
 // go to E2E_SHOTS (default test-results/shots).
@@ -23,20 +24,30 @@ async function blank(page: Page): Promise<void> {
   await page.getByTestId("cmd-new").click();
 }
 
-/** A 2 × 2 grid in a 60 × 60 rectangle about the origin, its panel open. Returns the feature's id. */
-async function gridFeature(page: Page): Promise<string> {
+/** A feature of one type in a 60 × 60 rectangle about the origin, its panel open. Returns the feature's id. */
+async function typedFeature(page: Page, type: "single" | "grid" | "charuco"): Promise<string> {
   await blank(page);
   await page.keyboard.press("r");
   await dragWorld(page, [-30, -30], [30, 30]);
   await page.keyboard.press("a");
   await expect(page.getByTestId("extrude-panel")).toBeVisible();
-  await page.locator('[data-path="marker.type"] [data-value="grid"]').click();
+  await page.locator(`[data-path="marker.type"] [data-value="${type}"]`).click();
   await idle(page);
   const s = await state(page);
-  expect(s.feature.marker.type).toBe("grid");
+  expect(s.feature.marker.type).toBe(type);
   expect(s.plan.dims?.length, "the core returns dims").toBeGreaterThan(0);
   return s.panel.featureId;
 }
+
+/** A 2 × 2 grid in a 60 × 60 rectangle about the origin, its panel open. Returns the feature's id. */
+const gridFeature = (page: Page) => typedFeature(page, "grid");
+
+/** The dims each type may draw: the sizes typed into it, and only those. */
+const CONTROLS = {
+  single: ["marker.marker_mm"],
+  grid: ["marker.marker_mm", "marker.separation_mm"],
+  charuco: ["marker.checker_mm", "marker.marker_mm"],
+} as const;
 
 /** Every drawn dimension, in drawing order, measured in client px. */
 async function drawn(page: Page): Promise<DrawnDim[]> {
@@ -93,7 +104,7 @@ const tipLength = (d: DrawnDim) => Math.hypot(d.b[0] - d.a[0], d.b[1] - d.a[1]);
 test.describe(`canvas dimensions (${CORE} core)`, () => {
   test.skip(CORE === "mock", "the mock core returns no dims");
 
-  test("a · a selected grid: marker, separation, outer, W and H, each as long as its value; b · no label offset", async ({ page }) => {
+  test("a · a selected grid: marker and separation only, each as long as its value; b · no label offset", async ({ page }) => {
     const fid = await gridFeature(page);
     // move the label off its preset spot, so the core returns a label.offset_mm dimension
     const lb = (await page.getByTestId("label-text").boundingBox())!;
@@ -107,12 +118,11 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
     expect(s.panel.featureId).toBe(fid);
     const planDims = s.plan.dims as { field: string; value_mm: number }[];
     expect(planDims.map((d) => d.field), "the core measures the label offset").toContain("label.offset_mm");
-    const want = planDims.filter((d) => d.field !== "label.offset_mm");
+    for (const f of ["outer", "rect.w", "rect.h"]) expect(planDims.map((d) => d.field), `the core still measures ${f}`).toContain(f);
+    const want = planDims.filter((d) => (CONTROLS.grid as readonly string[]).includes(d.field));
 
     const dims = await drawn(page);
-    const fields = dims.map((d) => d.field);
-    for (const f of ["marker.marker_mm", "marker.separation_mm", "outer", "rect.w", "rect.h"]) expect(fields).toContain(f);
-    expect(fields.filter((f) => f === "outer")).toHaveLength(2);
+    expect(dims.map((d) => d.field).sort()).toEqual([...CONTROLS.grid].sort());
     expect(dims.map((d) => [d.field, d.value])).toEqual(want.map((d) => [d.field, d.value_mm]));
 
     // each drawn length, arrow tip to arrow tip, over the zoom, is its value
@@ -137,11 +147,10 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
     for (let i = 0; i < dims.length; i++) for (let j = i + 1; j < dims.length; j++) {
       expect(overlap(dims[i].label!, dims[j].label!), `${dims[i].field} vs ${dims[j].field}`).toBe(false);
     }
-    // driven grey, the rectangle's own sizes solid
-    const muted = await token(page, "--muted"), text = await token(page, "--text");
+    // driven grey
+    const muted = await token(page, "--muted");
     expect((await dimOf(page, "marker.marker_mm")).fill).toBe(muted);
-    expect((await dimOf(page, "outer")).fill).toBe(muted);
-    expect((await dimOf(page, "rect.w")).fill).toBe(text);
+    expect((await dimOf(page, "marker.separation_mm")).fill).toBe(muted);
     await page.screenshot({ path: path.join(SHOTS, "dims-grid-light.png") });
     await page.getByTestId("theme-toggle").click();
     await page.screenshot({ path: path.join(SHOTS, "dims-grid-dark.png") });
@@ -220,34 +229,27 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
     expect(Math.abs(Number(await markerInput.inputValue()) - d.value)).toBeLessThan(0.006);
   });
 
-  test("e · typing into W resizes the rectangle and the marker re-plans", async ({ page }) => {
+  test("e · typing into the W × H box resizes the rectangle and the marker re-plans; no W or H on the canvas", async ({ page }) => {
     await gridFeature(page);
     let s = await state(page);
     const before = { marker: s.plan.marker_mm, outerW: s.plan.outer_mm[0] };
-    const w = await dimOf(page, "rect.w");
-    expect(w.value).toBe(60);
-    expect(w.set).toBe(true);
+    for (const f of ["rect.w", "rect.h", "outer"]) await expect(page.locator(`[data-dim="${f}"]`)).toHaveCount(0);
 
-    await typeDim(page, "rect.w", "40");
+    const w = page.locator('[data-testid="shape-dims"] input').first();
+    await expect(w).toHaveValue("60");
+    await w.fill("40");
+    await w.press("Enter");
+    await idle(page);
     s = await state(page);
     const r = s.doc.shapes.find((x: any) => x.id === s.feature.rectId);
     expect(r).toMatchObject({ w: 40, h: 60, cx: 0, cy: 0 });
     expect(s.plan.marker_mm).toBeLessThan(before.marker);
     expect(s.plan.outer_mm[0]).toBeLessThan(before.outerW);
-    const after = await dimOf(page, "rect.w");
-    expect(after.value).toBe(40);
-    expect(Math.abs(tipLength(after) / s.camera.zoom - 40)).toBeLessThan(0.3);
-    expect((await dimOf(page, "marker.marker_mm")).value).toBeCloseTo(s.plan.marker_mm, 4);
-    // the bottom-left W × H row agrees
-    await expect(page.locator('[data-testid="shape-dims"] input').first()).toHaveValue("40");
-
-    // H too; an empty Enter leaves the rectangle's size alone (it is the sketch's)
-    await typeDim(page, "rect.h", "50");
-    s = await state(page);
-    expect(s.doc.shapes.find((x: any) => x.id === s.feature.rectId)).toMatchObject({ w: 40, h: 50 });
-    await typeDim(page, "rect.h", "");
-    s = await state(page);
-    expect(s.doc.shapes.find((x: any) => x.id === s.feature.rectId)).toMatchObject({ w: 40, h: 50 });
+    // the marker dim follows; still no W, H or outer on the canvas
+    const m = await dimOf(page, "marker.marker_mm");
+    expect(m.value).toBeCloseTo(s.plan.marker_mm, 4);
+    expect(Math.abs(tipLength(m) / s.camera.zoom - m.value)).toBeLessThan(0.3);
+    expect((await drawn(page)).map((d) => d.field).sort()).toEqual([...CONTROLS.grid].sort());
   });
 
   test("f · zoomed out until the marker is 40 px wide: no two values overlap", async ({ page }) => {
@@ -267,8 +269,7 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
     expect(black.width).toBeLessThan(2 * 40 + 40);       // two markers and their gap
 
     const dims = await drawn(page);
-    expect(dims.length).toBeGreaterThanOrEqual(3);
-    for (const f of ["rect.w", "rect.h"]) expect(dims.map((d) => d.field)).toContain(f);
+    expect(dims.map((d) => d.field).sort()).toEqual([...CONTROLS.grid].sort());
     const rect = (await page.locator(`[data-shape="${s.feature.rectId}"]`).boundingBox())!;
     const rbox = { x: rect.x, y: rect.y, w: rect.width, h: rect.height };
     for (const d of dims) {
@@ -281,6 +282,68 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
     await page.screenshot({ path: path.join(SHOTS, "dims-small-light.png") });
     await page.getByTestId("theme-toggle").click();
     await page.screenshot({ path: path.join(SHOTS, "dims-small-dark.png") });
+  });
+
+  for (const type of ["single", "grid", "charuco"] as const) {
+    test(`g · a selected ${type}: exactly ${CONTROLS[type].length} dim(s), ${CONTROLS[type].join(" + ")}; no outer, W or H`, async ({ page }) => {
+      await typedFeature(page, type);
+      const s = await state(page);
+      const dims = await drawn(page);
+      expect(dims.map((d) => d.field).sort()).toEqual([...CONTROLS[type]].sort());
+      expect(await page.locator('[data-testid="dims"] [data-dim]').count()).toBe(CONTROLS[type].length);
+      // each is the plan's measure of that field, as long as its value
+      for (const d of dims) {
+        const p = (s.plan.dims as { field: string; value_mm: number }[]).find((x) => x.field === d.field)!;
+        expect(d.value).toBe(p.value_mm);
+        expect(Math.abs(tipLength(d) / s.camera.zoom - d.value), d.field).toBeLessThan(0.3);
+      }
+      // nothing shows the outer size or the rectangle's W or H
+      const rect = s.doc.shapes.find((x: any) => x.id === s.feature.rectId);
+      const hidden = new Set([s.plan.outer_mm[0], s.plan.outer_mm[1], rect.w, rect.h].map((v: number) => String(+v.toFixed(2))));
+      expect(dims.filter((d) => hidden.has(d.text!)).map((d) => d.field), "no dim value is the outer size or W / H").toEqual([]);
+      const titles = await page.locator('[data-testid="dims"] title').allTextContents();
+      expect(titles.some((t) => /outer|rectangle/i.test(t))).toBe(false);
+      await page.screenshot({ path: path.join(SHOTS, `dims-${type}.png`) });
+    });
+  }
+
+  test("h · the label follows as you type, a character at a time, without leaving the field; Esc reverts", async ({ page }) => {
+    const fid = await typedFeature(page, "single");
+    await page.locator('[role=tab][data-tab="label"]').click();
+    const text = page.locator('textarea[data-path="label.text"]');
+    const before = (await state(page)).plans[fid].label.lines as string[];
+    const lines = page.locator(`[data-testid="label-text"][data-feature="${fid}"] [data-label-line]`);
+    await expect(lines).toHaveCount(before.length);
+    const canvas = () => lines.allTextContents();
+    const focused = () => text.evaluate((e) => document.activeElement === e);
+
+    await text.click();
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.press("Backspace");
+    // an empty text is the core's template (web_api.label_text), so the canvas keeps it; the document follows
+    await expect.poll(async () => (await state(page)).feature.label.text, { timeout: 2000 }).toBe("");
+    let typed = "";
+    for (const ch of "AB") {
+      await page.keyboard.type(ch);
+      typed += ch;
+      await expect.poll(canvas, { timeout: 2000 }).toEqual([typed]);
+      expect(await focused(), "still in the field").toBe(true);
+    }
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("CD");
+    await expect.poll(canvas, { timeout: 2000 }).toEqual(["AB", "CD"]);
+    await expect(lines).toHaveCount(2);
+    expect(await focused(), "still in the field").toBe(true);
+    expect((await state(page)).feature.label.text).toBe("AB\nCD");
+    await page.screenshot({ path: path.join(SHOTS, "label-live.png") });
+
+    // Esc: back to the text from when the field was focused
+    await page.keyboard.press("Escape");
+    await expect.poll(canvas, { timeout: 2000 }).toEqual(before);
+    expect(await focused()).toBe(false);
+    await idle(page);
+    expect((await state(page)).feature.label.text).toBe("#{ids}");
+    await expect(text).toHaveValue("#{ids}");
   });
 
   test("label · two lines stacked 1.4 caps apart, as the core stacks them; a 3D print draws the pixel ink", async ({ page }) => {

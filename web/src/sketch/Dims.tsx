@@ -9,6 +9,11 @@
 // they are being driven, or if you set them they turn white". The label's
 // offset is left out: "it's not something we need precision positioning of".
 //
+// WHY only what you set (Zach, 2026-10-18): "do not display measurements here
+// that you cannot control". The outer size and the rectangle's W and H are
+// left out (W × H stays in ShapeDims' box); a feature shows only the sizes
+// its type takes (CONTROLS).
+//
 // WHY screen-space rings: the core stands each dimension offset_mm outside
 // the rectangle, rings a few mm apart, which collapse into one line when
 // zoomed out. Here the core's order on each side is kept but the rings are
@@ -29,18 +34,21 @@ const EXT_OVER = 4;    // px an extension line runs past the dimension line
 const TEXT_H = 15;     // the value's chip height, px
 const FONT_PX = 11;
 
+/** The dims each marker type draws: the sizes typed into it, and only those. */
+const CONTROLS: Record<string, string[]> = {
+  single: ["marker.marker_mm"],
+  grid: ["marker.marker_mm", "marker.separation_mm"],
+  charuco: ["marker.checker_mm", "marker.marker_mm"],
+};
+
 /** Which dims stay when they would overlap: the first wins. */
-const PRIORITY = ["rect.w", "rect.h", "marker.marker_mm", "marker.checker_mm", "marker.separation_mm", "outer"];
+const PRIORITY = ["marker.marker_mm", "marker.checker_mm", "marker.separation_mm"];
 
 const NAMES: Record<string, string> = {
   "marker.marker_mm": "Marker", "marker.checker_mm": "Checker", "marker.separation_mm": "Separation",
-  outer: "Outer", "rect.w": "Rectangle W", "rect.h": "Rectangle H",
 };
 
 export const fmtDim = (v: number) => String(+v.toFixed(2));
-
-/** The rectangle's own sizes are the sketch's: always driving, never driven. */
-export const isRectDim = (field: string) => field === "rect.w" || field === "rect.h";
 
 /** A set marker size as typed. The core may draw it a hair off (a whole
  *  number of the preset's cells), so a set dim shows what drives it, as the
@@ -59,9 +67,8 @@ export interface LaidDim {
   value: number;
   /** what the value shows: the typed value when set, else the drawn one */
   text: string;
-  /** set (typed, or the rectangle's own size) vs driven */
+  /** set (typed) vs driven */
   set: boolean;
-  editable: boolean;
   bad: boolean;
   /** the measured points on the geometry, and the arrow tips (screen px) */
   a: Vec2; b: Vec2; p: Vec2; q: Vec2;
@@ -88,7 +95,8 @@ type Side = "top" | "bottom" | "left" | "right";
 
 /** Lay out the plan's dims for one feature in screen px (scr: sketch -> screen). */
 export function layoutDims(f: Feature, rect: RectShape, plan: MarkerPlan, scr: (p: Vec2) => Vec2, z: number): LaidDim[] {
-  const dims = (plan.dims ?? []).filter((d) => d.field !== "label.offset_mm" && Math.hypot(d.b[0] - d.a[0], d.b[1] - d.a[1]) > 1e-6);
+  const fields = CONTROLS[f.marker.type] ?? [];
+  const dims = (plan.dims ?? []).filter((d) => fields.includes(d.field) && Math.hypot(d.b[0] - d.a[0], d.b[1] - d.a[1]) > 1e-6);
   // each dim's side of the rectangle (its offset normal in the rectangle's frame) and how far its geometry is inside that edge
   const placed = dims.map((d, i) => {
     const u = unit(sub(d.b, d.a));
@@ -107,17 +115,17 @@ export function layoutDims(f: Feature, rect: RectShape, plan: MarkerPlan, scr: (
     placed.filter((x) => x.side === side).sort((x, y) => x.d.offset_mm - y.d.offset_mm || x.i - y.i).forEach((x, r) => rings.set(x.i, r));
   }
   const errors = new Set(plan.warnings.filter((w) => w.level === "error").map((w) => w.field));
-  const out = placed.map(({ d, i, nw, edge }) => laidOne(f, d, i, nw, edge * z + GAP + (rings.get(i) ?? 0) * RING, scr, plan, errors));
+  const out = placed.map(({ d, i, nw, edge }) => laidOne(f, d, i, nw, edge * z + GAP + (rings.get(i) ?? 0) * RING, scr, errors));
   return hideOverlaps(out);
 }
 
-function laidOne(f: Feature, d: Dimension, i: number, nw: Vec2, off: number, scr: (p: Vec2) => Vec2, plan: MarkerPlan, errors: Set<string>): LaidDim {
+function laidOne(f: Feature, d: Dimension, i: number, nw: Vec2, off: number, scr: (p: Vec2) => Vec2, errors: Set<string>): LaidDim {
   const A = scr(d.a), B = scr(d.b);
   const n = unit(sub(scr(add(d.a, nw)), A));
   const p = add(A, n, off), q = add(B, n, off);
   const dir = unit(sub(q, p));
   const span = Math.hypot(q[0] - p[0], q[1] - p[1]);
-  const set = isRectDim(d.field) || (d.field !== "outer" && isSet(f, d.field));
+  const set = isSet(f, d.field);
   const text = fmtDim((set ? typed(f, d.field) : null) ?? d.value_mm);
   const tw = textWidth(text, set) + 10;
   const inside = span >= 2 * ARROW + 4;
@@ -128,9 +136,9 @@ function laidOne(f: Feature, d: Dimension, i: number, nw: Vec2, off: number, scr
   // readable from below or from the right, as a drawing's dimensions are
   if (angle >= 90) angle -= 180;
   if (angle < -90) angle += 180;
-  const bad = d.field === "outer" ? plan.overflow_mm > 0 : set && errors.has(d.field);
+  const bad = set && errors.has(d.field);
   return {
-    key: `${d.field}:${i}`, field: d.field, value: d.value_mm, text, set, editable: d.field !== "outer", bad,
+    key: `${d.field}:${i}`, field: d.field, value: d.value_mm, text, set, bad,
     a: A, b: B, p, q, inside, fits, at, angle, tw,
   };
 }
@@ -172,8 +180,6 @@ const CSS = `
 .cad-dim.bad text { fill: var(--bad); font-weight: 600; }
 .cad-dim .val { cursor: text; }
 .cad-dim .val:hover .chip { stroke: var(--accent); stroke-width: 1; }
-.cad-dim.fixed .val { cursor: default; }
-.cad-dim.fixed .val:hover .chip { stroke: none; }
 `;
 
 /** An arrowhead, its tip first (the e2e reads the tip as the path's first point). */
@@ -201,7 +207,7 @@ export function Dims({ fid, dims, editing, onEdit }: {
         // arrows inside point out to the tips; outside they point in, on short leaders
         const l0 = d.inside ? d.p : add(d.p, dir, -(ARROW + 6));
         const l1 = d.fits ? d.q : add(d.at, dir, -d.tw / 2);
-        const cls = ["cad-dim", d.set ? "set" : "driven", d.bad && "bad", !d.editable && "fixed"].filter(Boolean).join(" ");
+        const cls = ["cad-dim", d.set ? "set" : "driven", d.bad && "bad"].filter(Boolean).join(" ");
         return (
           <g key={d.key} className={cls} data-dim={d.field} data-value={d.value} data-set={d.set ? "1" : "0"}>
             <line className="ext" x1={e0[0]} y1={e0[1]} x2={e1[0]} y2={e1[1]} />
@@ -212,9 +218,9 @@ export function Dims({ fid, dims, editing, onEdit }: {
             {editing !== d.field && (
               <g className="val" data-dim-label={d.field} transform={`rotate(${d.angle} ${d.at[0]} ${d.at[1]})`}
                 onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => d.editable && onEdit(d.field)}
-                onDoubleClick={() => d.editable && onEdit(d.field)}>
-                <title>{`${NAMES[d.field] ?? d.field}: ${d.text} mm, ${d.field === "outer" ? "driven (the plan's outline)" : d.set ? "set" : "driven"}`
+                onClick={() => onEdit(d.field)}
+                onDoubleClick={() => onEdit(d.field)}>
+                <title>{`${NAMES[d.field] ?? d.field}: ${d.text} mm, ${d.set ? "set" : "driven"}`
                   + (d.text !== fmtDim(d.value) ? ` (drawn ${fmtDim(d.value)} mm: whole cells)` : "")}</title>
                 <rect className="chip" x={d.at[0] - d.tw / 2} y={d.at[1] - TEXT_H / 2} width={d.tw} height={TEXT_H} rx={3} />
                 <text x={d.at[0]} y={d.at[1]} textAnchor="middle" dominantBaseline="central">{d.text}</text>
