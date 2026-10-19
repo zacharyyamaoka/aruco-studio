@@ -15,12 +15,13 @@ const PY = [path.join(ROOT, ".venv", "bin", "python"), path.join(ROOT, ".venv", 
 const MM_PX = 96 / 25.4;
 
 // eight rectangles (mm corners on the sketch), sizes repeated as a real
-// document's are: 4 x 35 x 25, 35 x 40, 3 x 45 x 25. Labelled (the default),
-// each sticker is its whole rectangle. On Letter the core packs them in
-// 12 cuts tight / 18 spaced for the fewest sheets, 9 / 14 for the fewest cuts
+// document's are: 3 x 40 x 25, 3 x 40 x 30, 2 x 35 x 35. Labelled (the
+// default), each sticker is its whole rectangle. On Letter, spaced with a
+// 40 mm gap, the core packs them on 1 page in 18 cuts for the fewest sheets,
+// on 2 pages in 17 for the fewest cuts
 const RECTS: [[number, number], [number, number]][] = [
-  [[-100, -45], [-65, -20]], [[-55, -45], [-20, -20]], [[-10, -45], [25, -20]], [[35, -45], [70, -20]],
-  [[-100, 5], [-65, 45]], [[-55, 10], [-10, 35]], [[0, 10], [45, 35]], [[55, 10], [100, 35]],
+  [[-100, -45], [-60, -20]], [[-50, -45], [-10, -15]], [[0, -45], [35, -10]], [[45, -45], [85, -20]],
+  [[-100, 10], [-60, 40]], [[-50, 5], [-15, 40]], [[-5, 10], [35, 35]], [[45, 10], [85, 40]],
 ];
 
 async function blank(page: Page): Promise<void> {
@@ -109,8 +110,6 @@ test.describe(`the Sheet dialog (${CORE} core)`, () => {
         results[mode][objective] = got;
       }
       expect(results[mode].fewest_cuts.cuts).toBeLessThanOrEqual(results[mode].fewest_sheets.cuts);
-      // this document was picked so that switching shows: the cuts change
-      expect(results[mode].fewest_cuts.cuts).toBeLessThan(results[mode].fewest_sheets.cuts);
       expect(results[mode].fewest_sheets.pages).toBeLessThanOrEqual(results[mode].fewest_cuts.pages);
     }
     console.log("sheet stats", JSON.stringify(Object.fromEntries(Object.entries(results).map(([m, r]) =>
@@ -133,18 +132,25 @@ test.describe(`the Sheet dialog (${CORE} core)`, () => {
     expect(box.height).toBeCloseTo(parseFloat(h!) * MM_PX, 0);
     await expect(page.getByTestId("sheet-page-tabs")).toHaveCount((await shown(page)).pages > 1 ? 1 : 0);
     await page.getByTestId("print-mode").locator('[data-value="fit"]').click();
-    await page.getByTestId("sheet-objective").locator('[data-value="fewest_cuts"]').click();
-    expect(await shown(page)).toMatchObject({ cuts: results.spaced.fewest_cuts.cuts });
+
+    // a 40 mm gap: Fewest sheets keeps one page; Fewest cuts saves a cut on
+    // a second page, and a tab per page appears
+    const gap = page.locator('[data-testid="sheet-gap"] input');
+    await page.getByTestId("sheet-objective").locator('[data-value="fewest_sheets"]').click();
+    await gap.fill("40");
+    await gap.press("Enter");
+    const compact = await shown(page);
+    expect(compact.request).toMatchObject({ mode: "spaced", objective: "fewest_sheets", gap_mm: 40 });
+    expect(compact).toMatchObject(core(compact.request));
+    await expect(page.getByTestId("sheet-page-tabs")).toHaveCount(compact.pages > 1 ? 1 : 0);
     fs.mkdirSync(SHOTS, { recursive: true });
     await page.screenshot({ path: path.join(SHOTS, "sheet-dialog.png") });
-
-    // a wide gap takes more pages: one tab per page, each showing its page
-    const gap = page.locator('[data-testid="sheet-gap"] input');
-    await gap.fill("60");
-    await gap.press("Enter");
+    await page.getByTestId("sheet-objective").locator('[data-value="fewest_cuts"]').click();
     const wide = await shown(page);
-    expect(wide.request.gap_mm).toBe(60);
+    expect(wide.request).toMatchObject({ mode: "spaced", objective: "fewest_cuts", gap_mm: 40 });
     expect(wide).toMatchObject(core(wide.request));
+    expect(wide.cuts, "switching Optimize changes the cuts").toBeLessThan(compact.cuts);
+    expect(compact.pages).toBeLessThanOrEqual(wide.pages);
     expect(wide.pages).toBeGreaterThan(1);
     const tabs = page.getByTestId("sheet-page-tab");
     await expect(tabs).toHaveCount(wide.pages);

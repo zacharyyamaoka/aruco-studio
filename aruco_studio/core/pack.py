@@ -49,8 +49,8 @@ candidate's index breaks the last tie, so the result is deterministic.
 That is objective "fewest_sheets" (the default). Zach, 2026-10-18: "there
 are two things to optimize for btw: one is fewest cut lines, one is most
 compact (fewest number of sheets)". Objective "fewest_cuts" ranks the cuts
-first, then the bins (it may take more), and also tries the variants that
-line cuts up (`_variants`).
+first, then the bins (it may take more). Both also try the variants that
+line cuts up (`_variants`): they sometimes fit a bin fewer as well.
 
 ### The API
 
@@ -335,13 +335,13 @@ def _size_key(b: Box):
     return tuple(sorted(tuple(round(v, ND) for v in s[:2]) for s in _sizes(b)))
 
 
-def _turned_all(boxes: Sequence[Box], flat: bool):
+def _turned_all(boxes: Sequence[Box], flat: bool, bin_w: float, bin_h: float):
     """Every box that may turn turned the same way (its long side across
-    when `flat`, else along), none left free to turn: equal boxes line up.
-    -> (boxes, turned flags)."""
+    when `flat`, else along) where that way fits the bin, none left free to
+    turn: equal boxes line up. -> (boxes, turned flags)."""
     out, flags = [], []
     for b in boxes:
-        sizes = _sizes(b)
+        sizes = [s for s in _sizes(b) if s[0] <= bin_w + _EPS and s[1] <= bin_h + _EPS]
         w, h, t = sizes[0]
         for sw, sh, st in sizes[1:]:
             if (sw > sh + _EPS if flat else sh > sw + _EPS) and not (
@@ -353,25 +353,22 @@ def _turned_all(boxes: Sequence[Box], flat: bool):
     return out, flags
 
 
-def _variants(boxes: Sequence[Box], bin_w: float, bin_h: float, more: bool):
-    """(how, places, extra) of every variant pack tries: ORDERS x CHOICES x
-    SPLITS, and with `more` (objective "fewest_cuts") the extras that line
-    cuts up -- every box turned the same way (the long side across, or
-    along), and equal boxes packed together, the most numerous size first.
-    Measured (2026-10-18, 400 sets with repeated sizes): each family wins
-    some; each size on bins of its own never did (every bin adds its edge
-    cuts), so it is not tried."""
+def _variants(boxes: Sequence[Box], bin_w: float, bin_h: float):
+    """(how, places) of every variant pack tries: ORDERS x CHOICES x SPLITS,
+    then the ones that line cuts up -- every box turned the same way (the
+    long side across, or along), and equal boxes packed together, the most
+    numerous size first. Measured (2026-10-18, 400 sets with repeated
+    sizes): each family wins some; each size on bins of its own never did
+    (every bin adds its edge cuts), so it is not tried."""
     for oi, (oname, _f) in enumerate(ORDERS):
         for choice in CHOICES:
             for split in SPLITS:
                 yield ("%s, %s, %s" % (oname, choice, split),
-                       guillotine(boxes, bin_w, bin_h, oi, choice, split), False)
-    if not more:
-        return
+                       guillotine(boxes, bin_w, bin_h, oi, choice, split))
     for flat in (True, False):
         if not any(b.turn for b in boxes):
             break                                   # nothing turns: the variants above
-        turned, flags = _turned_all(boxes, flat)
+        turned, flags = _turned_all(boxes, flat, bin_w, bin_h)
         for oi, (oname, _f) in enumerate(ORDERS):
             for choice in CHOICES:
                 for split in SPLITS:
@@ -379,7 +376,7 @@ def _variants(boxes: Sequence[Box], bin_w: float, bin_h: float, more: bool):
                     yield ("%s turned %s, %s, %s" % ("flat" if flat else "upright", oname,
                                                      choice, split),
                            [p if p is None else p._replace(turned=flags[k])
-                            for k, p in enumerate(got)], True)
+                            for k, p in enumerate(got)])
     groups: dict = {}
     for k, b in enumerate(boxes):
         groups.setdefault(_size_key(b), []).append(k)
@@ -391,7 +388,7 @@ def _variants(boxes: Sequence[Box], bin_w: float, bin_h: float, more: bool):
     for choice in CHOICES:
         for split in SPLITS:
             yield ("same size, %s, %s" % (choice, split),
-                   _run(boxes, bin_w, bin_h, seq, choice, split), True)
+                   _run(boxes, bin_w, bin_h, seq, choice, split))
 
 
 OBJECTIVES = ("fewest_sheets", "fewest_cuts")
@@ -417,9 +414,8 @@ def pack(boxes: Sequence[Box], bin_w: float, bin_h: float, gap: float = 0.0,
     `objective` (Zach, 2026-10-18: "two things to optimize for ... one is
     fewest cut lines, one is most compact (fewest number of sheets)"):
     "fewest_sheets" ranks the variants by bins, then cuts; "fewest_cuts" by
-    cuts (on each box's `cut`), then bins, and tries more variants
-    (`_variants`) -- never on fewer bins than "fewest_sheets" finds, so that
-    one stays the most compact."""
+    cuts (on each box's `cut`), then bins. Both rank the same variants, so
+    fewest_cuts never cuts more and fewest_sheets never takes more bins."""
     if objective not in OBJECTIVES:
         raise ValueError("objective is one of %s (got %r)" % (", ".join(OBJECTIVES), objective))
     cuts_first = objective == "fewest_cuts"
@@ -446,17 +442,10 @@ def pack(boxes: Sequence[Box], bin_w: float, bin_h: float, gap: float = 0.0,
     best = None
     seen: dict = {}                     # a bin's rects -> its cuts (variants often agree)
     k = 0
-    fewest = None                       # the fewest bins of the variants "fewest_sheets" tries
-    for how, got, extra in _variants(grown, bin_w + gap, bin_h + gap, cuts_first):
+    for how, got in _variants(grown, bin_w + gap, bin_h + gap):
         places = [p._replace(w=p.w - gap, h=p.h - gap) for p in got]
         nb = 1 + max((p.bin for p in places), default=-1)
         k += 1
-        if not extra:
-            fewest = nb if fewest is None else min(fewest, nb)
-        elif nb < fewest:
-            # WHY: Fewest cuts never shows fewer sheets than Fewest sheets, and
-            # the default ("fewest_sheets") stays today's search
-            continue
         if best is not None and not cuts_first and nb > best[0][0]:
             continue                    # more bins never wins: skip counting its cuts
         cuts = 0
