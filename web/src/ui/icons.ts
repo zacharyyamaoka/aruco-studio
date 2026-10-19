@@ -30,6 +30,8 @@ export const GLYPHS: Record<string, string> = {
   clock: `<circle cx="8" cy="8" r="6" fill="none" ${S} stroke-width="1.3"/><path d="M8 4.5V8l2.5 1.5" fill="none" ${S} stroke-width="1.3"/>`,
   star: `<path d="M8 1.6l1.9 4 4.4.5-3.3 3 .9 4.3L8 11.2l-3.9 2.2.9-4.3-3.3-3 4.4-.5z" fill="${A}"/>`,
   cube: `<path d="M8 1.5l6 3v7l-6 3-6-3v-7zM2 4.5l6 3 6-3M8 7.5v7" fill="none" ${S}/>`,
+  // a tray with a down arrow: "Download for CAD" (WHY not the cube: the brand mark is a cube now)
+  download: `<path d="M8 2v8M4.5 6.5L8 10l3.5-3.5M2.5 11v2.5h11V11" fill="none" ${S}/>`,
   label: `<path d="M1.5 4.5h9l4 3.5-4 3.5h-9z" fill="none" ${S}/><path d="M4 9.5 5.6 6h.8L8 9.5M4.5 8.5h3" fill="none" stroke="${A}" stroke-width="1.2"/>`,
   marker: `<path fill-rule="evenodd" fill="currentColor" d="M2 2h12v12H2zM4.5 4.5H7V7H4.5zM9 7h2.5v2.5H9zM4.5 9H7v2.5H4.5z"/>`,
 };

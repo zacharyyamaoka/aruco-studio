@@ -51,7 +51,7 @@ export function CoreChip() {
 function CadMenu() {
   const none = () => {};
   return (
-    <Menu icon="cube" label="Download for CAD" testid="menu-cad" align="end">
+    <Menu icon="download" label="Download for CAD" testid="menu-cad" align="end">
       <MenuItem icon="cube" testid="cad-fusion" disabled onClick={none} hint="coming soon"
         label={<span className="cad-item"><b>Fusion 360</b><span className="cad-note">the add-in is being rebuilt on this core</span></span>} />
       <MenuItem icon="cube" testid="cad-onshape" disabled onClick={none} hint="coming soon"
