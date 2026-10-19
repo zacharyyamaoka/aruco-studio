@@ -1656,15 +1656,24 @@ def _pdf_ops(pg: _Ops) -> bytes:
     return "\n".join(out).encode("ascii")
 
 
-def _pdf_doc(pages: List[bytes], page_mm, title: str) -> bytes:
-    """PDF 1.4 bytes from page content streams (render_layout_pdf's file)."""
+def _pdf_doc(pages: List[bytes], page_mm, title: str, print_scaling: bool = False) -> bytes:
+    """PDF 1.4 bytes from page content streams (render_layout_pdf's file).
+    `print_scaling`: the catalog render_layout_pdf writes (REF's): /Version
+    /1.6 and /ViewerPreferences << /PrintScaling /None >>, so the viewer's
+    print dialog starts at Actual size, not "fit"."""
     page_w, page_h = page_mm
     objects: List[bytes] = []
 
     def add(body: bytes) -> int:
         objects.append(body)
         return len(objects)
-    add(b"<< /Type /Catalog /Pages 2 0 R >>")
+    if print_scaling:
+        # /Version: PrintScaling is PDF 1.6; the catalog's version overrides
+        # the header's (PDF 1.4 section 3.6.1), as in render_layout_pdf
+        add(b"<< /Type /Catalog /Version /1.6 /Pages 2 0 R "
+            b"/ViewerPreferences << /PrintScaling /None >> >>")
+    else:
+        add(b"<< /Type /Catalog /Pages 2 0 R >>")
     add(b"")
     font = add(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica "
                b"/Encoding /WinAnsiEncoding >>")
@@ -1695,13 +1704,21 @@ def _pdf_doc(pages: List[bytes], page_mm, title: str) -> bytes:
     return bytes(out)
 
 
-def render_sticker_pdf(layout: StickerLayout, date: Optional[str] = None) -> bytes:
+def render_sticker_pdf(layout: StickerLayout, date: Optional[str] = None,
+                       print_scaling: bool = False) -> bytes:
     """The sticker sheet as PDF 1.4 (vectors; the MediaBox is the page, so a
-    viewer's default scale is 1:1)."""
+    viewer's default scale is 1:1). `print_scaling`: the catalog also asks
+    the print dialog for 100 % (/PrintScaling /None, _pdf_doc)."""
+    # WHY opt-in, not on by default: every sheet.pdf written so far (the
+    # Studio's print bundle, the server's /api sheet, the tests that pin two
+    # renders equal) keeps its bytes; the online Studio's facade
+    # (web_api.sheet), which the Fusion adapter prints from, asks for it, so
+    # the adapter no longer patches the PDF it is handed (N-6, 2026-10-18).
     date = date or datetime.date.today().isoformat()
     total = max(1, layout.page_count)
     pages = [_pdf_ops(sticker_page_ops(layout, i, date)) for i in range(total)]
-    return _pdf_doc(pages, layout.page_mm, layout.settings.title or "ArUco sticker sheet")
+    return _pdf_doc(pages, layout.page_mm, layout.settings.title or "ArUco sticker sheet",
+                    print_scaling=print_scaling)
 
 
 def _xml(t: str) -> str:

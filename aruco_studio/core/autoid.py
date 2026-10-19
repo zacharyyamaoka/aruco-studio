@@ -30,6 +30,14 @@ DICT_4X4_1000, so the two share ids; 4x4 and 5x5 never collide).
        the typed id and it comes back), as numbering holds an overridden
        copy's, and is handed out only when nothing else is free.
 
+`reserved` (IdRequest.reserved, the Fusion adapter's N-6 ask): ids that are
+never handed out -- markers already printed by an older tool. One list for
+every family (id 3 reserved is 3 in DICT_4X4_* and in DICT_5X5_*). A driven
+item never takes one (a ledger id that now covers one moves, with a
+warning); a typed id on one keeps its number and gets an error, as two typed
+ranges that overlap do. Not covered: per-copy ids for the occurrences of one
+component -- every item here is one feature with one block of ids.
+
 WHY the ledger and not the hash keeps ids still: small dictionaries collide
 often -- 10 keys hashed into DICT_4X4_50 share a preferred id 62 % of the
 time (the birthday bound; 17 % in DICT_4X4_250) -- so which of two colliding
@@ -136,12 +144,24 @@ def _bigger(it: Item, taken: Dict[int, str]) -> Optional[str]:
     return None
 
 
-def assign(items, ledger: Optional[Dict[str, int]] = None) -> dict:
+def reserved_of(reserved) -> List[int]:
+    """The reserved ids, checked: whole numbers >= 0 (else ValueError), sorted."""
+    out = set()
+    for v in reserved or ():
+        if _whole(v, "reserved id") < 0:
+            raise ValueError(f"reserved id: 0 or more, got {v!r}")
+        out.add(v)
+    return sorted(out)
+
+
+def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None) -> dict:
     """{items: [{key, first_id, ids, driven}] in the request's order, ledger:
     the updated {key: first id}, warnings: [Issue with key]} (contract
     IdResult). An item that cannot get ids (out of its dictionary, or the
-    dictionary is full) comes back with ids [] and an error."""
+    dictionary is full) comes back with ids [] and an error. `reserved`:
+    ids never handed out, in any family (see the module's words)."""
     its = [item_of(d) for d in (items or [])]
+    res = set(reserved_of(reserved))
     seen = set()
     for it in its:
         if it.key in seen:
@@ -157,10 +177,14 @@ def assign(items, ledger: Optional[Dict[str, int]] = None) -> dict:
     warnings: List[dict] = []
 
     def clash(it: Item, start: int, avoid_held: bool = False) -> List[str]:
+        """The keys printing (or, avoid_held, holding) any id of the block;
+        avoid_held (the driven probe) also counts a reserved id, as "reserved"."""
         taken = claims.get(it.family, {})
         hold = held.get(it.family, {}) if avoid_held else {}
-        return sorted({m.get(start + k) for m in (taken, hold) for k in range(it.count)}
-                      - {None})
+        got = {m.get(start + k) for m in (taken, hold) for k in range(it.count)} - {None}
+        if avoid_held and on_reserved(it, start):
+            got.add("reserved")
+        return sorted(got)
 
     def take(it: Item, start: int, driven: bool) -> None:
         taken = claims.setdefault(it.family, {})
@@ -177,6 +201,12 @@ def assign(items, ledger: Optional[Dict[str, int]] = None) -> dict:
     def fits(it: Item, start: int) -> bool:
         return 0 <= start and start + it.count <= it.capacity
 
+    def on_reserved(it: Item, start: int) -> List[int]:
+        return [start + k for k in range(it.count) if start + k in res]
+
+    def ids_words(ids: List[int]) -> str:
+        return ("id " if len(ids) == 1 else "ids ") + ", ".join(map(str, ids))
+
     # 1. the ledger: printed ids never move
     for it in order:
         if it.first_id is not None or it.key not in led:
@@ -186,6 +216,12 @@ def assign(items, ledger: Optional[Dict[str, int]] = None) -> dict:
             warnings.append(_issue("warn", it.key,
                                    f"its ledger id {_label(start, it.count)} is not in "
                                    f"{it.dictionary} (0..{it.capacity - 1}) any more: it moves"))
+            continue
+        hit = on_reserved(it, start)
+        if hit:
+            warnings.append(_issue("warn", it.key,
+                                   f"its ledger ids {_label(start, it.count)} cover reserved "
+                                   f"{ids_words(hit)}: it moves"))
             continue
         hit = clash(it, start)
         if hit:
@@ -210,6 +246,11 @@ def assign(items, ledger: Optional[Dict[str, int]] = None) -> dict:
             continue
         hit = clash(it, start)
         take(it, start, False)
+        mine = on_reserved(it, start)
+        if mine:
+            warnings.append(_issue("error", it.key,
+                                   f"{_label(start, it.count)} covers reserved {ids_words(mine)} "
+                                   "(never handed out): it keeps its ids, change it"))
         if hit:
             warnings.append(_issue("error", it.key,
                                    f"{_label(start, it.count)} overlaps {', '.join(hit)}: both "
@@ -233,8 +274,8 @@ def assign(items, ledger: Optional[Dict[str, int]] = None) -> dict:
         want = preferred(it.key, it.dictionary, it.count, it.capacity)
         starts = list(range(want, it.capacity - it.count + 1)) + list(range(0, want))
         start = next((s for s in starts if not clash(it, s, True)), None)
-        if start is None:
-            start = next((s for s in starts if not clash(it, s)), None)
+        if start is None:                          # a held block, never a reserved one
+            start = next((s for s in starts if not clash(it, s) and not on_reserved(it, s)), None)
             if start is not None:
                 whose = sorted({held[it.family][start + k] for k in range(it.count)
                                 if start + k in held.get(it.family, {})})
@@ -244,7 +285,7 @@ def assign(items, ledger: Optional[Dict[str, int]] = None) -> dict:
                                        f"takes {_label(start, it.count)}, held for "
                                        f"{', '.join(whose)} (typed now)"))
         if start is None:
-            bigger = _bigger(it, claims.get(it.family, {}))
+            bigger = _bigger(it, {**{i: "reserved" for i in res}, **claims.get(it.family, {})})
             need = "id" if it.count == 1 else f"block of {it.count} ids"
             warnings.append(_issue("error", it.key,
                                    f"{it.dictionary} is full ({it.capacity} ids): no free {need} "

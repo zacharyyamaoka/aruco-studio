@@ -26,6 +26,7 @@ Fusion composes a Joint Origin: core.geometry.jo_compose).
 | `reference_face` | the target is a "profile" with a body (Flip does not apply) else "free" |
 | `label` on (2026-10-18) | core.rect_fill.fill: a band inside the rectangle on `label.side`; the marker is planned in the box it leaves (the target), centred there; "sans" text for an inkjet preset, the pixel font's ink for 3D |
 | `marker.origin_square` | core.rect_fill.square_origin on OpenCV's board frame |
+| `MarkerPlan.layers`, `cells`, `pattern_to_sketch`, `origin_z_mm` (CAD shells, N-6) | the TagPlan's `layers` placed like `black`; core.markers.cell_boxes; the matrix `black` is placed with; `origin`'s z (the printed surface: inkjet t, 3D the tile's top, on a face 0; Flip negates) |
 
 Issue fields: the core's key paths renamed (FIELDS); the page lint ("Over
 the page ...") and the cell / make rows -> "preset"; target -> "rect".
@@ -45,6 +46,7 @@ from .core import autosize as _A
 from .core import dictionary as _D
 from .core import label as _AL
 from .core import make as _MK
+from .core import markers as _M
 from .core import presets as _P
 from .core import rect_fill as _RF
 from .core import sheet as _SH
@@ -70,6 +72,7 @@ LABEL_CAP = _RF.LABEL_CAP          # height 0: 0.12 x the short side, within 2.5
 CAP_EM = _SH.CAP_EM                 # Helvetica's cap height / em (core.sheet prints the label with it)
 ND = 6                              # JSON numbers: 1e-6 mm
 ND_DIM = 9                          # a dimension's endpoints (plan_dims)
+SNAP_TOL_MM = 1e-6                  # inscribe: an edge this near a 0.1 mm grid line is on it
 
 
 def _r(v) -> float:
@@ -321,6 +324,18 @@ def rect_matrix(rect: dict):
             0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
 
 
+def line_centres(fl) -> list:
+    """Each line's centre in the rectangle's own frame (its cap box's: the
+    baseline at y - cap / 2), as the core stacks the lines: sans as
+    rect_fill's runs, pixel as core.label.block_boxes (LINE_GAP_PX pixels
+    between lines), every line centred on the block's x."""
+    if fl.font != "pixel":
+        return [t.at for t in fl.runs]
+    top = fl.at[1] + fl.block[1] / 2.0
+    pitch = fl.cap + _AL.LINE_GAP_PX * fl.stroke
+    return [(fl.at[0], top - fl.cap / 2.0 - k * pitch) for k in range(len(fl.drawn))]
+
+
 def placed_label(req: dict, kind: str, dictionary: str, ids: list, fl=None):
     """The contract's PlacedLabel: inside the rectangle, its text block's
     centre `at` (the band's centre + offset_mm, both in the rectangle's own
@@ -332,6 +347,7 @@ def placed_label(req: dict, kind: str, dictionary: str, ids: list, fl=None):
     R = rect_matrix(rect)
     return {"text": "\n".join(fl.lines), "at": _pt(R, *fl.at), "height_mm": _r(fl.cap),
             "angle_deg": _r(float(rect.get("angle_deg") or 0.0)), "lines": list(fl.lines),
+            "lines_at": [_pt(R, *c) for c in line_centres(fl)],
             "font": fl.font,
             "polygons": [{"outer": _loop(R, _rect_loop(r), True), "holes": []} for r in fl.ink],
             "box": _loop(R, _rect_loop(fl.band), True)}
@@ -368,6 +384,26 @@ def presets() -> list:
     return [flat_preset(p) for p in _builtins()]
 
 
+def _plain_rect(loops):
+    """(x0, y0, x1, y1) when the profile is ONE loop that is its own
+    axis-aligned bounding box (extra points along its edges allowed), else
+    None. A simple loop inside its box has the box's area only when it is
+    the box."""
+    if len(loops) != 1:
+        return None
+    pts = [(float(u), float(v)) for u, v in loops[0]]
+    x0, x1 = min(p[0] for p in pts), max(p[0] for p in pts)
+    y0, y1 = min(p[1] for p in pts), max(p[1] for p in pts)
+    box = (x1 - x0) * (y1 - y0)
+    if not box > 0:
+        return None
+    on_edge = all(min(abs(u - x0), abs(u - x1)) <= SNAP_TOL_MM
+                  or min(abs(v - y0), abs(v - y1)) <= SNAP_TOL_MM for u, v in pts)
+    if not on_edge or abs(abs(_area2(pts)) / 2.0 - box) > 1e-9 * box:
+        return None
+    return x0, y0, x1, y1
+
+
 def inscribe(profile: dict, holes: str = "avoid"):
     """The largest clear axis-aligned rectangle in a profile (mm), or None."""
     loops = [lp for lp in (profile or {}).get("loops") or [] if len(lp) >= 3]
@@ -375,6 +411,15 @@ def inscribe(profile: dict, holes: str = "avoid"):
         loops = loops[:1]
     if not loops:
         return None
+    box = _plain_rect(loops)
+    if box is not None:
+        # WHY exact (the Fusion adapter's N-6 report, 2026-10-18): a 50 x 80
+        # face came back 50 x 79.9 -- the search is within CLEAR_EPS_M of the
+        # optimum, and the inward snap then took a whole 0.1 mm. A profile
+        # that is itself the rectangle, nothing in its way, is the answer.
+        x0, y0, x1, y1 = box
+        return {"cx": _r((x0 + x1) / 2.0), "cy": _r((y0 + y1) / 2.0),
+                "w": _r(x1 - x0), "h": _r(y1 - y0), "angle_deg": 0.0}
     got = _A.largest_clear_rect([[(float(u) / 1000.0, float(v) / 1000.0) for u, v in lp]
                                  for lp in loops])
     if got is None:
@@ -382,10 +427,12 @@ def inscribe(profile: dict, holes: str = "avoid"):
     # WHY snap inward to 0.1 mm: the search returns sizes like 49.9646 mm, and
     # the rectangle becomes an ordinary sketch rectangle Zach reads and edits
     # (and a CAD sketch dimension). Moving each edge inward to the 0.1 mm grid
-    # keeps it inside the profile and gives numbers a person would type.
+    # keeps it inside the profile and gives numbers a person would type. An
+    # edge within SNAP_TOL_MM of a grid line is on it (not pushed one further in).
     cx, cy, w, h = (got[k] * 1000.0 for k in ("cx", "cy", "w", "h"))
-    x0, x1 = math.ceil((cx - w / 2.0) * 10.0 - 1e-9) / 10.0, math.floor((cx + w / 2.0) * 10.0 + 1e-9) / 10.0
-    y0, y1 = math.ceil((cy - h / 2.0) * 10.0 - 1e-9) / 10.0, math.floor((cy + h / 2.0) * 10.0 + 1e-9) / 10.0
+    t = SNAP_TOL_MM * 10.0
+    x0, x1 = math.ceil((cx - w / 2.0) * 10.0 - t) / 10.0, math.floor((cx + w / 2.0) * 10.0 + t) / 10.0
+    y0, y1 = math.ceil((cy - h / 2.0) * 10.0 - t) / 10.0, math.floor((cy + h / 2.0) * 10.0 + t) / 10.0
     if x1 <= x0 or y1 <= y0:
         return None
     return {"cx": _r((x0 + x1) / 2.0), "cy": _r((y0 + y1) / 2.0),
@@ -511,6 +558,40 @@ def plan_dims(req: dict, d: dict, fl, L, lay: dict) -> list:
              "b": pt(*g["b"]), "offset_mm": _r(g["offset_mm"])} for g in got]
 
 
+def cad_layers(d: dict, M) -> list:
+    """The contract's `layers`: the TagPlan's layers (plan/layers.py: REF's
+    bodies in build order) placed in the sketch by M -- polygons as `black`,
+    z along the sketch normal (Flip turns the marker over: [lo, hi] becomes
+    [-hi, -lo]). The web's settings (mode auto, corner mark none / triangle)
+    only build "add" steps; a "sub" step (a cut tool inside its part:
+    white mode, black_cut marks) has no place in the contract's shape and
+    is not sent."""
+    out = []
+    for L in d["layers"]:
+        if L["step"] != "add":
+            continue
+        z = sorted(_r(M[10] * v + M[11]) for v in L["z"])
+        out.append({"name": L["name"], "part": L["part"], "colour": L["colour"], "op": L["op"],
+                    "z": z,
+                    "polygons": [{"outer": _loop(M, p["outer"], True),
+                                  "holes": [_loop(M, hl, False) for hl in p.get("holes", [])]}
+                                 for p in L["polygons"]]})
+    return out
+
+
+def pattern_cells(d: dict) -> list:
+    """The contract's `cells`: the black as disjoint axis-aligned boxes
+    [u0, v0, u1, v1] (mm) in the PATTERN frame -- core.markers.cell_boxes,
+    the boxes plan/layers.py extrudes for the cells (a board's squares and
+    markers: core.board.black_rects_m). The corner triangle is not a box:
+    it is its own layer ("mark_triangle")."""
+    spec = _M.TagSpec.from_dict(d["marker"], lambda _t: None, "plan")
+    if spec is None:
+        return []
+    return [[_r(x0 * 1000.0), _r(y0 * 1000.0), _r(x1 * 1000.0), _r(y1 * 1000.0)]
+            for x0, y0, x1, y1 in _M.cell_boxes(spec)]
+
+
 def _summary(kind, dictionary, ids, lay, outer_mm) -> str:
     idw = "#%d" % ids[0] if len(ids) == 1 else "#%d–%d" % (ids[0], ids[-1])
     head = "Single" if kind == "single" else f"{TYPE_WORDS[kind]} {lay['cols']}×{lay['rows']}"
@@ -568,6 +649,8 @@ def plan(req: dict) -> dict:
             "auto": bool(m.get("auto")), "overflow_mm": overflow,
             "origin": origin, "label": placed_label(req, kind, mk["dictionary"], ids, fl),
             "dims": plan_dims(req, d, fl, L, lay),
+            "layers": cad_layers(d, M), "cells": pattern_cells(d),
+            "pattern_to_sketch": [_r(v) for v in M], "origin_z_mm": origin[11],
             "summary": _summary(kind, mk["dictionary"], ids, lay, outer_mm),
             "warnings": issues}
 
@@ -696,7 +779,10 @@ def sheet(req: dict, date=None) -> dict:
     straight cuts that free every sticker on all pages; `fill`: sticker area
     / printable area over all pages. `objective` (core.pack): "fewest_sheets"
     (default: the fewest pages, then the fewest cuts) or "fewest_cuts" (the
-    fewest cuts, then the fewest pages)."""
+    fewest cuts, then the fewest pages). `placements`: where each printed
+    request item landed (its index, page, box from the page's top-left in
+    mm, y down, and its turn), in item order. The PDF asks the viewer to
+    print at 100 % (core.sheet.render_sticker_pdf print_scaling)."""
     def is_box(cut) -> bool:
         # a sticker's cut outline is its own bounding box (no holes)
         pts = (cut or {}).get("outer") or []
@@ -707,6 +793,7 @@ def sheet(req: dict, date=None) -> dict:
         return not cut.get("holes") and len(pts) == 4 and len(xs) == 2 and len(ys) == 2
 
     items, warnings = [], []
+    index = {}                                     # a PrintItem's key -> its request item
     first = None
     for i, it in enumerate(req.get("items") or []):
         d, issues = _plan(it)
@@ -724,6 +811,7 @@ def sheet(req: dict, date=None) -> dict:
                f"{idw} · {_AL.dict_short(d['marker']['dictionary'])} · "
                f"{_mm(d['marker']['marker_length_m'] * 1000.0)} mm")
         p.key, p.caption = f"m{i + 1}", cap
+        index[p.key] = i
         if lab:
             # WYSIWYG (Zach, 2026-10-18): the sticker is the whole marker
             # rectangle, with the label inside it as the sketch has it
@@ -759,10 +847,14 @@ def sheet(req: dict, date=None) -> dict:
                          "text": f"{r.item.caption or r.item.key} is not printed: {r.reason}"})
     for t in lay.warnings:
         warnings.append({"field": "preset", "level": "warn", "text": t})
-    pdf = _SH.render_sticker_pdf(lay, date=date)
+    pdf = _SH.render_sticker_pdf(lay, date=date, print_scaling=True)
+    placements = sorted(({"item": index[p.item.key], "page": p.page, "x_mm": _r(p.x_mm),
+                          "y_mm": _r(p.y_mm), "w_mm": _r(p.w_mm), "h_mm": _r(p.h_mm),
+                          "rotation": int(p.rotation)} for p in lay.placed),
+                        key=lambda q: q["item"])
     return {"pages": lay.page_count, "svg": pages,
             "pdf_base64": base64.b64encode(pdf).decode("ascii"), "warnings": warnings,
-            "cuts": lay.cuts(), "fill": _r(lay.fill())}
+            "cuts": lay.cuts(), "fill": _r(lay.fill()), "placements": placements}
 
 
 
