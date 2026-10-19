@@ -95,7 +95,16 @@ export interface Preset {
   cell_step_mm?: number;     // cells snap to multiples of this (3D: the line width); 0 = no snap
 }
 
+/** What the sticker is cut to (Zach, 2026-10-18): the whole profile, the
+ *  marker rectangle (default: "we draw the outer allowed shape, and expect a
+ *  sticker that is that shape"), or just the marker (its quiet zone). Everything
+ *  inside the cut is white; exports always carry that white. */
+export type Trim = "profile" | "rectangle" | "marker";
+
 export interface PlanRequest {
+  trim?: Trim;               // default "rectangle"
+  /** the face / profile the rectangle came from; needed for trim "profile" */
+  profile?: Profile;
   rect: Rect;
   marker: MarkerParams;
   label: LabelParams;
@@ -140,7 +149,8 @@ export interface MarkerPlan {
   // geometry, already placed in the sketch frame (rect centre, angle, turn, flip)
   black: Polygon[];          // the ink
   outer: Loop;               // the white outline (quiet-zone edge)
-  cut?: Loop;                // the sticker's cut line: the marker rectangle (marker + label inside)
+  cut?: Loop;                // the sticker's cut line (outer loop), per `trim`: rectangle, profile or marker
+  cut_shape?: Polygon;       // the same with holes (a profile's holes are cut out); white fills it
   outer_mm: Vec2;            // its width and height in the marker's own frame
   marker_mm: number;
   checker_mm: number;        // 0 unless ChArUco
