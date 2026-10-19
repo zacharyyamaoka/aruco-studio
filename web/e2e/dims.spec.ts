@@ -295,14 +295,17 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
     const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByTestId("cmd-open").click()]);
     await chooser.setFiles({ name: "two-lines.arucostudio-web.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(doc)) });
     await idle(page);
-    await expect.poll(async () => (await state(page)).plans.f1?.label?.lines).toEqual(["PLATE", "#0"]);
+    // auto id (2026-10-18): an untouched feature gets its hashed id, not 0
+    await expect.poll(async () => (await state(page)).plans.f1?.label?.lines?.length).toBe(2);
     let s = await state(page);
+    const want2 = ["PLATE", `#${s.plans.f1.ids[0]}`];
+    expect(s.plans.f1.label.lines).toEqual(want2);
     const label = s.plans.f1.label;
     expect(label.font).toBe("sans");
 
     const lines = page.locator('[data-testid="label-text"] [data-label-line]');
     await expect(lines).toHaveCount(2);
-    expect(await lines.allTextContents()).toEqual(["PLATE", "#0"]);
+    expect(await lines.allTextContents()).toEqual(want2);
     const [b0, b1] = [(await lines.nth(0).boundingBox())!, (await lines.nth(1).boundingBox())!];
     expect(b0.height).toBeCloseTo(b1.height, 3);       // one font size: the boxes' tops are the baselines' pitch apart
     const want = 1.4 * label.height_mm * s.camera.zoom;
