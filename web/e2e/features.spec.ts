@@ -157,7 +157,10 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     const first = page.locator('input[data-path="marker.first_id"]');
     const autoId = await first.inputValue();
     expect(Number(autoId)).toBe(s.plan.ids[0]);
-    await first.fill("3");
+    // WHY not a fixed "3": the key is random, so its hashed auto id sometimes IS
+    // 3, and typing the value a field already shows is no edit (no change event)
+    const typed = String((Number(autoId) + 1) % 50);
+    await first.fill(typed);
     await first.press("Enter");
     await idle(page);
     await expect(page.locator('[data-drv="marker.first_id"]')).toHaveAttribute("data-driven", "0");
@@ -207,10 +210,10 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     expect(v2).toBeCloseTo(s.plan.marker_mm, 4);
 
     // keys: Esc reverts an edit; an empty field + Enter returns it to driven
-    await first.fill("9");
+    await first.fill(String((Number(typed) + 1) % 50));
     await first.press("Escape");
-    await expect(first).toHaveValue("3");
-    expect((await state(page)).feature.marker.first_id).toBe(3);
+    await expect(first).toHaveValue(typed);
+    expect((await state(page)).feature.marker.first_id).toBe(Number(typed));
     await first.fill("");
     await first.press("Enter");
     await idle(page);
