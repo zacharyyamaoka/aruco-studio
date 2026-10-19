@@ -333,20 +333,32 @@ def test_200_random_sets_are_valid_and_beat_the_shelves(capsys):
 
 # ------------------------------------------------------------ the objective
 
-# sha256 of the default (fewest_sheets) layouts of the 200 sets below, from
-# main @ 184f107 before the objective existed: the default stays as it was
-DEFAULT_DIGEST = {"tight": "f83f2a14afb675d517c704e92632799a6048c3387044fcec681682111868b79e",
-                  "spaced": "df18a2d6a70e25a81e58435fdeb8ed41f1805b333ee748bc0ce34e3e9dda9de5"}
+# sha256 of the default (fewest_sheets) layouts of the 200 sets below, 50 at
+# a time, from main @ 184f107 before the objective existed: the default
+# stays as it was
+DEFAULT_DIGEST = {
+    ("tight", 0): "892b7c0c326641c502e3f221724b6958e27ba1624fba1a1f9b7eed915891897e",
+    ("tight", 1): "8a730cfd8d4e90ba681c27057dd970e45b089084df203b501b1528dd3624c617",
+    ("tight", 2): "898325add393873366bf0a8117122f406d311595d1999774d3482fe9aed769aa",
+    ("tight", 3): "1026b548040374a38ef809d530906f9622364fa293e17c057edf0a141cd383fb",
+    ("spaced", 0): "730962ee8b339d02e7c9e064b8e9c3422f700729978e6fceb154a22270a4db05",
+    ("spaced", 1): "556142ec821f58a00a2336634c032fa76ca8eff7502a4d80122627de27ea9ebd",
+    ("spaced", 2): "099a079e0354a9a99aab44f2e482046e7f7381dc13b0c1c585e1f63f9424edf1",
+    ("spaced", 3): "05d3ca6a3560e68a14065b91ce41026d96f147e72665c8df30ea7bbb9ebc3807",
+}
 
 
-@pytest.mark.parametrize("mode", ["tight", "spaced"])
-def test_200_random_sets_fewest_cuts_against_fewest_sheets(mode, capsys):
+# WHY 50 sets a test: the 200 run in parallel (pytest-xdist); one test took 70 s
+@pytest.mark.parametrize("mode,block", sorted(DEFAULT_DIGEST))
+def test_200_random_sets_fewest_cuts_against_fewest_sheets(mode, block, capsys):
     """Zach, 2026-10-18: "two things to optimize for btw: one is fewest cut
-    lines, one is most compact (fewest number of sheets)"."""
+    lines, one is most compact (fewest number of sheets)". Medians over all
+    200 (2026-10-18): tight 44 cuts both (11 sets fewer), spaced 66.5 -> 64
+    (127 sets fewer, 16 a page more)."""
     gap = 0.0 if mode == "tight" else GAP
     digest = hashlib.sha256()
     rows = {"fewest_sheets": [], "fewest_cuts": []}
-    for seed in range(200):
+    for seed in range(50 * block, 50 * block + 50):
         page, its = random_set(seed)
         sheets = lay(its, mode, page)                       # the default
         cuts = lay(its, mode, page, objective="fewest_cuts")
@@ -363,15 +375,12 @@ def test_200_random_sets_fewest_cuts_against_fewest_sheets(mode, capsys):
         digest.update(b"%d;" % sheets.cuts())
     fewer = sum(1 for a, b in zip(rows["fewest_sheets"], rows["fewest_cuts"]) if b[1] < a[1])
     more = sum(1 for a, b in zip(rows["fewest_sheets"], rows["fewest_cuts"]) if b[0] > a[0])
-    table = ["| mode | objective | pages (sum) | median pages | median cuts | fewer cuts | more pages |",
-             "|---|---|---|---|---|---|---|"]
-    for name, r in rows.items():
-        table.append(f"| {mode} | {name} | {sum(x[0] for x in r)} | "
-                     f"{statistics.median(x[0] for x in r):g} | "
-                     f"{statistics.median(x[1] for x in r):g} | "
-                     f"{fewer if name == 'fewest_cuts' else ''} | "
-                     f"{more if name == 'fewest_cuts' else ''} |")
+    table = [f"| {mode} | {50 * block}-{50 * block + 49} | {name} | {sum(x[0] for x in r)} | "
+             f"{statistics.median(x[1] for x in r):g} | "
+             f"{(fewer if name == 'fewest_cuts' else '')} | {(more if name == 'fewest_cuts' else '')} |"
+             for name, r in rows.items()]
     with capsys.disabled():
-        print("\n" + "\n".join(table))
+        print("\n| mode | seeds | objective | pages (sum) | median cuts | fewer cuts | more pages |\n"
+              + "\n".join(table))
     assert fewer > 0
-    assert digest.hexdigest() == DEFAULT_DIGEST[mode]
+    assert digest.hexdigest() == DEFAULT_DIGEST[(mode, block)]
