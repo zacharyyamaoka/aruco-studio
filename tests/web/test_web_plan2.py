@@ -215,7 +215,8 @@ def test_cut_is_the_rectangle():
 def test_label_off_plans_are_todays():
     """Every number a label-off plan had at 56235bd (sha256 of its JSON then,
     tools: the facade at that commit), with only cut and dims added -- and
-    contract barrier 4's CAD fields (tests/web/test_web_cad.py)."""
+    contract barrier 4's CAD fields (tests/web/test_web_cad.py), and barrier
+    5's cut_shape (tests/web/test_web_trim.py)."""
     cases = {"45d745cfb9e6f365165f5c0bd683e49ca3e92ce73c36bc70e1ecd36fba350684":
              req({}, {"w": 20, "h": 20}),
              "ac8aa1c5edb27b8ab778aa1bfdd6da0f94c885ae28ff885f19e8cae6b0ce6ce7":
@@ -225,7 +226,7 @@ def test_label_off_plans_are_todays():
              req({"type": "charuco", "cols": 5, "rows": 4}, {"w": 80, "h": 60}, pre=P3D)}
     for sha, r in cases.items():
         p = W.plan(r)
-        new = {"cut", "dims", "layers", "cells", "pattern_to_sketch", "origin_z_mm"}
+        new = {"cut", "cut_shape", "dims", "layers", "cells", "pattern_to_sketch", "origin_z_mm"}
         assert new <= set(p)
         old = {k: v for k, v in p.items() if k not in new}
         assert hashlib.sha256(json.dumps(old, sort_keys=True).encode()).hexdigest() == sha

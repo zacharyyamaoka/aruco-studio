@@ -119,8 +119,10 @@ MIXED = [(40, 40), (40, 40), (30, 30), (30, 30), (50, 25), (25, 50), (90, 35), (
 def test_objective_fewest_cuts_never_cuts_more_and_never_takes_fewer_pages(mode):
     # contract.ts SheetRequest.objective (Zach, 2026-10-18: "fewest cut lines"
     # or "most compact (fewest number of sheets)"), default "fewest_sheets"
+    # trim "marker": the stickers this case was built on (a label-off sticker
+    # was the marker's outline until the rectangle became the default trim)
     its = [req({"first_id": i}, rect={"w": w, "h": h}) for i, (w, h) in enumerate(MIXED)]
-    its += squares(6, side=30.0)
+    its = [dict(r, trim="marker") for r in its + squares(6, side=30.0)]
     base = {"items": its, "cut_lines": True, "mode": mode}
     default = W.sheet(base, "2026-10-18")
     assert W.sheet({**base, "objective": "fewest_sheets"}, "2026-10-18") == default
