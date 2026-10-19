@@ -170,7 +170,9 @@ export interface MarkerPlan {
    *  + out of it), op "add" | "cut" | "keep", polygons in the sketch frame.
    *  Inkjet rule 2: paper [0, t], ink pocketed into it; 3D print: the recess. */
   layers?: { name: string; part: string; colour: "white" | "black" | "none"; op: "add" | "cut" | "keep";
-             z: [number, number]; polygons: Polygon[] }[];
+             z: [number, number]; polygons: Polygon[];
+             /** a cut / keep layer: the `name` of the layer it cuts into ("face" = the host body) */
+             into?: string }[];
   /** the black as axis-aligned boxes [u0, v0, u1, v1] in the PATTERN frame
    *  (convex pieces a B-rep kernel can extrude), and the 16-number row-major
    *  4x4 taking that frame to the sketch (rect centre, angle, turn, flip) */
@@ -200,6 +202,8 @@ export interface SheetRequest {
   items: PlanRequest[];      // every marker to print, each with its own label
   cut_lines: boolean;
   mode?: SheetMode;          // default "spaced"
+  /** the PDF asks the viewer to open the print dialog when it opens */
+  print_dialog?: boolean;
   gap_mm?: number;           // spaced only; default the core's
   /** what the packer optimizes first (Zach, 2026-10-18: "fewest cut lines"
    *  or "most compact (fewest number of sheets)"); default "fewest_sheets" */
@@ -283,8 +287,9 @@ export interface IdRequest {
   items: IdItem[];
   ledger?: Record<string, number>;   // key -> first id already given out: those never move
   /** ids that must never be handed out (e.g. markers already printed by an
-   *  older tool); per dictionary family like everything else */
-  reserved?: number[];
+   *  older tool). A plain list reserves the ids in EVERY family; a map
+   *  reserves them per dictionary family ("4x4", "5x5", ...: core.numbering.family) */
+  reserved?: number[] | Record<string, number[]>;
 }
 
 export interface IdResult {
