@@ -10,20 +10,28 @@ verify.camera is the camera, the dirt and the detector.
 `readable` MEASURES the distance: it runs `verify` head on, with the blur
 and grain of a decent camera (READ_VIEW), outward and then bisected
 (max_distance), so its limit is the simulator's, not a rule of thumb (the
-old core.markers.suggest's "5 px per module" is not used).
+old core.markers.suggest's "5 px per module" is not used); `measured` true.
+
+Without numpy / OpenCV (inside a CAD's Python: Fusion) this module still
+imports, `readable` gives the analytic answer (readable_analytic, `measured`
+false) and `verify` refuses in words.
 """
 from __future__ import annotations
 
 import base64
 import math
 
-import cv2
-import numpy as np
-
 from . import web_api as _W
 from .core import dictionary as _D
-from .verify import camera as _C
-from .verify import pnp as _pnp
+
+try:
+    import cv2
+    import numpy as np
+
+    from .verify import camera as _C
+    from .verify import pnp as _pnp
+except ImportError:                                # a CAD's Python: no numpy / OpenCV
+    cv2 = np = _C = _pnp = None
 
 PNG_MAX_W = 640
 # readable's probe: head on; a decent lens + demosaic (blur sigma 0.8 px) and
@@ -46,6 +54,16 @@ READ_JITTER = (1.0, 0.99, 1.01, 0.98, 1.02)
 FIELD_SHARE = 0.55
 FIELD_VIEW = {"tilt_deg": 45.0, "yaw_deg": 0.0, "blur_px": 1.0, "noise": 0.1, "glare": 0.0,
               "occlusion": 0.0}
+# readable_analytic (no OpenCV): the pinhole model at the limits the simulator
+# measured. WHY 3.1 px per cell (measured 2026-10-18, max_distance over the
+# cameras and markers FIELD_SHARE's comment names): at the head-on limit a
+# cell spans 1.61 px (6x6) to 3.08 px (5x5; a 4x4 2.27 single, 2.80 grid
+# and ChArUco) wherever OpenCV's minimum outline does not bind; at 4K it
+# binds first (the outline at the limit is 115-119 px against 115.2). So the
+# limit is the nearer of 3.1 px per cell and OpenCV's minimum outline: never
+# farther than the simulator measured (up to ~2x nearer for a 6x6).
+READ_PX_PER_CELL = 3.1
+PERIMETER_RATE = 0.03       # OpenCV's default minMarkerPerimeterRate (verify.camera's)
 
 
 def _plan(req: dict):
@@ -127,7 +145,13 @@ def _view(d: dict, scene, cam: _C.Cam, view: dict, picture: bool = True) -> dict
     return out
 
 
+def _need_cv(what: str) -> None:
+    if cv2 is None:
+        raise ImportError(f"{what} needs numpy and OpenCV, which this Python does not have")
+
+
 def verify(req: dict, view: dict) -> dict:
+    _need_cv("verify")
     d = _plan(req)
     cam = _C.Cam.of(view["camera"])
     return _view(d, _C.scene_of(d, _label(req, d)), cam, view)
@@ -187,17 +211,37 @@ def verdict_of(distance: float, limit: float) -> str:
     return "good" if distance <= FIELD_SHARE * limit else "marginal"
 
 
+def _readability(ppc: float, distance: float, lim: float, measured: bool) -> dict:
+    verdict = verdict_of(distance, lim)
+    why = {"good": "reads reliably",
+           "marginal": "reads head on, but a tilt, blur or dirt can lose it",
+           "poor": "too far: it will not read"}[verdict]
+    text = (f"{ppc:.1f} px per cell at {distance:.0f} mm: {why}; "
+            + (f"limit ≈ {_dist_words(lim)}" if lim > 0 else "it does not read at any distance")
+            + ("" if measured else " (estimated: no OpenCV here)"))
+    return {"px_per_cell": round(ppc, 3), "max_distance_mm": round(lim, 1), "verdict": verdict,
+            "text": text, "measured": measured}
+
+
+def readable_analytic(req: dict, camera: dict) -> dict:
+    """`readable` without OpenCV: a pinhole camera (verify.camera's f_px)
+    head on; the limit the nearer of READ_PX_PER_CELL and OpenCV's minimum
+    outline (PERIMETER_RATE x the image's longest side). Standard library."""
+    d = _plan(req)
+    w, h = (int(v) for v in camera["resolution"])
+    distance = float(camera["distance_mm"])
+    f_px = (w / 2.0) / math.tan(math.radians(float(camera["hfov_deg"])) / 2.0)
+    cell = cell_mm(d)
+    side = d["marker"]["marker_length_m"] * 1000.0
+    lim = min(cell * f_px / READ_PX_PER_CELL, 4.0 * side * f_px / (PERIMETER_RATE * max(w, h)))
+    return _readability(cell * f_px / distance, distance, lim, False)
+
+
 def readable(req: dict, camera: dict) -> dict:
+    if cv2 is None:
+        return readable_analytic(req, camera)
     d = _plan(req)
     cam = _C.Cam.of(camera)
     # the label is beside the marker, not on it: the limit is the marker's own
     lim = max_distance(d, _C.scene_of(d), cam)
-    ppc = _px_per_cell(d, cam)
-    verdict = verdict_of(cam.distance_mm, lim)
-    why = {"good": "reads reliably",
-           "marginal": "reads head on, but a tilt, blur or dirt can lose it",
-           "poor": "too far: it will not read"}[verdict]
-    text = (f"{ppc:.1f} px per cell at {cam.distance_mm:.0f} mm: {why}; "
-            + (f"limit ≈ {_dist_words(lim)}" if lim > 0 else "it does not read at any distance"))
-    return {"px_per_cell": round(ppc, 3), "max_distance_mm": round(lim, 1), "verdict": verdict,
-            "text": text}
+    return _readability(_px_per_cell(d, cam), cam.distance_mm, lim, True)

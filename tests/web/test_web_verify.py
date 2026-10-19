@@ -147,7 +147,8 @@ def test_through_the_worker_entry():
     got = json.loads(W.call("verify", json.dumps({"req": single(), "view": view()})))
     assert got["result"]["found"] == [0]
     got = json.loads(W.call("readable", json.dumps({"req": single(), "camera": CAM})))
-    assert set(got["result"]) == {"px_per_cell", "max_distance_mm", "verdict", "text"}
+    assert set(got["result"]) == {"px_per_cell", "max_distance_mm", "verdict", "text", "measured"}
+    assert got["result"]["measured"] is True
     assert "error" in json.loads(W.call("verify", json.dumps({"req": {}, "view": view()})))
 
 

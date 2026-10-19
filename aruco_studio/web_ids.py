@@ -8,10 +8,13 @@ from .core import autoid as _AI
 
 
 def assign_ids(req: dict) -> dict:
-    """IdRequest {items, ledger?} -> IdResult {items, ledger, warnings}."""
+    """IdRequest {items, ledger?, reserved?} -> IdResult {items, ledger, warnings}."""
     if not isinstance(req, dict) or not isinstance(req.get("items"), list):
-        raise ValueError("assign_ids needs {items: [...], ledger?: {key: first id}}")
+        raise ValueError("assign_ids needs {items: [...], ledger?: {key: first id}, reserved?: [id, ...]}")
     ledger = req.get("ledger")
     if ledger is not None and not isinstance(ledger, dict):
         raise ValueError(f"ledger: an object {{key: first id}}, got {ledger!r}")
-    return _AI.assign(req["items"], ledger)
+    reserved = req.get("reserved")
+    if reserved is not None and not isinstance(reserved, list):
+        raise ValueError(f"reserved: a list of ids, got {reserved!r}")
+    return _AI.assign(req["items"], ledger, reserved)
