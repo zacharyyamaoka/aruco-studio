@@ -116,6 +116,7 @@ export interface PlacedLabel {
   height_mm: number;         // cap height
   angle_deg: number;
   lines?: string[];          // the text split on "\n"
+  lines_at?: Vec2[];         // each line's centre, sketch frame (a CAD shell places one text per line)
   /** inkjet: "sans" (ordinary text); 3D print: "pixel" (blocky strokes a
    *  nozzle can print, given as `polygons`) */
   font?: "sans" | "pixel";
@@ -154,6 +155,20 @@ export interface MarkerPlan {
   origin: number[];
   label: PlacedLabel | null;
   dims?: Dimension[];        // marker size, checker, separation, outer, rectangle, label offset
+  // ---- for CAD shells (the Fusion adapter, 2026-10-18 N-6 report) ----
+  /** the bodies as built: z along the face normal (mm, 0 = the face plane,
+   *  + out of it), op "add" | "cut" | "keep", polygons in the sketch frame.
+   *  Inkjet rule 2: paper [0, t], ink pocketed into it; 3D print: the recess. */
+  layers?: { name: string; part: string; colour: "white" | "black" | "none"; op: "add" | "cut" | "keep";
+             z: [number, number]; polygons: Polygon[] }[];
+  /** the black as axis-aligned boxes [u0, v0, u1, v1] in the PATTERN frame
+   *  (convex pieces a B-rep kernel can extrude), and the 16-number row-major
+   *  4x4 taking that frame to the sketch (rect centre, angle, turn, flip) */
+  cells?: [number, number, number, number][];
+  pattern_to_sketch?: number[];
+  /** where the Joint Origin (`origin`) sits along z, mm (the detector's plane:
+   *  the printed surface) */
+  origin_z_mm?: number;
   summary: string;           // one line: "Grid 2×3 DICT_4X4_50 #0–5 · 16.2 mm · outer 41.0 × 60.5 mm"
   warnings: Issue[];
 }
@@ -189,6 +204,10 @@ export interface Sheet {
   warnings: Issue[];
   cuts?: number;             // straight cuts to free every sticker (a shared edge counts once)
   fill?: number;             // 0..1: sticker area / printable area, over all pages
+  /** where each request item landed: page (0-based), its sticker box on the
+   *  page (mm, y down, from the page's top-left), and its turn */
+  placements?: { item: number; page: number; x_mm: number; y_mm: number; w_mm: number; h_mm: number;
+                 rotation: 0 | 90 }[];
 }
 
 /** Verify accuracy: a simulated camera looks at the marker as planned. */
@@ -228,6 +247,9 @@ export interface Readability {
   max_distance_mm: number;   // the farthest the camera still reads it (head on)
   verdict: "good" | "marginal" | "poor";
   text: string;              // one plain line: why
+  /** true: max_distance_mm measured with the OpenCV simulator; false: the
+   *  analytic fallback (no OpenCV, e.g. inside a CAD's Python) */
+  measured?: boolean;
 }
 
 /** Auto id (Zach, 2026-10-18): a stable key per marker feature, hashed to a
@@ -250,6 +272,9 @@ export interface IdAssignment {
 export interface IdRequest {
   items: IdItem[];
   ledger?: Record<string, number>;   // key -> first id already given out: those never move
+  /** ids that must never be handed out (e.g. markers already printed by an
+   *  older tool); per dictionary family like everything else */
+  reserved?: number[];
 }
 
 export interface IdResult {
