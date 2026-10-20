@@ -1,12 +1,13 @@
 // The online Studio's screen (docs/design/online_studio_v1.md, "The screen"):
 // the top bar, the sketch viewport with its toolbar (bottom centre), the
-// floating ArUco Extrude panel; the presets modal, Print and Examples.
+// floating ArUco Extrude panel; the presets modal, Print, Examples and Re-ID.
 // WHY no timeline (Zach, 2026-10-18): "too specific to CAD … just clicking the
 // marker on the screen is what brings up the relevant inspector window".
 import { useEffect } from "react";
 import { TooltipProvider } from "@bam/ui";
 import { ExamplesDialog } from "./app/ExamplesDialog";
 import { openPrint, openVerify } from "./app/commands";
+import { ReIdDialog } from "./app/ReIdDialog";
 import { Toolbar } from "./app/Toolbar";
 import { TopBar } from "./app/TopBar";
 import { onCoreStatus, coreStatus } from "./coreSource";
@@ -101,6 +102,7 @@ export function App() {
       <PrintDialog />
       <VerifyDialog />
       <ExamplesDialog />
+      <ReIdDialog />
     </TooltipProvider>
   );
 }

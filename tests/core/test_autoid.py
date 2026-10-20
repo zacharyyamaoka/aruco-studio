@@ -450,7 +450,8 @@ def test_a_start_past_the_dictionary_wraps_round_as_the_hash_probe_does():
     # DICT_4X4_50 stops at 49: its family's counter wraps to 0; a 5x5 family is its own
     res = seq([item("a"), item("g", "grid", cols=3, rows=1), item("b", dictionary="DICT_5X5_250")], start=100)
     assert blocks(res) == [("a", [0]), ("g", [1, 2, 3]), ("b", [100])]
-    assert res["warnings"] == []
+    # ... no longer silently: one warning for DICT_4X4_50, keyed to no item (test_web_reid.py)
+    assert [(w["level"], "key" in w) for w in res["warnings"]] == [("warn", False)]
 
 
 @pytest.mark.parametrize("kw", [{"mode": "random"}, {"mode": None}, {"start": -1}, {"start": 1.5},
