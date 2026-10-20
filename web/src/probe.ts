@@ -26,6 +26,7 @@ function snapshot() {
     panel: { open: s.panel.open, featureId: s.panel.featureId, tab: s.panel.tab, selector: s.panel.selector, collapsed: s.panel.collapsed },
     feature: getFeature(s.doc, active), plan: active ? s.plans[active] ?? null : null, plans: s.plans,
     suggestions: s.suggestions, modal: s.modal, inscribing: s.inscribing,
+    canUndo: s.canUndo, canRedo: s.canRedo,
   };
 }
 

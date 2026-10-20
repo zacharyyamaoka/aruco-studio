@@ -27,7 +27,22 @@ function keyIsElsewhere(e: KeyboardEvent): boolean {
   return useStudio.getState().modal !== null;
 }
 
+/** Ctrl+Z / Cmd+Z undoes; Ctrl+Shift+Z, Ctrl+Y and Cmd+Shift+Z redo. In a
+ *  field they are the field's own. */
+function onUndoKey(e: KeyboardEvent): boolean {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return false;
+  const k = e.key.toLowerCase();
+  const redo = (k === "z" && e.shiftKey) || (k === "y" && e.ctrlKey && !e.shiftKey);
+  if (!redo && !(k === "z" && !e.shiftKey)) return false;
+  if (keyIsElsewhere(e)) return true;
+  e.preventDefault();
+  if (redo) useStudio.getState().redo();
+  else useStudio.getState().undo();
+  return true;
+}
+
 function onKey(e: KeyboardEvent) {
+  if (onUndoKey(e)) return;
   if (e.ctrlKey || e.metaKey || e.altKey || keyIsElsewhere(e)) return;
   const st = useStudio.getState();
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;

@@ -20,7 +20,7 @@
 // whole pixels apart, so the values stay legible at any zoom; a value that
 // would still overlap one already placed is hidden. Every line stands outside
 // the rectangle, so none crosses the marker's ink.
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { Dimension, MarkerPlan, Vec2 } from "../core/contract";
 import { isSet, type Feature } from "../model/doc";
 import { toLocal } from "../model/geom";
@@ -33,6 +33,7 @@ const EXT_GAP = 3;     // px between the geometry and its extension line
 const EXT_OVER = 4;    // px an extension line runs past the dimension line
 const TEXT_H = 15;     // the value's chip height, px
 const FONT_PX = 11;
+const LIVE_MS = 120;   // a typed value sets this long after the last keystroke, as the label's text does
 
 /** The dims each marker type draws: the sizes typed into it, and only those. */
 const CONTROLS: Record<string, string[]> = {
@@ -233,20 +234,38 @@ export function Dims({ fid, dims, editing, onEdit }: {
   );
 }
 
-/** The in-place editor over a dim's value: Enter sets, an empty Enter
- *  returns it to driven, Esc cancels; leaving the field commits, as the
- *  panel's rows do. */
-export function DimEditor({ dim, onCommit, onCancel }: {
-  dim: LaidDim; onCommit: (text: string) => void; onCancel: () => void;
+/** The in-place editor over a dim's value: the marker follows as you type
+ *  (`onLive`, LIVE_MS after the last keystroke); Enter sets, an empty Enter
+ *  returns it to driven, Esc puts back the value from when it opened;
+ *  leaving the field commits, as the panel's rows do.
+ *
+ *  WHY live (Zach, 2026-10-20): "when I manually edit the dimensions, they
+ *  should update in real time!" */
+export function DimEditor({ dim, onLive, onCommit, onCancel }: {
+  dim: LaidDim; onLive: (text: string) => void; onCommit: (text: string) => void; onCancel: () => void;
 }) {
   const done = useRef(false);
-  const finish = (fn: () => void) => { if (done.current) return; done.current = true; fn(); };
+  const pending = useRef<{ t: ReturnType<typeof setTimeout>; v: string; to: (v: string) => void } | null>(null);
+  const live = useRef(onLive);
+  live.current = onLive;
+  const cancel = () => { if (pending.current) clearTimeout(pending.current.t); pending.current = null; };
+  const finish = (fn: () => void) => { cancel(); if (done.current) return; done.current = true; fn(); };
+  // closed without Enter, Esc or a blur (another feature selected): what was typed still lands, on its own feature
+  useEffect(() => () => { const p = pending.current; cancel(); if (p && !done.current) p.to(p.v); }, []);
   const w = Math.max(56, dim.tw + 16);
   return (
     <input className="kit-input dim-edit" data-testid="dim-input" data-dim-edit={dim.field} type="text" inputMode="decimal"
       defaultValue={dim.text} autoFocus aria-label={`${NAMES[dim.field] ?? dim.field} (mm)`}
       onFocus={(e) => e.currentTarget.select()}
       onPointerDown={(e) => e.stopPropagation()}
+      onChange={(e) => {
+        const v = e.currentTarget.value;
+        cancel();
+        // WHY the onLive of THIS render: it names the feature typed into, so a
+        // click on another marker within LIVE_MS cannot land the value there
+        const to = live.current;
+        pending.current = { t: setTimeout(() => { pending.current = null; to(v); }, LIVE_MS), v, to };
+      }}
       onKeyDown={(e) => {
         e.stopPropagation();
         if (e.key === "Enter") { const t = e.currentTarget.value; finish(() => onCommit(t)); }

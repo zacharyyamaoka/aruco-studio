@@ -1,6 +1,16 @@
 // The app's state (zustand): the document, the tool, the selection, the
 // camera, the panel, the modals, and what the core last answered. The
 // document's edits are the pure functions of model/doc.ts and sketch/model.ts.
+//
+// Undo / redo (Ctrl+Z, Ctrl+Shift+Z / Ctrl+Y) walk the document's history:
+// snapshots, since a Doc is never mutated (a step is the document before
+// it). Every action that changes the document notes it; what the planner
+// writes back (auto id's ids and ledger) is not a step. One gesture (a drag,
+// A) is one step, and so is a burst of edits to one value (typing, live)
+// while each comes within IDLE_MS of the last. The selection, the camera and
+// the panel are not in the history.
+//
+// WHY (Zach, 2026-10-20): "You should support Ctrl Z to undo any changes that are done."
 import { create } from "zustand";
 import type { CoreInfo, Issue, LabelParams, MarkerPlan, Preset, Suggestion } from "./core/contract";
 import { core } from "./coreSource";
@@ -49,8 +59,13 @@ export interface Studio {
   /** a profile is being inscribed */
   inscribing: boolean;
   note: string | null;
+  /** the history has a step to undo / to redo */
+  canUndo: boolean;
+  canRedo: boolean;
 
-  setDoc: (doc: Doc) => void;
+  /** a new document state; edits sharing a `key` (one value, typed) within
+   *  IDLE_MS of each other are one undo step */
+  setDoc: (doc: Doc, key?: string) => void;
   loadDoc: (doc: Doc) => void;
   newDoc: (exampleId?: string) => void;
   setTool: (t: Tool) => void;
@@ -99,7 +114,17 @@ export interface Studio {
   setPreset: (p: Preset) => void;
   openModal: (m: Modal) => void;
   say: (note: string | null) => void;
+
+  undo: () => void;
+  redo: () => void;
+  /** a gesture (a drag) starts / ends: its edits are one undo step */
+  gesture: (on: boolean) => void;
 }
+
+/** Undo steps kept. */
+const HISTORY = 200;
+/** Edits to one value this close together are one step (ms). */
+const IDLE_MS = 500;
 
 const PANEL0: PanelState = { open: false, featureId: null, tab: "marker", collapsed: false, selector: null, backup: null };
 
@@ -123,14 +148,61 @@ export function activeFeatureId(s: Pick<Studio, "doc" | "sel" | "panel">): strin
 }
 
 export const useStudio = create<Studio>((set, get) => {
-  /** Edit the feature the panel edits. */
-  const edit = (fn: (f: Feature) => Feature) => set({ doc: updateFeature(get().doc, get().panel.featureId, fn) });
+  // ---------------------------------------------------------------- the history
+  const past: Doc[] = [];
+  let future: Doc[] = [];
+  /** the last step's key and when it last grew: the next edit with that key, soon, joins it */
+  let last: { key: string; at: number } | null = null;
+  /** an open gesture: its first change is a step, the rest join it */
+  let held: { stepped: boolean } | null = null;
+  /** past's length when the panel opened: Cancel rewinds the history to it */
+  let openAt = -1;
+  const same = (a: Doc, b: Doc) => a === b || JSON.stringify(a) === JSON.stringify(b);
+  const flags = () => ({ canUndo: past.length > 0, canRedo: future.length > 0 });
+  /** Note a change of the document from `prev` to `next`. */
+  const remember = (prev: Doc, next: Doc, key: string) => {
+    const now = performance.now();
+    if (held?.stepped) return;
+    if (!held && key && last?.key === key) {
+      // edits to one value that end where they began (Esc) are no step
+      if (past.length && same(next, past[past.length - 1])) { past.pop(); last = null; return; }
+      if (now - last.at < IDLE_MS) { last.at = now; return; }
+    }
+    if (same(prev, next)) return;
+    past.push(prev);
+    if (past.length > HISTORY) { past.shift(); if (openAt > 0) openAt -= 1; }
+    future = [];
+    last = key ? { key, at: now } : null;
+    if (held) held.stepped = true;
+  };
+  /** set(), noting a change of the document in the history. */
+  const put = (next: Partial<Studio>, key = "") => {
+    if (next.doc && next.doc !== get().doc) remember(get().doc, next.doc, key);
+    set({ ...next, ...flags() });
+  };
+  /** What an undone / redone document keeps of the selection and the panel:
+   *  only what is still in it. */
+  const still = (doc: Doc): Partial<Studio> => {
+    const { sel, panel } = get();
+    const out: Partial<Studio> = {};
+    if (panel.open && !getFeature(doc, panel.featureId)) { out.panel = { ...PANEL0, tab: panel.tab, collapsed: panel.collapsed }; openAt = -1; }
+    const there = !sel || sel.kind === "sketch" ? true
+      : sel.kind === "shape" ? doc.shapes.some((x) => x.id === sel.id)
+      : sel.kind === "profile" ? !!profileLoops(doc.shapes, sel.ref)
+      : !!getFeature(doc, sel.id);
+    if (!there) out.sel = null;
+    return out;
+  };
+
+  /** Edit the feature the panel edits (`key`: see setDoc). */
+  const edit = (fn: (f: Feature) => Feature, key = "") => put({ doc: updateFeature(get().doc, get().panel.featureId, fn) }, key);
   const editing = () => getFeature(get().doc, get().panel.featureId);
   /** Open the panel on a feature (made new when `fresh`), keeping the
    *  document before it for Cancel. */
   const open = (doc: Doc, f: Feature, fresh: boolean) => {
     const backup = get().doc;
-    set({
+    openAt = past.length;
+    put({
       doc: fresh ? addFeature(doc, f) : doc,
       panel: { ...PANEL0, open: true, featureId: f.id, backup, tab: get().panel.tab, collapsed: get().panel.collapsed },
       tool: "select",
@@ -153,11 +225,14 @@ export const useStudio = create<Studio>((set, get) => {
     builtins: [],
     inscribing: false,
     note: null,
+    canUndo: false,
+    canRedo: false,
 
-    setDoc: (doc) => set({ doc }),
+    setDoc: (doc, key) => put({ doc }, key),
     loadDoc: (doc) => {
       const preset = doc.preset ?? get().doc.preset;
-      set({ doc: { ...doc, preset }, sel: null, panel: PANEL0, plans: {}, planErrors: {}, idIssues: [], suggestions: [], tool: "select" });
+      openAt = -1;
+      put({ doc: { ...doc, preset }, sel: null, panel: PANEL0, plans: {}, planErrors: {}, idIssues: [], suggestions: [], tool: "select" });
       get().fit();
     },
     newDoc: (exampleId) => {
@@ -166,17 +241,17 @@ export const useStudio = create<Studio>((set, get) => {
     },
     setTool: (tool) => set({ tool }),
     select: (sel) => set({ sel }),
-    addShape: (s) => set({ doc: addShape(get().doc, s), sel: { kind: "shape", id: s.id } }),
-    updateShape: (s) => set({ doc: setShape(get().doc, s) }),
+    addShape: (s) => put({ doc: addShape(get().doc, s), sel: { kind: "shape", id: s.id } }),
+    updateShape: (s) => put({ doc: setShape(get().doc, s) }, `shape:${s.id}`),
     deleteSelection: () => {
       const { sel, doc, panel } = get();
       if (sel?.kind === "shape") {
         // a feature filling it goes with it
         const gone = featureOfRect(doc, sel.id)?.id;
-        set({ doc: deleteShape(doc, sel.id), sel: null, ...(gone && panel.featureId === gone ? { panel: PANEL0 } : {}) });
+        put({ doc: deleteShape(doc, sel.id), sel: null, ...(gone && panel.featureId === gone ? { panel: PANEL0 } : {}) });
       } else if (sel?.kind === "feature" || sel?.kind === "origin") {
         // the feature goes; its rectangle stays in the sketch
-        set({ doc: removeFeature(doc, sel.id), sel: null, ...(panel.featureId === sel.id ? { panel: PANEL0 } : {}) });
+        put({ doc: removeFeature(doc, sel.id), sel: null, ...(panel.featureId === sel.id ? { panel: PANEL0 } : {}) });
       }
     },
     setCamera: (camera) => set({ camera }),
@@ -220,11 +295,18 @@ export const useStudio = create<Studio>((set, get) => {
       const { sel, doc } = get();
       const owner = selectedFeatureId(doc, sel);
       if (owner) { get().editFeature(owner); return; }
-      const f = newFeature(null, null);
-      open(doc, f, true);
-      if (sel?.kind === "shape" && doc.shapes.find((s) => s.id === sel.id)?.kind === "rect") get().useRect(sel.id);
-      else if (sel?.kind === "profile") await get().useProfile(sel.ref);
-      else set({ panel: { ...get().panel, selector: "rect" } });
+      // the new feature and the rectangle (or profile) it takes are one step
+      held = { stepped: false };
+      try {
+        const f = newFeature(null, null);
+        open(doc, f, true);
+        if (sel?.kind === "shape" && doc.shapes.find((s) => s.id === sel.id)?.kind === "rect") get().useRect(sel.id);
+        else if (sel?.kind === "profile") await get().useProfile(sel.ref);
+        else set({ panel: { ...get().panel, selector: "rect" } });
+      } finally {
+        held = null;
+        last = null;
+      }
     },
     useRect: (id) => {
       const other = featureOfRect(get().doc, id);
@@ -257,7 +339,7 @@ export const useStudio = create<Studio>((set, get) => {
         const prev = f.profile && f.rectId && f.profile.outer === ref.outer ? featureRect(cur, f) : null;
         const shape: Shape = { kind: "rect", id: prev?.id ?? newId("r"), ...rect };
         const next = prev ? setShape(cur, shape) : addShape(cur, shape);
-        set({ doc: updateFeature(next, fid, (g) => ({ ...g, rectId: shape.id, profile: ref })), sel: { kind: "feature", id: fid } });
+        put({ doc: updateFeature(next, fid, (g) => ({ ...g, rectId: shape.id, profile: ref })), sel: { kind: "feature", id: fid } });
       } catch (e) {
         set({ note: `Inscribe failed: ${(e as Error).message}` });
       } finally {
@@ -279,21 +361,22 @@ export const useStudio = create<Studio>((set, get) => {
       const ref = editing()?.profile;
       if (ref) await get().useProfile(ref);
     },
-    setField: (path, value) => edit((f) => setField(f, path, value)),
-    resetField: (path) => edit((f) => resetField(f, path)),
-    setLabel: (key, value, featureId) => set({
-      doc: updateFeature(get().doc, featureId ?? get().panel.featureId, (f) => ({ ...f, label: { ...f.label, [key]: value } })),
-    }),
+    setField: (path, value) => edit((f) => setField(f, path, value), `field:${get().panel.featureId}:${path}`),
+    resetField: (path) => edit((f) => resetField(f, path), `field:${get().panel.featureId}:${path}`),
+    setLabel: (key, value, featureId) => {
+      const fid = featureId ?? get().panel.featureId;
+      put({ doc: updateFeature(get().doc, fid, (f) => ({ ...f, label: { ...f.label, [key]: value } })) }, `label:${fid}:${key}`);
+    },
     setKey: (key) => {
       const f = editing();
       if (!f) return;
       const k = key.trim() || f.id;
       const other = keyOwner(get().doc, f.id, k);
       if (other) { set({ note: `Key "${k}" is taken by another marker: keys are unique.` }); return; }
-      edit((g) => ({ ...g, key: k }));
+      edit((g) => ({ ...g, key: k }), `key:${f.id}`);
     },
     pick: (s) => edit((f) => pickSuggestion(f, s)),
-    turn: (featureId) => set({
+    turn: (featureId) => put({
       doc: updateFeature(get().doc, featureId ?? activeFeatureId(get()), (f) => setField(f, "marker.turn", nextTurn(f.marker.turn))),
     }),
     setTab: (tab) => set({ panel: { ...get().panel, tab } }),
@@ -302,11 +385,20 @@ export const useStudio = create<Studio>((set, get) => {
       const { doc, panel } = get();
       const f = getFeature(doc, panel.featureId);
       // OK without a rectangle makes nothing
-      set({ panel: { ...PANEL0, tab: panel.tab }, doc: f && !f.rectId ? removeFeature(doc, f.id) : doc });
+      openAt = -1;
+      put({ panel: { ...PANEL0, tab: panel.tab }, doc: f && !f.rectId ? removeFeature(doc, f.id) : doc });
     },
     cancel: () => {
       const { panel } = get();
-      set({ panel: { ...PANEL0, tab: panel.tab }, doc: panel.backup ?? get().doc, sel: null });
+      const next = { panel: { ...PANEL0, tab: panel.tab }, doc: panel.backup ?? get().doc, sel: null };
+      // Cancel takes the panel's steps back out of the history: as if it never opened
+      if (openAt >= 0 && past.length >= openAt && panel.backup) {
+        past.length = openAt;
+        future = [];
+        last = null;
+        set({ ...next, ...flags() });
+      } else put(next);
+      openAt = -1;
     },
     editFeature: (id) => {
       const { doc, panel, sel } = get();
@@ -329,10 +421,31 @@ export const useStudio = create<Studio>((set, get) => {
 
     setPreset: (p) => {
       touchRecent(p.id);
-      set({ doc: { ...get().doc, preset: p } });
+      put({ doc: { ...get().doc, preset: p } });
     },
     openModal: (modal) => set({ modal }),
     say: (note) => set({ note }),
+
+    undo: () => {
+      const doc = past.pop();
+      if (!doc) return;
+      future.push(get().doc);
+      last = null;
+      held = null;
+      set({ doc, ...still(doc), ...flags() });
+    },
+    redo: () => {
+      const doc = future.pop();
+      if (!doc) return;
+      past.push(get().doc);
+      last = null;
+      held = null;
+      set({ doc, ...still(doc), ...flags() });
+    },
+    gesture: (on) => {
+      held = on ? { stepped: false } : null;
+      last = null;
+    },
   };
 });
 

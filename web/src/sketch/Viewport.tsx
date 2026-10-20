@@ -5,7 +5,8 @@
 // label are drawn as its plan() returned them: no marker geometry is made
 // here. The sticker's white is the plan's cut_shape (the trim: the
 // rectangle, the profile with its holes, or the quiet zone), under the marker. The turn arc belongs to the feature in focus; the selected feature's
-// dimensions (./Dims.tsx) are typed into in place.
+// dimensions (./Dims.tsx) are typed into in place, the marker following as
+// you type. A drag (move, resize, the label) is one undo step.
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import type { MarkerPlan, Polygon, Vec2 } from "../core/contract";
 import {
@@ -57,7 +58,9 @@ export function Viewport() {
   const [hover, setHover] = useState<Hit>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [labelAt, setLabelAt] = useState<{ fid: string; at: Vec2 } | null>(null);
-  const [dimEdit, setDimEdit] = useState<{ fid: string; field: string } | null>(null);
+  /** the dimension being typed into, and its feature as it was when the editor opened (Esc puts it back) */
+  const [dimEdit, setDimEdit] = useState<{ fid: string; field: string; start: Feature } | null>(null);
+  const lastDim = useRef<LaidDim | null>(null);
   const space = useRef(false);
   const fitted = useRef(false);
 
@@ -156,7 +159,7 @@ export function Viewport() {
     const hEl = target.closest("[data-handle]");
     if (hEl) {
       const orig = selectedShape();
-      if (orig) setDrag({ kind: "resize", id: orig.id, handle: hEl.getAttribute("data-handle") as Handle, orig });
+      if (orig) { st.gesture(true); setDrag({ kind: "resize", id: orig.id, handle: hEl.getAttribute("data-handle") as Handle, orig }); }
       return;
     }
     const turnEl = target.closest("[data-turn]");
@@ -165,6 +168,7 @@ export function Viewport() {
     const lf = labelEl ? getFeature(st.doc, labelEl.getAttribute("data-feature")) : null;
     const lp = lf ? st.plans[lf.id]?.label : null;
     if (lf && lp) {
+      st.gesture(true);
       setDrag({ kind: "label", fid: lf.id, from: p, orig: lf.label.offset_mm, at: lp.at });
       st.select({ kind: "text", id: lf.id });
       return;
@@ -175,7 +179,7 @@ export function Viewport() {
     }
     const hit = hitTest(st.doc.shapes, p, EDGE_PX / z);
     const selShape = selectedShape();
-    const move = (sh: Shape) => setDrag({ kind: "move", id: sh.id, from: p, orig: sh, moved: false });
+    const move = (sh: Shape) => { st.gesture(true); setDrag({ kind: "move", id: sh.id, from: p, orig: sh, moved: false }); };
     // WHY WYSIWYG (Zach, 2026-10-18): "just clicking the marker on the screen is
     // what brings up the relevant inspector window". A click on a marker, on
     // its rectangle's edge or inside that rectangle selects the feature and
@@ -258,6 +262,7 @@ export function Viewport() {
       }
     }
     if (drag?.kind === "label") setLabelAt(null);
+    if (drag?.kind === "move" || drag?.kind === "resize" || drag?.kind === "label") st.gesture(false);
     setDrag(null);
   };
 
@@ -315,29 +320,43 @@ export function Viewport() {
   const dimFid = panel.open ? panel.featureId : selectedFeatureId(doc, sel);
   const dimOf = drawn.find((d) => d.f.id === dimFid);
   const laid: LaidDim[] = dimOf ? layoutDims(dimOf.f, dimOf.rect, dimOf.plan, scr, z) : [];
-  const editDim = dimEdit && dimEdit.fid === dimFid ? laid.find((d) => d.field === dimEdit.field) ?? null : null;
+  // the editor stays over the value's last place should the value be hidden while it changes
+  const editDim = dimEdit && dimEdit.fid === dimFid
+    ? laid.find((d) => d.field === dimEdit.field) ?? (lastDim.current?.field === dimEdit.field ? lastDim.current : null) : null;
+  lastDim.current = editDim;
 
   /** A value typed into a dimension: the marker's sizes through the same
    *  setField / resetField as the panel's rows (the panel's feature through the
-   *  store's actions, so its row and the dimension agree). An empty value
-   *  returns it to driven. */
-  const commitDim = (fid: string, field: string, text: string) => {
-    setDimEdit(null);
+   *  store's actions, so its row and the dimension agree), one undo step per
+   *  burst. While typing (`live`) a valid value sets as it is typed; an empty
+   *  value returns it to driven, on Enter only. */
+  const applyDim = (fid: string, field: string, text: string, live = false) => {
     const st = useStudio.getState();
     const f = getFeature(st.doc, fid);
     const t = text.trim().replace(",", ".");
     if (!f) return;
     const mine = st.panel.open && st.panel.featureId === fid;
+    const key = `field:${fid}:${field}`;
     if (t === "") {
-      if (!isSet(f, field)) return;
+      if (live || !isSet(f, field)) return;
       if (mine) st.resetField(field);
-      else st.setDoc(updateFeature(st.doc, fid, (g) => resetField(g, field)));
+      else st.setDoc(updateFeature(st.doc, fid, (g) => resetField(g, field)), key);
       return;
     }
     const v = Number(t);
     if (!Number.isFinite(v) || v < (field === "marker.marker_mm" ? 0.1 : 0)) return;
     if (mine) st.setField(field, v);
-    else st.setDoc(updateFeature(st.doc, fid, (g) => setField(g, field, v)));
+    else st.setDoc(updateFeature(st.doc, fid, (g) => setField(g, field, v)), key);
+  };
+  const commitDim = (fid: string, field: string, text: string) => {
+    setDimEdit(null);
+    applyDim(fid, field, text);
+  };
+  /** Esc: the feature's marker as it was when the editor opened. */
+  const revertDim = (fid: string, start: Feature) => {
+    setDimEdit(null);
+    const st = useStudio.getState();
+    st.setDoc(updateFeature(st.doc, fid, (g) => ({ ...g, marker: { ...start.marker, first_id: g.marker.first_id }, set: start.set })), `field:${fid}:${dimEdit?.field}`);
   };
 
   let arc: ReactElement | null = null;
@@ -490,7 +509,7 @@ export function Viewport() {
           ))}
         </g>
         {draft}
-        {dimOf && <Dims fid={dimOf.f.id} dims={laid} editing={editDim?.field ?? null} onEdit={(field) => setDimEdit({ fid: dimOf.f.id, field })} />}
+        {dimOf && <Dims fid={dimOf.f.id} dims={laid} editing={editDim?.field ?? null} onEdit={(field) => setDimEdit({ fid: dimOf.f.id, field, start: dimOf.f })} />}
         {triads}
         {arc}
         {labels}
@@ -500,9 +519,10 @@ export function Viewport() {
           {ticks}
         </g>
       </svg>
-      {editDim && dimFid && (
+      {editDim && dimEdit && dimFid && (
         <DimEditor key={`${dimFid}:${editDim.field}`} dim={editDim}
-          onCommit={(t) => commitDim(dimFid, editDim.field, t)} onCancel={() => setDimEdit(null)} />
+          onLive={(t) => applyDim(dimFid, editDim.field, t, true)}
+          onCommit={(t) => commitDim(dimFid, editDim.field, t)} onCancel={() => revertDim(dimFid, dimEdit.start)} />
       )}
       {panel.selector && (
         <div className="vp-hint" data-testid="selector-hint">
