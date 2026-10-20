@@ -9,7 +9,7 @@
 import { copyFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { coreReady, dragWorld, idle, openStudio, state, toClient, type Shape } from "./helpers";
+import { coreReady, dragWorld, idle, openStudio, state, toClient, type Shape, panelTab } from "./helpers";
 
 const MEDIA = process.env.SKETCH_MEDIA ?? "";
 
@@ -238,6 +238,8 @@ test.describe("the sketch's tools", () => {
     await rect(page, [-30, -10], [-10, 10]);
     await page.keyboard.press("a");
     await expect(page.getByTestId("extrude-panel")).toBeVisible();
+    // a new feature opens on Make (V1 Command Dialog): Type is a Marker row
+    await panelTab(page, "marker");
     await page.locator('[data-path="marker.type"] [data-value="grid"]').click();
     await idle(page);
     await page.getByTestId("panel-ok").click();
