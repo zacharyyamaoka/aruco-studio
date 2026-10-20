@@ -147,6 +147,37 @@ test.describe("landing page and crawling", () => {
     }
   });
 
+  test("3f · the new sections carry real captures: heights on the model (two stills), the marker maker (a muted looping clip); the tabs named", async ({ page, request }) => {
+    await page.goto("/about/");
+    await expect(page.locator("section#heights h3")).toHaveText("Heights on the model");
+    await expect(page.locator("section#heights p").first()).toContainText("measured from the white's outer face");
+    await expect(page.locator("section#heights p").first()).toContainText("driven from the preset's layers");
+    await expect(page.locator("section#canvas h3")).toHaveText("A marker maker on a canvas");
+    await expect(page.locator("section#profile p")).toContainText("3 tabs: Make, Marker and Label");
+    const stills = await page.locator("section#heights img").evaluateAll((is) => is.map((i) => i.getAttribute("src")!));
+    expect(stills).toEqual(["/about/media/heights-driven.webp", "/about/media/heights-set.webp"]);
+    const v = page.locator("section#canvas video");
+    for (const attr of ["autoplay", "muted", "loop", "playsinline"]) expect(await v.getAttribute(attr), attr).not.toBeNull();
+    for (const src of [...stills, await v.getAttribute("src"), await v.getAttribute("poster")]) {
+      const res = await request.get(src!);
+      expect(res.status(), src!).toBe(200);
+      expect(res.headers()["content-type"], src!).toMatch(/^(image|video)\//);
+    }
+    // drawn, not just present: the clip and both stills have a real size on the page
+    for (const el of [v, page.locator("section#heights img").first(), page.locator("section#heights img").last()]) {
+      await el.scrollIntoViewIfNeeded();
+      expect((await el.boundingBox())!.width).toBeGreaterThan(200);
+    }
+  });
+
+  test("3g · the 404 page offers Try Online, not Open Studio", async ({ request }) => {
+    const res = await request.get("/404.html");
+    expect(res.headers()["content-type"]).toContain("text/html");
+    const body = await res.text();
+    expect(body).toContain('<a href="/">Try Online</a>');
+    expect(body).not.toContain("Open Studio");
+  });
+
   test("4 · robots.txt and sitemap.xml are served as files, with their own content types", async ({ request }) => {
     const robots = await request.get("/robots.txt");
     expect(robots.status()).toBe(200);

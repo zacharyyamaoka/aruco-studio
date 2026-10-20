@@ -19,9 +19,11 @@ LIVE site:
   shots/*.png, shots/facts.json   the stills:
       (cd web && E2E_BASE_URL=https://arucostudio.com REPORT_SHOTS_DIR=<src>/shots \
           npx playwright test --project=e2e e2e/report.spec.ts)
-  shots/type-*.png, shots/trim-*.png   single / grid / ChArUco and the two
-      trims on the plate: extra.spec.ts beside them (run with a config whose
-      baseURL is the live site; it imports web/e2e/helpers.ts)
+  shots/type-*.png, shots/trim-*.png, shots/heights-*.png, shots/landing-facts.json,
+  canvas.webm, canvas.marks.json   single / grid / ChArUco and the two trims on
+      the plate, the heights in 3D, and the marker-maker clip:
+      (cd web && E2E_BASE_URL=https://arucostudio.com LANDING_SRC=<src> \
+          npx playwright test --project=e2e e2e/landing-shots.spec.ts)
   fusion.mp4 or fusion.webm (optional)   a screen recording of the add-in in
       Fusion 360. --media speeds it up FUSION_SPEED times into a muted, looping
       media/fusion.mp4 with a poster; the page shows the "In Fusion 360" figure
@@ -65,6 +67,13 @@ HERO_SPANS = [("core_ready", 0.5, "grid", 1.0), ("label", 1.1, "sheet_toggled", 
 HERO_POSTER_AT = ("grid", 0.6)   # the grid on the plate, the panel beside it
 # The Fusion 360 recording plays this many times faster than it was recorded.
 FUSION_SPEED = 4
+# The marker maker: from the blank sketch to just after the paste, at 1x.
+CANVAS_SPAN = ("start", 0.0, "end", 0.0)
+CANVAS_POSTER_AT = ("end", -0.3)   # eight markers, eight ids
+# WHY a crop (w, h, x, y in the 1280 x 800 recording): the blank sketch around
+# the eight markers is most of the frame and shrinks them to nothing on a phone;
+# the crop keeps the markers, the panel (it opens at the left edge) and the toolbar.
+CANVAS_CROP = (1100, 600, 0, 200)
 
 # out name -> (raw still, width px). Full-window shots are 2560 x 1600 (2x).
 STILLS = {
@@ -78,6 +87,8 @@ STILLS = {
     "autoid": ("06-two-markers.png", 1280),
     "trim-profile": ("trim-profile.png", 720),
     "trim-marker": ("trim-marker.png", 720),
+    "heights-driven": ("heights-driven.png", 720),
+    "heights-set": ("heights-set.png", 720),
     "sheet-sheets": ("09a-sheet-fewest-sheets.png", 1280),
     "sheet-cuts": ("09b-sheet-fewest-cuts.png", 1280),
     "print": ("10-sheet-plate.png", 1280),
@@ -114,11 +125,32 @@ def encode_media() -> None:
              "-c:v", "libwebp", "-quality", "86", "-compression_level", "6", str(MEDIA / f"{name}.webp")])
     # the numbers the copy quotes, kept beside the media so the page rebuilds without the raw captures
     facts = json.loads((SRC / "shots" / "facts.json").read_text())
+    landing = json.loads((SRC / "shots" / "landing-facts.json").read_text())
     used = {"sheet": {k: facts["sheet"][k] for k in ("spaced40/fewest_sheets", "spaced40/fewest_cuts")},
             "verify": {"legend": facts["verify"]["legend"], "calc": {"text": facts["verify"]["calc"]["text"]}},
-            "core_ready_s": facts["core_ready_s"]}
+            "core_ready_s": facts["core_ready_s"],
+            "tabs": landing["tabs"],
+            "heights": {"preset": landing["heights"]["preset"],
+                        **{k: landing["heights"]["extrude"][k] for k in ("white_mm", "black_mm")},
+                        "set_black_mm": landing["heights_set"]["extrude"]["black_mm"]},
+            "canvas": {"features": landing["canvas"]["features"], "ids": len(set(landing["canvas"]["ids"]))}}
     (MEDIA / "facts.json").write_text(json.dumps(used, indent=2, ensure_ascii=False) + "\n")
+    encode_canvas()
     encode_fusion()
+
+
+def encode_canvas() -> None:
+    """The marker maker on a canvas: muted, looping, with its end state as the poster."""
+    marks = json.loads((SRC / "canvas.marks.json").read_text())
+    a, da, b, db = CANVAS_SPAN
+    start, end = marks[a] + da, marks[b] + db
+    crop = ":".join(map(str, CANVAS_CROP))
+    run([FFMPEG, "-v", "error", "-y", "-ss", f"{start:.2f}", "-to", f"{end:.2f}", "-i", str(SRC / "canvas.webm"),
+         "-vf", f"crop={crop},format=yuv420p", "-c:v", "libx264", "-preset", "slow", "-crf", "24", "-r", "25",
+         "-movflags", "+faststart", "-an", str(MEDIA / "canvas.mp4")])
+    at = marks[CANVAS_POSTER_AT[0]] + CANVAS_POSTER_AT[1]
+    run([FFMPEG, "-v", "error", "-y", "-ss", f"{at:.2f}", "-i", str(SRC / "canvas.webm"), "-frames:v", "1",
+         "-vf", f"crop={crop}", "-q:v", "4", str(MEDIA / "canvas-poster.jpg")])
 
 
 def encode_fusion() -> None:
@@ -175,6 +207,11 @@ JSON_LD = {
 
 
 def features(facts: dict) -> str:
+    names = facts["tabs"]
+    tabs = f"{len(names)} tabs: " + ", ".join(f"<em>{esc(t)}</em>" for t in names[:-1]) + f" and <em>{esc(names[-1])}</em>"
+    h = facts["heights"]
+    canvas = facts["canvas"]
+    canvas_w, canvas_h = size_of(MEDIA / "canvas.mp4")
     sheet = facts["sheet"]
     few_sheets, few_cuts = sheet["spaced40/fewest_sheets"], sheet["spaced40/fewest_cuts"]
     plural = lambda n, w: f"{n} {w}{'' if n == 1 else 's'}"
@@ -185,7 +222,7 @@ def features(facts: dict) -> str:
   <p>A marker starts from a profile, the way an extrude does. Click inside a face and press <kbd>A</kbd>
   (<em>ArUco Extrude</em>): the marker is placed for you in the largest clear spot, avoiding the holes or ignoring
   them. Want it somewhere exact? Draw a rectangle (<kbd>R</kbd>) and double-click it to pick its outer edges as the
-  profile: the marker goes exactly there. The <em>ArUco Extrude</em> panel opens beside the marker.</p>
+  profile: the marker goes exactly there. The <em>ArUco Extrude</em> panel opens beside the marker, in {tabs}.</p>
   <figure class="shot"><picture><source srcset="/about/media/inspect-dark.webp" media="(prefers-color-scheme: dark)">{img("inspect", "The plate example: a single ArUco marker placed in the clear space between two holes, with the ArUco Extrude panel open beside it")}</picture>
   <figcaption>File › Examples › Plate: click between the holes, press A.</figcaption></figure>
 </section>
@@ -213,7 +250,21 @@ def features(facts: dict) -> str:
   <p>Every marker gets its own id without you keeping a list. A stable key per marker is hashed to a preferred id, and
   the file keeps a ledger, so adding or removing other markers never moves an id already given out. Type an id to
   override it; a clash shows red under ID.</p>
-  {fig("autoid", "Two markers on a blank sketch, #2 and #19, the second one's panel showing its driven id in grey")}
+  {fig("autoid", "Two markers on a blank sketch, each with its own id, the second one's panel open on the Marker tab")}
+</section>
+
+<section class="feature" id="canvas">
+  <h3>A marker maker on a canvas</h3>
+  <p>The sketch is a small sketcher of its own, so a batch of markers takes seconds. Type a rectangle's width and height
+  while you draw it, place a driving dimension with <kbd>D</kbd>, right-drag a window round several, and press <kbd>A</kbd>
+  once: one marker in each, each with its own id. <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd> copies
+  rectangles and markers together, and the copies get new ids.</p>
+  <figure class="shot clip"><video src="/about/media/canvas.mp4" poster="/about/media/canvas-poster.jpg" width="{canvas_w}" height="{canvas_h}"
+    autoplay muted loop playsinline controls preload="metadata"
+    aria-label="Recording of the Studio: four rectangles typed while drawing, a dimension from the Y axis, a window round them, A, then copy and paste">
+    <img src="/about/media/canvas-poster.jpg" alt="Eight ArUco markers on a blank sketch, each with its own id"></video>
+  <figcaption>Recorded on arucostudio.com: four typed rectangles, <kbd>D</kbd> to line one up with the Y axis, a window,
+  <kbd>A</kbd>, then copy and paste: {canvas['features']} markers, {canvas['ids']} ids.</figcaption></figure>
 </section>
 
 <section class="feature" id="trim">
@@ -222,6 +273,17 @@ def features(facts: dict) -> str:
   Everything inside the cut is white. For a rectangular sticker, draw a rectangle profile and trim to Profile.</p>
   {row(fig("trim-profile", "Trim Profile: the whole plate face is white", "Profile"),
        fig("trim-marker", "Trim Marker: only the marker and its quiet zone are white", "Marker"))}
+</section>
+
+<section class="feature" id="heights">
+  <h3>Heights on the model</h3>
+  <p>Press <kbd>3</kbd> (or the 2D | 3D toggle) to see the marker as solids. Each height has a drag arrow and a value box
+  on the model, like an extrude in CAD. The black is measured from the white's outer face. Every height is driven from
+  the preset's layers; drag or type to override any one, and ↺ hands it back.</p>
+  {row(fig("heights-driven", "The 3D view of a tile with a marker: an arrow up out of the white with 2.00 mm, an arrow down into the black with 0.60 mm, both grey",
+           f"Driven: the {esc(h['preset'])} 3D print preset gives white {h['white_mm']:.2f} mm, black {h['black_mm']:.2f} mm."),
+       fig("heights-set", "The same tile with the black's box typed to 1.20 mm, with a reset arrow; the white still grey",
+           f"Black typed to {h['set_black_mm']:.2f} mm; the white stays driven."))}
 </section>
 
 <section class="feature" id="layout">
@@ -407,7 +469,7 @@ h2 {{ font-size: clamp(24px, 3.4vw, 32px); letter-spacing: -0.01em; margin: 0 0 
 .feature h3, .principle h3, .qa h3 {{ font-size: 19px; margin: 0 0 6px; }}
 .feature > p {{ max-width: 720px; margin: 0 0 16px; }}
 figure.shot {{ margin: 0; }}
-figure.shot img {{ border: 1px solid var(--line); border-radius: 10px; width: 100%; }}
+figure.shot img, figure.shot.clip video {{ border: 1px solid var(--line); border-radius: 10px; width: 100%; }}
 figcaption {{ color: var(--muted); font-size: 14px; margin-top: 6px; }}
 .row {{ display: grid; gap: 14px; }}
 .row-2 {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
@@ -464,7 +526,7 @@ footer .ctas {{ justify-content: flex-start; margin-bottom: 16px; }}
       <img src="/about/media/hero-poster.jpg" alt="The Studio with a grid of ArUco markers on the plate example">
     </video>
   </div>
-  <p class="hero-cap">Recorded on arucostudio.com: Examples › Plate, click the face, <kbd>A</kbd>, Grid, then the Sheet's
+  <p class="hero-cap">Recorded on arucostudio.com: Examples › Plate, click the face, <kbd>A</kbd>, Marker › Grid, then the Sheet's
   Fewest cuts | Fewest sheets. One cut skips a size and label edit.</p>{fusion}
 </header>
 
