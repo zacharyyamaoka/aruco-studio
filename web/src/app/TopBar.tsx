@@ -17,23 +17,20 @@ function GithubMark() {
   );
 }
 
-// The brand mark: the Extrude Cube, an extruded block with a marker-like
-// bitmap on top, drawn with no tile (the same paths as public/icon.svg).
-// WHY: Zach's round-3 pick on 2026-10-18 (reports/media/logo-cube-variants-
-// 2026-10-18.html). The top bitmap is checked not to decode as any OpenCV
-// dictionary, and the white halo keeps it readable on the dark theme; do not
-// swap in a real marker or drop the halo.
+// The brand mark: the line-art block (#3's style at 0.48 x the
+// side) with the "winky face" bitmap on top, no tile; the same paths as
+// public/icon.svg.
+// WHY: Zach's round-4 pick on 2026-10-20 (reports/media/logo-slab-series-
+// 2026-10-18.html). The top bitmap and this stroke weight are checked not to
+// decode as any OpenCV dictionary, and the pass is narrow: re-check any
+// change to the bitmap, the height or the stroke.
 function BrandCube() {
   return (
     <svg className="brand-cube" viewBox="0 0 64 64" width="18" height="18" aria-hidden="true">
-      <path fill="#ffffff" stroke="#ffffff" strokeWidth="2.4" strokeLinejoin="round" d="M5.6 41.2L32 62L32 43.61L5.6 22.8z" />
-      <path fill="#ffffff" stroke="#ffffff" strokeWidth="2.4" strokeLinejoin="round" d="M58.4 41.2L32 62L32 43.61L58.4 22.8z" />
-      <path fill="#ffffff" stroke="#ffffff" strokeWidth="2.4" strokeLinejoin="round" d="M32 2L58.4 22.8L32 43.61L5.6 22.8z" />
-      <path fill="#3a4250" d="M5.6 41.2L32 62L32 43.61L5.6 22.8z" />
-      <path fill="#69727f" d="M58.4 41.2L32 62L32 43.61L58.4 22.8z" />
-      <path fill="#ffffff" d="M32 2L58.4 22.8L32 43.61L5.6 22.8z" />
-      <path fill="#ffffff" d="M32 2L58.4 22.8L32 43.61L5.6 22.8z" />
-      <path fill="#111418" d="M32 6.16L53.12 22.8L49.5 25.66L28.37 9.02zM28.59 8.85L32.21 11.71L28.48 14.65L24.85 11.79zM35.52 14.32L39.25 17.26L35.52 20.2L31.79 17.26zM46.08 22.64L49.71 25.5L45.98 28.44L42.35 25.58zM25.07 11.63L32.21 17.26L28.48 20.2L21.33 14.57zM35.52 19.86L39.25 22.8L35.52 25.75L31.79 22.8zM42.56 25.41L46.19 28.27L42.46 31.21L38.83 28.35zM21.54 14.4L25.17 17.26L21.44 20.2L17.81 17.34zM28.48 19.86L35.73 25.58L32 28.52L24.75 22.8zM39.04 28.19L42.67 31.04L38.93 33.98L35.31 31.13zM18.02 17.17L21.65 20.03L17.92 22.97L14.29 20.11zM24.96 22.64L28.69 25.58L24.96 28.52L21.23 25.58zM35.52 30.96L39.15 33.82L35.41 36.76L31.79 33.9zM14.5 19.95L35.63 36.59L32 39.45L10.88 22.8z" />
+      <path fill="#f1f3f6" stroke="#111418" strokeWidth="2.6" strokeLinejoin="round" d="M2 40.31L32 57.63L32 41.01L2 23.69z" />
+      <path fill="#dfe3e8" stroke="#111418" strokeWidth="2.6" strokeLinejoin="round" d="M62 40.31L32 57.63L32 41.01L62 23.69z" />
+      <path fill="#ffffff" stroke="#111418" strokeWidth="2.6" strokeLinejoin="round" d="M32 6.37L62 23.69L32 41.01L2 23.69z" />
+      <path fill="#111418" d="M32 10.87L54.2 23.69L50.39 25.89L28.19 13.07zM28.41 12.94L32.22 15.14L28.3 17.41L24.49 15.21zM35.7 17.15L39.62 19.41L35.7 21.68L31.78 19.41zM46.8 23.56L50.61 25.76L46.69 28.02L42.88 25.82zM24.71 15.08L32.22 19.41L28.3 21.68L20.79 17.34zM35.7 21.42L39.62 23.69L35.7 25.95L31.78 23.69zM43.1 25.69L46.91 27.89L42.99 30.16L39.18 27.96zM21.01 17.21L24.82 19.41L20.9 21.68L17.09 19.48zM28.3 21.42L35.92 25.82L32 28.09L24.38 23.69zM39.4 27.83L43.21 30.03L39.29 32.29L35.48 30.09zM17.31 19.35L21.12 21.55L17.2 23.81L13.39 21.61zM24.6 23.56L28.52 25.82L24.6 28.09L20.68 25.82zM35.7 29.97L39.51 32.17L35.59 34.43L31.78 32.23zM13.61 21.49L35.81 34.3L32 36.5L9.8 23.69z" />
     </svg>
   );
 }
