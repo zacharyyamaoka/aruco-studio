@@ -96,7 +96,7 @@ h2 { font-size: clamp(24px, 3.4vw, 32px); letter-spacing: -0.01em; margin: 0 0 8
 .feature h3, .principle h3, .qa h3 { font-size: 19px; margin: 0 0 6px; }
 .feature > p { max-width: 720px; margin: 0 0 16px; }
 figure.shot { margin: 0; }
-figure.shot img { border: 1px solid var(--line); border-radius: 10px; width: 100%; }
+figure.shot img, figure.shot.clip video { border: 1px solid var(--line); border-radius: 10px; width: 100%; }
 figcaption { color: var(--muted); font-size: 14px; margin-top: 6px; }
 .row { display: grid; gap: 14px; }
 .row-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -145,7 +145,7 @@ footer .ctas { justify-content: flex-start; margin-bottom: 16px; }
     <a class="btn primary" href="#download" data-cta="download">Download</a>
     <a class="btn" href="/" data-cta="online">Try Online</a>
   </div>
-  <p class="note">Free, no account. The Python core loaded in 2–4 s in our tests.</p>
+  <p class="note">Free, no account. The Python core loaded in 2–3 s in our tests.</p>
   <div class="hero-media">
     <video src="/about/media/hero.mp4" poster="/about/media/hero-poster.jpg" width="960" height="600"
       autoplay muted loop playsinline controls preload="metadata"
@@ -153,7 +153,7 @@ footer .ctas { justify-content: flex-start; margin-bottom: 16px; }
       <img src="/about/media/hero-poster.jpg" alt="The Studio with a grid of ArUco markers on the plate example">
     </video>
   </div>
-  <p class="hero-cap">Recorded on arucostudio.com: Examples › Plate, click the face, <kbd>A</kbd>, Grid, then the Sheet's
+  <p class="hero-cap">Recorded on arucostudio.com: Examples › Plate, click the face, <kbd>A</kbd>, Marker › Grid, then the Sheet's
   Fewest cuts | Fewest sheets. One cut skips a size and label edit.</p>
 </header>
 
@@ -167,7 +167,7 @@ footer .ctas { justify-content: flex-start; margin-bottom: 16px; }
   <p>A marker starts from a profile, the way an extrude does. Click inside a face and press <kbd>A</kbd>
   (<em>ArUco Extrude</em>): the marker is placed for you in the largest clear spot, avoiding the holes or ignoring
   them. Want it somewhere exact? Draw a rectangle (<kbd>R</kbd>) and double-click it to pick its outer edges as the
-  profile: the marker goes exactly there. The <em>ArUco Extrude</em> panel opens beside the marker.</p>
+  profile: the marker goes exactly there. The <em>ArUco Extrude</em> panel opens beside the marker, in 3 tabs: <em>Make</em>, <em>Marker</em> and <em>Label</em>.</p>
   <figure class="shot"><picture><source srcset="/about/media/inspect-dark.webp" media="(prefers-color-scheme: dark)"><img src="/about/media/inspect.webp" width="1280" height="800" alt="The plate example: a single ArUco marker placed in the clear space between two holes, with the ArUco Extrude panel open beside it" loading="lazy" decoding="async"></picture>
   <figcaption>File › Examples › Plate: click between the holes, press A.</figcaption></figure>
 </section>
@@ -176,7 +176,7 @@ footer .ctas { justify-content: flex-start; margin-bottom: 16px; }
   <h3>Single, Grid or ChArUco</h3>
   <p>One word switches the type. A grid lays out several markers with consecutive ids; a ChArUco board puts
   the markers in a checkerboard for camera calibration. Every OpenCV predefined dictionary is there, AprilTag included.</p>
-  <div class="row row-3"><figure class="shot"><img src="/about/media/type-single.webp" width="720" height="492" alt="A single ArUco marker on the plate" loading="lazy" decoding="async"><figcaption>Single</figcaption></figure><figure class="shot"><img src="/about/media/type-grid.webp" width="720" height="492" alt="A 2 × 2 grid of ArUco markers on the plate" loading="lazy" decoding="async"><figcaption>Grid</figcaption></figure><figure class="shot"><img src="/about/media/type-charuco.webp" width="720" height="492" alt="A ChArUco board on the plate" loading="lazy" decoding="async"><figcaption>ChArUco</figcaption></figure></div>
+  <div class="row row-3"><figure class="shot"><img src="/about/media/type-single.webp" width="720" height="502" alt="A single ArUco marker on the plate" loading="lazy" decoding="async"><figcaption>Single</figcaption></figure><figure class="shot"><img src="/about/media/type-grid.webp" width="720" height="520" alt="A 2 × 2 grid of ArUco markers on the plate" loading="lazy" decoding="async"><figcaption>Grid</figcaption></figure><figure class="shot"><img src="/about/media/type-charuco.webp" width="720" height="520" alt="A ChArUco board on the plate" loading="lazy" decoding="async"><figcaption>ChArUco</figcaption></figure></div>
 </section>
 
 <section class="feature" id="driven">
@@ -184,7 +184,7 @@ footer .ctas { justify-content: flex-start; margin-bottom: 16px; }
   <p>No “Auto” switches. Each field shows the actual value: in grey when the core worked it out, in black once you
   type it. A typed value is kept until you press ↺, which hands it back to the core. A value that no longer fits
   turns red but never blocks you.</p>
-  <div class="row row-2"><figure class="shot"><img src="/about/media/driven.webp" width="660" height="350" alt="The panel rows with the marker size, separation and columns in grey: driven" loading="lazy" decoding="async"><figcaption>Driven: the core sized the grid to fill the profile.</figcaption></figure><figure class="shot"><img src="/about/media/set.webp" width="660" height="412" alt="The same rows after typing a 16 mm marker: the size is black, with a reset arrow" loading="lazy" decoding="async"><figcaption>Set: 16 mm typed; the note says how it lands on whole printer dots.</figcaption></figure></div>
+  <div class="row row-2"><figure class="shot"><img src="/about/media/driven.webp" width="660" height="372" alt="The panel rows with the marker size, separation and columns in grey: driven" loading="lazy" decoding="async"><figcaption>Driven: the core sized the grid to fill the profile.</figcaption></figure><figure class="shot"><img src="/about/media/set.webp" width="660" height="434" alt="The same rows after typing a 16 mm marker: the size is black, with a reset arrow" loading="lazy" decoding="async"><figcaption>Set: 16 mm typed; the note says how it lands on whole printer dots.</figcaption></figure></div>
 </section>
 
 <section class="feature" id="auto-id">
@@ -192,14 +192,36 @@ footer .ctas { justify-content: flex-start; margin-bottom: 16px; }
   <p>Every marker gets its own id without you keeping a list. A stable key per marker is hashed to a preferred id, and
   the file keeps a ledger, so adding or removing other markers never moves an id already given out. Type an id to
   override it; a clash shows red under ID.</p>
-  <figure class="shot"><img src="/about/media/autoid.webp" width="1280" height="800" alt="Two markers on a blank sketch, #2 and #19, the second one&#x27;s panel showing its driven id in grey" loading="lazy" decoding="async"></figure>
+  <figure class="shot"><img src="/about/media/autoid.webp" width="1280" height="800" alt="Two markers on a blank sketch, each with its own id, the second one&#x27;s panel open on the Marker tab" loading="lazy" decoding="async"></figure>
+</section>
+
+<section class="feature" id="canvas">
+  <h3>A marker maker on a canvas</h3>
+  <p>The sketch is a small sketcher of its own, so a batch of markers takes seconds. Type a rectangle's width and height
+  while you draw it, place a driving dimension with <kbd>D</kbd>, right-drag a window round several, and press <kbd>A</kbd>
+  once: one marker in each, each with its own id. <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd> copies
+  rectangles and markers together, and the copies get new ids.</p>
+  <figure class="shot clip"><video src="/about/media/canvas.mp4" poster="/about/media/canvas-poster.jpg" width="1100" height="600"
+    autoplay muted loop playsinline controls preload="metadata"
+    aria-label="Recording of the Studio: four rectangles typed while drawing, a dimension from the Y axis, a window round them, A, then copy and paste">
+    <img src="/about/media/canvas-poster.jpg" alt="Eight ArUco markers on a blank sketch, each with its own id"></video>
+  <figcaption>Recorded on arucostudio.com: four typed rectangles, <kbd>D</kbd> to line one up with the Y axis, a window,
+  <kbd>A</kbd>, then copy and paste: 8 markers, 8 ids.</figcaption></figure>
 </section>
 
 <section class="feature" id="trim">
   <h3>Trim</h3>
   <p>What the sticker is cut to: the profile (the whole face, holes cut out) or just the marker and its quiet zone.
   Everything inside the cut is white. For a rectangular sticker, draw a rectangle profile and trim to Profile.</p>
-  <div class="row row-2"><figure class="shot"><img src="/about/media/trim-profile.webp" width="720" height="492" alt="Trim Profile: the whole plate face is white" loading="lazy" decoding="async"><figcaption>Profile</figcaption></figure><figure class="shot"><img src="/about/media/trim-marker.webp" width="720" height="492" alt="Trim Marker: only the marker and its quiet zone are white" loading="lazy" decoding="async"><figcaption>Marker</figcaption></figure></div>
+  <div class="row row-2"><figure class="shot"><img src="/about/media/trim-profile.webp" width="720" height="502" alt="Trim Profile: the whole plate face is white" loading="lazy" decoding="async"><figcaption>Profile</figcaption></figure><figure class="shot"><img src="/about/media/trim-marker.webp" width="720" height="502" alt="Trim Marker: only the marker and its quiet zone are white" loading="lazy" decoding="async"><figcaption>Marker</figcaption></figure></div>
+</section>
+
+<section class="feature" id="heights">
+  <h3>Heights on the model</h3>
+  <p>Press <kbd>3</kbd> (or the 2D | 3D toggle) to see the marker as solids. Each height has a drag arrow and a value box
+  on the model, like an extrude in CAD. The black is measured from the white's outer face. Every height is driven from
+  the preset's layers; drag or type to override any one, and ↺ hands it back.</p>
+  <div class="row row-2"><figure class="shot"><img src="/about/media/heights-driven.webp" width="720" height="480" alt="The 3D view of a tile with a marker: an arrow up out of the white with 2.00 mm, an arrow down into the black with 0.60 mm, both grey" loading="lazy" decoding="async"><figcaption>Driven: the Default 3D print preset gives white 2.00 mm, black 0.60 mm.</figcaption></figure><figure class="shot"><img src="/about/media/heights-set.webp" width="720" height="480" alt="The same tile with the black&#x27;s box typed to 1.20 mm, with a reset arrow; the white still grey" loading="lazy" decoding="async"><figcaption>Black typed to 1.20 mm; the white stays driven.</figcaption></figure></div>
 </section>
 
 <section class="feature" id="layout">
@@ -222,7 +244,7 @@ footer .ctas { justify-content: flex-start; margin-bottom: 16px; }
   <p>OpenCV's own ArUco detector reads a simulated camera view of exactly what you will print. Drag tilt, yaw, blur,
   noise, glare and occlusion; an angle sweep runs for every marker, and a camera calculator turns distance,
   resolution and field of view into pixels per cell and a verdict.</p>
-  <figure class="shot"><img src="/about/media/verify.webp" width="1280" height="800" alt="Verify: OpenCV reads marker 35 at 50 degrees of tilt, with the angle sweep and the camera calculator" loading="lazy" decoding="async"><figcaption>Measured on the live site: “Marker #35: reads to 80°”; at 1500 mm with a 1920 px, 70° camera: “5.7 px per cell at 1500 mm: reads reliably; limit ≈ 3.2 m”.</figcaption></figure>
+  <figure class="shot"><img src="/about/media/verify.webp" width="1280" height="800" alt="Verify: OpenCV reads marker 35 at 50 degrees of tilt, with the angle sweep and the camera calculator" loading="lazy" decoding="async"><figcaption>Measured on the live site: “Marker #33: reads to 75°”; at 1500 mm with a 1920 px, 70° camera: “5.7 px per cell at 1500 mm: reads reliably; limit ≈ 3.5 m”.</figcaption></figure>
 </section>
 
 </section>

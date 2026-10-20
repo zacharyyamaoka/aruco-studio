@@ -12,19 +12,36 @@
     }
   },
   "verify": {
-    "legend": "Marker #35: reads to 80°",
+    "legend": "Marker #33: reads to 75°",
     "calc": {
-      "text": "5.7 px per cell at 1500 mm: reads reliably; limit ≈ 3.2 m"
+      "text": "5.7 px per cell at 1500 mm: reads reliably; limit ≈ 3.5 m"
     }
   },
   "core_ready_s": [
+    3.4,
     2.9,
-    3.9,
-    2.4,
     2.3,
-    2.9,
-    2.8,
+    2.3,
+    2.3,
+    2.3,
+    2.3,
+    2.3,
     2.3,
     2.4
-  ]
+  ],
+  "tabs": [
+    "Make",
+    "Marker",
+    "Label"
+  ],
+  "heights": {
+    "preset": "Default",
+    "white_mm": 2,
+    "black_mm": 0.6,
+    "set_black_mm": 1.2
+  },
+  "canvas": {
+    "features": 8,
+    "ids": 8
+  }
 }
