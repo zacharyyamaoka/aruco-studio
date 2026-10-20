@@ -34,7 +34,7 @@ import numpy as np
 
 from . import detect as _det
 from . import pnp as _pnp
-from .render import Raster, top_view
+from .render import Raster, _Canvas, top_view
 
 CROP_MARGIN_PX = 32           # sensor px of white round the marker (> the 23 px threshold window)
 SS_MAX = 4                    # supersampling of the crop, per axis
@@ -123,7 +123,7 @@ class Scene:
     bounds: Tuple[float, float, float, float]      # u0, v0, u1, v1: sticker + label
     centre: Tuple[float, float, float]             # on the optical axis
     area: Tuple[float, float, float, float]        # the marker area (the ink's box): occlusion
-    label: Optional[dict] = None                   # {text, at (u, v), height_mm, dir (du, dv)}
+    label: Optional[dict] = None                   # {text, at (u, v), height_mm, dir (du, dv), ...}
 
 
 def _ink_box(d: dict):
@@ -141,7 +141,11 @@ def _ink_box(d: dict):
 
 def scene_of(d: dict, label: Optional[dict] = None) -> Scene:
     """`label`: {text, at (u, v) mm in the pattern frame, height_mm (cap),
-    dir (du, dv) the text's baseline} -- plain text beside the marker."""
+    dir (du, dv) the text's baseline} -- plain text beside the marker or on
+    it; optional: "colour" "white" (knocked out of the black: the letters
+    are paper), "widths" each line's width (mm: Helvetica's, the page's),
+    "polygons" the pixel font's ink [{outer, holes}] in the pattern frame
+    (drawn as they are instead of the text)."""
     s = d["guides"]["sticker"]
     u0, v0, u1, v1 = s
     z0 = float(d["frames"]["opencv"][11])
@@ -169,13 +173,24 @@ def _draw_label(r: Raster, label: dict):
     """The label's text (Hershey simplex, black) drawn on the top view at
     its cap height, along its baseline. A multi-line label draws each line
     stacked 1.4 caps apart around the label's centre, first line on top, as
-    the core lays it out (rect_fill: (1 + LINE_GAP) x cap)."""
+    the core lays it out (rect_fill: (1 + LINE_GAP) x cap). Colour "white":
+    the letters are paper knocked out of the black (Zach, 2026-10-20: the
+    text in the marker's border row), so they lighten what is under them.
+    "widths": each line stretched to the page's width, so the letters cover
+    the marker where the print does. "polygons": the pixel font, as drawn."""
+    white = label.get("colour") == "white"
+    if label.get("polygons"):
+        cv = _Canvas(r.u0, r.v1, r.img.shape[1], r.img.shape[0], r.px_per_mm)
+        m = cv.mask(label["polygons"])
+        r.img[m] = 255 if white else 0
+        return
     # WHY one putText per line (2026-10-18): Hershey draws "\n" as "?", so a
     # two-line label rendered as one line with a "?" in the middle.
     lines = [t for t in str(label["text"]).split("\n")]
     cap_mm = float(label["height_mm"])
     if not any(lines) or cap_mm * r.px_per_mm < 1.0:
         return
+    widths = label.get("widths") or [None] * len(lines)
     (cu, cv), (du, dv) = label["at"], label["dir"]
     n = math.hypot(du, dv) or 1.0
     du, dv = du / n, dv / n
@@ -184,10 +199,12 @@ def _draw_label(r: Raster, label: dict):
     for k, text in enumerate(lines):
         off = ((len(lines) - 1) / 2.0 - k) * pitch
         if text:
-            _draw_line(r, text, cap_mm, (cu + upu * off, cv + upv * off), (du, dv))
+            _draw_line(r, text, cap_mm, (cu + upu * off, cv + upv * off), (du, dv), white,
+                       widths[k] if k < len(widths) else None)
 
 
-def _draw_line(r: Raster, text: str, cap_mm: float, at, d):
+def _draw_line(r: Raster, text: str, cap_mm: float, at, d, white: bool = False,
+               width_mm: Optional[float] = None):
     cap_px = cap_mm * r.px_per_mm
     (_w1, h1), _b = cv2.getTextSize("H", cv2.FONT_HERSHEY_SIMPLEX, 1.0, 1)
     scale = cap_px / float(h1)
@@ -200,8 +217,9 @@ def _draw_line(r: Raster, text: str, cap_mm: float, at, d):
     (cu, cv), (du, dv) = at, d
     # patch px -> pattern mm: its middle at the line's centre, x along the baseline
     k = 1.0 / r.px_per_mm                          # the patch is drawn at the top view's scale
+    kx = k if not width_mm else float(width_mm) / max(1.0, float(tw))   # along the baseline
     px0, py0 = patch.shape[1] / 2.0, (pad + th / 2.0)
-    P2M = np.array([[k * du, k * dv, 0.0], [k * dv, -k * du, 0.0], [0.0, 0.0, 1.0]])
+    P2M = np.array([[kx * du, k * dv, 0.0], [kx * dv, -k * du, 0.0], [0.0, 0.0, 1.0]])
     P2M[:2, 2] = np.array([cu, cv]) - P2M[:2, :2] @ np.array([px0, py0])
     M2R = np.linalg.inv(r.A) @ np.eye(3)
     M2R[:2, 2] -= 0.5                              # raster centres at +0.5 -> indices
@@ -209,7 +227,10 @@ def _draw_line(r: Raster, text: str, cap_mm: float, at, d):
     h, w = r.img.shape
     warped = cv2.warpAffine(patch, A, (w, h), flags=cv2.INTER_LINEAR,
                             borderMode=cv2.BORDER_CONSTANT, borderValue=255)
-    np.minimum(r.img, warped, out=r.img)
+    if white:
+        np.maximum(r.img, 255 - warped, out=r.img)
+    else:
+        np.minimum(r.img, warped, out=r.img)
 
 
 def _occlude(r: Raster, area, share: float, rng) -> float:

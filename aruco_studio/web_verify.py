@@ -75,10 +75,14 @@ def _plan(req: dict):
 
 def _label(req: dict, d: dict):
     """The sketch's label in the pattern frame (verify.camera.scene_of), or
-    None (off, or Flip: the marker then faces away from its sketch text)."""
+    None (off, or Flip: the marker then faces away from its sketch text).
+    On the marker's black (Zach, 2026-10-20) it is white: the letters are
+    paper knocked out of the border row, which is what the detector must
+    still read past; the pixel font (3D) as its own boxes."""
     m = req["marker"]
     flip = bool(m.get("flip")) and not req.get("reference_face")
-    lab = _W.placed_label(req, d["layout"]["kind"], d["marker"]["dictionary"], d["ids"])
+    fl = _W._planned(req)[2]
+    lab = _W.placed_label(req, d["layout"]["kind"], d["marker"]["dictionary"], d["ids"], fl)
     if lab is None or flip:
         return None
     # WHY the plan's own pattern -> sketch matrix (2026-10-18): with the label
@@ -89,9 +93,21 @@ def _label(req: dict, d: dict):
     at = Mi @ np.array([lab["at"][0], lab["at"][1], 0.0, 1.0])
     a = math.radians(lab["angle_deg"])
     dr = Mi[:3, :3] @ np.array([math.cos(a), math.sin(a), 0.0])
-    return {"text": lab["text"], "at": (float(at[0]), float(at[1])),
-            "height_mm": float(lab["height_mm"]), "dir": (float(dr[0]), float(dr[1])),
-            "width_mm": max(_W.text_width(t, lab["height_mm"]) for t in lab["text"].split("\n"))}
+    out = {"text": lab["text"], "at": (float(at[0]), float(at[1])),
+           "height_mm": float(lab["height_mm"]), "dir": (float(dr[0]), float(dr[1])),
+           "width_mm": max(_W.text_width(t, lab["height_mm"]) for t in lab["text"].split("\n"))}
+    if fl.place == "on_marker":
+        # on the marker the letters must cover what the print covers (Helvetica's
+        # widths), and the 3D font is its own boxes; beside it, today's text
+        out["widths"] = [_W.text_width(t, lab["height_mm"]) for t in lab["text"].split("\n")]
+        if fl.knockout:
+            out["colour"] = "white"
+        if lab["font"] == "pixel" and lab["polygons"]:
+            def back(q):
+                return [[float((Mi @ np.array([u, v, 0.0, 1.0]))[k]) for k in (0, 1)] for u, v in q]
+            out["polygons"] = [{"outer": back(p["outer"]), "holes": [back(hl) for hl in p["holes"]]}
+                               for p in lab["polygons"]]
+    return out
 
 
 def cell_mm(d: dict) -> float:
@@ -245,6 +261,8 @@ def readable(req: dict, camera: dict) -> dict:
         return readable_analytic(req, camera)
     d = _plan(req)
     cam = _C.Cam.of(camera)
-    # the label is beside the marker, not on it: the limit is the marker's own
-    lim = max_distance(d, _C.scene_of(d), cam)
+    # a label beside the marker leaves the limit the marker's own; one ON it
+    # (the default since 2026-10-20) is part of what the detector reads past
+    on = _W.place_of(req.get("label") or {}) == "on_marker"
+    lim = max_distance(d, _C.scene_of(d, _label(req, d) if on else None), cam)
     return _readability(_px_per_cell(d, cam), cam.distance_mm, lim, True)

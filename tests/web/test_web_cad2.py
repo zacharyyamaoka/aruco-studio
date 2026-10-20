@@ -203,7 +203,7 @@ def test_the_notch_is_in_every_footprint_layer_a_board_builds():
 
 # ------------------------------------------------------------------ 3. the 3D label
 
-LABEL = {"on": True, "text": "#{id}\n{dict}"}
+LABEL = {"on": True, "text": "#{id}\n{dict}", "place": "outside"}   # ink, not knocked out (barrier 7)
 
 
 @pytest.mark.parametrize("face,flip", [(False, False), (False, True), (True, False)])
@@ -366,7 +366,8 @@ ROUND_TRIP = {             # name: (request, its cells on the 1e-6 grid)
                                                                                 "w": 60.0, "h": 40.0,
                                                                                 "angle_deg": 45.0},
                                                         pre=D3, label={"on": True, "text": "#{id}",
-                                                                       "side": "right"}), False),
+                                                                       "side": "right",
+                                                                       "place": "outside"}), False),
 }
 # black's vertices and the cells are each rounded to 1e-6 mm (ND): two
 # roundings of half a micron per axis, whatever M is

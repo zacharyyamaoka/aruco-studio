@@ -1500,6 +1500,12 @@ class _Ops:
         self.ops.append(("text", float(x), float(baseline_y), str(s), float(size), "left",
                          float(grey), 90))
 
+    def text_turned(self, x, baseline_y, s, size, rot, grey=0.0):
+        """Text turned `rot` degrees counter-clockwise on the page (90 reads
+        upward, -90 downward, 180 upside down), its baseline starting at (x, y)."""
+        self.ops.append(("text", float(x), float(baseline_y), str(s), float(size), "left",
+                         float(grey), int(rot)))
+
     def fill_polys(self, polys, grey=0.0):
         """Polygons with holes (lists of loops), even-odd, filled."""
         if polys:
@@ -1527,11 +1533,26 @@ def _draw_sticker(pg: _Ops, p: StickerPlace, s: SheetSettings):
     for t in item.texts_mm or ():                 # the label inside the sticker
         cap = float(t["cap_mm"])
         size = cap / CAP_EM * MM_TO_PT
+        # the Studio's knock-out (2026-10-20): "grey" 1.0 is white text over
+        # the black, so the page leaves the letters unprinted (WYSIWYG)
+        grey = float(t.get("grey", 0.0))
+        rot = int(t.get("rot", 0))
+        if rot:                                    # a label on a marker's left / right edge
+            r = math.radians(rot)
+            c, sn = round(math.cos(r), 12), round(math.sin(r), 12)
+            half = text_width_mm(t["text"], size) / 2.0
+            # the baseline's start: half a cap down its own up, half its width back along it
+            u = float(t["at"][0]) + sn * cap / 2.0 - c * half
+            v = float(t["at"][1]) - c * cap / 2.0 - sn * half
+            x, y = p.to_page(u, v)
+            pg.text_turned(x, y, t["text"], size, (rot + (90 if p.rotation == 90 else 0) + 180)
+                           % 360 - 180, grey)
+            continue
         x, y = p.to_page(float(t["at"][0]), float(t["at"][1]) - cap / 2.0)   # the baseline's middle
         if p.rotation == 90:                       # only when it is longer than the page
-            pg.text_up(x, y + text_width_mm(t["text"], size) / 2.0, t["text"], size)
+            pg.text_up(x, y + text_width_mm(t["text"], size) / 2.0, t["text"], size, grey)
         else:
-            pg.text(x, y, t["text"], size, "center")
+            pg.text(x, y, t["text"], size, "center", grey)
     o = outline_of(item)
     loops = [[p.to_page(u, v) for u, v in o["outer"]]]
     loops += [[p.to_page(u, v) for u, v in hl] for hl in o.get("holes", [])]
@@ -1645,8 +1666,9 @@ def _pdf_ops(pg: _Ops) -> bytes:
         elif kind == "text":
             _k, x, y, txt, size, align, grey, rot = op
             if rot:
-                out.append("BT /F1 %s Tf %s g 0 1 -1 0 %s Tm %s Tj ET"
-                           % (_n(size), _n(grey), P(x, y), pdf_string(txt)))
+                tm = {90: "0 1 -1 0", -90: "0 -1 1 0", 180: "-1 0 0 -1", -180: "-1 0 0 -1"}[rot]
+                out.append("BT /F1 %s Tf %s g %s %s Tm %s Tj ET"
+                           % (_n(size), _n(grey), tm, P(x, y), pdf_string(txt)))
                 continue
             if align != "left":
                 wd = text_width_mm(txt, size)
@@ -1770,7 +1792,8 @@ def _svg_ops(pg: _Ops) -> List[str]:
             _k, x, y, txt, size, align, grey, rot = op
             anchor = {"left": "start", "center": "middle", "right": "end"}[align]
             fs = size / MM_TO_PT
-            tr = ' transform="rotate(-90 %s %s)"' % (_svg_n(x), _svg_n(y)) if rot else ""
+            tr = (' transform="rotate(%s %s %s)"' % (_svg_n(-rot), _svg_n(x), _svg_n(y))
+                  if rot else "")
             out.append('<text x="%s" y="%s" font-family="Helvetica, Arial, sans-serif" '
                        'font-size="%s" text-anchor="%s" fill="%s"%s>%s</text>'
                        % (_svg_n(x), _svg_n(y), _svg_n(fs), anchor, _grey_hex(grey), tr,

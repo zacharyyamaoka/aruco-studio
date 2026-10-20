@@ -408,10 +408,12 @@ def test_bad_reserved_is_answered_in_words():
 
 def test_every_driven_value_a_shell_shows_is_in_the_plan():
     g = W.plan(req({"type": "grid", "cols": 3, "rows": 2, "first_id": 5}, rect={"w": 60.0, "h": 40.0},
-                   label={"on": True, "text": "#{ids}", "height_mm": 0.0}))
+                   label={"on": True, "text": "#{ids}", "height_mm": 0.0, "place": "outside"}))
     assert g["auto"] and g["marker_mm"] > 0 and g["separation_mm"] > 0
     assert (g["cols"], g["rows"]) == (3, 2) and g["ids"][0] == 5 and len(g["ids"]) == 6
-    assert g["label"]["height_mm"] == pytest.approx(RF.auto_cap(60.0, 40.0), abs=1e-6)
+    # barrier 7 (2026-10-20): driven = one module of the marker drawn, was
+    # RF.auto_cap (0.12 x the short side, "way too big")
+    assert g["label"]["height_mm"] == pytest.approx(g["cell_mm"], abs=1e-6)
     c = W.plan(req({"type": "charuco", "cols": 5, "rows": 4}, rect={"w": 80.0, "h": 60.0}))
     assert c["checker_mm"] > c["marker_mm"] > 0 and c["cell_mm"] > 0
     # a dimension carries each driven size

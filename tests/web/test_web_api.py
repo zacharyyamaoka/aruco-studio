@@ -255,10 +255,12 @@ def test_label_text_and_default_spot():
     p = W.plan(req({"type": "grid", "cols": 3, "rows": 2, "first_id": 4},
                    rect={"cx": 10.0, "cy": 20.0, "w": 60.0, "h": 40.0},
                    label={"on": True, "text": "{type} {dict} {ids} ({first}..{last}) #{id}",
-                          "gap_mm": 2.0}))
+                          "gap_mm": 2.0, "place": "outside"}))
     lab = p["label"]
     assert lab["text"] == "Grid 4X4_50 4-9 (4..9) #4"
-    cap = 40.0 * 0.12
+    # barrier 7 (2026-10-20): a driven cap is one module of the marker drawn
+    # (it was 0.12 x the rectangle's short side: 4.8 mm here)
+    cap = p["cell_mm"]
     assert lab["height_mm"] == pytest.approx(cap)
     # INSIDE the rectangle (Zach, 2026-10-18), in the band on its bottom edge:
     # EDGE x cap of white and DESCENT x cap of descender room under the text
@@ -266,7 +268,7 @@ def test_label_text_and_default_spot():
     low = 20.0 - 20.0 + (RF.EDGE + RF.DESCENT) * cap
     assert lab["at"] == [pytest.approx(10.0), pytest.approx(low + cap / 2.0)]
     moved = W.plan(req({"type": "single"}, label={"on": True, "side": "above", "height_mm": 3.0,
-                                                  "offset_mm": [1.0, -1.0]}))["label"]
+                                                  "offset_mm": [1.0, -1.0], "place": "outside"}))["label"]
     assert moved["text"] == "#0" and moved["height_mm"] == 3.0
     assert moved["at"] == [pytest.approx(1.0), pytest.approx(10.0 - RF.EDGE * 3.0 - 1.5 - 1.0)]
     assert W.plan(req())["label"] is None

@@ -107,14 +107,19 @@ def test_a_rectangle_poking_out_of_the_profile_is_a_warning():
 
 
 def test_a_label_outside_a_marker_trimmed_sticker_is_a_warning():
-    p = W.plan(trimmed("marker", label={"on": True, "text": "#{id}"}))
+    # barrier 7 (2026-10-20): only a label placed "outside" is off a marker
+    # trim; one ON the marker (the default) is inside the cut and kept
+    out = {"on": True, "text": "#{id}", "place": "outside"}
+    p = W.plan(trimmed("marker", label=out))
     got = issues(p, "label.on", "warn")
     assert got and "the label is outside a marker-trimmed sticker" in got[0]["text"]
     assert p["label"] is not None                  # not silently dropped from the sketch
-    sp = W.sticker_parts(trimmed("marker", label={"on": True, "text": "#{id}"}))
+    sp = W.sticker_parts(trimmed("marker", label=out))
     assert sp["texts"] == [] and sp["label_ink"] == []
     assert not issues(W.plan(trimmed("marker")), "label.on", "warn")
-    assert not issues(W.plan(trimmed("rectangle", label={"on": True})), "label.on", "warn")
+    assert not issues(W.plan(trimmed("rectangle", label=dict(out, text=""))), "label.on", "warn")
+    on = trimmed("marker", label={"on": True, "text": "#{id}"})
+    assert not issues(W.plan(on), "label.on", "warn") and W.sticker_parts(on)["texts"]
 
 
 # ------------------------------------------------------------------ svg
@@ -144,7 +149,9 @@ def even_odd(loops, x, y):
 @pytest.mark.parametrize("trim", ["rectangle", "profile", "marker"])
 @pytest.mark.parametrize("label", [False, True])
 def test_svg_is_white_inside_the_cut(trim, label):
-    r = trimmed(trim, label={"on": label, "text": "#{id}"})
+    # "outside": a marker trim leaves that label off the svg (barrier 7: a label
+    # on the marker stays, tests/web/test_web_label_place.py)
+    r = trimmed(trim, label={"on": label, "text": "#{id}", "place": "outside"})
     out = W.svg(r)
     root, white, loops = svg_parts(out)
     assert white.get("fill") == "#ffffff" and white.get("fill-rule") == "evenodd"
@@ -188,7 +195,8 @@ def test_every_sheet_sticker_is_its_cut():
              trimmed("profile"),
              trimmed("profile", TURNED, {"on": True, "text": "lid"}),
              trimmed("marker", dict(CLEAR, w=30.0, h=40.0)),
-             trimmed("marker", dict(CLEAR, w=30.0, h=40.0), {"on": True, "text": "#{id}"})]
+             trimmed("marker", dict(CLEAR, w=30.0, h=40.0), {"on": True, "text": "#{id}",
+                                                              "place": "outside"})]
     for mode in ("spaced", "tight"):
         got = W.sheet({"items": items, "cut_lines": True, "mode": mode}, "2026-10-18")
         assert not [w for w in got["warnings"] if w["level"] == "error"]
