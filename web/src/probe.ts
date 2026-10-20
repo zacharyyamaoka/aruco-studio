@@ -8,6 +8,7 @@ import { toScreen } from "./model/geom";
 import { plannerBusy } from "./planner";
 import { getFeature } from "./model/doc";
 import { activeFeatureId, useStudio } from "./store";
+import { view3d, type View3DProbe } from "./view3d/probe3d";
 
 export interface Probe {
   kind: "real" | "mock";
@@ -17,6 +18,10 @@ export interface Probe {
   idle: (timeoutMs?: number) => Promise<void>;
   plan: (req: PlanRequest) => Promise<MarkerPlan>;
   printHook: (() => void) | null;
+  /** the 3D view's arrows (client px), heights and solids; null in 2D */
+  view3d: () => Omit<View3DProbe, "project"> | null;
+  /** a 3D scene point (mm, z along the face normal) as client pixels; null in 2D */
+  project3d: (x: number, y: number, z: number) => [number, number] | null;
 }
 
 /** `feature` and `plan` are the feature in focus (the panel's, the selected
@@ -29,7 +34,7 @@ function snapshot() {
     panel: { open: s.panel.open, featureId: s.panel.featureId, tab: s.panel.tab, selector: s.panel.selector, collapsed: s.panel.collapsed },
     feature: getFeature(s.doc, active), plan: active ? s.plans[active] ?? null : null, plans: s.plans,
     suggestions: s.suggestions, modal: s.modal,
-    canUndo: s.canUndo, canRedo: s.canRedo,
+    canUndo: s.canUndo, canRedo: s.canRedo, view3d: s.view3d,
   };
 }
 
@@ -57,6 +62,10 @@ function idle(timeoutMs = 15000): Promise<void> {
 }
 
 export function installProbe(): void {
-  const probe: Probe = { kind: coreKind, state: snapshot, toClient, idle, plan: (req) => core.plan(req), printHook: null };
+  const probe: Probe = {
+    kind: coreKind, state: snapshot, toClient, idle, plan: (req) => core.plan(req), printHook: null,
+    view3d: () => { const p = view3d.probe?.(); if (!p) return null; const { project: _p, ...rest } = p; return rest; },
+    project3d: (x, y, z) => view3d.probe?.().project(x, y, z) ?? null,
+  };
   (window as unknown as { __aruco: Probe }).__aruco = probe;
 }
