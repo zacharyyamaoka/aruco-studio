@@ -12,19 +12,19 @@
 //
 // WHY (Zach, 2026-10-20): "You should support Ctrl Z to undo any changes that are done."
 import { create } from "zustand";
-import type { CoreInfo, Issue, LabelParams, MarkerPlan, Preset, Suggestion } from "./core/contract";
+import type { CoreInfo, IdResult, Issue, LabelParams, MarkerPlan, Preset, Suggestion } from "./core/contract";
 import { core } from "./coreSource";
 import {
-  addFeature, addShape, deleteShape, emptyDoc, featureOfRect, featureRect, getFeature, keyOwner, newFeature, newId, nextTurn, pickSuggestion,
+  addFeature, addShape, applyIds, deleteShape, emptyDoc, featureOfRect, featureRect, getFeature, keyOwner, newFeature, newId, nextTurn, pickSuggestion,
   removeFeature, resetField, setField, setShape, updateFeature, type Doc, type Feature, type Holes,
 } from "./model/doc";
 import { fitBox, type Camera } from "./model/geom";
 import { touchRecent } from "./presets/local";
-import { example } from "./sketch/examples";
+import { example } from "./model/examples";
 import { plainRect, profileLoops, shapeBox, sketchBox, type ProfileRef, type Selection, type Shape } from "./sketch/model";
 
 export type Tool = "select" | "rect" | "circle";
-export type Modal = null | "presets" | "print" | "examples" | "verify";
+export type Modal = null | "presets" | "print" | "examples" | "verify" | "reid";
 export type Tab = "marker" | "label";
 
 export interface PanelState {
@@ -112,6 +112,9 @@ export interface Studio {
   closePanel: () => void;
 
   setPreset: (p: Preset) => void;
+  /** Edit › Re-ID all markers…: a core.assign_ids answer for idItems(doc)
+   *  (sequential or fresh hash) into the document's ids and ledger, as one undo step */
+  reId: (res: IdResult) => void;
   openModal: (m: Modal) => void;
   say: (note: string | null) => void;
 
@@ -237,7 +240,8 @@ export const useStudio = create<Studio>((set, get) => {
     },
     newDoc: (exampleId) => {
       const ex = exampleId ? example(exampleId) : undefined;
-      get().loadDoc(emptyDoc(ex?.name ?? "Untitled", ex ? structuredClone(ex.shapes) : [], get().doc.preset));
+      const doc = emptyDoc(ex?.name ?? "Untitled", ex ? structuredClone(ex.shapes) : [], get().doc.preset);
+      get().loadDoc(ex?.features ? { ...doc, features: structuredClone(ex.features) } : doc);
     },
     setTool: (tool) => set({ tool }),
     select: (sel) => set({ sel }),
@@ -423,6 +427,8 @@ export const useStudio = create<Studio>((set, get) => {
       touchRecent(p.id);
       put({ doc: { ...get().doc, preset: p } });
     },
+    // the planner's next auto id call (hash, with this ledger) keeps these ids
+    reId: (res) => put({ doc: applyIds(get().doc, res) }),
     openModal: (modal) => set({ modal }),
     say: (note) => set({ note }),
 

@@ -1,7 +1,7 @@
 // File › Examples…: the golden faces as cards; a click opens one.
 import { Dialog } from "@bam/ui";
 import { loopD } from "../model/geom";
-import { EXAMPLES } from "../sketch/examples";
+import { EXAMPLES } from "../model/examples";
 import { shapeLoop, sketchBox } from "../sketch/model";
 import { useStudio } from "../store";
 

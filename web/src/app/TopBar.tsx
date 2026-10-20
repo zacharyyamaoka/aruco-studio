@@ -1,4 +1,4 @@
-// The top bar: the name, File and Export, the Download for CAD menu, the
+// The top bar: the name, File, Edit and Export, the Download for CAD menu, the
 // preset chip (opens the presets modal), the core chip, the skin, the theme,
 // the GitHub link.
 import { Glyph, Menu, MenuItem, MenuSeparator, useTheme } from "@bam/ui";
@@ -78,6 +78,24 @@ function SkinMenu() {
   );
 }
 
+/** Edit: the document's history (store.undo / redo, the keys App.tsx binds)
+ *  and Re-ID all markers… (ReIdDialog.tsx). */
+function EditMenu() {
+  const canUndo = useStudio((s) => s.canUndo);
+  const canRedo = useStudio((s) => s.canRedo);
+  const markers = useStudio((s) => s.doc.features.length);
+  const st = useStudio.getState;
+  return (
+    <Menu label="Edit" testid="menu-edit">
+      <MenuItem label="Undo" hint="Ctrl+Z" testid="cmd-undo" disabled={!canUndo} onClick={() => st().undo()} />
+      <MenuItem label="Redo" hint="Ctrl+Shift+Z" testid="cmd-redo" disabled={!canRedo} onClick={() => st().redo()} />
+      <MenuSeparator />
+      <MenuItem icon="marker" label="Re-ID all markers…" testid="cmd-reid" disabled={!markers}
+        title={markers ? undefined : "No markers yet: make an ArUco Extrude (A) first"} onClick={() => st().openModal("reid")} />
+    </Menu>
+  );
+}
+
 export function TopBar() {
   const preset = useStudio((s) => s.doc.preset);
   const name = useStudio((s) => s.doc.name);
@@ -95,6 +113,7 @@ export function TopBar() {
         <MenuSeparator />
         <MenuItem label="Save" hint=".arucostudio-web.json" testid="cmd-save" onClick={saveDoc} />
       </Menu>
+      <EditMenu />
       <Menu label="Export" testid="menu-export">
         <MenuItem icon="print" label="Print…" hint="P" testid="cmd-print" onClick={openPrint} />
         <MenuItem label="SVG" hint="the marker, true size" testid="cmd-svg" onClick={() => void exportSvg()} />

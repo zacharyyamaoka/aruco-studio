@@ -65,7 +65,8 @@ to have lots of the markers on a page and then re-id them"):
       skipped -- and the counter moves past it. Each family has its own
       counter, all starting at `start` (default 0). Past the end of the
       dictionary the probe wraps round as rule 3's does, and a full
-      dictionary is the same error;
+      dictionary is the same error. A `start` past a dictionary's last id
+      wraps its items to 0 with one warning per dictionary, keyed to no item;
     * fresh: the incoming ledger is ignored (no rule 1, nothing held), so
       every driven id is given out anew, in either mode, and the returned
       ledger replaces the old one. Typed ids still win; overlaps are flagged
@@ -350,11 +351,18 @@ def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None,
     # 3. the rest, driven: the preferred block, else the next free one (wrapping);
     #    sequential: in request order, from its family's counter
     counter: Dict[str, int] = {}
+    wrapped: Set[str] = set()
     for it in (its if sequential else order):
         if it.key in out:
             continue
         if sequential:
             want = counter.get(it.family, origin)
+            if origin > it.capacity - 1 and it.dictionary not in wrapped:
+                # keyed to no item: it is the request's start, not any one marker's
+                wrapped.add(it.dictionary)
+                warnings.append({"field": FIELD, "level": "warn",
+                                 "text": f"start {origin} is past {it.dictionary}'s last id "
+                                         f"{it.capacity - 1}: numbering wraps to 0"})
         else:
             want = preferred(it.key, it.dictionary, it.count, it.capacity)
         last = it.capacity - it.count
