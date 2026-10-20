@@ -34,8 +34,10 @@ test.describe(`online Studio (${CORE} core)`, () => {
       expect(overlaps(hole, r), `fit_rect ${JSON.stringify(r)} vs hole ${hole.id}`).toBe(false);
     }
     // drawn: the fit box on screen is its size in mm times the zoom
+    // WHY getBoundingClientRect, not boundingBox(): Playwright's box of a stroked
+    // dashed path takes in Chrome's stroke estimate (miter limit 4: 2 px a side)
     const el = page.locator(`[data-fit-rect="${s.feature.id}"]`);
-    const box = (await el.boundingBox())!;
+    const box = await el.evaluate((e) => { const b = e.getBoundingClientRect(); return { x: b.left, y: b.top, width: b.width, height: b.height }; });
     const z = s.camera.zoom;
     expect(Math.abs(box.width - r.w * z)).toBeLessThan(3);
     expect(Math.abs(box.height - r.h * z)).toBeLessThan(3);
