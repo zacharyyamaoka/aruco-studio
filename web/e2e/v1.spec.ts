@@ -9,7 +9,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, dragWorld, idle, loadExample, openStudio, state } from "./helpers";
+import { CORE, clickAt, coreReady, dragWorld, idle, loadExample, openStudio, panelTab, state } from "./helpers";
 
 const SHOTS = process.env.V1_SHOTS ?? "test-results/v1";
 
@@ -87,9 +87,9 @@ test.describe(`V1 click-to-inspect (${CORE} core)`, () => {
     expect(pb.y).toBeGreaterThanOrEqual(vp.y);
     expect(pb.x + pb.width).toBeLessThanOrEqual(vp.x + vp.width);
     expect(pb.y + pb.height).toBeLessThanOrEqual(vp.y + vp.height);
-    // the Preset row first, then the tabs
+    // the tabs first, nothing above them (V1 Command Dialog, 2026-10-20 night: the Preset is a row of Make)
     const rows = await panel.locator("[data-row], [role=tab]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row") ?? `tab:${e.getAttribute("data-tab")}`));
-    expect(rows[0]).toBe("preset");
+    expect(rows.slice(0, 3)).toEqual(["tab:make", "tab:marker", "tab:label"]);
     expect(rows.indexOf("tab:marker")).toBeLessThan(rows.indexOf("marker.type"));
     await page.screenshot({ path: path.join(SHOTS, "v1-panel-beside-marker.png") });
 
@@ -114,13 +114,13 @@ test.describe(`V1 click-to-inspect (${CORE} core)`, () => {
   test("b · words, not icons: Type Single | Grid | ChArUco, Turn, Side; Grid makes a grid", async ({ page }) => {
     const fid = await plateFeature(page);
     await clickMarker(page, fid);
+    await panelTab(page, "marker");
     const seg = (p: string, v: string) => page.locator(`[data-path="${p}"] [data-value="${v}"]`);
     for (const [v, t] of [["single", "Single"], ["grid", "Grid"], ["charuco", "ChArUco"]]) {
       await expect(seg("marker.type", v)).toHaveText(t);
       await expect(seg("marker.type", v).locator("svg")).toHaveCount(0);
     }
     for (const t of [0, 90, 180, 270]) await expect(seg("marker.turn", String(t))).toHaveText(`${t}°`);
-    await expect(seg("marker.corner_mark", "triangle")).toHaveText("Triangle");
     await expect(page.locator('[data-testid="toolbar"] [data-testid="tool-sheet"]')).toContainText("Sheet");
     await seg("marker.type", "grid").click();
     await idle(page);
@@ -131,15 +131,28 @@ test.describe(`V1 click-to-inspect (${CORE} core)`, () => {
     expect(s.plan.ids.length).toBe(s.plan.cols * s.plan.rows);
     await page.locator('[role=tab][data-tab="label"]').click();
     for (const [v, t] of [["below", "Below"], ["above", "Above"], ["left", "Left"], ["right", "Right"]]) await expect(seg("label.side", v)).toHaveText(t);
+    // the corner mark is a row of Label since V1 Command Dialog (2026-10-20 night)
+    await expect(seg("marker.corner_mark", "triangle")).toHaveText("Triangle");
   });
 
   test("c · Label: two lines, typed X offset moves it 3 mm, no offset readout on the canvas", async ({ page }) => {
     const fid = await plateFeature(page);
     await clickMarker(page, fid);
     await page.locator('[role=tab][data-tab="label"]').click();
-    for (const p of ["label.on", "label.text", "label.side", "label.offset_mm", "label.height_mm", "label.gap_mm"]) {
+    for (const p of ["label.on", "label.text", "label.place", "label.surface", "label.side", "label.offset_mm", "label.height_mm"]) {
       await expect(page.locator(`[data-row="${p}"]`), p).toHaveCount(1);
     }
+    // Gap is the band's, so a row only with the label Outside (V1 Command Dialog); Surface only on the marker
+    await expect(page.locator('[data-row="label.gap_mm"]')).toHaveCount(0);
+    await page.locator('[data-path="label.place"] [data-value="outside"]').click();
+    await idle(page);
+    await expect(page.locator('[data-row="label.gap_mm"]')).toHaveCount(1);
+    await expect(page.locator('[data-row="label.surface"]')).toHaveCount(0);
+    expect((await state(page)).feature.label.place).toBe("outside");
+    await page.locator('[data-reset="label.place"]').click();
+    await idle(page);
+    expect((await state(page)).feature.label.place).toBeUndefined();
+    await expect(page.locator('[data-row="label.gap_mm"]')).toHaveCount(0);
     await expect(page.getByTestId("label-placeholders")).toContainText("{id} {first} {last} {ids} {dict} {type}");
     // Height: driven (grey) at 0, showing the core's
     await expect(page.locator('[data-drv="label.height_mm"]')).toHaveAttribute("data-driven", "1");
@@ -185,6 +198,7 @@ test.describe(`V1 click-to-inspect (${CORE} core)`, () => {
   test("d · ChArUco: Origin Square [1, 1] moves the Joint Origin to that square's centre; ↺ back to the corner", async ({ page }) => {
     const fid = await plateFeature(page);
     await clickMarker(page, fid);
+    await panelTab(page, "marker");
     await page.locator('[data-path="marker.type"] [data-value="charuco"]').click();
     await idle(page);
     const origin = page.locator(`.triad[data-feature="${fid}"]`);
@@ -239,15 +253,15 @@ test.describe(`V1 click-to-inspect (${CORE} core)`, () => {
     const idBox = page.locator('[data-drv="marker.first_id"]');
     for (const [f, id] of [[f1, id1], [f2, id2]] as const) {
       await clickMarker(page, f);
+      await panelTab(page, "marker");
       await expect(idIn).toHaveValue(String(id));
       await expect(idBox).toHaveAttribute("data-driven", "1");
       expect(await colour(page, "marker.first_id")).toBe(await colour(page, "marker.marker_mm"));
     }
     const driven = await colour(page, "marker.first_id");
     await page.getByTestId("extrude-panel").screenshot({ path: path.join(SHOTS, "v1-id-row-driven.png") });
-    // the key, under Advanced
-    await page.locator('[data-testid="panel-advanced"] summary').click();
-    await expect(page.locator('input[data-path="feature.key"]')).toHaveValue(k2);
+    // the key: a plain row of Marker (V1 Command Dialog, 2026-10-20 night: no Advanced fold)
+    await expect(page.locator('[data-tab-body="marker"] input[data-path="feature.key"]')).toHaveValue(k2);
 
     // f2 takes f1's id by hand: set (not grey), and red under its ID row
     await idIn.fill(String(id1));

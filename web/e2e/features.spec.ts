@@ -5,7 +5,7 @@
 // computed colours. Screenshots go to E2E_SHOTS (default test-results/shots).
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, dragWorld, idle, openStudio, state } from "./helpers";
+import { CORE, clickAt, coreReady, dragWorld, idle, openStudio, panelTab, state } from "./helpers";
 
 const SHOTS = process.env.E2E_SHOTS ?? "test-results/shots";
 const FIXTURE = path.join(import.meta.dirname, "fixtures", "v1-plate.arucostudio-web.json");
@@ -31,6 +31,7 @@ async function extrudeOk(page: Page, firstId?: number): Promise<string> {
   await page.keyboard.press("a");
   await expect(page.getByTestId("extrude-panel")).toBeVisible();
   if (firstId !== undefined) {
+    await panelTab(page, "marker");
     const id = page.locator('input[data-path="marker.first_id"]');
     await id.fill(String(firstId));
     await id.press("Enter");
@@ -97,6 +98,7 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
       await clickMarker(page, f);
       await expect(page.getByTestId("extrude-panel")).toBeVisible();
       await expect(page.getByTestId("extrude-panel")).toContainText(`ArUco Extrude ${n}`);
+      await panelTab(page, "marker");
       await expect(page.locator('input[data-path="marker.first_id"]')).toHaveValue(first);
       const st = await state(page);
       expect(st.panel.featureId).toBe(f);
@@ -148,6 +150,7 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     await drawRect(page, [-20, -20], [20, 20]);
     await page.keyboard.press("a");
     await idle(page);
+    await panelTab(page, "marker");
     const marker = page.locator('input[data-path="marker.marker_mm"]');
     const markerBox = page.locator('[data-drv="marker.marker_mm"]');
     await expect(page.locator('[data-path="marker.auto"]')).toHaveCount(0);   // no Auto switch
@@ -251,6 +254,7 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     // its typed values are set, the rest driven
     await clickMarker(page, f.id);
     await expect(page.getByTestId("extrude-panel")).toBeVisible();
+    await panelTab(page, "marker");
     await expect(page.locator('[data-drv="marker.first_id"]')).toHaveAttribute("data-driven", "0");
     await expect(page.locator('[data-drv="marker.marker_mm"]')).toHaveAttribute("data-driven", "1");
     await expect(page.locator('[data-drv="marker.cols"]')).toHaveAttribute("data-driven", "1");
@@ -262,6 +266,7 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     await clickAt(page, 60, 40);
     await page.keyboard.press("a");
     await idle(page);
+    await panelTab(page, "marker");
     await page.locator('[data-path="marker.type"] [data-value="grid"]').click();
     await idle(page);
     const s = await state(page);
@@ -341,7 +346,7 @@ test("label keystrokes land on the marker they were typed into, even with an imm
   const f2 = await extrudeOk(page);
   await clickMarker(page, f1);                                   // marker 1's panel
   await expect.poll(async () => (await state(page)).panel.featureId).toBe(f1);
-  await page.locator('[role=tab][data-tab="label"]').click();
+  await panelTab(page, "label");
   const before2 = (await state(page)).doc.features.find((f: any) => f.id === f2).label.text;
   await page.locator('textarea[data-path="label.text"]').fill("RACE");
   await clickMarker(page, f2);                                   // marker 2, inside the 120 ms window

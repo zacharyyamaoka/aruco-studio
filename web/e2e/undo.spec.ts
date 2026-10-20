@@ -3,7 +3,7 @@
 // Each check measures the probe's numbers: the document, the plan the core
 // drew, and the history's canUndo / canRedo.
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, coreReady, dragWorld, idle, openStudio, planOutline, state } from "./helpers";
+import { CORE, coreReady, dragWorld, idle, openStudio, panelTab, planOutline, state } from "./helpers";
 
 async function blank(page: Page): Promise<void> {
   await openStudio(page);
@@ -137,6 +137,7 @@ test.describe(`undo / redo (${CORE} core)`, () => {
   test("c · Ctrl+Z in a focused field is the field's: the document stays", async ({ page }) => {
     await blank(page);
     await rectAndExtrude(page);
+    await panelTab(page, "marker");
     const s0 = await state(page);
     expect(s0.canUndo).toBe(true);
 

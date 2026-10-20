@@ -101,3 +101,12 @@ export function circleGap(c: { cx: number; cy: number; r: number }, r: Rect): nu
 export function overlaps(c: { cx: number; cy: number; r: number }, r: Rect, eps = 1e-3): boolean {
   return circleGap(c, r) < -eps;
 }
+
+/** Open one of the ArUco Extrude panel's tabs (V1 Command Dialog, 2026-10-20
+ *  night: Make | Marker | Label). A new feature opens on Make; a reopened one
+ *  keeps the tab the panel last had. */
+export async function panelTab(page: Page, tab: "make" | "marker" | "label"): Promise<void> {
+  const t = page.locator(`[data-testid="extrude-panel"] [role=tab][data-tab="${tab}"]`);
+  await t.click();
+  await expect(page.locator(`[data-testid="extrude-panel"] [data-tab-body="${tab}"]`)).toBeVisible();
+}
