@@ -66,6 +66,16 @@ READ_PX_PER_CELL = 3.1
 PERIMETER_RATE = 0.03       # OpenCV's default minMarkerPerimeterRate (verify.camera's)
 
 
+def placed(req: dict) -> dict:
+    """The request with the box its marker goes in (web_api.placed_in: its
+    rect, else the box fitted in its profile); refused in words when nothing
+    fits."""
+    req, pre = _W.placed_in(req)
+    if req["rect"] is None:
+        raise ValueError("nothing to verify: " + pre[0]["text"])
+    return req
+
+
 def _plan(req: dict):
     d, _issues = _W._plan(req)
     if not d["ok"]:
@@ -171,6 +181,7 @@ def _need_cv(what: str) -> None:
 
 def verify(req: dict, view: dict) -> dict:
     _need_cv("verify")
+    req = placed(req)
     d = _plan(req)
     cam = _C.Cam.of(view["camera"])
     return _view(d, _C.scene_of(d, _label(req, d)), cam, view)
@@ -246,6 +257,7 @@ def readable_analytic(req: dict, camera: dict) -> dict:
     """`readable` without OpenCV: a pinhole camera (verify.camera's f_px)
     head on; the limit the nearer of READ_PX_PER_CELL and OpenCV's minimum
     outline (PERIMETER_RATE x the image's longest side). Standard library."""
+    req = placed(req)
     d = _plan(req)
     w, h = (int(v) for v in camera["resolution"])
     distance = float(camera["distance_mm"])
@@ -259,6 +271,7 @@ def readable_analytic(req: dict, camera: dict) -> dict:
 def readable(req: dict, camera: dict) -> dict:
     if cv2 is None:
         return readable_analytic(req, camera)
+    req = placed(req)
     d = _plan(req)
     cam = _C.Cam.of(camera)
     # a label beside the marker leaves the limit the marker's own; one ON it

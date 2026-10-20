@@ -29,10 +29,12 @@ Fusion composes a Joint Origin: core.geometry.jo_compose).
 | `label` on, `place` "on_marker" (default, 2026-10-20) | core.rect_fill.on_marker on the marker planned in the whole rectangle (marker_geo): `surface` "black" knocks the text out of the border row (ChArUco: a black square), "white" prints it in the quiet zone; `height_mm` 0: core.label's row rule (half a module), one module in a ChArUco square |
 | `marker.origin_square` | core.rect_fill.square_origin on OpenCV's board frame |
 | `MarkerPlan.layers`, `cells`, `pattern_to_sketch`, `origin_z_mm` (CAD shells, N-6) | the TagPlan's `layers` placed like `black`; core.markers.cell_boxes; the matrix `black` is placed with; `origin`'s z (the printed surface: inkjet t, 3D the tile's top, on a face 0; Flip negates) |
-| `trim` (2026-10-18) -> `MarkerPlan.cut`, `cut_shape` | not the core's: the rectangle (default), `profile`'s loops as given, or `outer`; the plan is the same for all three. svg, sheet and the inkjet paper layer (`sticker`) are cut to it, white inside |
+| `profile` with no `rect`, `holes` (barrier 9, 2026-10-20 evening) -> `MarkerPlan.fit_rect` | placed_in / fit_box: the profile itself when it is a rectangle (rect_profile, rotated too), else inscribe's largest clear box; then planned as a rect is. A request with a rect is planned in it (fit_rect = rect) |
+| `trim` (2026-10-18; barrier 9) -> `MarkerPlan.cut`, `cut_shape` | not the core's: `profile`'s loops as given (default; a rect-only request's profile is its rect), or `outer` ("marker"); "rectangle" reads as "profile", said on "trim"; the plan is the same for both. svg, sheet and the inkjet paper layer (`sticker`) are cut to it, white inside |
 
 Issue fields: the core's key paths renamed (FIELDS); the page lint ("Over
-the page ...") and the cell / make rows -> "preset"; target -> "rect".
+the page ...") and the cell / make rows -> "preset"; target -> "rect"; the
+deprecated trim -> "trim"; a profile with no room for the marker -> "tag".
 """
 from __future__ import annotations
 
@@ -76,7 +78,8 @@ CAP_EM = _SH.CAP_EM                 # Helvetica's cap height / em (core.sheet pr
 ND = 6                              # JSON numbers: 1e-6 mm
 ND_DIM = 9                          # a dimension's endpoints (plan_dims)
 SNAP_TOL_MM = 1e-6                  # inscribe: an edge this near a 0.1 mm grid line is on it
-TRIMS = ("profile", "rectangle", "marker")
+RECT_TOL = 1e-6                     # rect_profile: |cos| of a right angle, |sin| of a straight edge
+TRIMS = ("profile", "marker")       # "rectangle" (deprecated, barrier 9) reads as "profile"
 
 
 def _r(v) -> float:
@@ -541,6 +544,98 @@ def inscribe(profile: dict, holes: str = "avoid"):
             "w": _r(x1 - x0), "h": _r(y1 - y0), "angle_deg": _r(got["angle_deg"])}
 
 
+def _corners(loop):
+    """A loop's corners: repeated points (within SNAP_TOL_MM) and points
+    along a straight edge (RECT_TOL) dropped."""
+    pts = []
+    for u, v in loop:
+        q = (float(u), float(v))
+        if not pts or math.hypot(q[0] - pts[-1][0], q[1] - pts[-1][1]) > SNAP_TOL_MM:
+            pts.append(q)
+    while len(pts) > 1 and math.hypot(pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1]) <= SNAP_TOL_MM:
+        pts.pop()
+    k = 0
+    while len(pts) >= 3 and k < len(pts):
+        a, b, c = pts[k - 1], pts[k], pts[(k + 1) % len(pts)]
+        e, f = (b[0] - a[0], b[1] - a[1]), (c[0] - b[0], c[1] - b[1])
+        if (abs(e[0] * f[1] - e[1] * f[0]) <= RECT_TOL * math.hypot(*e) * math.hypot(*f)
+                and e[0] * f[0] + e[1] * f[1] > 0):
+            del pts[k]                             # straight on: not a corner
+            k = 0
+        else:
+            k += 1
+    return pts
+
+
+def rect_profile(loops):
+    """The Rect a profile IS (one loop, 4 corners, right angles within
+    RECT_TOL, any rotation), unrounded, or None. Its w runs along the loop's
+    first edge and angle_deg is that edge's direction, so a rectangle drawn
+    as the UI draws one (geom.rectCorners: counter-clockwise from (-w/2,
+    -h/2)) comes back as it was drawn, angle included."""
+    if len(loops) != 1:
+        return None
+    pts = _corners(loops[0])
+    if len(pts) != 4:
+        return None
+    turns = []
+    for k in range(4):
+        a, b, c = pts[k - 1], pts[k], pts[(k + 1) % 4]
+        e, f = (b[0] - a[0], b[1] - a[1]), (c[0] - b[0], c[1] - b[1])
+        n = math.hypot(*e) * math.hypot(*f)
+        if abs(e[0] * f[0] + e[1] * f[1]) > RECT_TOL * n:
+            return None
+        turns.append(e[0] * f[1] - e[1] * f[0] > 0)
+    if len(set(turns)) != 1:
+        return None
+    raw = [(float(u), float(v)) for u, v in loops[0]]
+    first = next(((q[0] - p[0], q[1] - p[1]) for p, q in zip(raw, raw[1:] + raw[:1])
+                  if math.hypot(q[0] - p[0], q[1] - p[1]) > SNAP_TOL_MM), None)
+    edges = [(pts[(k + 1) % 4][0] - pts[k][0], pts[(k + 1) % 4][1] - pts[k][1]) for k in range(4)]
+    ex, ey = max(edges, key=lambda e: (e[0] * first[0] + e[1] * first[1]) / math.hypot(*e))
+    ang = math.atan2(ey, ex)
+    c, s = math.cos(ang), math.sin(ang)
+    us = [c * u + s * v for u, v in pts]
+    vs = [-s * u + c * v for u, v in pts]
+    mu, mv = (min(us) + max(us)) / 2.0, (min(vs) + max(vs)) / 2.0
+    return {"cx": c * mu - s * mv, "cy": s * mu + c * mv, "w": max(us) - min(us),
+            "h": max(vs) - min(vs), "angle_deg": math.degrees(ang)}
+
+
+def fit_box(profile: dict, holes: str = "avoid"):
+    """The box a marker is placed in, in a profile (contract barrier 9,
+    PlanRequest): the profile itself when it is a rectangle (rect_profile,
+    rotated too), else the largest clear box (inscribe: holes "avoid" keeps
+    it off them, "ignore" takes the outer loop only). None = nothing fits."""
+    loops = [lp for lp in (profile or {}).get("loops") or [] if len(lp) >= 3]
+    if holes == "ignore":
+        loops = loops[:1]
+    r = rect_profile(loops)
+    if r is not None:
+        # WHY exact, angle included (Zach, 2026-10-20 evening: "If you want a
+        # custom location, draw a rectangle profile"): the drawn rectangle IS
+        # the placement, so it is never searched or snapped, and a rectangle
+        # turned past 45 degrees keeps its turn (the marker turns with it)
+        return {k: _r(v) for k, v in r.items()}
+    return inscribe(profile, holes)
+
+
+def placed_in(req: dict):
+    """(the request with the box its marker goes in as `rect`, the fit's
+    issues). A request with a rect is returned as it is (Fusion and old
+    callers: that box). One with a profile and no rect gets fit_box's box,
+    or rect None and an error on "tag" when nothing fits in it."""
+    if req.get("rect") is not None or not (req.get("profile") or {}).get("loops"):
+        return req, []
+    holes = req.get("holes") or "avoid"
+    box = fit_box(req["profile"], holes)
+    if box is None:
+        why = "it is too small" if holes == "ignore" else "it is too small, or its holes leave no room"
+        return dict(req, rect=None), [{"field": "tag", "level": "error",
+                                       "text": f"no clear box for the marker in the profile: {why}"}]
+    return dict(req, rect=box, _fitted=True), []
+
+
 # ------------------------------------------------------------------ the trim
 
 def to_rect(rect: dict, loops) -> list:
@@ -554,33 +649,37 @@ def to_rect(rect: dict, loops) -> list:
 
 def trim_of(req: dict, issues=None):
     """(what the sticker is cut to, the profile's loops or None): `trim`
-    (default "rectangle"); "profile" with its loops (sketch frame, outer
-    counter-clockwise, holes clockwise), or the rectangle when the request
-    has no profile (said, on "tag"). Appends to `issues`: the rectangle
-    poking out of the profile ("rect"), a label placed outside a
-    marker-trimmed sticker ("label.on"; a label ON the marker is inside it)."""
+    (default "profile", contract barrier 9); "profile" with its loops (sketch
+    frame, outer counter-clockwise, holes clockwise), or "rectangle" -- the
+    request's rect, which is its profile -- when the request has none. The
+    deprecated trim "rectangle" reads as "profile" (said, on "trim").
+    Appends to `issues`: a request's rect poking out of its profile ("rect";
+    never a fitted box, placed_in: it is inside by construction), a label
+    placed outside a marker-trimmed sticker ("label.on"; a label ON the
+    marker is inside it)."""
     issues = [] if issues is None else issues
-    t = req.get("trim") or "rectangle"
-    if t not in TRIMS:
+    t = req.get("trim") or "profile"
+    if t == "rectangle":
+        issues.append({"field": "trim", "level": "info",
+                       "text": "trim to rectangle is now trim to profile; draw a rectangle profile"})
+        t = "profile"
+    elif t not in TRIMS:
         issues.append({"field": "tag", "level": "warn",
-                       "text": f"trim {t!r} is not profile, rectangle or marker: the rectangle"})
-        t = "rectangle"
+                       "text": f"trim {t!r} is not profile or marker: the profile"})
+        t = "profile"
     loops = None
     if t == "profile":
         loops = [[(float(u), float(v)) for u, v in lp]
                  for lp in ((req.get("profile") or {}).get("loops") or []) if len(lp) >= 3]
         if not loops:
-            issues.append({"field": "tag", "level": "info",
-                           "text": "trim to the profile needs the profile: the sticker is cut to "
-                                   "the rectangle"})
-            return "rectangle", None
+            return "rectangle", None               # a rect-only request: the rect is its profile
         loops = [lp if (_area2(lp) > 0) == (k == 0) else lp[::-1] for k, lp in enumerate(loops)]
         rect = req["rect"]
         # WHY the marker and label stay in the rectangle: the profile only
         # moves the cut line, so a rectangle hanging off the profile puts
         # them off the sticker
-        if not _A._rect_inside(to_rect(rect, loops), 0.0, 0.0, float(rect["w"]), float(rect["h"]),
-                               SNAP_TOL_MM):
+        if not req.get("_fitted") and not _A._rect_inside(
+                to_rect(rect, loops), 0.0, 0.0, float(rect["w"]), float(rect["h"]), SNAP_TOL_MM):
             issues.append({"field": "rect", "level": "warn",
                            "text": "the rectangle pokes outside the profile: the sticker is cut "
                                    "to the profile, so what hangs out is cut off"})
@@ -595,7 +694,8 @@ def trim_of(req: dict, issues=None):
 def cut_local(req: dict, d: dict, fl, trim: str, loops) -> dict:
     """The sticker's cut {"outer", "holes"} in the rectangle's own frame (mm,
     y up, its centre 0, unturned; never Flip, as sticker_parts): the
-    rectangle, the profile, or the marker's outline (the quiet-zone edge)."""
+    profile, the rectangle (a rect-only request's profile, trim_of), or the
+    marker's outline (the quiet-zone edge)."""
     one = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
     if trim == "profile":
         lp = to_rect(req["rect"], loops)
@@ -930,7 +1030,21 @@ def _summary(kind, dictionary, ids, lay, outer_mm) -> str:
             f"{outer_mm[1]:.1f} mm")
 
 
+def _refused(m: dict, issues: list, summary: str) -> dict:
+    return {"ok": False, "ids": [], "black": [], "outer": [], "outer_mm": [0.0, 0.0],
+            "marker_mm": 0.0, "checker_mm": 0.0, "separation_mm": 0.0,
+            "cols": int(m.get("cols") or 1), "rows": int(m.get("rows") or 1),
+            "cell_mm": 0.0, "auto": bool(m.get("auto")), "overflow_mm": 0.0,
+            "origin": [], "label": None, "summary": summary, "warnings": issues}
+
+
 def plan(req: dict) -> dict:
+    """The MarkerPlan of a PlanRequest: in its rect, or (no rect) in the box
+    fitted in its profile (placed_in), returned as `fit_rect`; refused, never
+    raised, when nothing fits in the profile."""
+    req, pre = placed_in(req)
+    if req["rect"] is None:
+        return _refused(req["marker"], pre, pre[0]["text"])
     d, issues, fl = _planned(req)
     m = req["marker"]
     face = bool(req.get("reference_face"))
@@ -940,12 +1054,7 @@ def plan(req: dict) -> dict:
                        "text": "the reference face sets Z: Flip does not apply"})
     issues += issues_of(d)
     if not d["ok"]:
-        return {"ok": False, "ids": [], "black": [], "outer": [], "outer_mm": [0.0, 0.0],
-                "marker_mm": 0.0, "checker_mm": 0.0, "separation_mm": 0.0,
-                "cols": int(m.get("cols") or 1), "rows": int(m.get("rows") or 1),
-                "cell_mm": 0.0, "auto": bool(m.get("auto")), "overflow_mm": 0.0,
-                "origin": [], "label": None,
-                "summary": "; ".join(d["errors"]) or "nothing fits", "warnings": issues}
+        return _refused(m, issues, "; ".join(d["errors"]) or "nothing fits")
     kind = d["layout"]["kind"]
     lay = d["layout"]
     mk = d["marker"]
@@ -991,6 +1100,7 @@ def plan(req: dict) -> dict:
             "separation_mm": _r(lay["separation_mm"]) if kind == "grid" else 0.0,
             "cols": int(lay["cols"]), "rows": int(lay["rows"]), "cell_mm": _r(marker_mm / modules),
             "auto": bool(m.get("auto")), "overflow_mm": overflow,
+            "fit_rect": {k: _r(rect.get(k) or 0.0) for k in ("cx", "cy", "w", "h", "angle_deg")},
             "origin": origin, "label": label,
             "dims": plan_dims(req, d, fl, L, lay),
             "layers": cad_layers(d, M, cut, label, cutout=pattern_cutout(req, d, fl, flip)),
@@ -1017,7 +1127,11 @@ def _cell_reason(lay, cells: dict, method: str):
 
 def suggest(req: dict) -> list:
     """Good value sets for the rectangle (autosize.candidates: every count at
-    its largest size), each with why: its badges and its cells."""
+    its largest size), each with why: its badges and its cells. No rect: the
+    box fitted in the profile (placed_in); none when nothing fits."""
+    req, _pre = placed_in(req)
+    if req["rect"] is None:
+        return []
     issues = []
     spec = spec_of(req, issues)
     s, n = spec.settings, spec.numbers
@@ -1099,7 +1213,11 @@ def svg(req: dict) -> str:
     """One sticker at true size (mm units), label on or off: its cut (the
     trim: the rectangle, the profile, the marker) filled white with its
     holes cut out, the black and the label inside it on top (sticker_parts,
-    the rectangle's own frame; the sketch's label is plan().label)."""
+    the rectangle's own frame; the sketch's label is plan().label). No
+    rect: the box fitted in the profile (placed_in)."""
+    req, pre = placed_in(req)
+    if req["rect"] is None:
+        raise ValueError("nothing to draw: " + pre[0]["text"])
     got = _planned(req)
     d = got[0]
     if not d["ok"]:
@@ -1172,6 +1290,12 @@ def sheet(req: dict, date=None) -> dict:
     index = {}                                     # a PrintItem's key -> its request item
     first = None
     for i, it in enumerate(req.get("items") or []):
+        it, pre = placed_in(it)
+        if it["rect"] is None:
+            warnings += pre
+            warnings.append({"field": "tag", "level": "error",
+                             "text": f"item {i + 1} is not printed: " + pre[0]["text"]})
+            continue
         got = _planned(it)
         d, issues = got[0], got[1]
         warnings += issues
