@@ -46,7 +46,10 @@ export interface MarkerParams {
   cols: number;              // grid / ChArUco; 1 for single
   rows: number;
   turn: Turn;                // which way is up: turns the marker in 90 degree steps
-  flip: boolean;             // mirror Z when there is no reference face (ignored with one)
+  /** turn the marker over: the outward side (Z) becomes the other one. Barrier 10
+   *  (Zach, 2026-10-20 night): it ALWAYS applies, on a reference face too -- the
+   *  reference face is only the background helper that picks the starting side. */
+  flip: boolean;
   quiet_modules: number;     // white border in modules (cells); 1 by default
   corner_mark: CornerMark;   // a triangle in the quiet zone's top-left corner
   /** ChArUco only (Zach, 2026-10-18): put the Joint Origin at the centre of
@@ -133,8 +136,33 @@ export interface PlanRequest {
   marker: MarkerParams;
   label: LabelParams;
   preset: Preset;
-  /** a face (body) under the rectangle: it sets Z, so Flip does not apply */
+  /** a face (body) under the profile: it picks which side is out (Z) -- a helper
+   *  only; marker.flip turns it over (barrier 10) */
   reference_face: boolean;
+  /** the heights (barrier 10). Absent or partial = driven from the preset. */
+  extrude?: ExtrudeParams;
+}
+
+/** The heights of an ArUco Extrude (contract barrier 10, Zach 2026-10-20 night:
+ *  "for inkjet you just get to set paper thickness (but its autofilled from the
+ *  preset); for 3D printer you get to set the white height and black height.
+ *  black height is always measured from the outer face of the white").
+ *  Every field is optional: unset = DRIVEN (from the preset; the plan returns
+ *  the value it used in MarkerPlan.extrude, the UI shows it grey); a set value
+ *  is always honoured, even one that prints badly (an issue says so). Heights
+ *  are along the outward side, mm. Flush (the black inlaid into the white from
+ *  its outer face) is the only placement in v1 (CF-8). */
+export interface ExtrudeParams {
+  /** 3D print: which colours are made. "auto" (driven): black only on a
+   *  reference face (the body is the white), both in open space */
+  mode?: "auto" | "both" | "black" | "white";
+  /** 3D print: the white tile, from the face (z 0) to its OUTER face (z white_mm) */
+  white_mm?: number;
+  /** 3D print: the black's height, measured from the white's outer face into it
+   *  (black only: from the face itself, into the body) */
+  black_mm?: number;
+  /** inkjet: the paper / vinyl thickness (driven: preset.thickness_mm) */
+  paper_mm?: number;
 }
 
 export type IssueLevel = "info" | "warn" | "error";
@@ -187,6 +215,11 @@ export interface MarkerPlan {
   /** the box the core placed the marker in (fitted in the profile, or the
    *  request's rect); dims, the label band and overflow are measured against it */
   fit_rect?: Rect;
+  /** barrier 10: the heights as planned, driven or set (`layers` z follows
+   *  them); `driven` names the fields the request left unset */
+  extrude?: { method: Method; mode: "both" | "black" | "white"; white_mm: number;
+              black_mm: number; paper_mm: number; flipped: boolean;
+              driven: ("mode" | "white_mm" | "black_mm" | "paper_mm")[] };
   /** OpenCV's frame of the marker / board as built, in the sketch frame:
    *  16 numbers, row-major 4x4, mm (the Joint Origin) */
   origin: number[];
