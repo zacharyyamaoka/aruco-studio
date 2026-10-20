@@ -111,12 +111,24 @@ export interface Preset {
  *  marker rectangle (default: "we draw the outer allowed shape, and expect a
  *  sticker that is that shape"), or just the marker (its quiet zone). Everything
  *  inside the cut is white; exports always carry that white. */
-export type Trim = "profile" | "rectangle" | "marker";
+export type Trim = "profile" | "marker"
+  /** deprecated (2026-10-20 evening): reads as "profile"; old files and shells only */
+  | "rectangle";
 
+/** THE MODEL (Zach, 2026-10-20 evening: "go back to just profile… behaving more
+ *  like an extrude"): the input is a PROFILE. The core places the marker in it
+ *  (the largest clear box, holes avoided or ignored). To place a marker by hand,
+ *  draw a rectangle and use it as the profile: a rectangle profile (rotated too)
+ *  is used exactly. Trim: the profile (default) or just the marker; a rectangle
+ *  sticker is a rectangle profile trimmed to profile. */
 export interface PlanRequest {
-  trim?: Trim;               // default "rectangle"
-  /** the face / profile the rectangle came from; needed for trim "profile" */
+  trim?: Trim;               // default "profile"
+  /** the profile the marker goes in (outer loop first, then holes) */
   profile?: Profile;
+  holes?: "avoid" | "ignore";  // default "avoid"
+  /** legacy: the box to place in. The core fits one in `profile` when this is
+   *  absent (and returns it as MarkerPlan.fit_rect); the UI stops sending it in
+   *  the profile-first lane, which also makes this field optional. */
   rect: Rect;
   marker: MarkerParams;
   label: LabelParams;
@@ -172,6 +184,9 @@ export interface MarkerPlan {
   cell_mm: number;           // one module (bit) of the marker
   auto: boolean;             // the size came from auto
   overflow_mm: number;       // how far the outline pokes past the rectangle; 0 = fits
+  /** the box the core placed the marker in (fitted in the profile, or the
+   *  request's rect); dims, the label band and overflow are measured against it */
+  fit_rect?: Rect;
   /** OpenCV's frame of the marker / board as built, in the sketch frame:
    *  16 numbers, row-major 4x4, mm (the Joint Origin) */
   origin: number[];
