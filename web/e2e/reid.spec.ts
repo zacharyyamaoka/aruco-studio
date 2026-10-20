@@ -5,7 +5,7 @@
 // from the probe's document and plans, and the labels drawn on the canvas.
 // REID_SHOTS=<dir> also saves 1280 × 800 screenshots of before, the dialog and after.
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, idle, loadExample, openStudio, state } from "./helpers";
+import { clickAt, CORE, coreReady, idle, loadExample, openStudio, panelTab, state } from "./helpers";
 
 const SHOTS = process.env.REID_SHOTS;
 
@@ -112,6 +112,7 @@ test.describe(`Re-ID (${CORE} core)`, () => {
     await clickAt(page, 175, 150);
     await expect(page.getByTestId("extrude-panel")).toBeVisible();
     expect((await state(page)).panel.featureId).toBe(f4.id);
+    await panelTab(page, "marker");
     const id = page.locator('input[data-path="marker.first_id"]');
     await id.fill("1");
     await id.press("Enter");

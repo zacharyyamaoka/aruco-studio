@@ -7,7 +7,7 @@
 // Screenshots go to E2E_SHOTS (default test-results/shots).
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, dragWorld, idle, loadExample, openStudio, state, toClient } from "./helpers";
+import { clickAt, CORE, coreReady, dragWorld, idle, loadExample, openStudio, panelTab, state, toClient } from "./helpers";
 
 const SHOTS = process.env.E2E_SHOTS ?? "test-results/shots";
 
@@ -56,6 +56,7 @@ test.describe(`Verify (${CORE} core)`, () => {
     await dragWorld(page, [124, 10], [144, 40]);
     await page.keyboard.press("a");
     await expect(page.getByTestId("extrude-panel")).toBeVisible();
+    await panelTab(page, "marker");
     await page.locator('[data-path="marker.type"] [data-value="grid"]').click();
     await idle(page);
     grid = (await state(page)).panel.featureId;

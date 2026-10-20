@@ -1,29 +1,37 @@
 // The ArUco Extrude panel (Fusion's feature dialog) for the feature it
 // edits. It opens beside the clicked marker (V1 "Click-to-inspect",
-// 2026-10-18) and follows it; on a phone it docks to the bottom. The Preset
-// and the Trim first (they describe the sticker), the selection row
-// (Profile, and Holes when it has some), then Marker | Label. Every
-// row shows its own issues from plan().warnings -- and the id's from auto
-// id -- under it. Every value is driven (grey: the core's, a rule's, auto id's
-// or the default) or set (typed: normal, with ↺); ../ui/DrivenField.tsx.
-// Manual values always go through; the plan flags what does not fit, it
-// never refuses.
+// 2026-10-18) and follows it; on a phone it docks to the bottom. Three tabs
+// and nothing above them but the title bar: Make (Profile, Holes, the Preset
+// with what it makes as grey lines, Trim, the heights, Flip), Marker, Label.
+// Every row of a tab is in view, groups split by thin rules; the footer is
+// the summary line, then OK / Cancel. Every row shows its own issues from
+// plan().warnings -- and the id's from auto id -- under it. Every value is
+// driven (grey: the core's, a rule's, the preset's, auto id's or the default)
+// or set (typed: normal, with ↺); ../ui/DrivenField.tsx. Manual values always
+// go through; the plan flags what does not fit, it never refuses.
+// WHY three flat tabs, Profile inside Make (Zach, 2026-10-20 night, panel
+// proposal V1 "Command Dialog", reports/media/panel-proposals-2026-10-20.html):
+// "I like separating the concerns"; "when you click it the first thing you
+// need to decide is manufacturing method and the location (so profile
+// selection in first tab)" -- and no row above the tabs, no Advanced fold.
 // WHY words, not icons, on the segmented choices (Zach, 2026-10-18: "I like
 // the use of text instead of icons here").
+import { useLayoutEffect, type ReactNode } from "react";
 import { FieldRow, Glyph, Messages, NumberField, SegmentedRow, Select, Switch, Tabs, TextField, Button, type Issue as KitIssue, type Opt } from "@bam/ui";
 import { X } from "lucide-react";
-import type { Issue, MarkerParams, Trim } from "../core/contract";
+import type { ExtrudeParams, Issue, LabelParams, MarkerParams, Trim } from "../core/contract";
 import { DEFAULT_MARKER, DEFAULT_TRIM, featureNumber, getFeature, idRange, isSet, referenceFace, typeCounts } from "../model/doc";
 import { boxOf, rectCorners, toScreen } from "../model/geom";
-import { samePreset, myPresets } from "../presets/local";
+import { presetNumbers, samePreset, myPresets } from "../presets/local";
 import { profileLoops } from "../sketch/model";
-import { useStudio } from "../store";
+import { useStudio, type Tab } from "../store";
 import type { Box } from "../ui/anchor";
 import { DrivenChoice, DrivenField } from "../ui/DrivenField";
 import { FloatingPanel } from "../ui/FloatingPanel";
 import { TextArea } from "../ui/TextArea";
-import { routeIssues, shownRows, tabLevel } from "./issues";
+import { routeIssues, tabLevel, tabRows } from "./issues";
 import { SuggestSelect } from "./SuggestSelect";
+import "./panel.css";
 
 const TYPES: Opt[] = [
   { value: "single", label: "Single", hint: "Single marker" },
@@ -44,6 +52,21 @@ const ORIGINS: Opt[] = [
 const TRIM_OPTS: Opt[] = [
   { value: "profile", label: "Profile", hint: "The sticker is the whole profile, its holes cut out" },
   { value: "marker", label: "Marker", hint: "The sticker is the marker and its quiet zone" },
+];
+// WHY Black | White | Both with Auto as the driven value (contract barrier 10):
+// Auto is black only on a reference face (the body is the white), both in open space
+const MODES: Opt[] = [
+  { value: "black", label: "Black", hint: "Only the black is made: into the body under it" },
+  { value: "white", label: "White", hint: "Only the white is made: the pattern into a dark body" },
+  { value: "both", label: "Both", hint: "A white tile with the black inlaid" },
+];
+const PLACES: Opt[] = [
+  { value: "on_marker", label: "On marker", hint: "In the marker's border: the black row or the white quiet zone" },
+  { value: "outside", label: "Outside", hint: "In a band beside the marker" },
+];
+const SURFACES: Opt[] = [
+  { value: "black", label: "Black", hint: "Knocked out of the black border row" },
+  { value: "white", label: "White", hint: "Black text in the white quiet zone" },
 ];
 const PLACEHOLDERS = "{id} {first} {last} {ids} {dict} {type}";
 const SIDES: Opt[] = ["below", "above", "left", "right"].map((s) => ({ value: s, label: s[0].toUpperCase() + s.slice(1) }));
@@ -72,6 +95,12 @@ function SelRow({ path, label, count, active, onActivate, onClear, issues, icon,
   );
 }
 
+/** A thin rule between two groups of rows (Fusion's command dialog). */
+const Rule = () => <hr className="xp-rule" />;
+
+/** A grey line under a row: what the value means (no issue, never red). */
+const Note = ({ children, testid }: { children: ReactNode; testid?: string }) => <div className="hint-line" data-testid={testid}>{children}</div>;
+
 /** What drives a field while it is driven (the tooltip). */
 const DEFAULT = "default";
 
@@ -79,16 +108,23 @@ export function ExtrudePanel() {
   const st = useStudio();
   const { doc, plans, panel, suggestions, info, builtins } = st;
   const f = getFeature(doc, panel.featureId);
+  // a feature made by this opening (not in the document before it) starts on
+  // Make; a reopened one keeps the tab the panel last had
+  const fresh = panel.open && !!f && !!panel.backup && !getFeature(panel.backup, f.id);
+  useLayoutEffect(() => {
+    if (fresh) useStudio.getState().setTab("make");
+  }, [panel.featureId, fresh]);
   if (!panel.open || !f) return null;
   const m = f.marker, l = f.label;
   const plan = plans[f.id] ?? null;
   const planError = st.planErrors[f.id] ?? null;
   const refFace = referenceFace(doc, f);
-  const shown = shownRows(m, l.on, refFace);
+  const method = doc.preset?.method ?? "inkjet";
+  const rows = tabRows(m, l, method);
   const issues: Issue[] = plan && f.profile ? [...plan.warnings] : [];
   // auto id's issues for this feature (Issue.key): a collision, a full dictionary
   for (const i of st.idIssues) if (i.key === f.key) issues.push({ ...i, field: "marker.first_id" });
-  const routed = routeIssues(issues, shown);
+  const routed = routeIssues(issues, [...rows.make, ...rows.marker, ...rows.label]);
   const iss = (p: string) => kit(routed[p]);
   const bad = (p: string) => !!routed[p]?.some((i) => i.level === "error");
   const library = [...builtins, ...myPresets()].find((p) => p.id === doc.preset?.id);
@@ -104,6 +140,13 @@ export function ExtrudePanel() {
   const counts = `default for ${m.type === "grid" ? "a grid" : "a ChArUco board"} (${dc} × ${dr})`;
   const square = m.origin_square ?? null;
   const offsetDriver = "the preset spot (Side); drag the text on the sketch to move it";
+  // the heights as planned (barrier 10): the core's MarkerPlan.extrude, driven or set
+  const ex = showPlan?.extrude ?? null;
+  const height = (k: keyof ExtrudeParams & `${string}_mm`, fallback: number | null = null): number | null =>
+    isSet(f, `extrude.${k}`) ? (f.extrude[k] as number) : ex ? ex[k] : fallback;
+  const mode = isSet(f, "extrude.mode") && f.extrude.mode !== "auto" ? f.extrude.mode! : ex?.mode ?? (refFace ? "black" : "both");
+  const layer = doc.preset?.layer_mm || 0.1;
+  const outward = refFace ? (m.flip ? "into the face (flipped)" : "out of the face") : (m.flip ? "down (flipped)" : "up");
 
   // what the panel opens beside: the box the marker was placed in, the marker
   // and its label band, on screen (the profile until it plans); the other
@@ -117,6 +160,74 @@ export function ExtrudePanel() {
   };
   const anchor = screenBox(f.id);
   const others = doc.features.filter((g) => g.id !== f.id).map((g) => screenBox(g.id)).filter((b): b is Box => !!b);
+
+  const makeTab = (
+    <div data-tab-body="make">
+      <SelRow path="profile" label="Profile" icon="profile" testid="sel-profile" count={f.profile ? 1 : 0} emptyText="Select…"
+        active={panel.selector === "profile"} issues={iss("profile")}
+        onActivate={() => st.setSelector(panel.selector === "profile" ? null : "profile")} onClear={st.clearProfile} />
+      {profileHasHoles && (
+        <FieldRow path="holes" label="Holes" title="Place the marker clear of the holes, or over them">
+          <SegmentedRow path="holes" compact value={f.holes} options={[{ value: "avoid", label: "Avoid" }, { value: "ignore", label: "Ignore" }]}
+            onChange={(v) => void st.setHoles(v as "avoid" | "ignore")} />
+        </FieldRow>
+      )}
+      <Rule />
+      <FieldRow path="preset" label="Preset" issues={iss("preset")}>
+        <button type="button" className="preset-pick" data-testid="panel-preset" onClick={() => st.openModal("presets")}
+          title="How it is made: open the presets">
+          <Glyph name={method === "print3d" ? "print3d" : "inkjet"} />
+          <span className="preset-name">{doc.preset ? doc.preset.name : "Loading…"}{modified && <i className="modified"> (modified)</i>}</span>
+        </button>
+        <button type="button" className="kit-ib" title="Presets…" aria-label="Presets" data-testid="panel-preset-more" onClick={() => st.openModal("presets")}>
+          <Glyph name="dots" />
+        </button>
+      </FieldRow>
+      {doc.preset && <Note testid="preset-lines">{method === "print3d" ? "3D print" : "Inkjet"} · {presetNumbers(doc.preset)}</Note>}
+      <Rule />
+      <FieldRow path="trim" label="Trim" title="What the sticker is cut to: everything inside the cut is white" issues={iss("trim")}>
+        <DrivenChoice {...drv("trim")} value={f.trim} driver={`${DEFAULT} (${DEFAULT_TRIM})`}>
+          <SegmentedRow path="trim" compact value={f.trim} options={TRIM_OPTS} onChange={(v) => st.setField("trim", v as Trim)} />
+        </DrivenChoice>
+      </FieldRow>
+      <Rule />
+      {method === "print3d" ? (
+        <>
+          <FieldRow path="extrude.mode" label="Extrude" issues={iss("extrude.mode")} title="Which colours are made">
+            <DrivenChoice {...drv("extrude.mode")} value={mode}
+              driver={`auto: ${refFace ? "black only, on a reference face (the body is the white)" : "both, in open space"}`}>
+              <SegmentedRow path="extrude.mode" compact value={mode} options={MODES} onChange={(v) => st.setField("extrude.mode", v)} />
+            </DrivenChoice>
+          </FieldRow>
+          <FieldRow path="extrude.white_mm" label="White height" issues={iss("extrude.white_mm")} title="The white tile, from the face to its outer face">
+            <DrivenField {...drv("extrude.white_mm")} value={height("white_mm")} driver="the preset: whole layers"
+              unit="mm" min={0} step={layer} bad={bad("extrude.white_mm")} />
+          </FieldRow>
+          <FieldRow path="extrude.black_mm" label="Black height" issues={iss("extrude.black_mm")} title="The black, measured from the white's outer face into it">
+            <DrivenField {...drv("extrude.black_mm")} value={height("black_mm")} driver="the preset: whole layers"
+              unit="mm" min={0} step={layer} bad={bad("extrude.black_mm")} />
+          </FieldRow>
+          {/* WHY (Zach, 2026-10-20 night): "black height is always measured from the outer face of the white" */}
+          <Note testid="black-from">from the white's outer face</Note>
+        </>
+      ) : (
+        <FieldRow path="extrude.paper_mm" label="Paper thickness" issues={iss("extrude.paper_mm")} title="The paper / vinyl the sticker is printed on">
+          <DrivenField {...drv("extrude.paper_mm")} value={height("paper_mm", doc.preset?.thickness_mm ?? null)}
+            driver={`the preset's thickness${doc.preset?.thickness_mm != null ? ` (${doc.preset.thickness_mm} mm)` : ""}`}
+            unit="mm" min={0} step={0.01} bad={bad("extrude.paper_mm")} />
+        </FieldRow>
+      )}
+      <Rule />
+      {/* WHY always (Zach, 2026-10-20 night): "in all cases you get the option to just flip it from what it currently is" */}
+      <FieldRow path="marker.flip" label="Flip" issues={iss("marker.flip")}
+        title={refFace ? "Turn it over: the reference face picks the starting side" : "Turn it over: no reference face, so up is the starting side"}>
+        <DrivenChoice {...drv("marker.flip")} value={m.flip} driver={`${DEFAULT} (off)`}>
+          <Switch path="marker.flip" value={m.flip} onChange={(v) => st.setField("marker.flip", v)} />
+        </DrivenChoice>
+      </FieldRow>
+      <Note testid="flip-out">Outward side: {outward}</Note>
+    </div>
+  );
 
   const markerTab = (
     <div data-tab-body="marker">
@@ -135,6 +246,7 @@ export function ExtrudePanel() {
           int min={0} bad={bad("marker.first_id")} />
         <span className="range" data-testid="id-range">{idRange(m, showPlan ? showPlan.ids : undefined)}</span>
       </FieldRow>
+      <Rule />
       <FieldRow path="marker.marker_mm" label="Marker" issues={iss("marker.marker_mm")}>
         <DrivenField {...drv("marker.marker_mm")} value={!m.auto ? m.marker_mm : showPlan ? showPlan.marker_mm : m.marker_mm}
           driver={fills} unit="mm" min={0.1} step={0.5} bad={bad("marker.marker_mm")} />
@@ -180,32 +292,26 @@ export function ExtrudePanel() {
         <SuggestSelect suggestions={suggestions} empty={f.profile ? "…" : "needs a profile"} onPick={st.pick}
           current={m.auto ? -1 : suggestions.findIndex((s) => s.params.cols === m.cols && s.params.rows === m.rows && Math.abs(s.params.marker_mm - m.marker_mm) < 1e-6)} />
       </FieldRow>
+      <Rule />
       <FieldRow path="marker.turn" label="Turn" issues={iss("marker.turn")}>
         <DrivenChoice {...drv("marker.turn")} value={m.turn} driver={`${DEFAULT} (0°)`}>
           <SegmentedRow path="marker.turn" compact value={m.turn} options={TURNS} onChange={(v) => st.setField("marker.turn", Number(v) as MarkerParams["turn"])} />
         </DrivenChoice>
       </FieldRow>
-      {!refFace && (
-        <FieldRow path="marker.flip" label="Flip" issues={iss("marker.flip")} title="Mirror: no reference face sets which side is up">
-          <DrivenChoice {...drv("marker.flip")} value={m.flip} driver={`${DEFAULT} (off)`}>
-            <Switch path="marker.flip" value={m.flip} onChange={(v) => st.setField("marker.flip", v)} />
-          </DrivenChoice>
-        </FieldRow>
-      )}
-      <FieldRow path="marker.corner_mark" label="Corner mark" issues={iss("marker.corner_mark")}>
-        <DrivenChoice {...drv("marker.corner_mark")} value={m.corner_mark} driver={`${DEFAULT} (none)`}>
-          <SegmentedRow path="marker.corner_mark" compact value={m.corner_mark} options={CORNERS} onChange={(v) => st.setField("marker.corner_mark", v as MarkerParams["corner_mark"])} />
-        </DrivenChoice>
+      {/* the quiet zone has no driven record in the document: its default (1) is the driven value */}
+      <FieldRow path="marker.quiet_modules" label="Quiet zone" issues={iss("marker.quiet_modules")} title="The white border round the marker, in cells">
+        <DrivenField path="marker.quiet_modules" value={m.quiet_modules} driven={m.quiet_modules === DEFAULT_MARKER.quiet_modules}
+          driver={`${DEFAULT} (${DEFAULT_MARKER.quiet_modules} cell)`} unit="cells" min={0} step={1} bad={bad("marker.quiet_modules")}
+          onSet={(v) => st.setField("marker.quiet_modules", v)} onReset={() => st.resetField("marker.quiet_modules")} />
       </FieldRow>
-      <details className="adv" data-testid="panel-advanced">
-        <summary>Advanced</summary>
-        <FieldRow path="feature.key" label="Key" title="Auto id hashes this stable key to the first id; keys are unique in the document">
-          <TextField path="feature.key" value={f.key} onCommit={st.setKey} placeholder={f.id} />
-        </FieldRow>
-      </details>
+      <Rule />
+      <FieldRow path="feature.key" label="Key" title="Auto id hashes this stable key to the first id; keys are unique in the document">
+        <TextField path="feature.key" value={f.key} onCommit={st.setKey} placeholder={f.id} />
+      </FieldRow>
     </div>
   );
 
+  const place = l.place ?? "on_marker";
   const labelTab = (
     <div data-tab-body="label">
       <FieldRow path="label.on" label="On" issues={iss("label.on")}>
@@ -221,11 +327,37 @@ export function ExtrudePanel() {
           <div className="hint-line" data-testid="label-placeholders">
             {PLACEHOLDERS} · Enter: a new line{showPlan?.label ? ` → “${(showPlan.label.lines ?? [showPlan.label.text]).join(" / ")}”` : ""}
           </div>
+          {/* Place and Surface: absent = driven (the contract's defaults), so their own value says it */}
+          <FieldRow path="label.place" label="Place" issues={iss("label.place")}>
+            <DrivenChoice path="label.place" driven={l.place === undefined} value={place} driver={`${DEFAULT} (on marker)`}
+              onSet={(v) => st.setField("label.place", v)} onReset={() => st.resetField("label.place")}>
+              <SegmentedRow path="label.place" compact value={place} options={PLACES} onChange={(v) => st.setField("label.place", v as LabelParams["place"])} />
+            </DrivenChoice>
+          </FieldRow>
+          {place === "on_marker" && (
+            <FieldRow path="label.surface" label="Surface" issues={iss("label.surface")}>
+              <DrivenChoice path="label.surface" driven={l.surface === undefined} value={l.surface ?? "black"} driver={`${DEFAULT} (black)`}
+                onSet={(v) => st.setField("label.surface", v)} onReset={() => st.resetField("label.surface")}>
+                <SegmentedRow path="label.surface" compact value={l.surface ?? "black"} options={SURFACES}
+                  onChange={(v) => st.setField("label.surface", v as LabelParams["surface"])} />
+              </DrivenChoice>
+            </FieldRow>
+          )}
           <FieldRow path="label.side" label="Side" issues={iss("label.side")}>
             <DrivenChoice {...drv("label.side")} value={l.side} driver={`${DEFAULT} (below)`}>
               <SegmentedRow path="label.side" compact value={l.side} options={SIDES} onChange={(v) => st.setField("label.side", v as typeof l.side)} />
             </DrivenChoice>
           </FieldRow>
+          <Rule />
+          <FieldRow path="label.height_mm" label="Height" issues={iss("label.height_mm")} title="Cap height">
+            <DrivenField {...drv("label.height_mm")} value={l.height_mm > 0 ? l.height_mm : showPlan?.label ? showPlan.label.height_mm : null}
+              driver="core rule: 0.12 × the rectangle's short side, 2.5 to 12 mm" unit="mm" min={0} step={0.5} bad={bad("label.height_mm")} />
+          </FieldRow>
+          {place === "outside" && (
+            <FieldRow path="label.gap_mm" label="Gap" issues={iss("label.gap_mm")}>
+              <DrivenField {...drv("label.gap_mm")} value={l.gap_mm} driver={DEFAULT} unit="mm" min={0} step={0.5} bad={bad("label.gap_mm")} />
+            </FieldRow>
+          )}
           <FieldRow path="label.offset_mm" label="Offset X" issues={iss("label.offset_mm")} title="From the preset spot; drag the text on the sketch to move it">
             <DrivenField path="label.offset_mm.x" value={l.offset_mm[0]} driven={l.offset_mm[0] === 0} driver={offsetDriver} unit="mm" step={0.5}
               onSet={(v) => st.setLabel("offset_mm", [v, l.offset_mm[1]])} onReset={() => st.setLabel("offset_mm", [0, l.offset_mm[1]])} />
@@ -234,61 +366,41 @@ export function ExtrudePanel() {
             <DrivenField path="label.offset_mm.y" value={l.offset_mm[1]} driven={l.offset_mm[1] === 0} driver={offsetDriver} unit="mm" step={0.5}
               onSet={(v) => st.setLabel("offset_mm", [l.offset_mm[0], v])} onReset={() => st.setLabel("offset_mm", [l.offset_mm[0], 0])} />
           </FieldRow>
-          <FieldRow path="label.height_mm" label="Height" issues={iss("label.height_mm")} title="Cap height">
-            <DrivenField {...drv("label.height_mm")} value={l.height_mm > 0 ? l.height_mm : showPlan?.label ? showPlan.label.height_mm : null}
-              driver="core rule: 0.12 × the rectangle's short side, 2.5 to 12 mm" unit="mm" min={0} step={0.5} bad={bad("label.height_mm")} />
-          </FieldRow>
-          <FieldRow path="label.gap_mm" label="Gap" issues={iss("label.gap_mm")}>
-            <DrivenField {...drv("label.gap_mm")} value={l.gap_mm} driver={DEFAULT} unit="mm" min={0} step={0.5} bad={bad("label.gap_mm")} />
-          </FieldRow>
         </>
       )}
+      <Rule />
+      {/* WHY on Label (Zach, 2026-10-20): the corner mark reads as a mark, beside the text */}
+      <FieldRow path="marker.corner_mark" label="Corner mark" issues={iss("marker.corner_mark")}>
+        <DrivenChoice {...drv("marker.corner_mark")} value={m.corner_mark} driver={`${DEFAULT} (none)`}>
+          <SegmentedRow path="marker.corner_mark" compact value={m.corner_mark} options={CORNERS} onChange={(v) => st.setField("marker.corner_mark", v as MarkerParams["corner_mark"])} />
+        </DrivenChoice>
+      </FieldRow>
     </div>
   );
 
+  const body: Record<Tab, ReactNode> = { make: makeTab, marker: markerTab, label: labelTab };
   return (
     <FloatingPanel title={`ArUco Extrude ${featureNumber(doc, f.id)}`} icon={<Glyph name="extrude" />} collapsed={panel.collapsed} onCollapse={st.collapse} testid="extrude-panel"
-      anchor={anchor} anchorKey={f.id} avoid={others} width={320}
+      anchor={anchor} anchorKey={f.id} avoid={others} width={320} className="xpanel"
       footer={
         <>
-          <Button variant="primary" onClick={st.ok} testid="panel-ok" disabled={!f.profile}>OK</Button>
-          <Button onClick={st.cancel} testid="panel-cancel">Cancel</Button>
+          <div className="summary" data-testid="plan-summary">
+            <div className="summary-line">{!f.profile ? "Select a profile: click inside a region, or double-click a rectangle" : showPlan ? showPlan.summary : planError ? `Plan failed: ${planError}` : "Planning…"}</div>
+            <Messages path="summary" issues={kit(routed.summary)} />
+          </div>
+          <div className="xp-actions">
+            <Button variant="primary" onClick={st.ok} testid="panel-ok" disabled={!f.profile}>OK</Button>
+            <Button onClick={st.cancel} testid="panel-cancel">Cancel</Button>
+          </div>
         </>
       }>
-      <FieldRow path="preset" label="Preset" issues={iss("preset")}>
-        <button type="button" className="preset-pick" data-testid="panel-preset" onClick={() => st.openModal("presets")}
-          title="How it is made: open the presets">
-          <Glyph name={doc.preset?.method === "print3d" ? "print3d" : "inkjet"} />
-          <span className="preset-name">{doc.preset ? doc.preset.name : "Loading…"}{modified && <i className="modified"> (modified)</i>}</span>
-        </button>
-        <button type="button" className="kit-ib" title="Presets…" aria-label="Presets" data-testid="panel-preset-more" onClick={() => st.openModal("presets")}>
-          <Glyph name="dots" />
-        </button>
-      </FieldRow>
-      <FieldRow path="trim" label="Trim" title="What the sticker is cut to: everything inside the cut is white" issues={iss("trim")}>
-        <DrivenChoice {...drv("trim")} value={f.trim} driver={`${DEFAULT} (${DEFAULT_TRIM})`}>
-          <SegmentedRow path="trim" compact value={f.trim} options={TRIM_OPTS} onChange={(v) => st.setField("trim", v as Trim)} />
-        </DrivenChoice>
-      </FieldRow>
-      <SelRow path="profile" label="Profile" icon="profile" testid="sel-profile" count={f.profile ? 1 : 0} emptyText="Select…"
-        active={panel.selector === "profile"} issues={iss("profile")}
-        onActivate={() => st.setSelector(panel.selector === "profile" ? null : "profile")} onClear={st.clearProfile} />
-      {profileHasHoles && (
-        <FieldRow path="holes" label="Holes" title="Place the marker clear of the holes, or over them">
-          <SegmentedRow path="holes" compact value={f.holes} options={[{ value: "avoid", label: "Avoid" }, { value: "ignore", label: "Ignore" }]}
-            onChange={(v) => void st.setHoles(v as "avoid" | "ignore")} />
-        </FieldRow>
-      )}
-      <Tabs value={panel.tab} onChange={(t) => st.setTab(t as "marker" | "label")}
+      <Tabs value={panel.tab} onChange={(t) => st.setTab(t as Tab)}
         tabs={[
-          { id: "marker", name: "Marker", level: tabLevel(routed, "marker.") },
-          { id: "label", name: "Label", level: tabLevel(routed, "label.") },
+          { id: "make", name: "Make", level: tabLevel(routed, rows.make) },
+          { id: "marker", name: "Marker", level: tabLevel(routed, rows.marker) },
+          { id: "label", name: "Label", level: tabLevel(routed, rows.label) },
         ]} />
-      <div className="tab-body">{panel.tab === "marker" ? markerTab : labelTab}</div>
-      <div className="summary" data-testid="plan-summary">
-        <div className="summary-line">{!f.profile ? "Select a profile: click inside a region, or double-click a rectangle" : showPlan ? showPlan.summary : planError ? `Plan failed: ${planError}` : "Planning…"}</div>
-        <Messages path="summary" issues={kit(routed.summary)} />
-      </div>
+      <div className="tab-body">{body[panel.tab] ?? makeTab}</div>
     </FloatingPanel>
   );
 }

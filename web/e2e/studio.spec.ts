@@ -3,9 +3,7 @@
 // the drawn elements' boxes in pixels.
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import {
-  CORE, clickAt, coreReady, dragWorld, fitRect, idle, loadExample, openStudio, overlaps, planOutline, profileRect, state, toClient,
-} from "./helpers";
+import { clickAt, CORE, coreReady, dragWorld, fitRect, idle, loadExample, openStudio, overlaps, panelTab, planOutline, profileRect, state, toClient } from "./helpers";
 
 test.describe(`online Studio (${CORE} core)`, () => {
   test("1 · the core chip reaches ready", async ({ page }) => {
@@ -65,6 +63,7 @@ test.describe(`online Studio (${CORE} core)`, () => {
     await clickAt(page, 60, 40);
     await page.keyboard.press("a");
     await idle(page);
+    await panelTab(page, "marker");
     await page.locator('[data-path="marker.type"] [data-value="grid"]').click();
     await idle(page);
     await expect(page.getByTestId("id-range")).toHaveText(/^#\d+–\d+$/);
