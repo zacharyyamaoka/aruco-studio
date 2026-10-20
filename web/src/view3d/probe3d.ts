@@ -28,6 +28,9 @@ export interface View3DProbe {
   faces: number;
   /** a scene point (mm) as client pixels */
   project: (x: number, y: number, z: number) => Vec2;
+  /** the camera straight down on the feature in focus, its outline filling the view;
+   *  `marks` false hides the arrows, dimension lines and value boxes (a clean top view) */
+  top: (marks?: boolean) => void;
 }
 
 export const view3d: { probe: (() => View3DProbe) | null } = { probe: null };

@@ -72,6 +72,93 @@ async function dragArrow(page: Page, a: Arrow, dx: number, dy: number, steps = 1
 
 const layer = (plan: any, colour: string) => plan.layers.find((L: any) => L.op === "add" && L.colour === colour && L.part !== "label");
 
+/** The tile on a 3D-print preset, its marker clicked in 2D: selected, its panel open. */
+async function inspectTile(page: Page): Promise<void> {
+  await tile(page);
+  const o = await planOutline(page);
+  await clickAt(page, o.cx, o.cy);
+  await expect(page.getByTestId("extrude-panel")).toBeVisible();
+}
+
+/** Click a control in a panel row, on whichever tab the panel keeps it. */
+async function panelRow(page: Page, rowPath: string, inner: string): Promise<void> {
+  const el = page.locator(`.fpanel [data-path="${rowPath}"] ${inner}`).first();
+  for (const tab of await page.locator('.fpanel [role="tab"]').all()) {
+    if (await el.isVisible()) break;
+    await tab.click();
+  }
+  await el.click();
+  await idle(page);
+}
+
+type Pt = [number, number];
+type Poly = { outer: Pt[]; holes: Pt[][] };
+const rings = (polys: Poly[]) => polys.flatMap((p) => [p.outer, ...p.holes]);
+
+/** Even-odd over every ring: inside the ink (a hole of a polygon is not). */
+function inPolys(polys: Poly[], [x, y]: Pt): boolean {
+  let inside = false;
+  for (const r of rings(polys)) {
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+      const [xi, yi] = r[i], [xj, yj] = r[j];
+      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/** How far a point is from the nearest ring edge (mm). */
+function edgeDist(polys: Poly[], [x, y]: Pt): number {
+  let d = Infinity;
+  for (const r of rings(polys)) {
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+      const [ax, ay] = r[j], [bx, by] = r[i];
+      const dx = bx - ax, dy = by - ay;
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1)));
+      d = Math.min(d, Math.hypot(ax + t * dx - x, ay + t * dy - y));
+    }
+  }
+  return d;
+}
+
+/** A grid of points over the marker's outline (cell / 3 apart), each clear of every edge by a fifth of a cell. */
+function gridPoints(outer: Pt[], black: Poly[], cell: number): Pt[] {
+  const xs = outer.map((p) => p[0]), ys = outer.map((p) => p[1]);
+  const step = cell / 3, out: Pt[] = [];
+  const shell: Poly[] = [{ outer, holes: [] }];
+  for (let x = Math.min(...xs) + step / 2; x < Math.max(...xs); x += step) {
+    for (let y = Math.min(...ys) + step / 2; y < Math.max(...ys); y += step) {
+      const p: Pt = [x, y];
+      if (inPolys(shell, p) && edgeDist(shell, p) > cell / 5 && edgeDist(black, p) > cell / 5) out.push(p);
+    }
+  }
+  return out;
+}
+
+/** The 3D view straight down (no arrows or boxes), then the luminance (0-255)
+ *  of its rendered canvas at each sketch point, projected on the tile's outer face (z white_mm). */
+async function topPixels(page: Page, pts: Pt[]): Promise<number[]> {
+  const z = ((await state(page)).plan.extrude.white_mm as number);
+  await page.evaluate(() => (window as any).__aruco.top3d(false));
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  const client = await page.evaluate(([ps, zz]) => (ps as Pt[]).map(([x, y]) => (window as any).__aruco.project3d(x, y, zz)), [pts, z] as const);
+  return page.evaluate((cs) => {
+    const c = document.querySelector('[data-testid="view3d"] canvas') as HTMLCanvasElement;
+    const r = c.getBoundingClientRect();
+    const k = document.createElement("canvas");
+    k.width = c.width;
+    k.height = c.height;
+    const g = k.getContext("2d")!;
+    g.drawImage(c, 0, 0);
+    const d = g.getImageData(0, 0, k.width, k.height).data;
+    return (cs as Pt[]).map(([x, y]) => {
+      const px = Math.round(((x - r.left) * c.width) / r.width), py = Math.round(((y - r.top) * c.height) / r.height);
+      const i = (py * k.width + px) * 4;
+      return 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    });
+  }, client);
+}
+
 test.describe(`the 3D view (${CORE} core)`, () => {
   test.skip(CORE === "mock", "the mock core plans no layers");
 
@@ -302,6 +389,69 @@ test.describe(`the 3D view (${CORE} core)`, () => {
     expect(k.base3d[2]).toBeCloseTo(-W + K, 6);
     expect(w.tip[1], "the white's arrow points down the screen").toBeGreaterThan(w.base[1] + 20);
     await page.screenshot({ path: path.join(SHOTS, "3d-print-flipped.png") });
+  });
+
+  test("g · top view, every turn: the rendered pixels are dark exactly where the plan has ink (plan.black, cells), light where it has none", async ({ page }) => {
+    await inspectTile(page);
+    await to3d(page);
+    for (const turn of [0, 90, 180, 270]) {
+      await panelRow(page, "marker.turn", `[data-value="${turn}"]`);
+      const s = await state(page);
+      expect(s.plan.extrude.flipped).toBe(false);
+      expect(s.feature.marker.turn).toBe(turn);
+      const { black, outer, cell_mm } = s.plan;
+      const pts = gridPoints(outer, black, cell_mm);
+      expect(pts.length, "sample points").toBeGreaterThan(200);
+      const want = pts.map((p) => inPolys(black, p));
+      expect(want.filter(Boolean).length, "some ink").toBeGreaterThan(20);
+      expect(want.filter((w) => !w).length, "some white").toBeGreaterThan(20);
+      // a second oracle: the core's cell boxes, through pattern_to_sketch
+      const M = s.plan.pattern_to_sketch as number[];
+      const cells = (s.plan.cells as number[][]).map(([u0, v0, u1, v1]) => {
+        const u = (u0 + u1) / 2, v = (v0 + v1) / 2;
+        return [M[0] * u + M[1] * v + M[3], M[4] * u + M[5] * v + M[7]] as [number, number];
+      });
+      // (a cell under the knocked-out label is not ink: the label's band is (h)'s)
+      const band: Poly[] = s.plan.label?.box ? [{ outer: s.plan.label.box, holes: [] }] : [];
+      const cellsOut = cells.filter((c) => !inPolys(band, c));
+      expect(cellsOut.length).toBeGreaterThan(cells.length / 2);
+      for (const c of cellsOut) expect(inPolys(black, c), "a cell centre is ink in plan.black").toBe(true);
+      const lum = await topPixels(page, [...pts, ...cellsOut]);
+      const bad = pts.map((p, i) => ({ p, want: want[i] ? "dark" : "light", got: lum[i] })).filter((x) => (x.want === "dark") !== (x.got < 110));
+      expect(bad.slice(0, 5), `turn ${turn}: ${bad.length} of ${pts.length} points off`).toEqual([]);
+      const badCells = lum.slice(pts.length).filter((v) => v >= 110).length;
+      expect(badCells, `turn ${turn}: cells drawn light`).toBe(0);
+      if (turn === 0) await page.screenshot({ path: path.join(SHOTS, "top-view-turn0.png") });
+    }
+  });
+
+  test("h · top view: the label's band reads as the plan has it -- glyphs knocked out light, the black round them dark, nothing mirrored", async ({ page }) => {
+    await inspectTile(page);
+    await to3d(page);
+    const s = await state(page);
+    const lab = s.plan.label;
+    expect(lab?.font).toBe("pixel");
+    // a fine grid over the label's band (half a stroke apart), each point a quarter stroke clear of every edge
+    const stroke = lab.height_mm / 5;
+    const box = lab.box as Pt[];
+    const xs = box.map((p) => p[0]), ys = box.map((p) => p[1]);
+    const pts: Pt[] = [];
+    for (let x = Math.min(...xs) + stroke / 4; x < Math.max(...xs); x += stroke / 2) {
+      for (let y = Math.min(...ys) + stroke / 4; y < Math.max(...ys); y += stroke / 2) {
+        if (edgeDist(s.plan.black, [x, y]) > stroke / 4) pts.push([x, y]);
+      }
+    }
+    const want = pts.map((p) => inPolys(s.plan.black, p));
+    const glyphs = want.filter((w) => !w).length;
+    expect(glyphs, "points inside the glyphs").toBeGreaterThan(20);
+    expect(want.length - glyphs, "points on the black round them").toBeGreaterThan(20);
+    // the oracle can tell a flip: mirrored top to bottom about the label's line, the band disagrees with itself
+    const flipped = pts.filter(([x, y]) => inPolys(s.plan.black, [x, y]) !== inPolys(s.plan.black, [x, 2 * lab.at[1] - y])).length;
+    expect(flipped, "points a mirrored label would get wrong").toBeGreaterThan(10);
+    const lum = await topPixels(page, pts);
+    const bad = pts.map((p, i) => ({ p, want: want[i] ? "dark" : "light", got: Math.round(lum[i]) })).filter((x) => (x.want === "dark") !== (x.got < 110));
+    expect(bad.slice(0, 5), `${bad.length} of ${pts.length} label points off`).toEqual([]);
+    await page.screenshot({ path: path.join(SHOTS, "top-view-label.png") });
   });
 
   test("video · the drag-then-type flow (VIEW3D_VIDEO)", async ({ browser }) => {

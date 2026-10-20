@@ -276,6 +276,19 @@ export function View3D() {
         feature: state.arrows.length ? activeFeatureId(st) : null,
         heights: plan && st.doc.preset ? heightsOf(plan, st.doc.preset.method) : null,
         arrows, solids, faces, project: (x: number, y: number, z: number) => client(new THREE.Vector3(x, y, z)),
+        top: (showMarks = true) => {
+          // straight down on the feature in focus (a hair off vertical, so screen up stays +y, as in 2D)
+          const b = plan ? plan.outer : [];
+          const xs = b.map((q) => q[0]), ys = b.map((q) => q[1]);
+          const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+          const span = Math.max(10, Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+          const dist = (1.15 * span) / 2 / Math.tan((FOV * Math.PI) / 360);
+          camera.position.set(cx, cy - dist * 1e-4, dist);
+          controls.target.set(cx, cy, 0);
+          controls.update();
+          marks.visible = showMarks;
+          for (const el of boxes.current.values()) el.style.visibility = showMarks ? "" : "hidden";
+        },
       };
     };
 

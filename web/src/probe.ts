@@ -19,9 +19,11 @@ export interface Probe {
   plan: (req: PlanRequest) => Promise<MarkerPlan>;
   printHook: (() => void) | null;
   /** the 3D view's arrows (client px), heights and solids; null in 2D */
-  view3d: () => Omit<View3DProbe, "project"> | null;
+  view3d: () => Omit<View3DProbe, "project" | "top"> | null;
   /** a 3D scene point (mm, z along the face normal) as client pixels; null in 2D */
   project3d: (x: number, y: number, z: number) => [number, number] | null;
+  /** the 3D camera straight down on the feature in focus (marks false: no arrows / boxes) */
+  top3d: (marks?: boolean) => void;
 }
 
 /** `feature` and `plan` are the feature in focus (the panel's, the selected
@@ -64,8 +66,9 @@ function idle(timeoutMs = 15000): Promise<void> {
 export function installProbe(): void {
   const probe: Probe = {
     kind: coreKind, state: snapshot, toClient, idle, plan: (req) => core.plan(req), printHook: null,
-    view3d: () => { const p = view3d.probe?.(); if (!p) return null; const { project: _p, ...rest } = p; return rest; },
+    view3d: () => { const p = view3d.probe?.(); if (!p) return null; const { project: _p, top: _t, ...rest } = p; return rest; },
     project3d: (x, y, z) => view3d.probe?.().project(x, y, z) ?? null,
+    top3d: (marks) => view3d.probe?.().top(marks),
   };
   (window as unknown as { __aruco: Probe }).__aruco = probe;
 }
