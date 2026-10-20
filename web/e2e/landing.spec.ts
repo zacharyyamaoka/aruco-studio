@@ -8,6 +8,7 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 
 const GITHUB = "https://github.com/zacharyyamaoka/aruco-studio";
+const RELEASES = `${GITHUB}/releases`;
 const HEADLINE = "ArUco markers at the level of intent";
 
 /** The page's JSON-LD blocks, parsed from the raw HTML the server sends. */
@@ -28,7 +29,7 @@ test.describe("landing page and crawling", () => {
       const res = await page.goto("/about/");
       expect(res!.status()).toBe(200);
       await expect(page.locator("h1")).toHaveText(HEADLINE);
-      for (const id of ["what", "philosophy", "cad", "qa"]) await expect(page.locator(`section#${id} h2`)).toBeVisible();
+      for (const id of ["what", "philosophy", "download", "qa"]) await expect(page.locator(`section#${id} h2`)).toBeVisible();
       expect(await page.locator("#qa .qa").count()).toBeGreaterThanOrEqual(5);
       // the real file, not the Studio's SPA shell
       expect(await page.locator("#root").count()).toBe(0);
@@ -49,15 +50,100 @@ test.describe("landing page and crawling", () => {
     expect(noscript).toContain(`<a href="${GITHUB}">`);
   });
 
-  test("3 · the two calls to action: Open Studio -> /, GitHub -> the repo", async ({ page }) => {
+  test("3 · the two calls to action: Download -> #download (primary), Try Online -> /", async ({ page }) => {
     await page.goto("/about/");
-    await expect(page.locator('[data-cta="studio"]')).toHaveAttribute("href", "/");
-    await expect(page.locator('[data-cta="studio"]')).toHaveText("Open Studio");
-    await expect(page.locator('[data-cta="github"]')).toHaveAttribute("href", GITHUB);
-    await expect(page.locator('[data-cta="github"]')).toHaveText("GitHub");
-    for (const cta of ["studio", "github"]) {
-      const b = (await page.locator(`[data-cta="${cta}"]`).boundingBox())!;
-      expect(b.y + b.height, `${cta} is above the fold`).toBeLessThan(800);
+    const download = page.locator('header.hero [data-cta="download"]');
+    const online = page.locator('header.hero [data-cta="online"]');
+    await expect(download).toHaveAttribute("href", "#download");
+    await expect(download).toHaveText("Download");
+    await expect(download).toHaveClass(/\bprimary\b/);
+    await expect(online).toHaveAttribute("href", "/");
+    await expect(online).toHaveText("Try Online");
+    // GitHub is no longer a call to action, here or at the bottom
+    expect(await page.locator('.ctas a[href*="github.com"], [data-cta="github"]').count()).toBe(0);
+    for (const b of [await download.boundingBox(), await online.boundingBox()]) {
+      expect(b!.y + b!.height, "the calls to action are above the fold").toBeLessThan(800);
+    }
+    // the same two at the bottom of the page
+    const foot = page.locator("footer .ctas a");
+    await expect(foot).toHaveText(["Download", "Try Online"]);
+    expect(await foot.evaluateAll((as) => as.map((a) => a.getAttribute("href")))).toEqual(["#download", "/"]);
+    await download.click();
+    await expect(page).toHaveURL(/#download$/);
+    expect((await page.locator("section#download h2").boundingBox())!.y, "Download scrolls to its section").toBeLessThan(200);
+  });
+
+  test("3b · GitHub is the mark at the right of the top bar; the footer keeps its text link", async ({ page }) => {
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto("/about/");
+      const gh = page.locator('nav.top a[aria-label="GitHub"]');
+      await expect(gh).toHaveAttribute("href", GITHUB);
+      await expect(gh).toBeVisible();
+      expect(await gh.locator("svg path").count(), "the GitHub mark").toBe(1);
+      expect((await gh.textContent())!.trim(), "an icon, not a word").toBe("");
+      // the rightmost thing in the bar, flush with its right edge
+      const m = await page.evaluate(() => {
+        const nav = document.querySelector("nav.top")!.getBoundingClientRect();
+        const items = [...document.querySelectorAll("nav.top a")].filter((a) => (a as HTMLElement).offsetParent !== null)
+          .map((a) => ({ label: a.getAttribute("aria-label"), right: a.getBoundingClientRect().right }));
+        return { navRight: nav.right, last: items.reduce((a, b) => (b.right > a.right ? b : a)) };
+      });
+      expect(m.last.label, `${width} px`).toBe("GitHub");
+      expect(Math.abs(m.navRight - m.last.right), `${width} px`).toBeLessThan(1);
+    }
+    await expect(page.locator(`footer a[href="${GITHUB}"]`)).toHaveText("GitHub");
+  });
+
+  test("3c · #download: one honest card per CAD program, no fake downloads", async ({ page }) => {
+    await page.goto("/about/");
+    const cards = page.locator("section#download .card");
+    await expect(cards.locator("b")).toHaveText(["Fusion 360", "Onshape", "Online"]);
+    const fusion = page.locator('#download .card[data-cad="fusion"]');
+    await expect(fusion).toContainText("being rebuilt on this core");
+    await expect(fusion.locator("button")).toHaveText("Coming soon");
+    await expect(fusion.locator("button")).toBeDisabled();
+    await expect(fusion.locator(`a[href="${RELEASES}"]`)).toHaveText("Watch for the release");
+    await expect(page.locator('#download .card[data-cad="onshape"]')).toContainText("planned");
+    await expect(page.locator('#download .card[data-cad="online"] a.btn')).toHaveAttribute("href", "/");
+    await expect(page.locator('#download .card[data-cad="online"] a.btn')).toHaveText("Try Online");
+    // nothing pretends to be a file
+    const hrefs = await page.locator("#download a").evaluateAll((as) => as.map((a) => a.getAttribute("href")!));
+    expect(hrefs.sort()).toEqual(["/", RELEASES].sort());
+    expect(await page.locator("a[download]").count()).toBe(0);
+    for (const b of await page.locator("#download button").all()) await expect(b).toBeDisabled();
+  });
+
+  test("3d · Philosophy leads with \"Make markers where you CAD\", the quotes below it", async ({ page }) => {
+    await page.goto("/about/");
+    const lead = page.locator("section#philosophy h3").first();
+    await expect(lead).toHaveText("Make markers where you CAD");
+    await expect(page.locator("#where-you-cad p")).toContainText("rest of the assembly");
+    const y = async (sel: string) => (await page.locator(sel).first().boundingBox())!.y;
+    expect(await y("#where-you-cad")).toBeLessThan(await y("#philosophy .principles"));
+    expect(await page.locator("#philosophy .principles blockquote").count()).toBeGreaterThanOrEqual(7);
+  });
+
+  test("3e · profile-first copy: no trim to Rectangle, the profile section, the Fusion 360 slot all or nothing", async ({ page, request }) => {
+    await page.goto("/about/");
+    await expect(page.locator(".sub")).toHaveText(/^Pick a profile, get a printable, CAD-ready ArUco \/ ChArUco marker\./);
+    await expect(page.locator("section#profile h3")).toHaveText("The profile");
+    await expect(page.locator("section#trim figcaption")).toHaveText(["Profile", "Marker"]);
+    const body = await (await request.get("/about/")).text();
+    expect(body).not.toMatch(/draw a rectangle, get/i);
+    expect(body).not.toContain("trim-rectangle");
+    // the CAD video is shown only once its media exists: never an empty box
+    const slot = page.locator("#in-fusion");
+    if (await slot.count()) {
+      const v = slot.locator("video");
+      for (const attr of ["autoplay", "muted", "loop", "playsinline"]) expect(await v.getAttribute(attr), attr).not.toBeNull();
+      for (const src of [await v.getAttribute("src"), await v.getAttribute("poster")]) {
+        const res = await request.get(src!);
+        expect(res.headers()["content-type"], src!).toMatch(/^(image|video)\//);
+      }
+      await expect(slot.locator("figcaption")).toContainText("In Fusion 360");
+    } else {
+      expect(body).not.toContain("fusion.mp4");
     }
   });
 
