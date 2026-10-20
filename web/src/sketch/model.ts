@@ -161,6 +161,32 @@ export function rectAt(shapes: Shape[], p: Vec2, tol: number): RectShape | null 
   return around.reduce((a, b) => (b.w * b.h < a.w * a.h ? b : a));
 }
 
+// ------------------------------------------------------------ box selection
+
+function segsCross(a: Vec2, b: Vec2, c: Vec2, d: Vec2): boolean {
+  const o = (p: Vec2, q: Vec2, r: Vec2) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]));
+  return o(a, b, c) !== o(a, b, d) && o(c, d, a) !== o(c, d, b);
+}
+
+/** The shapes a selection box picks (a box in sketch mm). A WINDOW (dragged
+ *  left to right) takes the shapes wholly inside it; a CROSSING (right to
+ *  left) also takes those its edges touch: the CAD convention (Fusion,
+ *  AutoCAD). A box wholly inside a shape does not touch it. */
+export function boxPick(shapes: Shape[], box: Box, crossing: boolean): string[] {
+  const inBox = (p: Vec2) => p[0] >= box.x0 && p[0] <= box.x1 && p[1] >= box.y0 && p[1] <= box.y1;
+  const edges: [Vec2, Vec2][] = [
+    [[box.x0, box.y0], [box.x1, box.y0]], [[box.x1, box.y0], [box.x1, box.y1]],
+    [[box.x1, box.y1], [box.x0, box.y1]], [[box.x0, box.y1], [box.x0, box.y0]],
+  ];
+  return shapes.filter((s) => {
+    const loop = shapeLoop(s);
+    if (loop.every(inBox)) return true;
+    if (!crossing) return false;
+    if (loop.some(inBox)) return true;
+    return loop.some((p, i) => edges.some(([c, d]) => segsCross(p, loop[(i + 1) % loop.length], c, d)));
+  }).map((s) => s.id);
+}
+
 // ------------------------------------------------------------ edits
 
 /** Move by a delta snapped to the step: a shape keeps its own offsets from

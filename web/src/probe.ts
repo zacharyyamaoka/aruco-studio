@@ -30,6 +30,8 @@ function snapshot() {
     feature: getFeature(s.doc, active), plan: active ? s.plans[active] ?? null : null, plans: s.plans,
     suggestions: s.suggestions, modal: s.modal,
     canUndo: s.canUndo, canRedo: s.canRedo,
+    // the sketch lane (2026-10-20 night): every selected shape, the selected sketch dim
+    selection: s.multi, dimSel: s.dimSel,
   };
 }
 

@@ -15,15 +15,18 @@ import { create } from "zustand";
 import type { CoreInfo, IdResult, Issue, LabelParams, MarkerPlan, Preset, Suggestion } from "./core/contract";
 import { core } from "./coreSource";
 import {
-  addFeature, addShape, applyIds, deleteShape, emptyDoc, featureOfProfile, featureOfRect, getFeature, keyOwner, newFeature, nextTurn, pickSuggestion,
+  addFeature, addShape, applyIds, deleteShape, emptyDoc, featureOfProfile, featureOfRect, getFeature, keyOwner, newFeature, newId, nextTurn, pickSuggestion,
   rectProfile, removeFeature, resetField, setField, setShape, updateFeature, type Doc, type Feature, type Holes,
 } from "./model/doc";
 import { boxOf, fitBox, rectCorners, type Camera } from "./model/geom";
 import { touchRecent } from "./presets/local";
 import { example } from "./model/examples";
-import { profileLoops, sketchBox, type ProfileRef, type Selection, type Shape } from "./sketch/model";
+import type { Vec2 } from "./core/contract";
+import { dimsAmong, lockedAxes, refusal, renameDim, solve, type SketchDim } from "./sketch/constraints";
+import { moveShape, profileLoops, sketchBox, type ProfileRef, type Selection, type Shape } from "./sketch/model";
 
-export type Tool = "select" | "rect" | "circle";
+/** dim: Sketch Dimension (D), Fusion's */
+export type Tool = "select" | "rect" | "circle" | "dim";
 export type Modal = null | "presets" | "print" | "examples" | "verify" | "reid";
 /** the panel's tabs (Zach, 2026-10-20 night, V1 Command Dialog): Make holds the
  *  profile, the preset, trim and the heights; then Marker; then Label */
@@ -65,6 +68,12 @@ export interface Studio {
   /** the history has a step to undo / to redo */
   canUndo: boolean;
   canRedo: boolean;
+  /** every selected shape (a right-drag box, Shift+click): a drag, the arrows,
+   *  Del, Ctrl+C and A act on them all. `sel` stays the primary selection, which
+   *  the panel reads: the first of them, or the feature A opened */
+  multi: string[];
+  /** the selected sketch dimension: Del deletes it */
+  dimSel: string | null;
 
   /** a new document state; edits sharing a `key` (one value, typed) within
    *  IDLE_MS of each other are one undo step */
@@ -73,9 +82,34 @@ export interface Studio {
   newDoc: (exampleId?: string) => void;
   setTool: (t: Tool) => void;
   select: (s: Selection) => void;
-  addShape: (s: Shape) => void;
+  /** a drawn shape, with the driving dims its typed values made (one undo step) */
+  addShape: (s: Shape, dims?: SketchDim[]) => void;
   updateShape: (s: Shape) => void;
   deleteSelection: () => void;
+  /** select these shapes (`add`: to what is selected) */
+  selectShapes: (ids: string[], add?: boolean) => void;
+  /** Shift+click: add the shape to the selection, or take it out */
+  toggleShape: (id: string) => void;
+  selectDim: (id: string | null) => void;
+  /** a new sketch dimension, its value applied (false: refused, with a note) */
+  addDim: (d: SketchDim) => boolean;
+  /** a dimension's new value (typed): the geometry follows, one undo step */
+  setDimValue: (id: string, value: number) => void;
+  /** move shapes from where they were (`base`, the shapes at the drag's start)
+   *  by (dx, dy) mm: a shape whose position a dimension sets holds on that axis
+   *  (with a note), what they dimension follows */
+  moveShapes: (base: Shape[], ids: string[], dx: number, dy: number) => void;
+  /** the arrows: the selected shapes by (dx, dy) mm, one undo step */
+  nudge: (dx: number, dy: number) => void;
+  /** the shapes a move, Del, Ctrl+C act on: the selected ones, else the selected feature's or profile's */
+  selectedShapeIds: () => string[];
+  /** Ctrl+C: the selected shapes, the features whose profile they all are, the dims among them */
+  copy: () => void;
+  /** Ctrl+X: copy, then delete them (their features with them) */
+  cut: () => void;
+  /** Ctrl+V: what was copied, centred at `at` (a sketch point), else 10 mm on
+   *  from the last paste; new ids and keys, one undo step */
+  paste: (at: Vec2 | null) => void;
   setCamera: (c: Camera) => void;
   setView: (w: number, h: number) => void;
   fit: () => void;
@@ -137,6 +171,12 @@ const IDLE_MS = 500;
 
 const PANEL0: PanelState = { open: false, featureId: null, tab: "marker", collapsed: false, selector: null, backup: null };
 
+/** What Ctrl+C holds: shapes, the features on them and the dims among them. */
+export interface Clip { format: "arucostudio-clip"; shapes: Shape[]; features: Feature[]; dims: SketchDim[] }
+
+/** The selection fields for a new primary selection: a shape is the only one selected. */
+const only = (sel: Selection): Pick<Studio, "sel" | "multi" | "dimSel"> => ({ sel, multi: sel?.kind === "shape" ? [sel.id] : [], dimSel: null });
+
 /** The feature the selection names: a feature, its Joint Origin or its label,
  *  the rectangle that is its profile, or its profile. */
 export function selectedFeatureId(doc: Doc, sel: Selection): string | null {
@@ -197,8 +237,15 @@ export const useStudio = create<Studio>((set, get) => {
       : sel.kind === "profile" ? !!profileLoops(doc.shapes, sel.ref)
       : !!getFeature(doc, sel.id);
     if (!there) out.sel = null;
+    const multi = get().multi.filter((id) => doc.shapes.some((x) => x.id === id));
+    if (multi.length !== get().multi.length) out.multi = multi;
+    if (get().dimSel && !doc.dims.some((d) => d.id === get().dimSel)) out.dimSel = null;
     return out;
   };
+
+  /** the clipboard (in memory; the system's too when the page may write it) and the pastes made from it */
+  let clip: Clip | null = null;
+  let pastes = 0;
 
   /** Edit the feature the panel edits (`key`: see setDoc). */
   const edit = (fn: (f: Feature) => Feature, key = "") => put({ doc: updateFeature(get().doc, get().panel.featureId, fn) }, key);
@@ -233,12 +280,14 @@ export const useStudio = create<Studio>((set, get) => {
     note: null,
     canUndo: false,
     canRedo: false,
+    multi: [],
+    dimSel: null,
 
     setDoc: (doc, key) => put({ doc }, key),
     loadDoc: (doc) => {
       const preset = doc.preset ?? get().doc.preset;
       openAt = -1;
-      put({ doc: { ...doc, preset }, sel: null, panel: PANEL0, plans: {}, planErrors: {}, idIssues: [], suggestions: [], tool: "select" });
+      put({ doc: { ...doc, dims: doc.dims ?? [], preset }, ...only(null), panel: PANEL0, plans: {}, planErrors: {}, idIssues: [], suggestions: [], tool: "select" });
       get().fit();
     },
     newDoc: (exampleId) => {
@@ -247,20 +296,135 @@ export const useStudio = create<Studio>((set, get) => {
       get().loadDoc(ex?.features ? { ...doc, features: structuredClone(ex.features) } : doc);
     },
     setTool: (tool) => set({ tool }),
-    select: (sel) => set({ sel }),
-    addShape: (s) => put({ doc: addShape(get().doc, s), sel: { kind: "shape", id: s.id } }),
-    updateShape: (s) => put({ doc: setShape(get().doc, s) }, `shape:${s.id}`),
+    select: (sel) => set(only(sel)),
+    addShape: (s, dims = []) => {
+      const doc = addShape(get().doc, s);
+      put({ doc: dims.length ? { ...doc, dims: [...doc.dims, ...dims], shapes: solve(doc.shapes, [...doc.dims, ...dims]) } : doc, ...only({ kind: "shape", id: s.id }) });
+    },
+    // what the shape dimensions follows it (solve)
+    updateShape: (s) => {
+      const doc = setShape(get().doc, s);
+      put({ doc: { ...doc, shapes: solve(doc.shapes, doc.dims) } }, `shape:${s.id}`);
+    },
     deleteSelection: () => {
-      const { sel, doc, panel } = get();
-      if (sel?.kind === "shape") {
-        // a feature whose profile it bounds goes with it
-        const next = deleteShape(doc, sel.id);
+      const { sel, doc, panel, multi, dimSel } = get();
+      if (dimSel) {
+        put({ doc: { ...doc, dims: doc.dims.filter((d) => d.id !== dimSel) }, dimSel: null });
+      } else if (sel?.kind === "shape" || multi.length > 1) {
+        // every selected shape; a feature whose profile it bounds goes with it
+        const ids = [...new Set([...multi, ...(sel?.kind === "shape" ? [sel.id] : [])])];
+        const next = ids.reduce(deleteShape, doc);
         const gone = panel.open && !getFeature(next, panel.featureId);
-        put({ doc: next, sel: null, ...(gone ? { panel: PANEL0 } : {}) });
+        openAt = gone ? -1 : openAt;
+        put({ doc: next, ...only(null), ...(gone ? { panel: PANEL0 } : {}) });
       } else if (sel?.kind === "feature" || sel?.kind === "origin") {
         // the feature goes; its profile's shapes stay in the sketch
         put({ doc: removeFeature(doc, sel.id), sel: null, ...(panel.featureId === sel.id ? { panel: PANEL0 } : {}) });
       }
+    },
+    selectShapes: (ids, add = false) => {
+      const multi = add ? [...new Set([...get().multi, ...ids])] : [...new Set(ids)];
+      if (get().panel.open && multi.length) get().ok();
+      set({ multi, sel: multi.length ? { kind: "shape", id: multi[0] } : null, dimSel: null });
+    },
+    toggleShape: (id) => {
+      const { multi, sel } = get();
+      const base = multi.length ? multi : sel?.kind === "shape" ? [sel.id] : [];
+      const next = base.includes(id) ? base.filter((x) => x !== id) : [...base, id];
+      if (get().panel.open) get().ok();
+      set({ multi: next, sel: next.length ? { kind: "shape", id: next.includes(id) ? id : next[0] } : null, dimSel: null });
+    },
+    selectDim: (dimSel) => set(dimSel ? { sel: null, multi: [], dimSel } : { dimSel }),
+    addDim: (d) => {
+      const { doc } = get();
+      const why = refusal(doc.shapes, doc.dims, d);
+      if (why) { set({ note: why }); return false; }
+      const dims = [...doc.dims, d];
+      put({ doc: { ...doc, dims, shapes: solve(doc.shapes, dims) } });
+      return true;
+    },
+    setDimValue: (id, value) => {
+      const { doc } = get();
+      const dims = doc.dims.map((d) => (d.id === id ? { ...d, value } : d));
+      put({ doc: { ...doc, dims, shapes: solve(doc.shapes, dims) } });
+    },
+    moveShapes: (base, ids, dx, dy) => {
+      const { doc } = get();
+      // WHY held (Fusion): a dimensioned position does not move by hand; what
+      // it is measured from does, and solve() brings it along
+      const moved = base.map((s) => {
+        if (!ids.includes(s.id)) return s;
+        const lock = lockedAxes(base, doc.dims, s.id);
+        return moveShape(s, lock.x ? 0 : dx, lock.y ? 0 : dy);
+      });
+      const shapes = solve(moved, doc.dims);
+      const want = moveShape({ kind: "circle", id: "", cx: 0, cy: 0, r: 1 }, dx, dy) as { cx: number; cy: number };
+      const held = { x: false, y: false };
+      for (const id of ids) {
+        const a = base.find((s) => s.id === id), b = shapes.find((s) => s.id === id);
+        if (!a || !b || a.kind === "poly" || b.kind === "poly") continue;
+        if (Math.abs(b.cx - a.cx - want.cx) > 1e-6) held.x = true;
+        if (Math.abs(b.cy - a.cy - want.cy) > 1e-6) held.y = true;
+      }
+      const axes = [held.x && "x", held.y && "y"].filter(Boolean).join(" and ");
+      put({ doc: { ...doc, shapes }, ...(axes ? { note: `Held on ${axes}: a dimension places it there.` } : {}) });
+    },
+    nudge: (dx, dy) => {
+      const ids = get().selectedShapeIds();
+      if (ids.length) get().moveShapes(get().doc.shapes, ids, dx, dy);
+    },
+    selectedShapeIds: () => {
+      const { multi, sel, doc } = get();
+      if (multi.length) return multi;
+      if (sel?.kind === "shape") return [sel.id];
+      const ref = sel?.kind === "profile" ? sel.ref
+        : sel?.kind === "feature" || sel?.kind === "origin" || sel?.kind === "text" ? getFeature(doc, sel.id)?.profile : null;
+      return ref ? [ref.outer, ...ref.holes].filter((id) => doc.shapes.some((s) => s.id === id)) : [];
+    },
+    copy: () => {
+      const { doc } = get();
+      const ids = get().selectedShapeIds();
+      if (!ids.length) return;
+      const shapes = doc.shapes.filter((s) => ids.includes(s.id));
+      const features = doc.features.filter((f) => f.profile && [f.profile.outer, ...f.profile.holes].every((id) => ids.includes(id)));
+      clip = structuredClone({ format: "arucostudio-clip", shapes, features, dims: dimsAmong(doc.dims, ids) });
+      pastes = 0;
+      // the system clipboard too, when the page may write it (the paste reads the copy in memory)
+      try { void navigator.clipboard?.writeText(JSON.stringify(clip)).catch(() => {}); } catch { /* not allowed: memory only */ }
+      set({ note: `Copied ${shapes.length} shape${shapes.length === 1 ? "" : "s"}${features.length ? ` and ${features.length} ArUco Extrude${features.length === 1 ? "" : "s"}` : ""}.` });
+    },
+    cut: () => {
+      const ids = get().selectedShapeIds();
+      if (!ids.length) return;
+      get().copy();
+      const { doc, panel } = get();
+      const next = ids.reduce(deleteShape, doc);
+      const gone = panel.open && !getFeature(next, panel.featureId);
+      if (gone) openAt = -1;
+      put({ doc: next, ...only(null), ...(gone ? { panel: PANEL0 } : {}) });
+    },
+    paste: (at) => {
+      if (!clip || !clip.shapes.length) return;
+      if (get().panel.open) get().ok();
+      const { doc } = get();
+      const b = sketchBox(clip.shapes)!;
+      pastes += 1;
+      // at the cursor (the copy's middle there), else 10 mm on (right, down) per paste
+      const [dx, dy] = at ? [at[0] - (b.x0 + b.x1) / 2, at[1] - (b.y0 + b.y1) / 2] : [10 * pastes, -10 * pastes];
+      const map: Record<string, string> = {};
+      const shapes = clip.shapes.map((s) => {
+        map[s.id] = newId(s.kind === "rect" ? "r" : s.kind === "circle" ? "c" : "p");
+        return { ...moveShape(structuredClone(s), dx, dy), id: map[s.id] };
+      });
+      // new ids and keys: auto id hands each pasted feature new marker ids; every setting is kept
+      const features = clip.features.map((f) => {
+        const id = newId("f");
+        return { ...structuredClone(f), id, key: id, profile: { outer: map[f.profile!.outer], holes: f.profile!.holes.map((h) => map[h]) } };
+      });
+      const dims = clip.dims.map((d) => renameDim(d, newId("d"), map));
+      const allDims = [...doc.dims, ...dims];
+      const next = { ...doc, shapes: solve([...doc.shapes, ...shapes], allDims), features: [...doc.features, ...features], dims: allDims };
+      put({ doc: next, multi: shapes.map((s) => s.id), sel: { kind: "shape", id: shapes[0].id }, dimSel: null, tool: "select" });
     },
     setCamera: (camera) => set({ camera }),
     setView: (w, h) => set({ view: { w, h } }),
@@ -299,6 +463,26 @@ export const useStudio = create<Studio>((set, get) => {
     // leaves it selected, and R, drag, A was the custom placement's happy path;
     // A takes its outer edges, as a double-click on it would.
     extrude: async () => {
+      // WHY (Zach, 2026-10-20 night: "an Aruco marker maker, however on a
+      // canvas"): A on several selected rectangles makes one feature in each
+      // (a rectangle profile, the defaults, its own auto id) as one step; the
+      // panel opens on the first, the rectangles stay selected
+      const many = get().multi.length > 1
+        ? get().multi.map((id) => get().doc.shapes.find((s) => s.id === id)).filter((s): s is Shape => s?.kind === "rect") : [];
+      if (many.length > 1) {
+        if (get().panel.open) get().ok();
+        const { doc, panel, multi } = get();
+        const fresh = many.filter((r) => !featureOfRect(doc, r.id)).map((r) => newFeature(rectProfile(r.id)));
+        if (!fresh.length) { set({ note: "Those rectangles already have ArUco Extrudes: click a marker to edit it." }); return; }
+        openAt = past.length;
+        put({
+          doc: fresh.reduce(addFeature, doc),
+          panel: { ...PANEL0, open: true, featureId: fresh[0].id, backup: doc, tab: panel.tab, collapsed: panel.collapsed },
+          tool: "select", sel: { kind: "feature", id: fresh[0].id }, multi, dimSel: null,
+          note: `${fresh.length} ArUco Extrudes, one in each rectangle.`,
+        });
+        return;
+      }
       if (get().panel.open) {
         if (get().panel.selector || selectedFeatureId(get().doc, get().sel) === get().panel.featureId) return;
         get().ok();
@@ -326,7 +510,7 @@ export const useStudio = create<Studio>((set, get) => {
       if (other && other.id !== panel.featureId) { set({ note: "That profile already has an ArUco Extrude: click its marker to edit it." }); return; }
       if (!profileLoops(doc.shapes, ref) || !editing()) return;
       edit((f) => ({ ...f, profile: ref }));
-      set({ sel: { kind: "feature", id: panel.featureId! }, panel: { ...get().panel, selector: null } });
+      set({ ...only({ kind: "feature", id: panel.featureId! }), panel: { ...get().panel, selector: null } });
     },
     setSelector: (selector) => set({ panel: { ...get().panel, selector } }),
     clearProfile: () => {
@@ -367,7 +551,7 @@ export const useStudio = create<Studio>((set, get) => {
     },
     cancel: () => {
       const { panel } = get();
-      const next = { panel: { ...PANEL0, tab: panel.tab }, doc: panel.backup ?? get().doc, sel: null };
+      const next = { panel: { ...PANEL0, tab: panel.tab }, doc: panel.backup ?? get().doc, ...only(null) };
       // Cancel takes the panel's steps back out of the history: as if it never opened
       if (openAt >= 0 && past.length >= openAt && panel.backup) {
         past.length = openAt;
@@ -382,18 +566,18 @@ export const useStudio = create<Studio>((set, get) => {
       const f = getFeature(doc, id ?? selectedFeatureId(doc, sel));
       if (!f || panel.open) return;
       open(doc, f, false);
-      set({ sel: { kind: "feature", id: f.id } });
+      set(only({ kind: "feature", id: f.id }));
     },
 
     inspect: (id) => {
       const { panel } = get();
-      if (panel.open && panel.featureId === id) { set({ sel: { kind: "feature", id } }); return; }
+      if (panel.open && panel.featureId === id) { set(only({ kind: "feature", id })); return; }
       if (panel.open) get().ok();
       get().editFeature(id);
     },
     closePanel: () => {
       if (get().panel.open) get().ok();
-      set({ sel: null });
+      set(only(null));
     },
 
     setPreset: (p) => {

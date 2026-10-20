@@ -230,13 +230,16 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
     expect(Math.abs(Number(await markerInput.inputValue()) - d.value)).toBeLessThan(0.006);
   });
 
-  test("e · typing into the W × H box resizes the rectangle and the marker re-plans; no W or H on the canvas", async ({ page }) => {
+  test("e · typing W (a driving sketch dim, D) resizes the rectangle and the marker re-plans; no W or H among the marker's dims", async ({ page }) => {
     await gridFeature(page);
     let s = await state(page);
     const before = { marker: s.plan.marker_mm, outerW: s.plan.outer_mm[0] };
     for (const f of ["rect.w", "rect.h", "outer"]) await expect(page.locator(`[data-dim="${f}"]`)).toHaveCount(0);
 
-    const w = page.locator('[data-testid="shape-dims"] input').first();
+    // the W × H box is gone (2026-10-20 night): W is a sketch dim, D on the bottom edge dragged down to place it
+    await page.keyboard.press("d");
+    await dragWorld(page, [0, -30], [0, -40]);
+    const w = page.getByTestId("sdim-input");
     await expect(w).toHaveValue("60");
     await w.fill("40");
     await w.press("Enter");

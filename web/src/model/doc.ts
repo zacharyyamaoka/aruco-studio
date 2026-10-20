@@ -11,6 +11,7 @@
 // marker in the profile, like an extrude; a rectangle profile is used exactly
 // (contract.ts PlanRequest, barrier 9).
 import type { ExtrudeParams, IdItem, IdRequest, IdResult, LabelParams, MarkerParams, MarkerType, PlanRequest, Preset, Suggestion, Trim, Turn } from "../core/contract";
+import { dimShapes, type SketchDim } from "../sketch/constraints";
 import { plainRect, profileLoops, sameProfile, type ProfileRef, type RectShape, type Shape } from "../sketch/model";
 
 export type Holes = "avoid" | "ignore";
@@ -49,6 +50,9 @@ export interface Doc {
   version: 3;
   name: string;
   shapes: Shape[];
+  /** the sketch's driving dimensions (D; ../sketch/constraints.ts): a file
+   *  from before them has none */
+  dims: SketchDim[];
   features: Feature[];
   /** auto id: key -> the first id already given out (IdRequest.ledger) */
   id_ledger: Record<string, number>;
@@ -90,7 +94,7 @@ export function newFeature(profile: ProfileRef | null, id = newId("f")): Feature
 }
 
 export function emptyDoc(name = "Untitled", shapes: Shape[] = [], preset: Preset | null = null): Doc {
-  return { format: "arucostudio-web", version: 3, name, shapes, features: [], id_ledger: {}, preset };
+  return { format: "arucostudio-web", version: 3, name, shapes, dims: [], features: [], id_ledger: {}, preset };
 }
 
 // ------------------------------------------------------------ shapes
@@ -105,11 +109,11 @@ export function setShape(doc: Doc, s: Shape): Doc {
 
 /** Delete a shape; a feature whose profile it bounds goes with it (a feature
  *  is reached by clicking its marker: one without a profile could not be),
- *  and a profile it was a hole of loses that hole. */
+ *  a profile it was a hole of loses that hole, and a dimension naming it goes. */
 export function deleteShape(doc: Doc, id: string): Doc {
   const features = doc.features.filter((f) => f.profile?.outer !== id).map((f) =>
     f.profile?.holes.includes(id) ? { ...f, profile: { ...f.profile, holes: f.profile.holes.filter((h) => h !== id) } } : f);
-  return { ...doc, shapes: doc.shapes.filter((x) => x.id !== id), features };
+  return { ...doc, shapes: doc.shapes.filter((x) => x.id !== id), dims: doc.dims.filter((d) => !dimShapes(d).includes(id)), features };
 }
 
 // ------------------------------------------------------------ features
@@ -427,7 +431,10 @@ export function parseDoc(text: string): Doc {
   const shapes: Shape[] = Array.isArray(d.shapes) ? d.shapes.filter((s: Shape) => s && ["rect", "circle", "poly"].includes(s.kind)) : [];
   const features: Feature[] = Array.isArray(d.features) ? d.features.filter((f: unknown) => f && typeof f === "object").map(readFeature) : [];
   const ledger = d.id_ledger && typeof d.id_ledger === "object" ? d.id_ledger as Record<string, number> : {};
+  const ids = new Set(shapes.map((s) => s.id));
+  const dims: SketchDim[] = Array.isArray(d.dims)
+    ? d.dims.filter((x: SketchDim) => x && typeof x.id === "string" && dimShapes(x).every((id) => ids.has(id))) : [];
   return {
-    format: "arucostudio-web", version: 3, name: String(d.name ?? "Untitled"), shapes, features, id_ledger: ledger, preset: d.preset ?? null,
+    format: "arucostudio-web", version: 3, name: String(d.name ?? "Untitled"), shapes, dims, features, id_ledger: ledger, preset: d.preset ?? null,
   };
 }
