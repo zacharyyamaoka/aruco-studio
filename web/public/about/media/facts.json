@@ -1,0 +1,30 @@
+{
+  "sheet": {
+    "spaced40/fewest_sheets": {
+      "pages": 1,
+      "cuts": 18,
+      "fill": 0.197931
+    },
+    "spaced40/fewest_cuts": {
+      "pages": 2,
+      "cuts": 17,
+      "fill": 0.098965
+    }
+  },
+  "verify": {
+    "legend": "Marker #35: reads to 80°",
+    "calc": {
+      "text": "5.7 px per cell at 1500 mm: reads reliably; limit ≈ 3.2 m"
+    }
+  },
+  "core_ready_s": [
+    2.9,
+    3.9,
+    2.4,
+    2.3,
+    2.9,
+    2.8,
+    2.3,
+    2.4
+  ]
+}

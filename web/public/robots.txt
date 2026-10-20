@@ -1,0 +1,5 @@
+# arucostudio.com: everything may be crawled.
+User-agent: *
+Allow: /
+
+Sitemap: https://arucostudio.com/sitemap.xml
