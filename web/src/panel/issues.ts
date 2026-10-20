@@ -1,8 +1,11 @@
 // Per-line validation: each plan warning goes under the row its field names.
 // A field whose row is not drawn goes to the row that owns it (rows → the
-// Columns × Rows row, checker → Marker, a hidden label field → On); what has
-// no row at all goes to the summary line. Pure: vitest covers it.
-import type { Issue, IssueLevel, MarkerParams } from "../core/contract";
+// Columns × Rows row, checker → Marker, a hidden label field → Place or On,
+// the other method's heights → Preset); what has no row at all goes to the
+// summary line. The rows are listed per tab (Make | Marker | Label, V1 Command
+// Dialog), so a tab's dot is the worst of its own rows. Pure: vitest covers it.
+import type { Issue, IssueLevel, LabelParams, MarkerParams, Method } from "../core/contract";
+import type { Tab } from "../store";
 
 const OWNER: Record<string, string> = {
   // the box the marker is placed in (the legacy rect, or the core's fit_rect) is the profile's
@@ -15,26 +18,47 @@ const OWNER: Record<string, string> = {
   "marker.cols": "marker.marker_mm",
   "marker.id": "marker.first_id",
   "marker.ids": "marker.first_id",
-  "marker.flip": "marker.turn",
+  // the heights of the other method (and a bare "extrude") are the preset's
+  "extrude": "preset",
+  "extrude.paper_mm": "preset",
+  "extrude.mode": "preset",
+  "extrude.white_mm": "preset",
+  "extrude.black_mm": "preset",
   "marker.origin_square": "marker.type",
   "label.text": "label.on",
   "label.height_mm": "label.on",
   "label.side": "label.on",
-  "label.gap_mm": "label.on",
+  "label.gap_mm": "label.place",
+  "label.surface": "label.place",
+  "label.place": "label.on",
   "label.offset_mm": "label.on",
 };
 
-/** The rows drawn for these numbers, by field path. */
-export function shownRows(m: MarkerParams, labelOn: boolean, referenceFace: boolean): string[] {
-  const rows = ["profile", "preset", "trim", "marker.type", "marker.dictionary", "marker.first_id", "marker.marker_mm"];
-  if (m.type === "charuco") rows.push("marker.checker_mm", "marker.origin_square");
-  if (m.type === "grid") rows.push("marker.separation_mm");
-  if (m.type !== "single") rows.push("marker.cols");
-  rows.push("marker.suggest", "marker.turn");
-  if (!referenceFace) rows.push("marker.flip");
-  rows.push("marker.corner_mark", "label.on");
-  if (labelOn) rows.push("label.text", "label.height_mm", "label.side", "label.gap_mm", "label.offset_mm");
-  return rows;
+/** The rows each tab draws for these numbers, by field path, top to bottom. */
+export function tabRows(m: MarkerParams, l: Pick<LabelParams, "on" | "place">, method: Method): Record<Tab, string[]> {
+  const make = ["profile", "preset", "trim"];
+  if (method === "print3d") make.push("extrude.mode", "extrude.white_mm", "extrude.black_mm");
+  else make.push("extrude.paper_mm");
+  make.push("marker.flip");
+  const marker = ["marker.type", "marker.dictionary", "marker.first_id", "marker.marker_mm"];
+  if (m.type === "charuco") marker.push("marker.checker_mm", "marker.origin_square");
+  if (m.type === "grid") marker.push("marker.separation_mm");
+  if (m.type !== "single") marker.push("marker.cols");
+  marker.push("marker.suggest", "marker.turn", "marker.quiet_modules", "feature.key");
+  const label = ["label.on"];
+  if (l.on) {
+    const outside = l.place === "outside";
+    label.push("label.text", "label.place", ...(outside ? [] : ["label.surface"]), "label.side", "label.height_mm",
+      ...(outside ? ["label.gap_mm"] : []), "label.offset_mm");
+  }
+  label.push("marker.corner_mark");
+  return { make, marker, label };
+}
+
+/** Every row drawn, in any tab. */
+export function shownRows(m: MarkerParams, l: Pick<LabelParams, "on" | "place">, method: Method): string[] {
+  const t = tabRows(m, l, method);
+  return [...t.make, ...t.marker, ...t.label];
 }
 
 /** Issues by the row they show under; "summary" holds the rest. */
@@ -57,7 +81,7 @@ export function worstLevel(issues: Issue[] | undefined): IssueLevel | null {
   return w;
 }
 
-/** The worst level among the rows of one tab ("marker." or "label."). */
-export function tabLevel(routed: Record<string, Issue[]>, prefix: string): IssueLevel | null {
-  return worstLevel(Object.entries(routed).filter(([k]) => k.startsWith(prefix)).flatMap(([, v]) => v));
+/** The worst level among the rows of one tab. */
+export function tabLevel(routed: Record<string, Issue[]>, rows: string[]): IssueLevel | null {
+  return worstLevel(rows.flatMap((r) => routed[r] ?? []));
 }

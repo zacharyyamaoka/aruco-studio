@@ -1,0 +1,25 @@
+/* The ArUco Extrude panel's layout (./ExtrudePanel.tsx), V1 "Command Dialog"
+   (reports/media/panel-proposals-2026-10-20.html): Fusion's classic command
+   dialog kept flat -- a label column, every row of a tab in view, thin rules
+   between groups, the summary line and OK / Cancel at the foot. Layout only:
+   every colour, size and font is a token, so each skin (../skins/) restyles it. */
+.xpanel { --xp-label: 96px; }
+/* the label column: a fixed width, the label in the text's colour (not muted) */
+.xpanel .kit-row { grid-template-columns: var(--xp-label) minmax(0, 1fr); }
+.xpanel .kit-field:not(.has-error, .has-warn) .row-label { color: color-mix(in srgb, var(--text) 82%, transparent); }
+.xpanel .kit-msgs { margin-left: calc(var(--xp-label) + var(--gap)); }
+.xpanel .hint-line { padding-left: calc(var(--xp-label) + var(--gap) + 10px); }
+/* the tabs: first in the body, kept in view while a long tab scrolls */
+.xpanel .fpanel-body { padding-top: 0; }
+.xpanel .kit-tabs { position: sticky; top: 0; z-index: 2; margin-top: 0; }
+.xpanel .kit-tab { font-size: var(--font-size, 12px); }
+.xpanel .tab-body { padding: 6px 0 4px; }
+/* a thin rule between two groups of rows */
+.xpanel .xp-rule { border: 0; border-top: 1px solid var(--line-soft); margin: 5px 10px; }
+/* the foot: the summary line, then OK / Cancel on their own row */
+.xpanel .fpanel-foot { flex-direction: column; align-items: stretch; gap: 0; padding: 0; }
+.xpanel .fpanel-foot .summary { margin: 0; padding: 6px 10px 2px; border-top: 0; }
+.xpanel .fpanel-foot .summary .kit-msgs { margin-left: 0; }
+.xpanel .summary-line { font-weight: 600; }
+.xpanel .xp-actions { display: flex; justify-content: flex-end; gap: 6px; padding: 6px 10px 7px; }
+.xpanel.collapsed .fpanel-foot .summary { display: none; }

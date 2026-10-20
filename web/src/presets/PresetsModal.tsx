@@ -1,6 +1,7 @@
 // The presets modal (Fusion's "ArUco print presets"; Zach's 2026-10-18
-// review): the left bar finds (search, the Method / Paper / Nozzle chips,
-// Recent / My presets / Built-in), the middle shows the cards, the right is
+// review, laid out as V1 "Command Dialog"'s library dialog, 2026-10-20 night):
+// the left bar finds (search, the Method / Paper / Nozzle chips, Recent / My
+// presets / Built-in), the middle lists the presets by method, the right is
 // the picked preset's Info, always open. A click picks a card and shows its
 // Info; a double-click or Select uses it. My presets are edited in place in
 // Info and saved in this browser (./local.ts); a built-in is read-only:
@@ -11,7 +12,7 @@ import { Copy, Download, Plus, Trash2, Upload } from "lucide-react";
 import type { Preset } from "../core/contract";
 import { downloadText } from "../io/files";
 import { useStudio } from "../store";
-import { chipValues, filterPresets, infoRows, NO_FILTERS, PAGES, withField, type Filters, type InfoRow } from "./fields";
+import { chipValues, filterPresets, infoRows, methodName, NO_FILTERS, PAGES, withField, type Filters, type InfoRow } from "./fields";
 import { blankPreset, exportJson, importJson, myPresets, presetNumbers, recentIds, saveMine } from "./local";
 import "./presets.css";
 
@@ -27,6 +28,8 @@ function thumb(p: Preset): string {
   return `<svg viewBox="0 0 96 80" width="96" height="80"><rect x="6" y="14" width="44" height="52" fill="#fff"/><g transform="translate(10 22) scale(1.5)">${mk}</g>`
     + `<rect x="58" y="14" width="26" height="52" fill="none" stroke="#9aa3ae"/>${lines}<text x="71" y="76" font-size="7" text-anchor="middle" fill="#6b7480" font-family="sans-serif">${p.line_mm ?? ""} mm</text></svg>`;
 }
+
+const METHODS: Preset["method"][] = ["inkjet", "print3d"];
 
 function Chips({ title, values, on, toggle }: { title: string; values: string[]; on: string[]; toggle: (v: string) => void }) {
   if (!values.length) return null;
@@ -187,22 +190,34 @@ function PresetsLibrary() {
             <span className="grow" />
             <span className="muted">{list.length} of {base.length}</span>
           </div>
-          <div className="cards" role="listbox" aria-label="Presets">
+          {/* WHY a list by method (V1 Command Dialog, 2026-10-20 night): how it is made is the first thing to decide */}
+          <div className="pl-list" role="listbox" aria-label="Presets" data-testid="preset-list">
             {!list.length && (
               <div className="empty">{coll === "mine" && !mine.length ? "No presets of your own yet: New, or Duplicate a built-in."
                 : builtins.length ? "Nothing matches." : "Loading the core's presets…"}</div>
             )}
-            {list.map((p) => (
-              <div key={p.id} className={`card${p.id === picked ? " on" : ""}`} role="option" aria-selected={p.id === picked}
-                data-card={p.id} data-mark={p.id === current?.id ? "current" : undefined}
-                onClick={() => setPicked(p.id)} onDoubleClick={() => choose(p.id)}>
-                {p.id === current?.id && <span className="card-mark" data-testid="card-mark">current</span>}
-                <div className="thumb" dangerouslySetInnerHTML={{ __html: thumb(p) }} />
-                <div className="name">{p.name}</div>
-                <div className="sub">{presetNumbers(p)}</div>
-                <div className="where"><Glyph name={p.builtin ? "cube" : "star"} size={12} />{p.builtin ? "Built-in" : "My preset"}</div>
-              </div>
-            ))}
+            {METHODS.map((method) => {
+              const group = list.filter((p) => p.method === method);
+              if (!group.length) return null;
+              return (
+                <div key={method} className="pl-group" role="group" aria-label={methodName(method)} data-group={method}>
+                  <div className="pl-group-head">{methodName(method)}</div>
+                  {group.map((p) => (
+                    <div key={p.id} className={`card pl-item${p.id === picked ? " on" : ""}`} role="option" aria-selected={p.id === picked}
+                      data-card={p.id} data-mark={p.id === current?.id ? "current" : undefined}
+                      onClick={() => setPicked(p.id)} onDoubleClick={() => choose(p.id)}>
+                      <div className="thumb" dangerouslySetInnerHTML={{ __html: thumb(p) }} />
+                      <div className="pl-text">
+                        <div className="name">{p.name}</div>
+                        <div className="sub">{presetNumbers(p)}</div>
+                      </div>
+                      <div className="where"><Glyph name={p.builtin ? "cube" : "star"} size={12} />{p.builtin ? "Built-in" : "My preset"}</div>
+                      {p.id === current?.id && <span className="card-mark" data-testid="card-mark">current</span>}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
           </div>
         </main>
         <aside className="lib-side" data-testid="presets-side">
