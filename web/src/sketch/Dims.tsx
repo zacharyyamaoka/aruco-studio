@@ -15,16 +15,16 @@
 // its type takes (CONTROLS).
 //
 // WHY screen-space rings: the core stands each dimension offset_mm outside
-// the rectangle, rings a few mm apart, which collapse into one line when
+// the box it placed the marker in (MarkerPlan.fit_rect: "the rectangle"
+// below), rings a few mm apart, which collapse into one line when
 // zoomed out. Here the core's order on each side is kept but the rings are
 // whole pixels apart, so the values stay legible at any zoom; a value that
 // would still overlap one already placed is hidden. Every line stands outside
 // the rectangle, so none crosses the marker's ink.
 import { useEffect, useRef } from "react";
-import type { Dimension, MarkerPlan, Vec2 } from "../core/contract";
+import type { Dimension, MarkerPlan, Rect, Vec2 } from "../core/contract";
 import { isSet, type Feature } from "../model/doc";
 import { toLocal } from "../model/geom";
-import type { RectShape } from "./model";
 
 const GAP = 14;        // px from the rectangle's edge to the first ring
 const RING = 22;       // px between rings
@@ -94,8 +94,9 @@ const unit = (v: Vec2): Vec2 => { const n = Math.hypot(v[0], v[1]) || 1; return 
 
 type Side = "top" | "bottom" | "left" | "right";
 
-/** Lay out the plan's dims for one feature in screen px (scr: sketch -> screen). */
-export function layoutDims(f: Feature, rect: RectShape, plan: MarkerPlan, scr: (p: Vec2) => Vec2, z: number): LaidDim[] {
+/** Lay out the plan's dims for one feature in screen px (scr: sketch -> screen),
+ *  standing outside `rect`: the box the core placed the marker in. */
+export function layoutDims(f: Feature, rect: Rect, plan: MarkerPlan, scr: (p: Vec2) => Vec2, z: number): LaidDim[] {
   const fields = CONTROLS[f.marker.type] ?? [];
   const dims = (plan.dims ?? []).filter((d) => fields.includes(d.field) && Math.hypot(d.b[0] - d.a[0], d.b[1] - d.a[1]) > 1e-6);
   // each dim's side of the rectangle (its offset normal in the rectangle's frame) and how far its geometry is inside that edge

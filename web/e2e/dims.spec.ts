@@ -24,7 +24,7 @@ async function blank(page: Page): Promise<void> {
   await page.getByTestId("cmd-new").click();
 }
 
-/** A feature of one type in a 60 × 60 rectangle about the origin, its panel open. Returns the feature's id. */
+/** A feature of one type in a 60 × 60 rectangle profile about the origin, its panel open. Returns the feature's id. */
 async function typedFeature(page: Page, type: "single" | "grid" | "charuco"): Promise<string> {
   await blank(page);
   await page.keyboard.press("r");
@@ -141,7 +141,7 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
     expect(svgText).not.toMatch(/offset/i);
 
     // no value sits on the rectangle (so none on the marker's ink), none on another
-    const rect = (await page.locator(`[data-shape="${s.feature.rectId}"]`).boundingBox())!;
+    const rect = (await page.locator(`[data-shape="${s.feature.profile.outer}"]`).boundingBox())!;
     const rbox = { x: rect.x, y: rect.y, w: rect.width, h: rect.height };
     for (const d of dims) expect(overlap(d.label!, rbox), `${d.field} value off the rectangle`).toBe(false);
     for (let i = 0; i < dims.length; i++) for (let j = i + 1; j < dims.length; j++) {
@@ -202,7 +202,7 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
     await dragWorld(page, [30, 30], [36, 36]);
     await idle(page);
     s = await state(page);
-    expect(s.doc.shapes.find((x: any) => x.id === s.feature.rectId)).toMatchObject({ w: 66, h: 66 });
+    expect(s.doc.shapes.find((x: any) => x.id === s.feature.profile.outer)).toMatchObject({ w: 66, h: 66 });
     d = await dimOf(page, "marker.marker_mm");
     expect(d.text).toBe("12");
     expect(d.value).toBe(planned12);
@@ -241,7 +241,7 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
     await w.press("Enter");
     await idle(page);
     s = await state(page);
-    const r = s.doc.shapes.find((x: any) => x.id === s.feature.rectId);
+    const r = s.doc.shapes.find((x: any) => x.id === s.feature.profile.outer);
     expect(r).toMatchObject({ w: 40, h: 60, cx: 0, cy: 0 });
     expect(s.plan.marker_mm).toBeLessThan(before.marker);
     expect(s.plan.outer_mm[0]).toBeLessThan(before.outerW);
@@ -270,7 +270,7 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
 
     const dims = await drawn(page);
     expect(dims.map((d) => d.field).sort()).toEqual([...CONTROLS.grid].sort());
-    const rect = (await page.locator(`[data-shape="${s.feature.rectId}"]`).boundingBox())!;
+    const rect = (await page.locator(`[data-shape="${s.feature.profile.outer}"]`).boundingBox())!;
     const rbox = { x: rect.x, y: rect.y, w: rect.width, h: rect.height };
     for (const d of dims) {
       expect(overlap(d.label!, rbox), `${d.field} value off the rectangle`).toBe(false);
@@ -298,7 +298,7 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
         expect(Math.abs(tipLength(d) / s.camera.zoom - d.value), d.field).toBeLessThan(0.3);
       }
       // nothing shows the outer size or the rectangle's W or H
-      const rect = s.doc.shapes.find((x: any) => x.id === s.feature.rectId);
+      const rect = s.doc.shapes.find((x: any) => x.id === s.feature.profile.outer);
       const hidden = new Set([s.plan.outer_mm[0], s.plan.outer_mm[1], rect.w, rect.h].map((v: number) => String(+v.toFixed(2))));
       expect(dims.filter((d) => hidden.has(d.text!)).map((d) => d.field), "no dim value is the outer size or W / H").toEqual([]);
       const titles = await page.locator('[data-testid="dims"] title').allTextContents();
@@ -350,9 +350,9 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
     await openStudio(page);
     await coreReady(page);
     const doc = {
-      format: "arucostudio-web", version: 2, name: "Two lines", id_ledger: {}, preset: null,
+      format: "arucostudio-web", version: 3, name: "Two lines", id_ledger: {}, preset: null,
       shapes: [{ kind: "rect", id: "r1", cx: 0, cy: 0, w: 60, h: 60, angle_deg: 0 }],
-      features: [{ id: "f1", key: "f1", rectId: "r1", profile: null, holes: "avoid", marker: { type: "single" }, label: { on: true, text: "PLATE\n#{ids}" }, set: [] }],
+      features: [{ id: "f1", key: "f1", profile: { outer: "r1", holes: [] }, holes: "avoid", marker: { type: "single" }, label: { on: true, text: "PLATE\n#{ids}" }, set: [] }],
     };
     await page.getByTestId("menu-file").click();
     const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByTestId("cmd-open").click()]);

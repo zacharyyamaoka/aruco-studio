@@ -67,7 +67,8 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     expect(f1).not.toBe(f2);
 
     const s = await state(page);
-    expect(s.doc.features.map((f: any) => [f.id, f.key, f.rectId])).toEqual([[f1, f1, r1], [f2, f2, r2]]);
+    // A on a drawn (selected) rectangle: that rectangle on its own is the profile
+    expect(s.doc.features.map((f: any) => [f.id, f.key, f.profile])).toEqual([[f1, f1, { outer: r1, holes: [] }], [f2, f2, { outer: r2, holes: [] }]]);
     expect(Object.keys(s.plans).sort()).toEqual([f1, f2].sort());
 
     // drawn: two black paths, each inside its own rectangle's box
@@ -153,7 +154,7 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
 
     // driven: the plan's value, grey, its driver in the tooltip
     await expect(markerBox).toHaveAttribute("data-driven", "1");
-    await expect(markerBox).toHaveAttribute("title", /fills the rectangle/);
+    await expect(markerBox).toHaveAttribute("title", /fills the profile/);
     let s = await state(page);
     const v0 = Number(await marker.inputValue());
     expect(v0).toBeCloseTo(s.plan.marker_mm, 4);
@@ -237,11 +238,12 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     await expect(page.getByTestId("note")).toContainText("Opened v1-plate");
     await idle(page);
     const s = await state(page);
-    expect(s.doc).toMatchObject({ version: 2, name: "Old plate", id_ledger: {} });
+    expect(s.doc).toMatchObject({ version: 3, name: "Old plate", id_ledger: {} });
     expect(s.doc.features).toHaveLength(1);
     const f = s.doc.features[0];
     expect(f.key).toBe(f.id);
-    expect(f.rectId).toBe("r1");
+    // its rectangle on its own is its profile now (2026-10-20 evening)
+    expect(f.profile).toEqual({ outer: "r1", holes: [] });
     expect(s.plans[f.id]?.ids).toEqual([4, 5, 6, 7]);
     const black = (await page.locator(`[data-marker="${f.id}"] [data-marker-black]`).boundingBox())!;
     const rect = (await page.locator('[data-shape="r1"]').boundingBox())!;
@@ -316,11 +318,11 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     expect(tools.y + tools.height).toBeLessThanOrEqual(panel.y);
     expect(Math.abs(tools.x + tools.width / 2 - 195)).toBeLessThanOrEqual(1);
     const vp = (await page.getByTestId("viewport").boundingBox())!;
-    const rectId = (await state(page)).feature.rectId;
+    const fid = (await state(page)).feature.id;
     await expect.poll(async () => {
-      const boxes = [await page.locator("[data-marker-outline]").boundingBox(), await page.locator(`[data-shape="${rectId}"]`).boundingBox()];
+      const boxes = [await page.locator("[data-marker-outline]").boundingBox(), await page.locator(`[data-fit-rect="${fid}"]`).boundingBox()];
       return boxes.every((m) => !!m && m.y >= vp.y + 18 && m.y + m.height <= tools.y && m.x >= 0 && m.x + m.width <= 390);
-    }, { message: "the marker and its rectangle are fully between the ruler and the toolbar" }).toBe(true);
+    }, { message: "the marker and the box it was placed in are fully between the ruler and the toolbar" }).toBe(true);
     const m = (await page.locator("[data-marker-outline]").boundingBox())!;
     expect(m.height).toBeGreaterThan(60);   // fitted, not a speck
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -348,5 +350,5 @@ test("label keystrokes land on the marker they were typed into, even with an imm
     { timeout: 3000 }).toBe("RACE");
   const s = await state(page);
   expect(s.doc.features.find((f: any) => f.id === f2).label.text).toBe(before2);
-  expect(s.doc.features.find((f: any) => f.id === f1).rectId).toBe(r1);
+  expect(s.doc.features.find((f: any) => f.id === f1).profile).toEqual({ outer: r1, holes: [] });
 });

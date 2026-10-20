@@ -34,8 +34,34 @@ function capacityOf(dict: string): number {
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
+/** A request with the box its marker goes in. */
+type Placed = PlanRequest & { rect: Rect };
+
+/** A loop of four corners at right angles as a rectangle (rotated too). */
+function loopRect(loop: Loop): Rect | null {
+  if (loop.length !== 4) return null;
+  const e = loop.map((p, i) => [loop[(i + 1) % 4][0] - p[0], loop[(i + 1) % 4][1] - p[1]]);
+  const len = (v: number[]) => Math.hypot(v[0], v[1]);
+  const dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1];
+  const tol = 1e-6 * Math.max(len(e[0]), len(e[1]), 1);
+  if (Math.abs(dot(e[0], e[1])) > tol * len(e[0]) || Math.abs(dot(e[1], e[2])) > tol * len(e[1])) return null;
+  const cx = loop.reduce((a, p) => a + p[0], 0) / 4, cy = loop.reduce((a, p) => a + p[1], 0) / 4;
+  return { cx: r2(cx), cy: r2(cy), w: r2(len(e[0])), h: r2(len(e[1])), angle_deg: r2((Math.atan2(e[0][1], e[0][0]) * 180) / Math.PI) };
+}
+
+/** The box the marker goes in (contract barrier 9): the legacy rect when
+ *  sent, a rectangle profile as it is, else the largest clear box in it. */
+function placed(req: PlanRequest): Placed {
+  const pr = req.profile;
+  const holes = req.holes ?? "avoid";
+  const r = req.rect ?? (pr?.loops.length
+    ? (pr.loops.length === 1 || holes === "ignore" ? loopRect(pr.loops[0]) : null) ?? inscribeOf(pr, holes) : null);
+  if (!r) throw new Error("nothing fits in the profile (mock core)");
+  return { ...req, rect: r };
+}
+
 /** The sizes in the marker's own frame: marker, checker, separation, outer. */
-function sizes(req: PlanRequest) {
+function sizes(req: Placed) {
   const m = req.marker;
   const n = bitsOf(m.dictionary) + 2;
   const q = m.quiet_modules / n;          // quiet zone per marker side, in markers
@@ -72,6 +98,12 @@ function bits(id: number, n: number): boolean[] {
   return out;
 }
 
+function rectLoop(r: Rect): Loop {
+  const a = (r.angle_deg * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a);
+  return ([[-r.w / 2, -r.h / 2], [r.w / 2, -r.h / 2], [r.w / 2, r.h / 2], [-r.w / 2, r.h / 2]] as Vec2[])
+    .map(([u, v]) => [r2(r.cx + u * c - v * s), r2(r.cy + u * s + v * c)] as Vec2);
+}
+
 function sq(x0: number, y0: number, s: number): Loop {
   return [[x0, y0], [x0 + s, y0], [x0 + s, y0 + s], [x0, y0 + s]];
 }
@@ -87,7 +119,7 @@ function markerPolys(id: number, x0: number, y0: number, size: number, b: number
   return { outer: sq(x0, y0, size), holes };
 }
 
-function place(req: PlanRequest, p: Vec2): Vec2 {
+function place(req: Placed, p: Vec2): Vec2 {
   const m = req.marker, r = req.rect;
   let [u, v] = p;
   if (m.flip && !req.reference_face) u = -u;
@@ -103,7 +135,8 @@ function resolveText(t: string, ids: number[], req: PlanRequest): string {
     .replace(/\{ids\}/g, range).replace(/\{dict\}/g, req.marker.dictionary.replace("DICT_", "")).replace(/\{type\}/g, req.marker.type);
 }
 
-function planOf(req: PlanRequest): MarkerPlan {
+function planOf(req0: PlanRequest): MarkerPlan {
+  const req = placed(req0);
   const m = req.marker, r = req.rect;
   const z = sizes(req);
   const b = bitsOf(m.dictionary);
@@ -163,11 +196,16 @@ function planOf(req: PlanRequest): MarkerPlan {
   const o = m.type === "single" ? [r.cx, r.cy] : place(req, [x0, y0]);
   const origin = [fl * c, -s, 0, o[0], fl * s, c, 0, o[1], 0, 0, fl, 0, 0, 0, 0, 1];
   const kind = m.type === "single" ? "Single" : m.type === "grid" ? `Grid ${z.cols}×${z.rows}` : `ChArUco ${z.cols}×${z.rows}`;
+  // the cut: the marker's quiet zone, else the profile with its holes (a
+  // legacy request without one: its rect); "rectangle" reads as "profile"
+  const pr = req.profile?.loops;
+  const cut_shape: Polygon = req.trim === "marker" ? { outer, holes: [] }
+    : pr?.length ? { outer: pr[0], holes: pr.slice(1) } : { outer: rectLoop(r), holes: [] };
   const idTxt = ids.length > 1 ? `#${ids[0]}–${ids[ids.length - 1]}` : `#${ids[0]}`;
   return {
     ok: !warnings.some((w) => w.level === "error"), ids, black, outer, outer_mm: [r2(ow), r2(oh)], marker_mm: r2(z.marker),
     checker_mm: r2(z.checker), separation_mm: r2(z.sep), cols: z.cols, rows: z.rows, cell_mm: r2(z.cell), auto: m.auto,
-    overflow_mm: overflow, origin, label, warnings,
+    overflow_mm: overflow, fit_rect: r, cut: cut_shape.outer, cut_shape, origin, label, warnings,
     summary: `${kind} ${m.dictionary} ${idTxt} · ${r2(z.marker)} mm · outer ${r2(ow)} × ${r2(oh)} mm (mock core)`,
   };
 }
@@ -214,7 +252,8 @@ function inscribeOf(profile: Profile, holes: "avoid" | "ignore"): Rect | null {
   return { cx: r2((x0 + x1) / 2), cy: r2((y0 + y1) / 2), w: r2(x1 - x0), h: r2(y1 - y0), angle_deg: 0 };
 }
 
-function suggestOf(req: PlanRequest): Suggestion[] {
+function suggestOf(req0: PlanRequest): Suggestion[] {
+  const req = placed(req0);
   const m = req.marker;
   const out: Suggestion[] = [];
   if (m.type === "single") {
