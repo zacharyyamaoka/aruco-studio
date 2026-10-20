@@ -34,7 +34,11 @@ export interface MarkerParams {
   first_id: number;          // the id (single) or the first id of the range
   /** true: the core sizes the marker (and checker) to fill the rectangle for
    *  the given cols / rows. false: marker_mm is used as typed, even when it
-   *  does not fit; the plan then reports overflow_mm and a red warning. */
+   *  does not fit; the plan then reports overflow_mm and a red warning.
+   *  A SET value is always honoured, Auto or not (Zach, 2026-10-20: "we should
+   *  always have complete control… even if it wouldn't print properly or would
+   *  go outside the rectangle"): with auto true and checker_mm or separation_mm
+   *  set, those are drawn as typed and only the unset numbers are derived. */
   auto: boolean;
   marker_mm: number;         // the black marker's side (auto = false)
   checker_mm: number;        // ChArUco square side; 0 = the core's default for marker_mm
@@ -52,6 +56,12 @@ export interface MarkerParams {
 }
 
 export type LabelSide = "below" | "above" | "left" | "right";
+/** Where the label goes (Zach, 2026-10-20): ON the marker (in its black border
+ *  row, the text knocked out white, or in its white quiet zone, black text), or
+ *  OUTSIDE it (the band inside the rectangle, as before). `side` picks the edge
+ *  in both cases. Default "on_marker". */
+export type LabelPlace = "on_marker" | "outside";
+export type LabelSurface = "black" | "white";
 
 /** The label lives INSIDE the marker rectangle (Zach, 2026-10-18: "the outer
  *  rectangle … efficiently define[s] the outbounds and then the feature will
@@ -62,7 +72,9 @@ export interface LabelParams {
   /** placeholders: {id} {first} {last} {ids} (e.g. "0-5") {dict} {type};
    *  "\n" breaks lines (multi-line labels) */
   text: string;
-  height_mm: number;         // cap height; 0 = the core picks from the rectangle's size
+  height_mm: number;         // cap height; 0 = driven: one cell (module) of the marker, so it fits a border row
+  place?: LabelPlace;        // default "on_marker"
+  surface?: LabelSurface;    // on_marker only: the black border row (default) or the white quiet zone
   side: LabelSide;           // the preset spot: the band inside the rectangle on that side
   gap_mm: number;            // between the label band and the marker
   offset_mm: Vec2;           // x, y from the preset spot (typed, or a drag on the canvas)
