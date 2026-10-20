@@ -134,19 +134,27 @@ test.describe(`trim (${CORE} core)`, () => {
     await expect(page.locator('[data-drv="trim"]')).toHaveAttribute("data-driven", "1");
   });
 
-  test("trim Marker with the label on: the warning shows under Label › On", async ({ page }) => {
+  // WHY changed (2026-10-20): labels go ON the marker by default now (Zach: "the
+  // text should be sized ... to fit inside that black cell row"), so a
+  // marker-trimmed sticker keeps its label and nothing warns. The outside case
+  // (warned) is covered in the core's tests (tests/web/test_web_trim.py) until
+  // the Label tab gets its Place row.
+  test("trim Marker with the label on the marker (the default): no warning, the label is on the sticker", async ({ page }) => {
     await plateFeature(page);
-    expect((await state(page)).feature.label.on).toBe(true);
+    const s0 = await state(page);
+    expect(s0.feature.label.on).toBe(true);
     await pickTrim(page, "marker");
     await page.locator('[role=tab][data-tab="label"]').click();
+    await idle(page);
     const warn = page.locator('[data-issues-for="label.on"] [data-level="warn"]');
-    await expect(warn).toHaveCount(1);
-    await expect(warn).toContainText("the label is outside a marker-trimmed sticker");
-    await expect(page.locator('[role=tab][data-tab="label"]')).toHaveClass(/has-warn/);
-    await page.screenshot({ path: path.join(SHOTS, "trim-marker-label-warning.png") });
-    // Rectangle again: the warning goes
-    await pickTrim(page, "rectangle");
     await expect(warn).toHaveCount(0);
+    const s = await state(page);
+    const plan = s.plans[s.feature.id];
+    const xs = plan.cut_shape.outer.map((p: number[]) => p[0]), ys = plan.cut_shape.outer.map((p: number[]) => p[1]);
+    const [lx, ly] = plan.label.at;
+    expect(lx > Math.min(...xs) && lx < Math.max(...xs) && ly > Math.min(...ys) && ly < Math.max(...ys),
+      `label ${plan.label.at} inside the marker-trimmed cut`).toBe(true);
+    await page.screenshot({ path: path.join(SHOTS, "trim-marker-label-on-marker.png") });
   });
 
   test("Profile needs a profile: a drawn rectangle's feature has it disabled, with why", async ({ page }) => {
