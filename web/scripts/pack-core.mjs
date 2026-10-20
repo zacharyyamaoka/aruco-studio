@@ -1,5 +1,5 @@
 // Packs the Python core for the browser (docs/design/online_studio_v1.md):
-//   web/public/py/aruco_studio.zip   aruco_studio/{__init__.py, web_api.py, web_ids.py, web_verify.py, core/, plan/, scene/, verify/}
+//   web/public/py/aruco_studio.zip   aruco_studio/{__init__.py, web_api.py, web_extrude.py, web_ids.py, web_verify.py, core/, plan/, scene/, verify/}
 //                                    + aruco_studio/_build.json (the version info() reports);
 //                                    verify/ needs numpy + OpenCV, which the worker loads on the
 //                                    first verify / readable call
@@ -18,7 +18,7 @@ const web = path.resolve(here, "..");
 const root = path.resolve(web, "..");
 const pkg = path.join(root, "aruco_studio");
 const PACKAGES = ["core", "plan", "scene", "verify"];
-const FILES = ["__init__.py", "web_api.py", "web_ids.py", "web_verify.py"];
+const FILES = ["__init__.py", "web_api.py", "web_extrude.py", "web_ids.py", "web_verify.py"];
 const PYODIDE = ["pyodide.mjs", "pyodide.asm.mjs", "pyodide.asm.wasm", "python_stdlib.zip", "pyodide-lock.json"];
 
 function walk(dir) {
