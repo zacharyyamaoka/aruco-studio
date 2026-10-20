@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { Preset, Suggestion } from "../core/contract";
-import { rectShape } from "../sketch/model";
+import { circleShape, rectShape } from "../sketch/model";
 import v1Fixture from "../../e2e/fixtures/v1-plate.arucostudio-web.json?raw";
+import v2Fixture from "../../e2e/fixtures/v2-rect.arucostudio-web.json?raw";
 import {
-  DEFAULT_MARKER, addFeature, addShape, applyIds, deleteShape, emptyDoc, featureNumber, featureOfRect, idCount, idItems, idRange, idRequest,
-  isSet, keyOwner, newFeature, nextTurn, parseDoc, pickSuggestion, planRequest, removeFeature, resetField, serialise, setField, setMarker, setType, sheetItems, effectiveTrim } from "./doc";
+  DEFAULT_MARKER, addFeature, addShape, applyIds, deleteShape, emptyDoc, featureNumber, featureOfProfile, featureOfRect, featureRect, idCount, idItems,
+  idRange, idRequest, isSet, keyOwner, newFeature, nextTurn, parseDoc, pickSuggestion, planRequest, rectProfile, referenceFace, removeFeature,
+  resetField, serialise, setField, setMarker, setType, sheetItems } from "./doc";
 
 const preset: Preset = { id: "builtin:x", name: "X", method: "inkjet", builtin: true, page: "A4", page_mm: [210, 297] };
 
@@ -34,7 +36,7 @@ describe("the marker's numbers", () => {
 });
 
 describe("driven vs set", () => {
-  const f0 = newFeature("r1", null, "f1");
+  const f0 = newFeature(rectProfile("r1"), "f1");
 
   it("a new feature is all driven", () => {
     for (const p of ["marker.marker_mm", "marker.checker_mm", "marker.separation_mm", "label.height_mm", "marker.first_id", "marker.cols",
@@ -94,75 +96,162 @@ describe("driven vs set", () => {
 
 describe("the document", () => {
   const base = addShape(addShape(emptyDoc("t", [], preset), rectShape("r1", 0, 0, 40, 20)), rectShape("r2", 50, 0, 80, 30));
+  const plate = {
+    ...emptyDoc("p", [rectShape("p", 0, 0, 120, 80), circleShape("h", 25, 55, 20), rectShape("r1", 40, 20, 80, 60)]), preset,
+  };
 
   it("a feature has a stable id, and its key is the id", () => {
-    const f = newFeature("r1", null);
+    const f = newFeature(rectProfile("r1"));
     expect(f.id).toMatch(/^f/);
     expect(f.key).toBe(f.id);
-    expect(newFeature("r1", null).id).not.toBe(f.id);
+    expect(newFeature(rectProfile("r1")).id).not.toBe(f.id);
   });
 
-  it("no request without a feature, a rectangle and a preset", () => {
+  it("no request without a feature, a profile whose shapes exist and a preset", () => {
     expect(planRequest(base, null)).toBeNull();
-    expect(planRequest(base, newFeature(null, null))).toBeNull();
-    expect(planRequest({ ...base, preset: null }, newFeature("r1", null))).toBeNull();
+    expect(planRequest(base, newFeature(null))).toBeNull();
+    expect(planRequest(base, newFeature(rectProfile("gone")))).toBeNull();
+    expect(planRequest({ ...base, preset: null }, newFeature(rectProfile("r1")))).toBeNull();
   });
 
-  it("the request carries the rectangle without its id, and the reference face", () => {
-    const req = planRequest(base, newFeature("r1", { outer: "p", holes: [] }))!;
-    expect(req.rect).toEqual({ cx: 20, cy: 10, w: 40, h: 20, angle_deg: 0 });
-    expect(req.reference_face).toBe(true);
-    expect(planRequest(base, newFeature("r1", null))!.reference_face).toBe(false);
+  it("the request carries the profile's loops, its holes and the trim, never a rect (the core places the marker)", () => {
+    const face = planRequest(plate, newFeature({ outer: "p", holes: ["h", "r1"] }))!;
+    expect(face).not.toHaveProperty("rect");
+    expect(face).toMatchObject({ trim: "profile", holes: "avoid", reference_face: true });
+    expect(face.profile!.loops).toHaveLength(3);
+    expect(face.profile!.loops[0]).toEqual([[0, 0], [120, 0], [120, 80], [0, 80]]);
+    // the holes go clockwise, the rectangle hole too
+    expect(face.profile!.loops[2]).toEqual([[40, 60], [80, 60], [80, 20], [40, 20]]);
   });
 
-  it("many features: each by its rectangle, numbered in order, every one a sheet item", () => {
-    const a = newFeature("r1", null, "fa"), b = setField(newFeature("r2", null, "fb"), "marker.first_id", 5);
-    const waiting = newFeature(null, null, "fc");
+  it("a rectangle on its own is a rectangle profile: its four corners, no reference face", () => {
+    const f = newFeature(rectProfile("r1"));
+    const req = planRequest(plate, f)!;
+    expect(req.profile!.loops).toEqual([[[40, 20], [80, 20], [80, 60], [40, 60]]]);
+    expect(req.reference_face).toBe(false);
+    expect(featureRect(plate, f)?.id).toBe("r1");
+    expect(referenceFace(plate, f)).toBe(false);
+    // the plate's outer edges alone (a double-click on it) are a rectangle profile too
+    expect(featureRect(plate, newFeature(rectProfile("p")))?.id).toBe("p");
+    // a region with holes is a face
+    const face = newFeature({ outer: "p", holes: ["h"] });
+    expect(featureRect(plate, face)).toBeNull();
+    expect(referenceFace(plate, face)).toBe(true);
+  });
+
+  it("holes: avoid by default, ignore as chosen", () => {
+    const f = { ...newFeature({ outer: "p", holes: ["h"] }), holes: "ignore" as const };
+    expect(planRequest(plate, f)!.holes).toBe("ignore");
+  });
+
+  it("a profile's owner: one feature per profile, the holes in any order", () => {
+    const d = addFeature(addFeature(plate, newFeature({ outer: "p", holes: ["h", "r1"] }, "fa")), newFeature(rectProfile("r1"), "fb"));
+    expect(featureOfProfile(d, { outer: "p", holes: ["r1", "h"] })?.id).toBe("fa");
+    expect(featureOfProfile(d, { outer: "p", holes: ["h"] })).toBeNull();
+    expect(featureOfRect(d, "r1")?.id).toBe("fb");
+    expect(featureOfRect(d, "p")).toBeNull();
+  });
+
+  it("many features: each by its profile, numbered in order, every one a sheet item", () => {
+    const a = newFeature(rectProfile("r1"), "fa"), b = setField(newFeature(rectProfile("r2"), "fb"), "marker.first_id", 5);
+    const waiting = newFeature(null, "fc");
     const d = addFeature(addFeature(addFeature(base, a), b), waiting);
     expect(featureOfRect(d, "r2")?.id).toBe("fb");
     expect(featureNumber(d, "fb")).toBe(2);
     const items = sheetItems(d);
     expect(items).toHaveLength(2);
-    expect(items.map((r) => r.rect.cx)).toEqual([20, 65]);
+    expect(items.map((r) => r.profile!.loops[0][0])).toEqual([[0, 0], [50, 0]]);
     expect(items[1].marker.first_id).toBe(5);
     expect(idItems(d).map((i) => [i.key, i.first_id])).toEqual([["fa", null], ["fb", 5], ["fc", null]]);
   });
 
-  it("removing a feature keeps its rectangle", () => {
-    const d = removeFeature(addFeature(base, newFeature("r1", null, "fa")), "fa");
+  it("removing a feature keeps its profile's shapes", () => {
+    const d = removeFeature(addFeature(base, newFeature(rectProfile("r1"), "fa")), "fa");
     expect(d.features).toHaveLength(0);
     expect(d.shapes.map((s) => s.id)).toEqual(["r1", "r2"]);
   });
 
-  it("deleting a feature's rectangle deletes the feature; a profile that named a shape loses it", () => {
-    const d = deleteShape(addFeature(addFeature(base, newFeature("r1", null, "fa")), newFeature("r2", { outer: "p", holes: ["r1"] }, "fb")), "r1");
-    expect(d.shapes).toHaveLength(1);
+  it("deleting a profile's outer shape deletes its feature; deleting a hole takes it out of the profile", () => {
+    const d0 = addFeature(addFeature(plate, newFeature(rectProfile("r1"), "fa")), newFeature({ outer: "p", holes: ["h", "r1"] }, "fb"));
+    const d = deleteShape(d0, "r1");
+    expect(d.shapes.map((s) => s.id)).toEqual(["p", "h"]);
     expect(d.features.map((f) => f.id)).toEqual(["fb"]);
-    expect(d.features[0]).toMatchObject({ rectId: "r2", profile: null });
+    expect(d.features[0].profile).toEqual({ outer: "p", holes: ["h"] });
+    expect(deleteShape(d0, "p").features.map((f) => f.id)).toEqual(["fa"]);
   });
 
-  it("saves and reads back (version 2, with the ledger)", () => {
-    const d = { ...addFeature(base, setField(newFeature("r1", null), "label.side", "above")), id_ledger: { k: 3 } };
+  it("moving a profile's shape moves its request (the planner re-plans on it)", () => {
+    const f = newFeature(rectProfile("r1"));
+    const moved = { ...plate, shapes: plate.shapes.map((s) => (s.id === "r1" ? { ...s, cx: (s as { cx: number }).cx + 20 } : s)) };
+    expect(planRequest(moved, f)!.profile!.loops[0][0]).toEqual([60, 20]);
+  });
+
+  it("saves and reads back (version 3, with the ledger)", () => {
+    const d = { ...addFeature(base, setField(newFeature(rectProfile("r1")), "label.side", "above")), id_ledger: { k: 3 } };
     const text = serialise(d);
-    expect(JSON.parse(text).version).toBe(2);
+    expect(JSON.parse(text).version).toBe(3);
+    expect(JSON.parse(text).features[0]).not.toHaveProperty("rectId");
     expect(parseDoc(text)).toEqual(d);
   });
 
   it("refuses a file that is not one, by name", () => {
     expect(() => parseDoc("{}")).toThrow(/arucostudio-web/);
-    expect(() => parseDoc(JSON.stringify({ format: "arucostudio-web", version: 3 }))).toThrow(/version 3/);
+    expect(() => parseDoc(JSON.stringify({ format: "arucostudio-web", version: 4 }))).toThrow(/version 4/);
   });
 
   it("fills missing fields from the defaults", () => {
-    const d = parseDoc(JSON.stringify({ format: "arucostudio-web", version: 2, shapes: [], features: [{ id: "fx", rectId: null, marker: { type: "grid" } }] }));
+    const d = parseDoc(JSON.stringify({ format: "arucostudio-web", version: 3, shapes: [], features: [{ id: "fx", profile: null, marker: { type: "grid" } }] }));
     expect(d.features[0].marker).toMatchObject({ type: "grid", dictionary: "DICT_4X4_50", auto: true });
-    expect(d.features[0]).toMatchObject({ id: "fx", key: "fx", set: [] });
+    expect(d.features[0]).toMatchObject({ id: "fx", key: "fx", set: [], trim: "profile" });
     expect(d.id_ledger).toEqual({});
   });
 });
 
+describe("version 2 files migrate: a feature's rectangle becomes its profile (2026-10-20 evening)", () => {
+  it("rectId + trim rectangle opens as that rectangle on its own, trim profile (driven), and requests that rectangle", () => {
+    const d = parseDoc(v2Fixture);
+    expect(d.version).toBe(3);
+    expect(d.shapes.map((s) => s.id)).toEqual(["plate", "plate-h1", "plate-h2", "r1", "r2"]);
+    const f1 = d.features[0];
+    expect(f1).not.toHaveProperty("rectId");
+    expect(f1.profile).toEqual({ outer: "r1", holes: [] });
+    expect(f1.trim).toBe("profile");
+    expect(isSet(f1, "trim")).toBe(false);
+    expect(f1.set).toEqual(["marker.first_id"]);
+    expect(f1.marker.first_id).toBe(7);
+    const req = planRequest(d, f1)!;
+    expect(req.trim).toBe("profile");
+    expect(req.profile!.loops).toEqual([[[150, 10], [190, 10], [190, 40], [150, 40]]]);
+    expect(req.reference_face).toBe(false);
+  });
+
+  it("a rectangle inscribed in a face keeps its spot: the inscribed rectangle is the profile; a set trim marker stays", () => {
+    const f2 = parseDoc(v2Fixture).features[1];
+    expect(f2.profile).toEqual({ outer: "r2", holes: [] });
+    expect(f2.trim).toBe("marker");
+    expect(isSet(f2, "trim")).toBe(true);
+    expect(f2.marker).toMatchObject({ type: "grid", cols: 2, rows: 3, first_id: 20 });
+  });
+
+  it("an old set trim rectangle is profile, driven; a waiting feature (no rectangle) has no profile", () => {
+    const raw = JSON.parse(v2Fixture);
+    raw.features[0].set = ["trim"];
+    raw.features[1] = { ...raw.features[1], rectId: null };
+    const d = parseDoc(JSON.stringify(raw));
+    expect(d.features[0].trim).toBe("profile");
+    expect(isSet(d.features[0], "trim")).toBe(false);
+    expect(d.features[1].profile).toBeNull();
+    expect(sheetItems(d)).toHaveLength(1);
+  });
+
+  it("a migrated file saves as version 3 and reads back the same", () => {
+    const d = parseDoc(v2Fixture);
+    expect(parseDoc(serialise(d))).toEqual(d);
+  });
+});
+
 describe("auto id", () => {
-  const two = () => addFeature(addFeature(emptyDoc("D"), newFeature("r1", null, "f1")), setField(newFeature("r2", null, "f2"), "marker.first_id", 9));
+  const two = () => addFeature(addFeature(emptyDoc("D"), newFeature(rectProfile("r1"), "f1")), setField(newFeature(rectProfile("r2"), "f2"), "marker.first_id", 9));
 
   it("the request: a driven first id is null, a typed one kept, with the ledger", () => {
     const d = { ...two(), id_ledger: { f1: 3 } };
@@ -201,7 +290,7 @@ describe("auto id", () => {
   });
 
   it("a board's origin square is driven at null (the corner), set as typed, and a new type drops it", () => {
-    const c = setField(newFeature("r1", null, "f1"), "marker.type", "charuco");
+    const c = setField(newFeature(rectProfile("r1"), "f1"), "marker.type", "charuco");
     expect(isSet(c, "marker.origin_square")).toBe(false);
     const s = setField(c, "marker.origin_square", [1, 1]);
     expect(s.marker.origin_square).toEqual([1, 1]);
@@ -214,7 +303,7 @@ describe("auto id", () => {
 describe("version 1 files migrate", () => {
   it("the old one-feature fixture becomes one feature that plans", () => {
     const d = parseDoc(v1Fixture);
-    expect(d.version).toBe(2);
+    expect(d.version).toBe(3);
     expect(d.name).toBe("Old plate");
     expect(d.features).toHaveLength(1);
     expect(d.id_ledger).toEqual({});
@@ -222,14 +311,14 @@ describe("version 1 files migrate", () => {
     const f = d.features[0];
     expect(f.id).toBeTruthy();
     expect(f.key).toBe(f.id);
-    expect(f.rectId).toBe("r1");
+    expect(f.profile).toEqual({ outer: "r1", holes: [] });
     expect(f.marker).toMatchObject({ type: "grid", dictionary: "DICT_5X5_100", first_id: 4, cols: 2, rows: 2, auto: true });
     // what differs from its driven value was typed: set; the rest is driven
     expect([...f.set].sort()).toEqual(["label.gap_mm", "marker.dictionary", "marker.first_id", "marker.type"]);
     expect(isSet(f, "marker.cols")).toBe(false);
     expect(isSet(f, "marker.marker_mm")).toBe(false);
     const req = planRequest(d, f)!;
-    expect(req.rect).toEqual({ cx: 60, cy: 40, w: 30, h: 30, angle_deg: 0 });
+    expect(req.profile!.loops).toEqual([[[45, 25], [75, 25], [75, 55], [45, 55]]]);
     expect(req.preset.id).toBe("builtin:inkjet-letter-vinyl");
     expect(sheetItems(d)).toHaveLength(1);
   });
@@ -251,52 +340,43 @@ describe("version 1 files migrate", () => {
   });
 });
 
-describe("trim (2026-10-18)", () => {
+describe("trim (2026-10-18; profile | marker since 2026-10-20 evening)", () => {
   const plate = { ...emptyDoc("p", [rectShape("p", 0, 0, 120, 80), { kind: "circle", id: "h", cx: 25, cy: 55, r: 10 }, rectShape("r1", 40, 20, 80, 60)]), preset };
 
-  it("a new feature is cut to the rectangle, driven; set and reset like any row", () => {
-    const f = newFeature("r1", null);
-    expect(f.trim).toBe("rectangle");
+  it("a new feature is cut to its profile, driven; set and reset like any row", () => {
+    const f = newFeature(rectProfile("r1"));
+    expect(f.trim).toBe("profile");
     expect(isSet(f, "trim")).toBe(false);
     const m = setField(f, "trim", "marker");
     expect(m.trim).toBe("marker");
     expect(isSet(m, "trim")).toBe(true);
     const r = resetField(m, "trim");
-    expect(r.trim).toBe("rectangle");
+    expect(r.trim).toBe("profile");
     expect(isSet(r, "trim")).toBe(false);
   });
 
-  it("the request sends the trim, and for profile the profile's loops as inscribe gets them", () => {
-    const f = newFeature("r1", { outer: "p", holes: ["h"] });
-    const rq = planRequest(plate, f)!;
-    expect(rq.trim).toBe("rectangle");
-    expect(rq.profile).toBeUndefined();
-    const pq = planRequest(plate, setField(f, "trim", "profile"))!;
+  it("the request sends the trim with the profile's loops either way", () => {
+    const f = newFeature({ outer: "p", holes: ["h"] });
+    const pq = planRequest(plate, f)!;
     expect(pq.trim).toBe("profile");
     expect(pq.profile!.loops).toHaveLength(2);
-    expect(pq.profile!.loops[0]).toEqual([[0, 0], [120, 0], [120, 80], [0, 80]]);
-    // no profile: the request is cut to the rectangle (the panel says so under
-    // Trim); the feature keeps its Profile choice for when one comes back
-    const nf = setField(newFeature("r1", null), "trim", "profile");
-    const np = planRequest(plate, nf)!;
-    expect(np.trim).toBe("rectangle");
-    expect(np.profile).toBeUndefined();
-    expect(nf.trim).toBe("profile");
-    expect(effectiveTrim(nf)).toBe("rectangle");
+    const mq = planRequest(plate, setField(f, "trim", "marker"))!;
+    expect(mq.trim).toBe("marker");
+    expect(mq.profile!.loops).toHaveLength(2);
   });
 
-  it("files from before trim open on the rectangle, driven; a saved trim round-trips", () => {
+  it("files from before trim open on the profile, driven; a saved trim round-trips; an unknown one is the profile", () => {
     const f = parseDoc(v1Fixture).features[0];
-    expect(f.trim).toBe("rectangle");
+    expect(f.trim).toBe("profile");
     expect(isSet(f, "trim")).toBe(false);
-    const d = addFeature(plate, setField(newFeature("r1", null, "fm"), "trim", "marker"));
+    const d = addFeature(plate, setField(newFeature(rectProfile("r1"), "fm"), "trim", "marker"));
     const back = parseDoc(serialise(d)).features[0];
     expect(back.trim).toBe("marker");
     expect(isSet(back, "trim")).toBe(true);
     const raw = JSON.parse(serialise(d));
     raw.features[0].trim = "bogus";
     const bad = parseDoc(JSON.stringify(raw)).features[0];
-    expect(bad.trim).toBe("rectangle");
+    expect(bad.trim).toBe("profile");
     expect(isSet(bad, "trim")).toBe(false);
   });
 });

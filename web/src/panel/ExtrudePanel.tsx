@@ -1,8 +1,8 @@
 // The ArUco Extrude panel (Fusion's feature dialog) for the feature it
 // edits. It opens beside the clicked marker (V1 "Click-to-inspect",
 // 2026-10-18) and follows it; on a phone it docks to the bottom. The Preset
-// and the Trim first (they describe the sticker), the selection rows
-// (Profile, Rectangle), then Marker | Label. Every
+// and the Trim first (they describe the sticker), the selection row
+// (Profile, and Holes when it has some), then Marker | Label. Every
 // row shows its own issues from plan().warnings -- and the id's from auto
 // id -- under it. Every value is driven (grey: the core's, a rule's, auto id's
 // or the default) or set (typed: normal, with ↺); ../ui/DrivenField.tsx.
@@ -13,10 +13,10 @@
 import { FieldRow, Glyph, Messages, NumberField, SegmentedRow, Select, Switch, Tabs, TextField, Button, type Issue as KitIssue, type Opt } from "@bam/ui";
 import { X } from "lucide-react";
 import type { Issue, MarkerParams, Trim } from "../core/contract";
-import { DEFAULT_MARKER, DEFAULT_TRIM, effectiveTrim, featureNumber, featureRect, getFeature, idRange, isSet, typeCounts } from "../model/doc";
-import { boxOf, toScreen } from "../model/geom";
+import { DEFAULT_MARKER, DEFAULT_TRIM, featureNumber, getFeature, idRange, isSet, referenceFace, typeCounts } from "../model/doc";
+import { boxOf, rectCorners, toScreen } from "../model/geom";
 import { samePreset, myPresets } from "../presets/local";
-import { shapeLoop } from "../sketch/model";
+import { profileLoops } from "../sketch/model";
 import { useStudio } from "../store";
 import type { Box } from "../ui/anchor";
 import { DrivenChoice, DrivenField } from "../ui/DrivenField";
@@ -39,10 +39,10 @@ const ORIGINS: Opt[] = [
   { value: "corner", label: "Board corner", hint: "The Joint Origin at OpenCV's board corner" },
   { value: "square", label: "Square", hint: "The Joint Origin at the centre of one board square" },
 ];
-const NO_PROFILE = "Needs a profile: pick the face this rectangle was inscribed from (Profile)";
-const trims = (hasProfile: boolean): Opt[] => [
-  { value: "profile", label: "Profile", hint: hasProfile ? "The sticker is the whole profile (the face), its holes cut out" : NO_PROFILE, disabled: !hasProfile },
-  { value: "rectangle", label: "Rectangle", hint: "The sticker is the marker rectangle" },
+// WHY no Rectangle (Zach, 2026-10-20 evening): "If you want trim to rectangle
+// then just make your profile a rectangle and trim to profile!"
+const TRIM_OPTS: Opt[] = [
+  { value: "profile", label: "Profile", hint: "The sticker is the whole profile, its holes cut out" },
   { value: "marker", label: "Marker", hint: "The sticker is the marker and its quiet zone" },
 ];
 const PLACEHOLDERS = "{id} {first} {last} {ids} {dict} {type}";
@@ -83,9 +83,9 @@ export function ExtrudePanel() {
   const m = f.marker, l = f.label;
   const plan = plans[f.id] ?? null;
   const planError = st.planErrors[f.id] ?? null;
-  const refFace = !!f.profile;
+  const refFace = referenceFace(doc, f);
   const shown = shownRows(m, l.on, refFace);
-  const issues: Issue[] = plan && f.rectId ? [...plan.warnings] : [];
+  const issues: Issue[] = plan && f.profile ? [...plan.warnings] : [];
   // auto id's issues for this feature (Issue.key): a collision, a full dictionary
   for (const i of st.idIssues) if (i.key === f.key) issues.push({ ...i, field: "marker.first_id" });
   const routed = routeIssues(issues, shown);
@@ -95,22 +95,24 @@ export function ExtrudePanel() {
   const modified = !!doc.preset && !!library && !samePreset(library, doc.preset);
   const dicts: Opt[] = (info?.dictionaries.map((d) => ({ value: d.name, label: d.name.replace("DICT_", ""), hint: `${d.capacity} ids` }))
     ?? FALLBACK_DICTS.map((d) => ({ value: d, label: d.replace("DICT_", "") })));
-  const showPlan = plan && f.rectId ? plan : null;
+  const showPlan = plan && f.profile ? plan : null;
   const profileHasHoles = !!f.profile?.holes.length;
   /** The props every driven field shares: its state, set and reset. */
   const drv = (path: string) => ({ path, driven: !isSet(f, path), onSet: (v: unknown) => st.setField(path, v), onReset: () => st.resetField(path) });
-  const fills = "fills the rectangle";
+  const fills = "fills the profile";
   const [dc, dr] = typeCounts(m.type);
   const counts = `default for ${m.type === "grid" ? "a grid" : "a ChArUco board"} (${dc} × ${dr})`;
   const square = m.origin_square ?? null;
   const offsetDriver = "the preset spot (Side); drag the text on the sketch to move it";
 
-  // what the panel opens beside: the rectangle, the marker and its label
-  // band, on screen; the other markers' boxes it keeps clear where it can
+  // what the panel opens beside: the box the marker was placed in, the marker
+  // and its label band, on screen (the profile until it plans); the other
+  // markers' boxes it keeps clear where it can
   const screenBox = (id: string): Box | null => {
-    const g = getFeature(doc, id), rect = featureRect(doc, g), p = plans[id];
-    if (!rect) return null;
-    const pts = [...shapeLoop(rect), ...(p ? p.outer : []), ...(p?.label?.box ?? [])];
+    const g = getFeature(doc, id), p = plans[id];
+    const pr = g?.profile ? profileLoops(doc.shapes, g.profile) : null;
+    if (!pr) return null;
+    const pts = p ? [...(p.fit_rect ? rectCorners(p.fit_rect) : []), ...p.outer, ...(p.label?.box ?? [])] : pr.loops[0];
     return boxOf(pts.map((q) => toScreen(st.camera, st.view.w, st.view.h, q)));
   };
   const anchor = screenBox(f.id);
@@ -175,7 +177,7 @@ export function ExtrudePanel() {
         </FieldRow>
       )}
       <FieldRow path="marker.suggest" label="Suggest" issues={iss("marker.suggest")} title="Good value sets for this rectangle: picking one sets them">
-        <SuggestSelect suggestions={suggestions} empty={f.rectId ? "…" : "needs a rectangle"} onPick={st.pick}
+        <SuggestSelect suggestions={suggestions} empty={f.profile ? "…" : "needs a profile"} onPick={st.pick}
           current={m.auto ? -1 : suggestions.findIndex((s) => s.params.cols === m.cols && s.params.rows === m.rows && Math.abs(s.params.marker_mm - m.marker_mm) < 1e-6)} />
       </FieldRow>
       <FieldRow path="marker.turn" label="Turn" issues={iss("marker.turn")}>
@@ -249,7 +251,7 @@ export function ExtrudePanel() {
       anchor={anchor} anchorKey={f.id} avoid={others} width={320}
       footer={
         <>
-          <Button variant="primary" onClick={st.ok} testid="panel-ok" disabled={!f.rectId}>OK</Button>
+          <Button variant="primary" onClick={st.ok} testid="panel-ok" disabled={!f.profile}>OK</Button>
           <Button onClick={st.cancel} testid="panel-cancel">Cancel</Button>
         </>
       }>
@@ -263,22 +265,16 @@ export function ExtrudePanel() {
           <Glyph name="dots" />
         </button>
       </FieldRow>
-      <FieldRow path="trim" label="Trim" title="What the sticker is cut to: everything inside the cut is white"
-        issues={f.trim !== effectiveTrim(f)
-          ? [...iss("trim"), { field: "trim", level: "info", text: "no profile now: cut to the rectangle until one is selected again" }]
-          : iss("trim")}>
-        <DrivenChoice {...drv("trim")} value={effectiveTrim(f)} driver={`${DEFAULT} (${DEFAULT_TRIM})`}>
-          <SegmentedRow path="trim" compact value={effectiveTrim(f)} options={trims(refFace)} onChange={(v) => st.setField("trim", v as Trim)} />
+      <FieldRow path="trim" label="Trim" title="What the sticker is cut to: everything inside the cut is white" issues={iss("trim")}>
+        <DrivenChoice {...drv("trim")} value={f.trim} driver={`${DEFAULT} (${DEFAULT_TRIM})`}>
+          <SegmentedRow path="trim" compact value={f.trim} options={TRIM_OPTS} onChange={(v) => st.setField("trim", v as Trim)} />
         </DrivenChoice>
       </FieldRow>
-      <SelRow path="profile" label="Profile" icon="profile" testid="sel-profile" count={f.profile ? 1 : 0} emptyText="None (optional)"
+      <SelRow path="profile" label="Profile" icon="profile" testid="sel-profile" count={f.profile ? 1 : 0} emptyText="Select…"
         active={panel.selector === "profile"} issues={iss("profile")}
         onActivate={() => st.setSelector(panel.selector === "profile" ? null : "profile")} onClear={st.clearProfile} />
-      <SelRow path="rect" label="Rectangle" icon="rect" testid="sel-rect" count={f.rectId ? 1 : 0} emptyText="Select…"
-        active={panel.selector === "rect" || st.inscribing} issues={iss("rect")}
-        onActivate={() => st.setSelector(panel.selector === "rect" ? null : "rect")} onClear={st.clearRect} />
       {profileHasHoles && (
-        <FieldRow path="holes" label="Holes" title="Inscribe the rectangle around the holes, or over them">
+        <FieldRow path="holes" label="Holes" title="Place the marker clear of the holes, or over them">
           <SegmentedRow path="holes" compact value={f.holes} options={[{ value: "avoid", label: "Avoid" }, { value: "ignore", label: "Ignore" }]}
             onChange={(v) => void st.setHoles(v as "avoid" | "ignore")} />
         </FieldRow>
@@ -290,7 +286,7 @@ export function ExtrudePanel() {
         ]} />
       <div className="tab-body">{panel.tab === "marker" ? markerTab : labelTab}</div>
       <div className="summary" data-testid="plan-summary">
-        <div className="summary-line">{st.inscribing ? "Inscribing a rectangle…" : !f.rectId ? "Select a rectangle or a face" : showPlan ? showPlan.summary : planError ? `Plan failed: ${planError}` : "Planning…"}</div>
+        <div className="summary-line">{!f.profile ? "Select a profile: click inside a region, or double-click a rectangle" : showPlan ? showPlan.summary : planError ? `Plan failed: ${planError}` : "Planning…"}</div>
         <Messages path="summary" issues={kit(routed.summary)} />
       </div>
     </FloatingPanel>

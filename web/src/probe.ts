@@ -1,7 +1,9 @@
 // window.__aruco: a small probe for the e2e tests. State getters in
 // millimetres, a world → client mapping for pointer drags, and idle(),
-// which resolves once no core call is in flight or scheduled.
-import { callsInFlight, coreKind, coreStatus } from "./coreSource";
+// which resolves once no core call is in flight or scheduled; plan() asks the
+// core directly (an e2e compares a request the UI no longer sends).
+import type { MarkerPlan, PlanRequest } from "./core/contract";
+import { callsInFlight, core, coreKind, coreStatus } from "./coreSource";
 import { toScreen } from "./model/geom";
 import { plannerBusy } from "./planner";
 import { getFeature } from "./model/doc";
@@ -13,6 +15,7 @@ export interface Probe {
   /** a sketch point (mm) as client pixels in the page */
   toClient: (x: number, y: number) => [number, number];
   idle: (timeoutMs?: number) => Promise<void>;
+  plan: (req: PlanRequest) => Promise<MarkerPlan>;
   printHook: (() => void) | null;
 }
 
@@ -25,7 +28,7 @@ function snapshot() {
     core: coreStatus(), doc: s.doc, sel: s.sel, tool: s.tool, camera: s.camera, view: s.view,
     panel: { open: s.panel.open, featureId: s.panel.featureId, tab: s.panel.tab, selector: s.panel.selector, collapsed: s.panel.collapsed },
     feature: getFeature(s.doc, active), plan: active ? s.plans[active] ?? null : null, plans: s.plans,
-    suggestions: s.suggestions, modal: s.modal, inscribing: s.inscribing,
+    suggestions: s.suggestions, modal: s.modal,
     canUndo: s.canUndo, canRedo: s.canRedo,
   };
 }
@@ -43,7 +46,7 @@ function idle(timeoutMs = 15000): Promise<void> {
   return new Promise((resolve, reject) => {
     let quiet = 0;
     const tick = () => {
-      const busy = callsInFlight() > 0 || plannerBusy() || useStudio.getState().inscribing;
+      const busy = callsInFlight() > 0 || plannerBusy();
       quiet = busy ? 0 : quiet + 1;
       if (quiet >= 3) return resolve();
       if (performance.now() - t0 > timeoutMs) return reject(new Error("core calls still in flight"));
@@ -54,6 +57,6 @@ function idle(timeoutMs = 15000): Promise<void> {
 }
 
 export function installProbe(): void {
-  const probe: Probe = { kind: coreKind, state: snapshot, toClient, idle, printHook: null };
+  const probe: Probe = { kind: coreKind, state: snapshot, toClient, idle, plan: (req) => core.plan(req), printHook: null };
   (window as unknown as { __aruco: Probe }).__aruco = probe;
 }

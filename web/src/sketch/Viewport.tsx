@@ -3,23 +3,27 @@
 // millimetres; pan with the middle or right button or Space-drag, zoom at
 // the cursor, F fits. Every feature's marker, outline, Joint Origin and
 // label are drawn as its plan() returned them: no marker geometry is made
-// here. The sticker's white is the plan's cut_shape (the trim: the
-// rectangle, the profile with its holes, or the quiet zone), under the marker. The turn arc belongs to the feature in focus; the selected feature's
-// dimensions (./Dims.tsx) are typed into in place, the marker following as
-// you type. A drag (move, resize, the label) is one undo step.
+// here. The sticker's white is the plan's cut_shape (the trim: the profile
+// with its holes, or the quiet zone), under the marker. The turn arc belongs
+// to the feature in focus; the selected feature's dimensions (./Dims.tsx)
+// stand outside the box the core placed its marker in (MarkerPlan.fit_rect)
+// and are typed into in place, the marker following as you type. A drag
+// (move, resize, the label) is one undo step; moving or resizing a profile's
+// shapes re-plans its marker (a rectangle profile: the marker follows it).
 import { useEffect, useRef, useState, type ReactElement } from "react";
-import type { MarkerPlan, Polygon, Vec2 } from "../core/contract";
+import type { MarkerPlan, Polygon, Rect, Vec2 } from "../core/contract";
 import {
-  featureOfRect, featureRect, getFeature, isSet, resetField, setField, updateFeature, type Feature,
+  featureOfProfile, featureOfRect, featureRect, getFeature, isSet, rectProfile, resetField, setField, updateFeature, type Doc, type Feature,
 } from "../model/doc";
 import {
-  boxOf, fromLocal, handlePoint, HANDLES, loopD, niceStep, rectFromCorners, toLocal, toScreen, toWorld, zoomAt,
+  boxOf, fromLocal, handlePoint, HANDLES, loopD, niceStep, rectCorners, rectFromCorners, toLocal, toScreen, toWorld, zoomAt,
   type Handle,
 } from "../model/geom";
 import { activeFeatureId, selectedFeatureId, useStudio } from "../store";
 import { DimEditor, Dims, layoutDims, type LaidDim } from "./Dims";
 import {
-  circleFrom, hitTest, inShape, moveShape, plainRect, profileLoops, resizeShape, sameProfile, shapeLoop, type Hit, type Shape,
+  circleFrom, hitTest, inShape, moveShape, profileLoops, rectAt, rectOf, resizeShape, sameProfile, shapeLoop,
+  type Hit, type ProfileRef, type Shape,
 } from "./model";
 
 type Drag =
@@ -45,6 +49,20 @@ const OUTLINE = { fill: "transparent" };
  *  trim, the mock) its cut, else the marker's outline as before. */
 const cutShape = (p: MarkerPlan): Polygon => p.cut_shape ?? { outer: p.cut ?? p.outer, holes: [] };
 
+/** The box the core placed a feature's marker in: the plan's fit_rect, else
+ *  (a core from before barrier 9) the rectangle profile, else the outline's box. */
+function placeBox(doc: Doc, f: Feature, plan: MarkerPlan): Rect {
+  if (plan.fit_rect) return plan.fit_rect;
+  const r = featureRect(doc, f);
+  if (r) return rectOf(r);
+  const b = boxOf(plan.outer);
+  return { cx: (b.x0 + b.x1) / 2, cy: (b.y0 + b.y1) / 2, w: b.x1 - b.x0, h: b.y1 - b.y0, angle_deg: 0 };
+}
+
+/** How long after a Profile-row pick a double-click still picks for the panel
+ *  (its first click picked the region; the double-click means the rectangle). */
+const DBL_MS = 700;
+
 export function Viewport() {
   const host = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
@@ -61,6 +79,8 @@ export function Viewport() {
   /** the dimension being typed into, and its feature as it was when the editor opened (Esc puts it back) */
   const [dimEdit, setDimEdit] = useState<{ fid: string; field: string; start: Feature } | null>(null);
   const lastDim = useRef<LaidDim | null>(null);
+  /** the last Profile-row pick: a double-click right after it re-picks for the same feature */
+  const picked = useRef<{ fid: string; at: number } | null>(null);
   const space = useRef(false);
   const fitted = useRef(false);
 
@@ -107,10 +127,10 @@ export function Viewport() {
   // docks over the bottom of the canvas, so when it opens on a feature (and again once that feature first
   // plans) the canvas fits the marker into the part above the panel
   const editId = panel.open ? panel.featureId : null;
-  const editRect = editId ? doc.features.find((f) => f.id === editId)?.rectId ?? null : null;
+  const editProfile = editId ? JSON.stringify(doc.features.find((f) => f.id === editId)?.profile ?? null) : null;
   const editPlanned = !!(editId && plans[editId]);
   useEffect(() => {
-    if (!editId || !editRect || !window.matchMedia?.("(max-width: 640px)").matches) return;
+    if (!editId || !editProfile || editProfile === "null" || !window.matchMedia?.("(max-width: 640px)").matches) return;
     const raf = requestAnimationFrame(() => {
       const vp = host.current?.getBoundingClientRect();
       if (!vp) return;
@@ -120,7 +140,7 @@ export function Viewport() {
       useStudio.getState().fitFeature(editId, RULER, Math.max(0, vp.bottom - Math.min(...tops)));
     });
     return () => cancelAnimationFrame(raf);
-  }, [editId, editRect, editPlanned]);
+  }, [editId, editProfile, editPlanned]);
 
   // Esc while drawing drops the draft (the app's Esc does the rest)
   useEffect(() => {
@@ -137,7 +157,7 @@ export function Viewport() {
   const scr = (p: Vec2): Vec2 => toScreen(camera, w, h, p);
 
   /** The shape the handles and a drag inside act on: the selected shape, or
-   *  the selected feature's rectangle. */
+   *  the selected feature's rectangle profile. */
   const selectedShape = (): Shape | undefined => {
     const st = useStudio.getState();
     const s = st.sel;
@@ -181,25 +201,25 @@ export function Viewport() {
     const selShape = selectedShape();
     const move = (sh: Shape) => { st.gesture(true); setDrag({ kind: "move", id: sh.id, from: p, orig: sh, moved: false }); };
     // WHY WYSIWYG (Zach, 2026-10-18): "just clicking the marker on the screen is
-    // what brings up the relevant inspector window". A click on a marker, on
-    // its rectangle's edge or inside that rectangle selects the feature and
-    // opens its panel; a press-drag moves the rectangle. Empty canvas closes it.
+    // what brings up the relevant inspector window". A click on a marker selects
+    // the feature and opens its panel; a press-drag on a rectangle profile's
+    // marker moves the rectangle, and the marker follows (the custom placement).
+    // A marker placed in a face does not drag the face. Empty canvas closes it.
     const markerId = st.panel.selector ? null : target.closest("[data-marker]")?.getAttribute("data-marker");
-    const markerRect = markerId ? featureRect(st.doc, getFeature(st.doc, markerId)) : null;
-    if (markerId && markerRect) {
+    const markerOf = markerId ? getFeature(st.doc, markerId) : null;
+    if (markerId && markerOf) {
       st.inspect(markerId);
-      move(markerRect);
+      const r = featureRect(st.doc, markerOf);
+      if (r) move(r);
       return;
     }
     if (hit?.kind === "edge") {
+      // the Profile row takes a region or a double-clicked rectangle, not an edge
+      if (st.panel.selector) return;
       const s = st.doc.shapes.find((x) => x.id === hit.id)!;
-      if (st.panel.selector === "rect" && s.kind === "rect") st.useRect(s.id);
-      else if (st.panel.selector) return;
-      else {
-        const owner = featureOfRect(st.doc, s.id);
-        if (owner) st.inspect(owner.id);
-        else { if (st.panel.open) st.ok(); st.select({ kind: "shape", id: s.id }); }
-      }
+      const owner = featureOfRect(st.doc, s.id);
+      if (owner) st.inspect(owner.id);
+      else { if (st.panel.open) st.ok(); st.select({ kind: "shape", id: s.id }); }
       move(s);
       return;
     }
@@ -209,18 +229,54 @@ export function Viewport() {
       return;
     }
     if (hit?.kind === "region") {
-      if (st.panel.open && st.panel.selector === "profile" && getFeature(st.doc, st.panel.featureId)?.rectId) st.setProfile(hit.ref);
-      else if (st.panel.open && st.panel.selector) void st.useProfile(hit.ref);
-      else {
-        const plain = plainRect(st.doc.shapes, hit.ref);
-        const owner = plain ? featureOfRect(st.doc, plain.id) : null;
-        if (owner && plain) { st.inspect(owner.id); move(plain); return; }
-        if (st.panel.open) st.ok();
-        st.select({ kind: "profile", ref: hit.ref });
+      if (st.panel.open && st.panel.selector) { pickProfile(hit.ref); return; }
+      const owner = featureOfProfile(st.doc, hit.ref);
+      if (owner) {
+        st.inspect(owner.id);
+        const r = featureRect(st.doc, owner);
+        if (r) move(r);
+        return;
       }
+      if (st.panel.open) st.ok();
+      st.select({ kind: "profile", ref: hit.ref });
       return;
     }
     st.closePanel();
+  };
+
+  /** The Profile row's pick, noted so a double-click that follows re-picks. */
+  const pickProfile = (ref: ProfileRef) => {
+    const st = useStudio.getState();
+    const fid = st.panel.featureId;
+    st.useProfile(ref);
+    picked.current = fid ? { fid, at: performance.now() } : null;
+  };
+
+  /** A double-click on a rectangle (its edge or inside it): its outer edges
+   *  alone are the profile, whatever is inside it (Zach, 2026-10-20 evening:
+   *  "you could double click on a rectangle and it would select the outer
+   *  edges"). For the Profile row while it waits (or right after its first
+   *  click picked the region), else as the selection. */
+  const onDoubleClick = (e: React.MouseEvent) => {
+    const st = useStudio.getState();
+    const target = e.target as Element;
+    if (tool !== "select" || e.button !== 0) return;
+    if (target.closest("[data-dim-label],[data-label],[data-turn],[data-handle],input")) return;
+    const p = world(e);
+    const onEdge = hitTest(st.doc.shapes, p, EDGE_PX / z)?.kind === "edge";
+    // a marker is its feature's: a double-click on it picks nothing else
+    if (!onEdge && target.closest("[data-marker]")) return;
+    const r = rectAt(st.doc.shapes, p, EDGE_PX / z);
+    if (!r) return;
+    const ref = rectProfile(r.id);
+    const last = picked.current;
+    const forPanel = st.panel.open && (st.panel.selector === "profile"
+      || (!!last && last.fid === st.panel.featureId && performance.now() - last.at < DBL_MS));
+    if (forPanel) { pickProfile(ref); return; }
+    const owner = featureOfProfile(st.doc, ref);
+    if (owner) { st.inspect(owner.id); return; }
+    if (st.panel.open) st.ok();
+    st.select({ kind: "profile", ref });
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -308,18 +364,25 @@ export function Viewport() {
   };
   const selShape = selectedShape();
   const selId = selShape?.id ?? null;
-  // every feature that has a rectangle and a plan; the one in focus gets the
-  // turn arc
+  // every feature that has a profile and a plan, with the box its marker was
+  // placed in; the one in focus gets the turn arc
   const drawn = doc.features
-    .map((f) => ({ f, rect: featureRect(doc, f), plan: plans[f.id] as MarkerPlan | undefined }))
-    .filter((d): d is { f: Feature; rect: NonNullable<ReturnType<typeof featureRect>>; plan: MarkerPlan } => !!d.rect && !!d.plan);
+    .filter((f) => !!f.profile && !!plans[f.id])
+    .map((f) => ({ f, plan: plans[f.id], rect: placeBox(doc, f, plans[f.id]) }));
   const activeId = activeFeatureId({ doc, sel, panel });
-  const featureRects = new Set(doc.features.map((f) => f.rectId));
+  const featureRects = new Set(doc.features.map((f) => featureRect(doc, f)?.id));
 
   // the selected feature's dimensions (the panel's feature, or the one the selection names)
   const dimFid = panel.open ? panel.featureId : selectedFeatureId(doc, sel);
   const dimOf = drawn.find((d) => d.f.id === dimFid);
   const laid: LaidDim[] = dimOf ? layoutDims(dimOf.f, dimOf.rect, dimOf.plan, scr, z) : [];
+  // WHY draw the fit box (dashed, faint, only for the selected feature, only
+  // when the profile is not itself a rectangle): with the core placing the
+  // marker, the box it chose is what the dims, the label band and overflow are
+  // measured against, so it has to be visible; dashed reads as construction
+  // geometry (not a shape to pick or a cut line), and drawing it on every
+  // marker, or over a rectangle profile's own edges, would only repeat lines.
+  const fitBoxOf = dimOf && !featureRect(doc, dimOf.f) && dimOf.plan.fit_rect ? dimOf : null;
   // the editor stays over the value's last place should the value be hidden while it changes
   const editDim = dimEdit && dimEdit.fid === dimFid
     ? laid.find((d) => d.field === dimEdit.field) ?? (lastDim.current?.field === dimEdit.field ? lastDim.current : null) : null;
@@ -471,7 +534,7 @@ export function Viewport() {
   return (
     <div ref={host} className="viewport" data-testid="viewport" data-tool={tool} style={{ cursor }}
       onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
-      onPointerLeave={() => !drag && setHover(null)}
+      onPointerLeave={() => !drag && setHover(null)} onDoubleClick={onDoubleClick}
       onContextMenu={(e) => e.preventDefault()}>
       <svg ref={svg} width={w} height={h} className="vp-svg" data-zoom={z}>
         <defs>
@@ -509,6 +572,10 @@ export function Viewport() {
           ))}
         </g>
         {draft}
+        {fitBoxOf && (
+          <path d={sl(rectCorners(fitBoxOf.rect))} data-fit-rect={fitBoxOf.f.id} className="fit-rect"
+            style={{ fill: "none", stroke: "var(--muted)", strokeWidth: 1, strokeDasharray: "5 4", opacity: 0.7, pointerEvents: "none" }} />
+        )}
         {dimOf && <Dims fid={dimOf.f.id} dims={laid} editing={editDim?.field ?? null} onEdit={(field) => setDimEdit({ fid: dimOf.f.id, field, start: dimOf.f })} />}
         {triads}
         {arc}
@@ -526,7 +593,7 @@ export function Viewport() {
       )}
       {panel.selector && (
         <div className="vp-hint" data-testid="selector-hint">
-          {panel.selector === "rect" ? "Select a rectangle (its edge) or a profile (inside a region)" : "Select a profile (click inside a region)"}
+          Select a profile: click inside a region, or double-click a rectangle
         </div>
       )}
     </div>

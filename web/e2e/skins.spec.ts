@@ -16,7 +16,7 @@ async function pickSkin(page: Page, id: SkinId): Promise<void> {
   await expect(page.locator("html")).toHaveAttribute("data-skin", id);
 }
 
-/** The plate with the ArUco Extrude panel open on its inscribed rectangle. */
+/** The plate with the ArUco Extrude panel open on its face (the profile). */
 async function platePanel(page: Page): Promise<void> {
   await openStudio(page);
   await coreReady(page);

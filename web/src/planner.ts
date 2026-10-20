@@ -39,7 +39,7 @@ function suggestInput(id: string, req: PlanRequest | null): string {
   if (!req) return "";
   // what the list depends on: not the size the list itself sets
   const { marker_mm: _m, checker_mm: _c, auto: _a, cols: _x, rows: _y, ...marker } = req.marker;
-  return JSON.stringify({ id, rect: req.rect, marker, preset: req.preset, ref: req.reference_face });
+  return JSON.stringify({ id, profile: req.profile, holes: req.holes, marker, preset: req.preset, ref: req.reference_face });
 }
 
 async function runPlan(id: string, req: PlanRequest, key: string) {

@@ -4,8 +4,7 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import {
-  CORE, clickAt, coreReady, dragWorld, featureRect, idle, loadExample, openStudio, overlaps, planOutline, state, toClient,
-  type Rect,
+  CORE, clickAt, coreReady, dragWorld, fitRect, idle, loadExample, openStudio, overlaps, planOutline, profileRect, state, toClient,
 } from "./helpers";
 
 test.describe(`online Studio (${CORE} core)`, () => {
@@ -17,7 +16,9 @@ test.describe(`online Studio (${CORE} core)`, () => {
     await expect(page.getByTestId("core-chip")).toContainText(CORE === "mock" ? "Mock core" : "Python ready");
   });
 
-  test("2 · plate: click the face, A: an inscribed rectangle off both holes, a black marker", async ({ page }) => {
+  // 2026-10-20 evening (barrier 9): the profile is the input; the core places
+  // the marker (fit_rect) and no rectangle is added to the sketch
+  test("2 · plate: click the face, A: the core places the marker off both holes (fit_rect, drawn dashed), a black marker", async ({ page }) => {
     await openStudio(page);
     await coreReady(page);
     await loadExample(page, "plate");
@@ -25,24 +26,27 @@ test.describe(`online Studio (${CORE} core)`, () => {
     await expect.poll(async () => (await state(page)).sel?.kind).toBe("profile");
     await page.keyboard.press("a");
     await idle(page);
-    const r = await featureRect(page);
+    const r = await fitRect(page);
     const s = await state(page);
-    expect(s.doc.shapes).toHaveLength(4);
+    expect(s.doc.shapes).toHaveLength(3);
+    expect(s.feature.profile).toEqual({ outer: "plate", holes: ["plate-h1", "plate-h2"] });
     for (const hole of s.doc.shapes.filter((x: any) => x.kind === "circle")) {
-      expect(overlaps(hole, r as Rect), `rectangle ${JSON.stringify(r)} vs hole ${hole.id}`).toBe(false);
+      expect(overlaps(hole, r), `fit_rect ${JSON.stringify(r)} vs hole ${hole.id}`).toBe(false);
     }
-    // drawn: the rectangle's box on screen is its size in mm times the zoom
-    const el = page.locator(`[data-shape="${r.id}"]`);
-    const box = (await el.boundingBox())!;
+    // drawn: the fit box on screen is its size in mm times the zoom
+    // WHY getBoundingClientRect, not boundingBox(): Playwright's box of a stroked
+    // dashed path takes in Chrome's stroke estimate (miter limit 4: 2 px a side)
+    const el = page.locator(`[data-fit-rect="${s.feature.id}"]`);
+    const box = await el.evaluate((e) => { const b = e.getBoundingClientRect(); return { x: b.left, y: b.top, width: b.width, height: b.height }; });
     const z = s.camera.zoom;
-    expect(Math.abs(box.width - r.w! * z)).toBeLessThan(3);
-    expect(Math.abs(box.height - r.h! * z)).toBeLessThan(3);
+    expect(Math.abs(box.width - r.w * z)).toBeLessThan(3);
+    expect(Math.abs(box.height - r.h * z)).toBeLessThan(3);
     // and it keeps off the holes on screen too: no hole's centre is inside its box
     for (const hole of s.doc.shapes.filter((x: any) => x.kind === "circle")) {
       const [hx, hy] = await toClient(page, hole.cx, hole.cy);
       expect(hx > box.x && hx < box.x + box.width && hy > box.y && hy < box.y + box.height).toBe(false);
     }
-    // the marker: black paths, filled dark, inside the rectangle
+    // the marker: black paths, filled dark, inside the fit box
     const black = page.locator("[data-marker-black]");
     expect((await black.getAttribute("d"))!.length).toBeGreaterThan(20);
     const fill = await black.evaluate((e) => getComputedStyle(e).fill);
@@ -54,7 +58,7 @@ test.describe(`online Studio (${CORE} core)`, () => {
     expect(bb.x + bb.width).toBeLessThanOrEqual(box.x + box.width + 1);
   });
 
-  test("3 · grid: the ids range shows; a big typed size is drawn past the rectangle and flagged red", async ({ page }) => {
+  test("3 · grid: the ids range shows; a big typed size is drawn past the fit box and flagged red", async ({ page }) => {
     await openStudio(page);
     await coreReady(page);
     await loadExample(page, "plate");
@@ -74,8 +78,7 @@ test.describe(`online Studio (${CORE} core)`, () => {
     const s = await state(page);
     expect(s.feature.marker).toMatchObject({ auto: false, marker_mm: 80 });
     expect(s.plan.overflow_mm).toBeGreaterThan(0);
-    const r = await featureRect(page);
-    const rect = (await page.locator(`[data-shape="${r.id}"]`).boundingBox())!;
+    const rect = (await page.locator(`[data-fit-rect="${s.feature.id}"]`).boundingBox())!;
     const outline = (await page.locator("[data-marker-outline]").boundingBox())!;
     expect(outline.width).toBeGreaterThan(rect.width + 5);
     expect(outline.height).toBeGreaterThan(rect.height + 5);
@@ -85,14 +88,15 @@ test.describe(`online Studio (${CORE} core)`, () => {
     expect(G + B).toBeLessThan(R);
   });
 
-  test("4 · drag the rectangle 20 mm: the marker's centre moves 20 mm", async ({ page }) => {
+  // the custom placement (a rectangle profile) is what a drag moves now
+  test("4 · drag the rectangle profile 20 mm: the marker's centre moves 20 mm", async ({ page }) => {
     await openStudio(page);
     await coreReady(page);
-    await loadExample(page, "plate");
-    await clickAt(page, 60, 40);
-    await page.keyboard.press("a");
+    await loadExample(page, "custom-placement");
     await idle(page);
-    const r = await featureRect(page);
+    await page.locator('[data-marker="custom-f1"]').click();
+    await idle(page);
+    const r = await profileRect(page);
     const before = await planOutline(page);
     const px0 = (await page.locator("[data-marker-outline]").boundingBox())!;
     // grab the rectangle's left edge, away from its handles (a handle resizes)
@@ -160,7 +164,7 @@ test.describe(`online Studio (${CORE} core)`, () => {
     expect(await noScroll()).toBe(true);
   });
 
-  test("8 · a circle inside a drawn rectangle: inside the ring, A: the inscribed rectangle keeps off the circle", async ({ page }) => {
+  test("8 · a circle inside a drawn rectangle: inside the ring, A: the marker's box keeps off the circle", async ({ page }) => {
     await openStudio(page);
     await coreReady(page);
     await page.getByTestId("menu-file").click();
@@ -180,15 +184,17 @@ test.describe(`online Studio (${CORE} core)`, () => {
     expect(s.sel.ref).toEqual({ outer: s.doc.shapes[0].id, holes: [circle.id] });
     await page.keyboard.press("a");
     await idle(page);
-    const r = await featureRect(page);
-    expect(r.id).not.toBe(s.doc.shapes[0].id);
-    expect(overlaps(circle, r as Rect), `rectangle ${JSON.stringify(r)} vs circle`).toBe(false);
+    const r = await fitRect(page);
+    s = await state(page);
+    expect(s.doc.shapes).toHaveLength(2);
+    expect(s.feature.profile).toEqual({ outer: s.doc.shapes[0].id, holes: [circle.id] });
+    expect(overlaps(circle, r), `fit_rect ${JSON.stringify(r)} vs circle`).toBe(false);
     // inside the drawn rectangle
-    expect(r.cx! - r.w! / 2).toBeGreaterThanOrEqual(-40 - 1e-6);
-    expect(r.cx! + r.w! / 2).toBeLessThanOrEqual(40 + 1e-6);
-    // drawn where the model says
-    const box = (await page.locator(`[data-shape="${r.id}"]`).boundingBox())!;
-    const [x0, y1] = await toClient(page, r.cx! - r.w! / 2, r.cy! - r.h! / 2);
+    expect(r.cx - r.w / 2).toBeGreaterThanOrEqual(-40 - 1e-6);
+    expect(r.cx + r.w / 2).toBeLessThanOrEqual(40 + 1e-6);
+    // drawn where the core says
+    const box = (await page.locator(`[data-fit-rect="${s.feature.id}"]`).boundingBox())!;
+    const [x0, y1] = await toClient(page, r.cx - r.w / 2, r.cy - r.h / 2);
     expect(Math.abs(box.x - x0)).toBeLessThan(3);
     expect(Math.abs(box.y + box.height - y1)).toBeLessThan(3);
   });

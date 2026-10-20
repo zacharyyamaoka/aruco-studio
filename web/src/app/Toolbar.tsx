@@ -28,7 +28,7 @@ export function Toolbar() {
       <Tool icon={<Glyph name="rect" />} name="Rectangle" keys="R" active={tool === "rect"} onClick={() => st().setTool("rect")} testid="tool-rect" />
       <Tool icon={<Glyph name="circle" />} name="Circle" keys="C" active={tool === "circle"} onClick={() => st().setTool("circle")} testid="tool-circle" />
       <span className="tb-sep" />
-      <Tool icon={<Glyph name="extrude" />} name="ArUco Extrude" full="ArUco Extrude: the marker in the selected rectangle or face" keys="A" active={panelOpen} onClick={() => void st().extrude()} testid="tool-extrude" />
+      <Tool icon={<Glyph name="extrude" />} name="ArUco Extrude" full="ArUco Extrude: the marker in the selected profile (click inside a region, or double-click a rectangle)" keys="A" active={panelOpen} onClick={() => void st().extrude()} testid="tool-extrude" />
       <span className="tb-sep" />
       <Tool icon={<Glyph name="print" />} name="Sheet" full="Sheet: print the stickers" keys="S" onClick={openPrint} testid="tool-sheet" />
       <Tool icon={<Glyph name="verify" />} name="Verify" full="Verify: a simulated camera reads the marker" keys="K" onClick={openVerify} testid="tool-verify" />

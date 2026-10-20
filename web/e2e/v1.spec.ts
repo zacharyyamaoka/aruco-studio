@@ -62,8 +62,14 @@ const colour = (page: Page, p: string) => page.locator(`input[data-path="${p}"]`
 const overlap = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
 test.describe(`V1 click-to-inspect (${CORE} core)`, () => {
+  // WHY the custom placement (2026-10-20 evening): a marker placed in a face
+  // has no rectangle to drag; a rectangle profile is what moves its marker
   test("a · a click on a marker opens the panel beside it, on screen; empty canvas closes it", async ({ page }) => {
-    const fid = await plateFeature(page);
+    await openStudio(page);
+    await coreReady(page);
+    await loadExample(page, "custom-placement");
+    await idle(page);
+    const fid = "custom-f1";
     await clickMarker(page, fid);
     const panel = page.getByTestId("extrude-panel");
     const vp = (await page.getByTestId("viewport").boundingBox())!;
@@ -87,9 +93,10 @@ test.describe(`V1 click-to-inspect (${CORE} core)`, () => {
     expect(rows.indexOf("tab:marker")).toBeLessThan(rows.indexOf("marker.type"));
     await page.screenshot({ path: path.join(SHOTS, "v1-panel-beside-marker.png") });
 
-    // it follows the marker when the rectangle moves
+    // it follows the marker when its rectangle profile moves
     const s = await state(page);
-    const r = s.doc.shapes.find((x: any) => x.id === s.feature.rectId);
+    const r = s.doc.shapes.find((x: any) => x.id === s.feature.profile.outer);
+    expect(s.feature.profile).toEqual({ outer: "custom", holes: [] });
     const from: [number, number] = [r.cx - r.w / 2, r.cy + r.h * 0.3];
     await dragWorld(page, from, [from[0] - 10, from[1]]);
     await idle(page);

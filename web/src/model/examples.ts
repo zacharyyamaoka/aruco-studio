@@ -1,20 +1,24 @@
 // The examples File › Examples… opens: the golden faces (../sketch/examples.ts,
-// shapes only) and the documents that come with their ArUco Extrudes made.
+// shapes only: click inside one, A) and the documents that come with their
+// ArUco Extrudes made. Every feature is a profile: a face's region, or a
+// rectangle on its own (the custom placement).
 // WHY the sticker sheet (Zach, 2026-10-20): "we should be able to have lots of
 // the markers on a page and then re-id them": a page of markers whose auto
 // ids are scattered by the hash, for Edit › Re-ID all markers… to number.
+// WHY the custom placement (Zach, 2026-10-20 evening): "if you want a custom
+// location, then you draw a rectangle profile".
 import { rectShape, type Shape } from "../sketch/model";
 import { EXAMPLES as FACES } from "../sketch/examples";
-import { newFeature, setField, type Feature } from "./doc";
+import { newFeature, rectProfile, setField, type Feature } from "./doc";
 
 export interface Example { id: string; name: string; note: string; shapes: Shape[]; features?: Feature[] }
 
 type Kind = "single" | "grid" | "charuco";
 
-/** One marker on the sheet: its rectangle (centre, size, mm) and its type. */
+/** One marker on the sheet: its rectangle profile (centre, size, mm) and its type. */
 function sticker(n: number, kind: Kind, cx: number, cy: number, w: number, h: number): [Shape, Feature] {
   const rect = rectShape(`sheet-r${n}`, cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2);
-  const f = newFeature(rect.id, null, `sheet-f${n}`);
+  const f = newFeature(rectProfile(rect.id), `sheet-f${n}`);
   return [rect, kind === "single" ? f : setField(f, "marker.type", kind)];
 }
 
@@ -35,8 +39,18 @@ const STICKERS: [Shape, Feature][] = [
   sticker(12, "single", 105, 30, 30, 30),
 ];
 
+const PLATE = FACES.find((e) => e.id === "plate")!;
+// a 30 mm square drawn on the plate's top right, clear of both holes
+const CUSTOM = rectShape("custom", 55, 42, 85, 72);
+
 export const EXAMPLES: Example[] = [
   ...FACES,
+  {
+    id: "custom-placement", name: "Custom placement: draw a rectangle profile",
+    note: "the plate with a rectangle drawn on it as the profile: drag the rectangle and the marker follows",
+    shapes: [...PLATE.shapes, CUSTOM],
+    features: [newFeature(rectProfile(CUSTOM.id), "custom-f1")],
+  },
   {
     id: "sticker-sheet", name: "Sticker sheet — many markers (Re-ID)",
     note: "12 markers on a 240 × 180 mm sheet, ids scattered by auto id: Edit › Re-ID numbers them",

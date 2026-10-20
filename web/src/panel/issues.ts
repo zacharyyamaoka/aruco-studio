@@ -5,6 +5,9 @@
 import type { Issue, IssueLevel, MarkerParams } from "../core/contract";
 
 const OWNER: Record<string, string> = {
+  // the box the marker is placed in (the legacy rect, or the core's fit_rect) is the profile's
+  "rect": "profile",
+  "holes": "profile",
   "marker.rows": "marker.cols",
   "marker.auto": "marker.marker_mm",
   "marker.checker_mm": "marker.marker_mm",
@@ -23,7 +26,7 @@ const OWNER: Record<string, string> = {
 
 /** The rows drawn for these numbers, by field path. */
 export function shownRows(m: MarkerParams, labelOn: boolean, referenceFace: boolean): string[] {
-  const rows = ["profile", "rect", "preset", "trim", "marker.type", "marker.dictionary", "marker.first_id", "marker.marker_mm"];
+  const rows = ["profile", "preset", "trim", "marker.type", "marker.dictionary", "marker.first_id", "marker.marker_mm"];
   if (m.type === "charuco") rows.push("marker.checker_mm", "marker.origin_square");
   if (m.type === "grid") rows.push("marker.separation_mm");
   if (m.type !== "single") rows.push("marker.cols");

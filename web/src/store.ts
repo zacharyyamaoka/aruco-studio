@@ -15,13 +15,13 @@ import { create } from "zustand";
 import type { CoreInfo, IdResult, Issue, LabelParams, MarkerPlan, Preset, Suggestion } from "./core/contract";
 import { core } from "./coreSource";
 import {
-  addFeature, addShape, applyIds, deleteShape, emptyDoc, featureOfRect, featureRect, getFeature, keyOwner, newFeature, newId, nextTurn, pickSuggestion,
-  removeFeature, resetField, setField, setShape, updateFeature, type Doc, type Feature, type Holes,
+  addFeature, addShape, applyIds, deleteShape, emptyDoc, featureOfProfile, featureOfRect, getFeature, keyOwner, newFeature, nextTurn, pickSuggestion,
+  rectProfile, removeFeature, resetField, setField, setShape, updateFeature, type Doc, type Feature, type Holes,
 } from "./model/doc";
-import { fitBox, type Camera } from "./model/geom";
+import { boxOf, fitBox, rectCorners, type Camera } from "./model/geom";
 import { touchRecent } from "./presets/local";
 import { example } from "./model/examples";
-import { plainRect, profileLoops, shapeBox, sketchBox, type ProfileRef, type Selection, type Shape } from "./sketch/model";
+import { profileLoops, sketchBox, type ProfileRef, type Selection, type Shape } from "./sketch/model";
 
 export type Tool = "select" | "rect" | "circle";
 export type Modal = null | "presets" | "print" | "examples" | "verify" | "reid";
@@ -33,8 +33,8 @@ export interface PanelState {
   featureId: string | null;
   tab: Tab;
   collapsed: boolean;
-  /** the selection row waiting for a click on the sketch */
-  selector: "rect" | "profile" | null;
+  /** the selection row waiting for a click on the sketch (Profile: the only one) */
+  selector: "profile" | null;
   /** the document before the panel opened: Cancel puts it back */
   backup: Doc | null;
 }
@@ -56,8 +56,6 @@ export interface Studio {
   suggestions: Suggestion[];
   info: CoreInfo | null;
   builtins: Preset[];
-  /** a profile is being inscribed */
-  inscribing: boolean;
   note: string | null;
   /** the history has a step to undo / to redo */
   canUndo: boolean;
@@ -76,19 +74,17 @@ export interface Studio {
   setCamera: (c: Camera) => void;
   setView: (w: number, h: number) => void;
   fit: () => void;
-  /** fit one feature (its rectangle, marker and label) into the view between
+  /** fit one feature (its profile, marker and label) into the view between
    *  `topPx` hidden at its top (the toolbar) and `bottomPx` at its bottom
    *  (the docked panel on a phone) */
   fitFeature: (id: string, topPx: number, bottomPx: number) => void;
 
   extrude: () => Promise<void>;
-  useRect: (id: string) => void;
-  useProfile: (ref: ProfileRef) => Promise<void>;
-  setProfile: (ref: ProfileRef) => void;
+  /** the panel's feature takes this profile (the Profile row's pick) */
+  useProfile: (ref: ProfileRef) => void;
   setSelector: (s: PanelState["selector"]) => void;
-  clearRect: () => void;
   clearProfile: () => void;
-  setHoles: (h: Holes) => Promise<void>;
+  setHoles: (h: Holes) => void;
   /** set a panel field by hand ("marker.cols", "label.gap_mm", ...) */
   setField: (path: string, value: unknown) => void;
   /** a panel field back to driven */
@@ -105,7 +101,7 @@ export interface Studio {
   ok: () => void;
   cancel: () => void;
   editFeature: (id?: string) => void;
-  /** a click on a marker (or its rectangle): select that feature and open
+  /** a click on a marker (or its rectangle profile): select that feature and open
    *  its panel; a panel open on another feature closes first (OK) */
   inspect: (id: string) => void;
   /** a click on empty canvas: the panel closes (OK) and nothing is selected */
@@ -132,14 +128,11 @@ const IDLE_MS = 500;
 const PANEL0: PanelState = { open: false, featureId: null, tab: "marker", collapsed: false, selector: null, backup: null };
 
 /** The feature the selection names: a feature, its Joint Origin or its label,
- *  or the rectangle it fills. */
+ *  the rectangle that is its profile, or its profile. */
 export function selectedFeatureId(doc: Doc, sel: Selection): string | null {
   if (sel?.kind === "feature" || sel?.kind === "origin" || sel?.kind === "text") return getFeature(doc, sel.id)?.id ?? null;
   if (sel?.kind === "shape") return featureOfRect(doc, sel.id)?.id ?? null;
-  if (sel?.kind === "profile") {
-    const plain = plainRect(doc.shapes, sel.ref);
-    return plain ? featureOfRect(doc, plain.id)?.id ?? null : null;
-  }
+  if (sel?.kind === "profile") return featureOfProfile(doc, sel.ref)?.id ?? null;
   return null;
 }
 
@@ -226,7 +219,6 @@ export const useStudio = create<Studio>((set, get) => {
     suggestions: [],
     info: null,
     builtins: [],
-    inscribing: false,
     note: null,
     canUndo: false,
     canRedo: false,
@@ -250,11 +242,12 @@ export const useStudio = create<Studio>((set, get) => {
     deleteSelection: () => {
       const { sel, doc, panel } = get();
       if (sel?.kind === "shape") {
-        // a feature filling it goes with it
-        const gone = featureOfRect(doc, sel.id)?.id;
-        put({ doc: deleteShape(doc, sel.id), sel: null, ...(gone && panel.featureId === gone ? { panel: PANEL0 } : {}) });
+        // a feature whose profile it bounds goes with it
+        const next = deleteShape(doc, sel.id);
+        const gone = panel.open && !getFeature(next, panel.featureId);
+        put({ doc: next, sel: null, ...(gone ? { panel: PANEL0 } : {}) });
       } else if (sel?.kind === "feature" || sel?.kind === "origin") {
-        // the feature goes; its rectangle stays in the sketch
+        // the feature goes; its profile's shapes stay in the sketch
         put({ doc: removeFeature(doc, sel.id), sel: null, ...(panel.featureId === sel.id ? { panel: PANEL0 } : {}) });
       }
     },
@@ -273,12 +266,12 @@ export const useStudio = create<Studio>((set, get) => {
 
     fitFeature: (id, topPx, bottomPx) => {
       const { doc, view, plans } = get();
-      const r = featureRect(doc, getFeature(doc, id));
-      if (!r) return;
-      const b = shapeBox(r);
+      const ref = getFeature(doc, id)?.profile;
+      const pr = ref ? profileLoops(doc.shapes, ref) : null;
+      if (!pr) return;
+      // the marker, the box it was placed in and its label (the profile until it plans)
       const plan = plans[id];
-      const pts = plan ? [...plan.outer, ...(plan.label ? [plan.label.at] : [])] : [];
-      for (const [x, y] of pts) { b.x0 = Math.min(b.x0, x); b.y0 = Math.min(b.y0, y); b.x1 = Math.max(b.x1, x); b.y1 = Math.max(b.y1, y); }
+      const b = boxOf(plan ? [...(plan.fit_rect ? rectCorners(plan.fit_rect) : []), ...plan.outer, ...(plan.label ? [plan.label.at] : [])] : pr.loops[0]);
       const visible = Math.max(80, view.h - topPx - bottomPx);
       const cam = fitBox(b, view.w, visible, 20);
       // fitBox centres it in a view `visible` tall; the real one has topPx more
@@ -287,10 +280,13 @@ export const useStudio = create<Studio>((set, get) => {
     },
 
     // ---------------------------------------------------------------- ArUco Extrude
-    // A on a rectangle (or a plain rectangle's profile) that already has a
-    // feature opens that feature; A on a new rectangle or profile makes a new
-    // one; A on a selected feature opens it; A on nothing makes a new one that
-    // waits for a rectangle. A panel open on another feature closes first (OK).
+    // A on a profile (or a rectangle) that already has a feature opens that
+    // feature; A on a new profile makes a new one; A on a selected feature
+    // opens it; A on nothing makes a new one whose Profile row waits for a
+    // click. A panel open on another feature closes first (OK).
+    // WHY a selected rectangle counts (2026-10-20 evening): drawing a rectangle
+    // leaves it selected, and R, drag, A was the custom placement's happy path;
+    // A takes its outer edges, as a double-click on it would.
     extrude: async () => {
       if (get().panel.open) {
         if (get().panel.selector || selectedFeatureId(get().doc, get().sel) === get().panel.featureId) return;
@@ -302,69 +298,32 @@ export const useStudio = create<Studio>((set, get) => {
       // the new feature and the rectangle (or profile) it takes are one step
       held = { stepped: false };
       try {
-        const f = newFeature(null, null);
+        const f = newFeature(null);
         open(doc, f, true);
-        if (sel?.kind === "shape" && doc.shapes.find((s) => s.id === sel.id)?.kind === "rect") get().useRect(sel.id);
-        else if (sel?.kind === "profile") await get().useProfile(sel.ref);
-        else set({ panel: { ...get().panel, selector: "rect" } });
+        const ref = sel?.kind === "profile" ? sel.ref
+          : sel?.kind === "shape" && doc.shapes.find((s) => s.id === sel.id)?.kind === "rect" ? rectProfile(sel.id) : null;
+        if (ref) get().useProfile(ref);
+        else set({ panel: { ...get().panel, selector: "profile" } });
       } finally {
         held = null;
         last = null;
       }
     },
-    useRect: (id) => {
-      const other = featureOfRect(get().doc, id);
-      if (other && other.id !== get().panel.featureId) { set({ note: "That rectangle already has an ArUco Extrude: double-click it to edit." }); return; }
-      edit((f) => ({ ...f, rectId: id }));
-      set({ sel: { kind: "feature", id: get().panel.featureId! }, panel: { ...get().panel, selector: null } });
-    },
-    useProfile: async (ref) => {
-      const { doc } = get();
-      const plain = plainRect(doc.shapes, ref);
-      if (plain) {
-        const other = featureOfRect(doc, plain.id);
-        if (other && other.id !== get().panel.featureId) { set({ note: "That rectangle already has an ArUco Extrude: double-click it to edit." }); return; }
-        edit((f) => ({ ...f, rectId: plain.id, profile: null }));
-        set({ sel: { kind: "feature", id: get().panel.featureId! }, panel: { ...get().panel, selector: null } });
-        return;
-      }
-      const loops = profileLoops(doc.shapes, ref);
-      const f0 = editing();
-      if (!loops || !f0) return;
-      const fid = f0.id;
-      set({ inscribing: true, panel: { ...get().panel, selector: null }, sel: { kind: "profile", ref } });
-      try {
-        const rect = await core.inscribe(loops, f0.holes);
-        if (!rect) { set({ note: "Nothing fits in that profile." }); return; }
-        const cur = get().doc;
-        const f = getFeature(cur, fid);
-        if (!f) return;
-        // re-inscribing the same profile moves the rectangle it made before
-        const prev = f.profile && f.rectId && f.profile.outer === ref.outer ? featureRect(cur, f) : null;
-        const shape: Shape = { kind: "rect", id: prev?.id ?? newId("r"), ...rect };
-        const next = prev ? setShape(cur, shape) : addShape(cur, shape);
-        put({ doc: updateFeature(next, fid, (g) => ({ ...g, rectId: shape.id, profile: ref })), sel: { kind: "feature", id: fid } });
-      } catch (e) {
-        set({ note: `Inscribe failed: ${(e as Error).message}` });
-      } finally {
-        set({ inscribing: false });
-      }
-    },
-    setProfile: (ref) => {
+    useProfile: (ref) => {
+      const { doc, panel } = get();
+      const other = featureOfProfile(doc, ref);
+      if (other && other.id !== panel.featureId) { set({ note: "That profile already has an ArUco Extrude: click its marker to edit it." }); return; }
+      if (!profileLoops(doc.shapes, ref) || !editing()) return;
       edit((f) => ({ ...f, profile: ref }));
-      set({ panel: { ...get().panel, selector: null }, sel: { kind: "feature", id: get().panel.featureId! } });
+      set({ sel: { kind: "feature", id: panel.featureId! }, panel: { ...get().panel, selector: null } });
     },
     setSelector: (selector) => set({ panel: { ...get().panel, selector } }),
-    clearRect: () => {
-      edit((f) => ({ ...f, rectId: null }));
-      set({ panel: { ...get().panel, selector: "rect" } });
+    clearProfile: () => {
+      edit((f) => ({ ...f, profile: null }));
+      set({ panel: { ...get().panel, selector: "profile" } });
     },
-    clearProfile: () => edit((f) => ({ ...f, profile: null })),
-    setHoles: async (holes) => {
-      edit((f) => ({ ...f, holes }));
-      const ref = editing()?.profile;
-      if (ref) await get().useProfile(ref);
-    },
+    // the plan request carries the choice: the core places the marker anew
+    setHoles: (holes) => edit((f) => ({ ...f, holes })),
     setField: (path, value) => edit((f) => setField(f, path, value), `field:${get().panel.featureId}:${path}`),
     resetField: (path) => edit((f) => resetField(f, path), `field:${get().panel.featureId}:${path}`),
     setLabel: (key, value, featureId) => {
@@ -388,9 +347,9 @@ export const useStudio = create<Studio>((set, get) => {
     ok: () => {
       const { doc, panel } = get();
       const f = getFeature(doc, panel.featureId);
-      // OK without a rectangle makes nothing
+      // OK without a profile makes nothing
       openAt = -1;
-      put({ panel: { ...PANEL0, tab: panel.tab }, doc: f && !f.rectId ? removeFeature(doc, f.id) : doc });
+      put({ panel: { ...PANEL0, tab: panel.tab }, doc: f && !f.profile ? removeFeature(doc, f.id) : doc });
     },
     cancel: () => {
       const { panel } = get();
