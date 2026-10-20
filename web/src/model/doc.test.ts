@@ -382,13 +382,13 @@ describe("trim (2026-10-18; profile | marker since 2026-10-20 evening)", () => {
 });
 
 describe("the heights (barrier 10, 2026-10-20 night): set only when typed, driven otherwise", () => {
-  it("setField / resetField on extrude.*, isSet, and the request carries extrude only when something is set", () => {
+  it("setField / resetField on extrude.*, isSet, and the request always carries extrude ({} = all driven)", () => {
     let d = addShape(emptyDoc("t", [], preset), rectShape("r", 0, 0, 40, 30));
     let f = newFeature(rectProfile("r"));
     d = addFeature(d, f);
     expect(f.extrude).toEqual({});
     expect(isSet(f, "extrude.white_mm")).toBe(false);
-    expect(planRequest(d, f)).not.toHaveProperty("extrude");
+    expect(planRequest(d, f)!.extrude).toEqual({});
     f = setField(f, "extrude.white_mm", 2.4);
     f = setField(f, "extrude.mode", "black");
     expect(isSet(f, "extrude.white_mm")).toBe(true);
@@ -399,7 +399,7 @@ describe("the heights (barrier 10, 2026-10-20 night): set only when typed, drive
     expect(isSet(f, "extrude.black_mm")).toBe(true);
     f = resetField(resetField(resetField(f, "extrude.white_mm"), "extrude.mode"), "extrude.black_mm");
     expect(f.extrude).toEqual({});
-    expect(planRequest(d, f)).not.toHaveProperty("extrude");
+    expect(planRequest(d, f)!.extrude).toEqual({});
   });
 
   it("files from before barrier 10 open with every height driven", () => {
