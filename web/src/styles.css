@@ -34,6 +34,10 @@ body { font: var(--font-size)/1.35 var(--font); background: var(--bg); color: va
 .topbar { display: flex; align-items: center; gap: 4px; padding: 0 8px; background: var(--panel); border-bottom: 1px solid var(--line); min-width: 0; }
 .topbar .brand { display: inline-flex; align-items: center; gap: 6px; margin-right: 6px; white-space: nowrap; font-size: 13px; }
 .brand-cube { flex: none; }
+/* the brand is a link to the landing page: no link colour or underline in any skin */
+a.brand, a.brand:visited { color: inherit; text-decoration: none; border-radius: var(--radius-sm); }
+a.brand:hover { color: var(--accent); }
+a.brand:focus-visible { color: var(--accent); outline: 2px solid var(--accent); outline-offset: 2px; }
 .topbar .doc-name { color: var(--muted); margin-left: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .chip-preset, .chip-core { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 12px;
   border: 1px solid var(--line); background: var(--field); color: var(--text); font: inherit; white-space: nowrap; min-width: 0; }

@@ -59,6 +59,8 @@ test.describe("skins", () => {
   test("1 · every switch changes the panel's background, accent and font; the layout keeps its boxes", async ({ page }) => {
     await platePanel(page);
     await expect(page.locator("html")).toHaveAttribute("data-skin", "studio");
+    // the brand is a link to the landing page
+    expect(await page.getByTestId("brand").getAttribute("href")).toMatch(/\/about\/$/);
     const looks = new Map<SkinId, Look>([["studio", await look(page)]]);
     // the order makes every switch a real change: Studio and Onshape are both white panels
     for (const id of ["fusion", "onshape", "unstyled", "studio"] as SkinId[]) {
@@ -68,6 +70,13 @@ test.describe("skins", () => {
       expect(after.bg, `${id}: background`).not.toBe(before.bg);
       expect(after.accent, `${id}: accent`).not.toBe(before.accent);
       expect(after.font, `${id}: font`).not.toBe(before.font);
+      // the brand link: the top bar's own text colour, no underline
+      const brand = await page.evaluate(() => {
+        const a = document.querySelector("[data-testid=brand]")!, bar = document.querySelector("[data-testid=topbar]")!;
+        return { deco: getComputedStyle(a).textDecorationLine, color: getComputedStyle(a).color, bar: getComputedStyle(bar).color };
+      });
+      expect(brand.deco, `${id}: brand underline`).toBe("none");
+      expect(brand.color, `${id}: brand colour`).toBe(brand.bar);
       looks.set(id, after);
     }
     // no two skins share an accent or a font

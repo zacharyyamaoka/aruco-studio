@@ -89,7 +89,8 @@ export function TopBar() {
   const st = useStudio.getState;
   return (
     <header className="topbar" data-testid="topbar">
-      <span className="brand"><BrandCube /><b>ArUco Studio</b></span>
+      {/* the brand goes to the landing page (Zach, 2026-10-20); a real navigation, not a route */}
+      <a className="brand" href="/about/" title="About ArUco Studio" data-testid="brand"><BrandCube /><b>ArUco Studio</b></a>
       <Menu label="File" testid="menu-file">
         <MenuItem icon="sketch" label="New" testid="cmd-new" onClick={() => st().newDoc()} />
         <MenuItem icon="library" label="Examples…" testid="cmd-examples" onClick={() => st().openModal("examples")} />
