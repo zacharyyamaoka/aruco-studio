@@ -302,6 +302,14 @@ export interface IdRequest {
    *  older tool). A plain list reserves the ids in EVERY family; a map
    *  reserves them per dictionary family ("4x4", "5x5", ...: core.numbering.family) */
   reserved?: number[] | Record<string, number[]>;
+  /** Re-ID (Zach, 2026-10-20: "lots of markers on a page and then re-id them"):
+   *  "hash" (default) keeps today's stable hashed ids; "sequential" numbers the
+   *  driven markers in document order from `start`, each grid / board a
+   *  contiguous range. `fresh` ignores the ledger so every driven id is given
+   *  out anew (the returned ledger replaces the old one). Typed ids always win. */
+  mode?: "hash" | "sequential";
+  start?: number;
+  fresh?: boolean;
 }
 
 export interface IdResult {
