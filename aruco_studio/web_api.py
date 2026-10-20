@@ -24,7 +24,8 @@ Fusion composes a Joint Origin: core.geometry.jo_compose).
 | `preset` (method inkjet) | `settings.make` = core.make.new_make("sticker", profile): rule 2, its page, margins and paper thickness |
 | `preset` (method print3d) | `settings.make` = new_make("print3d") |
 | `preset.cell_step_mm`, `min_cell_mm` | `settings.cells` {"of": "cell", "mm": step} (0 = no snap: {"of": "marker", "mm": 0.5}, the legacy step) |
-| `reference_face` | the target is a "profile" with a body (Flip does not apply) else "free" |
+| `reference_face` | the target is a "profile" with a body else "free": it picks the starting outward side (Auto's Black only), and `marker.flip` still turns it over (barrier 10) |
+| `extrude` (barrier 10, 2026-10-20 night) -> `MarkerPlan.extrude` | web_extrude: `mode` -> `settings.mode`, `white_mm` / `black_mm` -> `numbers.*_offset` / `*_height` (the black from the white's outer face), `paper_mm` -> the sticker's stock; unset = driven (core.presets.driven_heights, the preset's thickness). `MarkerPlan.extrude` only when the request has one, so every plan without stays as it was |
 | `label` on, `place` "outside" (2026-10-18) | core.rect_fill.fill: a band inside the rectangle on `label.side`; the marker is planned in the box it leaves (the target), centred there; "sans" text for an inkjet preset, the pixel font's ink for 3D. `height_mm` 0: one module of the marker drawn (the search in _outside) |
 | `label` on, `place` "on_marker" (default, 2026-10-20) | core.rect_fill.on_marker on the marker planned in the whole rectangle (marker_geo): `surface` "black" knocks the text out of the border row (ChArUco: a black square), "white" prints it in the quiet zone; `height_mm` 0: core.label's row rule (half a module), one module in a ChArUco square |
 | `marker.origin_square` | core.rect_fill.square_origin on OpenCV's board frame |
@@ -59,6 +60,7 @@ from .plan import TagSpec, Target, plan_tag
 from .plan import exports as _X
 from .plan import mesh as _ME
 from .scene import sheet as _SS
+from . import web_extrude as _EX
 
 API = ("info", "presets", "inscribe", "plan", "suggest", "svg", "sheet", "verify", "readable", "assign_ids")
 
@@ -69,7 +71,8 @@ FIELDS = {"numbers.size": "marker.marker_mm", "numbers.square": "marker.checker_
           "settings.force": "marker.cols", "settings.turn": "marker.turn",
           "settings.flip": "marker.flip", "settings.quiet_modules": "marker.quiet_modules",
           "settings.corner_mark": "marker.corner_mark", "settings.label": "label",
-          "settings.holes": "rect"}
+          "settings.holes": "rect",
+          "numbers.white_height": "extrude.white_mm", "numbers.black_height": "extrude.black_mm"}
 PRESET_FIELDS = ("settings.cells", "settings.make")
 TYPE_WORDS = {"single": "ArUco", "grid": "Grid", "charuco": "ChArUco"}
 LABEL_TEMPLATE = "#{ids}"           # an empty label text
@@ -147,15 +150,22 @@ def _page_key(preset: dict, issues: list) -> str:
     return "letter"
 
 
-def make_of(preset: dict, issues: list) -> dict:
-    """`settings.make` for a flat preset."""
+def make_of(preset: dict, issues: list, paper_mm=None) -> dict:
+    """`settings.make` for a flat preset; an inkjet's paper `paper_mm`
+    (extrude, barrier 10) or, unset, the preset's thickness."""
     if preset.get("method") != "inkjet":
         return _MK.new_make("print3d")
     profile = {"kind": "sticker", "make_rule": _MK.INSET_RULE, "page": _page_key(preset, issues),
-               "stock_mm": float(preset.get("thickness_mm") or _MK.VINYL_MM),
+               "stock_mm": _EX.driven_paper(preset) if paper_mm is None else paper_mm,
                "margin_mm": float(preset["margin_mm"]) if preset.get("margin_mm") is not None
                else _MK.PAGE_MARGIN_MM}
-    return _MK.new_make("sticker", profile)
+    mk = _MK.new_make("sticker", profile)
+    if paper_mm is not None:
+        # WHY over new_make's: it puts its own stock in for one out of
+        # core.make.THICKNESS_MM without a word; the core's reading of the
+        # make (core.make.make_of) says what it does with it
+        mk["thickness_mm"] = float(paper_mm)
+    return mk
 
 
 def cells_of(preset: dict) -> dict:
@@ -176,16 +186,20 @@ def spec_of(req: dict, issues: list) -> TagSpec:
     rect, m = req["rect"], req["marker"]
     kind = m["type"]
     auto = bool(m.get("auto"))
+    ex = _EX.heights(req, issues)
     s = {"layout": kind, "dictionary": m["dictionary"], "origin_v": 2, "as_typed": True,
-         "mode": "auto", "turn": int(m.get("turn") or 0),
+         "mode": "auto" if ex["auto"] else ex["mode"], "turn": int(m.get("turn") or 0),
          # WHY `is None`, not `or` (barrier 7): a typed 0 was read as 1 without a word
          "quiet_modules": 1.0 if m.get("quiet_modules") is None else float(m["quiet_modules"]),
          "corner_mark": m.get("corner_mark") or "none",
-         "make": make_of(req.get("preset") or {}, issues),
+         "make": make_of(req.get("preset") or {}, issues,
+                         ex["paper_mm"] if "paper_mm" in ex["set"] else None),
          "cells": cells_of(req.get("preset") or {})}
     if kind != "single":
         s["force"] = [int(m.get("cols") or 1), int(m.get("rows") or 1)]
     n = {"marker_id": int(m.get("first_id") or 0)}
+    if ex["method"] == "print3d":
+        n.update(_EX.numbers(ex))                  # the heights, driven or set (barrier 10)
     if not auto:
         n["size"] = float(m.get("marker_mm") or 0.0)
         if kind == "charuco":
@@ -248,10 +262,16 @@ def field_of(f: str, text: str) -> str:
     return "tag"
 
 
-def issues_of(plan_d: dict) -> list:
+def issues_of(plan_d: dict, paper_set: bool = False) -> list:
+    """The core's warnings on the contract's fields; `paper_set`: the
+    request set extrude.paper_mm, so what the core says of the paper's
+    thickness is said there (else on "preset", its thickness)."""
     out = []
     for w in plan_d["warnings"]:
-        out.append({"field": field_of(w["field"], w["text"]), "level": w["level"], "text": w["text"]})
+        f = field_of(w["field"], w["text"])
+        if paper_set and w["field"].startswith("settings.make.thickness_mm"):
+            f = "extrude.paper_mm"
+        out.append({"field": f, "level": w["level"], "text": w["text"]})
     return out
 
 
@@ -917,10 +937,17 @@ def _rigid_inv(T):
             0.0, 0.0, 0.0, 1.0]
 
 
-def pattern_cutout(req: dict, d: dict, fl, flip: bool):
+def pattern_cutout(req: dict, d: dict, fl, flip: bool, white_only: bool = False):
     """A pixel label knocked out of the black, as loops in the plan's
-    pattern frame (cad_layers' `cutout`), or None."""
-    if fl is None or not fl.knockout or not fl.ink:
+    pattern frame (cad_layers' `cutout`), or None. `white_only` (a 3D
+    White only, barrier 10): the footprint is the WHITE, so the label cut
+    out of it is the one printed black on white (on the marker's quiet
+    zone: the body shows through); a knocked-out one is white ink there
+    (cad_layers), never a cutout."""
+    if fl is None or not fl.ink:
+        return None
+    if not (fl.knockout and not white_only
+            or white_only and not fl.knockout and fl.place == "on_marker"):
         return None
     P = _rigid_inv(_local(d, fl, flip))
     return [[(P[0] * u + P[1] * v + P[3], P[4] * u + P[5] * v + P[7]) for u, v in _rect_loop(r)]
@@ -956,6 +983,9 @@ def cad_layers(d: dict, M, paper=None, label=None, cutout=None) -> list:
     a tile (the white tile's corner cut) it is a cut layer into that tile.
     `label` (the plan's PlacedLabel): the pixel font's ink is the layer
     "label_ink", black, at the black's z; a sans label is text, no layer.
+    White only (no black, barrier 10): "label_ink" is white at the white
+    pattern's z, and "recess_label" cuts it into the face as the pattern's
+    recess does.
     `cutout` (pattern-frame loops): a pixel label knocked out of the black
     (on the marker, 2026-10-20) -- taken out of the footprint's polygons as
     the board's corner cut is (the white under shows: core.label's "cut"
@@ -1003,6 +1033,21 @@ def cad_layers(d: dict, M, paper=None, label=None, cutout=None) -> list:
         if z is not None:
             out.append({"name": "label_ink", "part": "label", "colour": "black", "op": "add",
                         "z": list(z), "polygons": label["polygons"]})
+        else:
+            # WHY (barrier 10; docs/design/3d_features_2026-10-20.md, "White
+            # only drops the label"): White only has no black layer, so the
+            # label never reached `layers`. There it is white, made as the
+            # white pattern is: at its z, cut into the face where it is
+            pat = next((R for R in out if R["part"] == "pattern" and R["colour"] == "white"), None)
+            if pat is not None:
+                out.append({"name": "label_ink", "part": "label", "colour": "white", "op": "add",
+                            "z": list(pat["z"]), "polygons": label["polygons"]})
+                rec = next((R for R in out if R["part"] == "recess" and R["op"] == "cut"
+                            and R.get("into") == "face"), None)
+                if rec is not None:
+                    out.append({"name": "recess_label", "part": "recess", "colour": "none",
+                                "op": "cut", "z": list(rec["z"]), "polygons": label["polygons"],
+                                "into": "face"})
     return out
 
 
@@ -1038,21 +1083,30 @@ def _refused(m: dict, issues: list, summary: str) -> dict:
             "origin": [], "label": None, "summary": summary, "warnings": issues}
 
 
+def flip_of(req: dict) -> bool:
+    """Is the marker turned over (`marker.flip`)? Always as asked: on a
+    reference face too (barrier 10)."""
+    # WHY (contract barrier 10, Zach 2026-10-20 night: "in all cases you get
+    # the option to just flip it from what it currently is"): Flip was
+    # ignored with a reference face ("the reference face sets Z: Flip does
+    # not apply", an info on marker.flip). The face only picks the starting
+    # outward side now; Flip turns it over, here and in web_verify
+    return bool((req.get("marker") or {}).get("flip"))
+
+
 def plan(req: dict) -> dict:
     """The MarkerPlan of a PlanRequest: in its rect, or (no rect) in the box
     fitted in its profile (placed_in), returned as `fit_rect`; refused, never
-    raised, when nothing fits in the profile."""
+    raised, when nothing fits in the profile. `extrude` (barrier 10): the
+    heights as planned, only when the request has one (web_extrude)."""
     req, pre = placed_in(req)
     if req["rect"] is None:
         return _refused(req["marker"], pre, pre[0]["text"])
     d, issues, fl = _planned(req)
     m = req["marker"]
-    face = bool(req.get("reference_face"))
-    flip = bool(m.get("flip")) and not face
-    if m.get("flip") and face:
-        issues.append({"field": "marker.flip", "level": "info",
-                       "text": "the reference face sets Z: Flip does not apply"})
-    issues += issues_of(d)
+    flip = flip_of(req)
+    ex = _EX.heights(req)
+    issues += issues_of(d, "paper_mm" in ex["set"])
     if not d["ok"]:
         return _refused(m, issues, "; ".join(d["errors"]) or "nothing fits")
     kind = d["layout"]["kind"]
@@ -1093,25 +1147,31 @@ def plan(req: dict) -> dict:
     else:
         cut = {"outer": _loop(rect_matrix(rect), _rect_loop((-w / 2.0, -h / 2.0, w / 2.0, h / 2.0)),
                               True), "holes": []}
-    return {"ok": True, "ids": ids, "black": black, "outer": outer,
-            "cut": [list(q) for q in cut["outer"]], "cut_shape": cut,
-            "outer_mm": outer_mm, "marker_mm": _r(marker_mm),
-            "checker_mm": _r(lay["square_mm"]) if kind == "charuco" else 0.0,
-            "separation_mm": _r(lay["separation_mm"]) if kind == "grid" else 0.0,
-            "cols": int(lay["cols"]), "rows": int(lay["rows"]), "cell_mm": _r(marker_mm / modules),
-            "auto": bool(m.get("auto")), "overflow_mm": overflow,
-            "fit_rect": {k: _r(rect.get(k) or 0.0) for k in ("cx", "cy", "w", "h", "angle_deg")},
-            "origin": origin, "label": label,
-            "dims": plan_dims(req, d, fl, L, lay),
-            "layers": cad_layers(d, M, cut, label, cutout=pattern_cutout(req, d, fl, flip)),
-            "cells": pattern_cells(d),
-            # WHY full precision, the one field that is (every other number is
-            # 1e-6, ND): a CAD shell composes this matrix with its own frames
-            # and places every cell by it, so a rounded rotation (an error of
-            # 5e-7 per entry, ~5e-5 mm at 100 mm) would build up there
-            "pattern_to_sketch": [float(v) + 0.0 for v in M], "origin_z_mm": origin[11],
-            "summary": _summary(kind, mk["dictionary"], ids, lay, outer_mm),
-            "warnings": issues}
+    out = {"ok": True, "ids": ids, "black": black, "outer": outer,
+           "cut": [list(q) for q in cut["outer"]], "cut_shape": cut,
+           "outer_mm": outer_mm, "marker_mm": _r(marker_mm),
+           "checker_mm": _r(lay["square_mm"]) if kind == "charuco" else 0.0,
+           "separation_mm": _r(lay["separation_mm"]) if kind == "grid" else 0.0,
+           "cols": int(lay["cols"]), "rows": int(lay["rows"]), "cell_mm": _r(marker_mm / modules),
+           "auto": bool(m.get("auto")), "overflow_mm": overflow,
+           "fit_rect": {k: _r(rect.get(k) or 0.0) for k in ("cx", "cy", "w", "h", "angle_deg")},
+           "origin": origin, "label": label,
+           "dims": plan_dims(req, d, fl, L, lay),
+           "layers": cad_layers(d, M, cut, label, cutout=pattern_cutout(
+               req, d, fl, flip, white_only=ex["method"] == "print3d" and ex["mode"] == "white")),
+           "cells": pattern_cells(d),
+           # WHY full precision, the one field that is (every other number is
+           # 1e-6, ND): a CAD shell composes this matrix with its own frames
+           # and places every cell by it, so a rounded rotation (an error of
+           # 5e-7 per entry, ~5e-5 mm at 100 mm) would build up there
+           "pattern_to_sketch": [float(v) + 0.0 for v in M], "origin_z_mm": origin[11],
+           "summary": _summary(kind, mk["dictionary"], ids, lay, outer_mm),
+           "warnings": issues}
+    if req.get("extrude") is not None:
+        # WHY only when asked: a request without `extrude` (every caller
+        # before barrier 10) gets the plan it got, byte for byte
+        out["extrude"] = _EX.report(ex, d, flip)
+    return out
 
 
 def _cell_reason(lay, cells: dict, method: str):
