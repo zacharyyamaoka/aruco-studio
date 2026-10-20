@@ -8,7 +8,7 @@
   "compatibility_date": "2026-10-18",
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "404-page"
   },
   // WHY workers_dev on: aruco-studio.<account>.workers.dev keeps working if DNS breaks.
   "workers_dev": true,
