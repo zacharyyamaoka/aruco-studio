@@ -10,7 +10,7 @@
 // rectangle profile … it's just going to be a profile"): the core places the
 // marker in the profile, like an extrude; a rectangle profile is used exactly
 // (contract.ts PlanRequest, barrier 9).
-import type { IdItem, IdRequest, IdResult, LabelParams, MarkerParams, MarkerType, PlanRequest, Preset, Suggestion, Trim, Turn } from "../core/contract";
+import type { ExtrudeParams, IdItem, IdRequest, IdResult, LabelParams, MarkerParams, MarkerType, PlanRequest, Preset, Suggestion, Trim, Turn } from "../core/contract";
 import { plainRect, profileLoops, sameProfile, type ProfileRef, type RectShape, type Shape } from "../sketch/model";
 
 export type Holes = "avoid" | "ignore";
@@ -33,6 +33,11 @@ export interface Feature {
   trim: Trim;
   marker: MarkerParams;
   label: LabelParams;
+  /** the heights (contract barrier 10): ONLY the fields set by hand are present;
+   *  an absent one is driven from the preset (the plan's MarkerPlan.extrude says
+   *  its value). The Make tab's rows and the 3D view's drag arrows both write it
+   *  through setField("extrude.<key>") / resetField. */
+  extrude: ExtrudeParams;
   /** the fields typed by hand among those the contract has no driven
    *  encoding for ("marker.cols", "label.gap_mm", ...). The rest say it in
    *  their own value: see isSet(). */
@@ -80,7 +85,7 @@ export function rectProfile(rectId: string): ProfileRef {
 
 export function newFeature(profile: ProfileRef | null, id = newId("f")): Feature {
   return {
-    id, key: id, profile, holes: "avoid", trim: DEFAULT_TRIM, marker: { ...DEFAULT_MARKER }, label: { ...DEFAULT_LABEL, offset_mm: [0, 0] }, set: [],
+    id, key: id, profile, holes: "avoid", trim: DEFAULT_TRIM, marker: { ...DEFAULT_MARKER }, label: { ...DEFAULT_LABEL, offset_mm: [0, 0] }, extrude: {}, set: [],
   };
 }
 
@@ -177,6 +182,11 @@ const ENCODED: Record<string, (f: Feature) => boolean> = {
   "marker.separation_mm": (f) => f.marker.separation_mm > 0,
   "label.height_mm": (f) => f.label.height_mm > 0,
   "marker.origin_square": (f) => f.marker.origin_square != null,   // driven = null: OpenCV's board corner
+  // barrier 10: an extrude field is set when present (absent = driven by the preset)
+  "extrude.mode": (f) => f.extrude.mode !== undefined,
+  "extrude.white_mm": (f) => f.extrude.white_mm !== undefined,
+  "extrude.black_mm": (f) => f.extrude.black_mm !== undefined,
+  "extrude.paper_mm": (f) => f.extrude.paper_mm !== undefined,
 };
 
 /** The fields a row can set that the contract has no driven encoding for. */
@@ -211,7 +221,8 @@ const unmark = (set: string[], paths: string[]) => set.filter((p) => !paths.incl
  *  flags overflow). */
 export function setField(f: Feature, path: string, value: unknown): Feature {
   if (path === "trim") return { ...f, trim: value as Trim, set: mark(f.set, path) };
-  const [part, key] = path.split(".") as ["marker" | "label", string];
+  const [part, key] = path.split(".") as ["marker" | "label" | "extrude", string];
+  if (part === "extrude") return { ...f, extrude: { ...f.extrude, [key]: value } };
   if (part === "label") {
     return { ...f, label: { ...f.label, [key]: value }, set: (LISTED as readonly string[]).includes(path) ? mark(f.set, path) : f.set };
   }
@@ -232,7 +243,12 @@ export function resetField(f: Feature, path: string): Feature {
   if (path === "label.height_mm") return { ...f, label: { ...f.label, height_mm: 0 } };
   if (path === "marker.origin_square") return { ...f, marker: { ...f.marker, origin_square: null } };
   if (path === "trim") return { ...f, trim: DEFAULT_TRIM, set: unmark(f.set, [path]) };
-  const [part, key] = path.split(".") as ["marker" | "label", string];
+  const [part, key] = path.split(".") as ["marker" | "label" | "extrude", string];
+  if (part === "extrude") {
+    const extrude = { ...f.extrude };
+    delete extrude[key as keyof ExtrudeParams];
+    return { ...f, extrude };
+  }
   const set = unmark(f.set, [path]);
   if (part === "label") return { ...f, label: { ...f.label, [key]: drivenValue(f.marker, path) }, set };
   if (key === "type") {
@@ -299,6 +315,8 @@ export function planRequest(doc: Doc, f: Feature | null): PlanRequest | null {
   return {
     trim: f.trim, profile, holes: f.holes, marker: f.marker, label: f.label, preset: doc.preset,
     reference_face: referenceFace(doc, f),
+    // only when something is set: an all-driven feature's request is byte for byte what it was
+    ...(Object.keys(f.extrude).length ? { extrude: f.extrude } : {}),
   };
 }
 
@@ -360,6 +378,8 @@ function readFeature(raw: Record<string, unknown>): Feature {
   } as Feature;
   if (typeof f.key !== "string" || !f.key) f.key = f.id;
   if (!Array.isArray(f.set)) f.set = [];
+  // before barrier 10 (2026-10-20 night) there were no heights: all driven
+  if (!f.extrude || typeof f.extrude !== "object" || Array.isArray(f.extrude)) f.extrude = {};
   // version 2 (2026-10-18 .. 20): the marker filled the rectangle `rectId` (drawn,
   // or inscribed in the face `profile`); that rectangle on its own is the profile
   // now, so the marker stays where it was
