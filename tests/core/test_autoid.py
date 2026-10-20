@@ -4,6 +4,8 @@ ledger, reproducibility without it, typed ids, capacity, grids -- and one
 mutant that proves the uniqueness gate can fail."""
 from __future__ import annotations
 
+import hashlib
+import json
 import random
 import sys
 import types
@@ -314,3 +316,195 @@ def test_the_uniqueness_gate_catches_a_probe_that_skips_the_overlap_check(monkey
     red = sum(1 for seed in SEEDS if violations(mutant.assign(random_doc(seed)[1]),
                                                 random_doc(seed)[1]))
     assert red > 0
+
+
+# ------------------------------------------------------------------ Re-ID
+
+def hash_request(seed):
+    """One random request in today's terms (no mode, start or fresh): a
+    document, a ledger on a third of the seeds, reserved ids (a list or a
+    map per family) on half."""
+    rng, items = random_doc(seed)
+    ledger = AI.assign(items[: len(items) // 2])["ledger"] if seed % 3 == 1 else None
+    reserved = None
+    if seed % 4 == 2:
+        reserved = rng.sample(range(60), rng.randint(1, 8))
+    elif seed % 4 == 3:
+        reserved = {"4x4": rng.sample(range(60), rng.randint(1, 5)), "aruco5x5": [rng.randrange(100)]}
+    return items, ledger, reserved
+
+
+def hash_digest(**re_id):
+    """sha256 over the JSON of 200 random requests' answers, in order."""
+    h = hashlib.sha256()
+    for seed in SEEDS:
+        items, ledger, reserved = hash_request(seed)
+        res = AI.assign(items, ledger, reserved, **re_id)
+        h.update(json.dumps(res, ensure_ascii=False).encode("utf-8") + b"\n")
+    return h.hexdigest()
+
+
+# the digest of hash_digest() taken on main @ 51f39de, before Re-ID existed
+HASH_DIGEST = "aeb0e284fe570bbd64d48a5c752329302978c3ab1ccfeb1a8028502f281cc731"
+
+
+def seq(items, ledger=None, reserved=None, start=0, fresh=False):
+    return AI.assign(items, ledger, reserved, mode="sequential", start=start, fresh=fresh)
+
+
+def blocks(res):
+    return [(a["key"], a["ids"]) for a in res["items"]]
+
+
+def test_hash_mode_is_byte_identical_to_before_re_id():
+    assert hash_digest() == HASH_DIGEST
+    assert hash_digest(mode="hash", start=0, fresh=False) == HASH_DIGEST
+    assert hash_digest(mode="hash", start=37) == HASH_DIGEST            # start is sequential's
+
+
+def test_sequential_numbers_twelve_mixed_items_contiguously_in_document_order():
+    shapes = [("single",), ("grid", 3, 2), ("single",), ("grid", 2, 2), ("grid", 4, 1), ("single",),
+              ("single",), ("grid", 1, 3), ("grid", 2, 1), ("single",), ("grid", 3, 3), ("single",)]
+    items = [item(f"m{11 - k:02d}", s[0], "DICT_4X4_250" if k % 3 else "DICT_4X4_50", *s[1:])
+             for k, s in enumerate(shapes)]                 # keys sort against document order
+    res = seq(items)
+    assert res["warnings"] == []
+    nxt = 0
+    for it, a in zip(items, res["items"]):
+        assert a["key"] == it["key"] and a["driven"]
+        assert a["ids"] == list(range(nxt, nxt + it["count"])), a
+        nxt += it["count"]
+    assert nxt == 34
+    assert res["ledger"] == {a["key"]: a["first_id"] for a in res["items"]}
+    assert violations(res, items) == []
+
+
+def test_sequential_starts_at_start():
+    res = seq([item("b", dictionary="DICT_4X4_250"), item("a", "grid", "DICT_4X4_250", cols=3, rows=2),
+               item("c", dictionary="DICT_4X4_250")], start=100)
+    assert blocks(res) == [("b", [100]), ("a", list(range(101, 107))), ("c", [107])]
+    assert res["warnings"] == []
+
+
+def test_each_family_has_its_own_counter_from_start():
+    items = [item("a"), item("p", dictionary="DICT_5X5_100"), item("g", "grid", "DICT_4X4_1000", cols=2, rows=1),
+             item("q", "grid", "DICT_5X5_50", cols=3, rows=1), item("b", dictionary="DICT_4X4_250")]
+    assert blocks(seq(items, start=5)) == [("a", [5]), ("p", [5]), ("g", [6, 7]), ("q", [6, 7, 8]), ("b", [8])]
+
+
+def test_sequential_skips_typed_ids():
+    items = [item("a"), item("t1", first_id=2), item("g", "grid", cols=2, rows=2), item("b"),
+             item("t2", "grid", cols=2, rows=1, first_id=5), item("c")]
+    res = seq(items)
+    assert res["warnings"] == []
+    assert blocks(res) == [("a", [0]), ("t1", [2]), ("g", [7, 8, 9, 10]), ("b", [11]), ("t2", [5, 6]), ("c", [12])]
+    assert res["ledger"] == {"a": 0, "g": 7, "b": 11, "c": 12}
+
+
+def test_sequential_skips_reserved_ids():
+    items = [item("a"), item("b"), item("g", "grid", cols=2, rows=1), item("p", dictionary="DICT_5X5_50")]
+    assert blocks(seq(items, reserved=[0, 2, 5])) == [("a", [1]), ("b", [3]), ("g", [6, 7]), ("p", [1])]
+    assert blocks(seq(items, reserved={"4x4": [0, 2, 5]})) == [("a", [1]), ("b", [3]), ("g", [6, 7]), ("p", [0])]
+
+
+def test_without_fresh_ledgered_items_keep_their_ids_and_only_new_ones_are_numbered():
+    items = [item("a"), item("b"), item("c"), item("d"), item("e")]
+    res = seq(items, ledger={"b": 1, "d": 40, "gone": 2})
+    assert blocks(res) == [("a", [0]), ("b", [1]), ("c", [2]), ("d", [40]), ("e", [3])]
+    assert res["ledger"] == {"a": 0, "b": 1, "c": 2, "d": 40, "e": 3}
+    again = seq(list(reversed(items)) + [item("f")], ledger=res["ledger"])
+    assert {k: v["ids"] for k, v in by_key(again).items()} == {**{k: i for k, i in blocks(res)}, "f": [4]}
+
+
+def test_fresh_discards_the_ledger_in_either_mode():
+    items = [item("a"), item("b"), item("c")]
+    led = {"a": 30, "b": 0, "gone": 9}
+    res = seq(items, ledger=led, fresh=True)
+    assert blocks(res) == [("a", [0]), ("b", [1]), ("c", [2])]
+    assert res["ledger"] == {"a": 0, "b": 1, "c": 2}
+    assert AI.assign(items, led, mode="hash", fresh=True) == AI.assign(items)
+    # a typed item's old ledger id is not held nor kept any more
+    held = AI.assign([item("t", first_id=20), item("x")], {"t": 5})
+    assert held["ledger"]["t"] == 5
+    fresh = seq([item("t", first_id=20), item("x")], ledger={"t": 5}, fresh=True)
+    assert fresh["ledger"] == {"x": 0}
+
+
+def test_fresh_typed_ids_still_win_and_collisions_are_flagged():
+    items = [item("a"), item("x", first_id=0), item("y", first_id=0)]
+    res = seq(items, ledger={"a": 0}, fresh=True)
+    assert blocks(res) == [("a", [1]), ("x", [0]), ("y", [0])]
+    assert set(errors_of(res)) == {"x", "y"}
+
+
+def test_sequential_full_dictionary_is_todays_error():
+    items = [item(f"s{59 - i:02d}") for i in range(60)]
+    res = seq(items)
+    assert [a["ids"] for a in res["items"][:50]] == [[i] for i in range(50)]
+    errs = errors_of(res)
+    assert set(errs) == {a["key"] for a in res["items"][50:]}
+    assert all(len(t) == 1 and "DICT_4X4_100" in t[0] for t in errs.values())
+
+
+def test_a_start_past_the_dictionary_wraps_round_as_the_hash_probe_does():
+    # DICT_4X4_50 stops at 49: its family's counter wraps to 0; a 5x5 family is its own
+    res = seq([item("a"), item("g", "grid", cols=3, rows=1), item("b", dictionary="DICT_5X5_250")], start=100)
+    assert blocks(res) == [("a", [0]), ("g", [1, 2, 3]), ("b", [100])]
+    assert res["warnings"] == []
+
+
+@pytest.mark.parametrize("kw", [{"mode": "random"}, {"mode": None}, {"start": -1}, {"start": 1.5},
+                                {"start": True}, {"start": "3"}, {"fresh": "yes"}, {"fresh": 1}])
+def test_bad_re_id_arguments_raise(kw):
+    with pytest.raises(ValueError):
+        AI.assign([item("a")], **kw)
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_sequential_uniqueness_with_and_without_fresh(seed):
+    items, ledger, reserved = hash_request(seed)
+    start = seed % 7 * 9
+    for fresh in (False, True):
+        res = seq(items, ledger, reserved, start=start, fresh=fresh)
+        assert violations(res, items) == []
+        assert [a["key"] for a in res["items"]] == [it["key"] for it in items]
+        if fresh:                                   # the old ledger is gone: only what was given out now
+            assert res["ledger"] == {a["key"]: a["first_id"] for a in res["items"] if a["driven"] and a["ids"]}
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_sequential_stability_without_fresh_survivors_keep_their_ids(seed):
+    rng, items = random_doc(seed)
+    first = seq(items)
+    keep = items[:]
+    for _ in range(min(rng.randint(1, 3), len(keep))):
+        keep.pop(rng.randrange(len(keep)))
+    doc = keep + [random_item(rng, f"new-{seed}-{k}") for k in range(rng.randint(1, 5))]
+    rng.shuffle(doc)
+    second = seq(doc, first["ledger"])
+    before, after = by_key(first), by_key(second)
+    for it in keep:
+        if before[it["key"]]["ids"]:
+            assert after[it["key"]]["ids"] == before[it["key"]]["ids"], it["key"]
+    assert violations(second, doc) == []
+    # and it settles (a refused item's first_id is only where its probe began)
+    assert blocks(seq(doc, second["ledger"])) == blocks(second)
+
+
+# the sequential probe with the typed-id check taken out of clash()
+SEQ_MUTANT = ("start = next((s for s in starts if not [k for k in clash(it, s, True) if not "
+              "(sequential and k in {x.key for x in its if x.first_id is not None})]), None)")
+
+
+def test_the_uniqueness_gate_catches_sequential_skipping_the_typed_id_check(monkeypatch):
+    src = Path(AI.__file__).read_text(encoding="utf-8")
+    assert src.count(PROBE) == 1, "the probe line moved: update this mutant"
+    mutant = types.ModuleType("aruco_studio.core._autoid_seq_mutant")
+    mutant.__package__ = "aruco_studio.core"
+    monkeypatch.setitem(sys.modules, mutant.__name__, mutant)
+    exec(compile(src.replace(PROBE, SEQ_MUTANT), AI.__file__, "exec"), mutant.__dict__)
+    docs = [random_doc(seed)[1] for seed in SEEDS]
+    red = sum(1 for items in docs if violations(mutant.assign(items, mode="sequential"), items))
+    assert red > 0
+    # the same mutant leaves hash mode alone: it is the sequential gate that goes red
+    assert all(mutant.assign(items) == AI.assign(items) for items in docs)

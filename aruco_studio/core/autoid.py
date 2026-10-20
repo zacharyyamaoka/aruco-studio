@@ -55,6 +55,22 @@ reproducible with no ledger. What is guaranteed:
       whatever order they arrive in (sorted keys, sha256 -- never Python's
       salted hash()).
 
+Re-ID (IdRequest.mode / start / fresh, Zach, 2026-10-20: "we should be able
+to have lots of the markers on a page and then re-id them"):
+
+    * mode "hash" (the default) is everything above, unchanged;
+    * mode "sequential" swaps rule 3's preferred id for a counter: the driven
+      items, in REQUEST (document) order, each take the next free block of
+      their count from the counter -- typed, ledger, held and reserved ids
+      skipped -- and the counter moves past it. Each family has its own
+      counter, all starting at `start` (default 0). Past the end of the
+      dictionary the probe wraps round as rule 3's does, and a full
+      dictionary is the same error;
+    * fresh: the incoming ledger is ignored (no rule 1, nothing held), so
+      every driven id is given out anew, in either mode, and the returned
+      ledger replaces the old one. Typed ids still win; overlaps are flagged
+      as in rule 2.
+
 Standard library only (it runs in Pyodide).
 """
 from __future__ import annotations
@@ -189,13 +205,25 @@ def reserved_in(reserved) -> Dict[Optional[str], Set[int]]:
     return {None: set(reserved_of(reserved))}
 
 
-def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None) -> dict:
+MODES = ("hash", "sequential")
+
+
+def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None,
+           mode: str = "hash", start: int = 0, fresh: bool = False) -> dict:
     """{items: [{key, first_id, ids, driven}] in the request's order, ledger:
     the updated {key: first id}, warnings: [Issue with key]} (contract
     IdResult). An item that cannot get ids (out of its dictionary, or the
     dictionary is full) comes back with ids [] and an error. `reserved`:
     ids never handed out, a list in every family or a map per family (see
-    the module's words)."""
+    the module's words). `mode` "hash" | "sequential", `start` (sequential's
+    first id) and `fresh` (ignore the ledger): Re-ID, the module's words."""
+    if mode not in MODES:
+        raise ValueError(f"mode: {' or '.join(map(repr, MODES))}, got {mode!r}")
+    if _whole(start, "start") < 0:
+        raise ValueError(f"start: 0 or more, got {start!r}")
+    if not isinstance(fresh, bool):
+        raise ValueError(f"fresh: true or false, got {fresh!r}")
+    sequential, origin = mode == "sequential", start      # `start` is reused below
     its = [item_of(d) for d in (items or [])]
     by_family = reserved_in(reserved)
     every = by_family.get(None, set())
@@ -212,8 +240,14 @@ def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None) -> dic
         if it.key in seen:
             raise ValueError(f"item key {it.key!r} appears twice: keys are unique")
         seen.add(it.key)
-    led = {k: v for k, v in (ledger or {}).items()
-           if isinstance(k, str) and isinstance(v, int) and not isinstance(v, bool) and v >= 0}
+    # WHY: without `fresh`, sequential still honours the ledger -- ledgered
+    # items keep their ids and only items the ledger does not know get
+    # sequential numbers -- because printed ids never move unless asked
+    # (rule 1). Renumbering what is already printed is the explicit Re-ID:
+    # `fresh`, which drops the ledger (Zach, 2026-10-20).
+    led = {} if fresh else {
+        k: v for k, v in (ledger or {}).items()
+        if isinstance(k, str) and isinstance(v, int) and not isinstance(v, bool) and v >= 0}
     order = sorted(its, key=lambda it: it.key)
     claims: Dict[str, Dict[int, str]] = {}      # family -> id -> the key printing it
     held: Dict[str, Dict[int, str]] = {}        # family -> id -> a typed item's old ledger id
@@ -313,12 +347,18 @@ def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None) -> dic
                 hold = held.setdefault(it.family, {})
                 for k in range(it.count):
                     hold.setdefault(led[it.key] + k, it.key)
-    # 3. the rest, driven: the preferred block, else the next free one (wrapping)
-    for it in order:
+    # 3. the rest, driven: the preferred block, else the next free one (wrapping);
+    #    sequential: in request order, from its family's counter
+    counter: Dict[str, int] = {}
+    for it in (its if sequential else order):
         if it.key in out:
             continue
-        want = preferred(it.key, it.dictionary, it.count, it.capacity)
-        starts = list(range(want, it.capacity - it.count + 1)) + list(range(0, want))
+        if sequential:
+            want = counter.get(it.family, origin)
+        else:
+            want = preferred(it.key, it.dictionary, it.count, it.capacity)
+        last = it.capacity - it.count
+        starts = list(range(want, last + 1)) + list(range(0, min(want, last + 1)))
         start = next((s for s in starts if not clash(it, s, True)), None)
         if start is None:                          # a held block, never a reserved one
             start = next((s for s in starts if not clash(it, s) and not on_reserved(it, s)), None)
@@ -342,4 +382,5 @@ def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None) -> dic
             refuse(it, want, True)
             continue
         take(it, start, True)
+        counter[it.family] = start + it.count
     return {"items": [out[it.key] for it in its], "ledger": new_ledger, "warnings": warnings}
