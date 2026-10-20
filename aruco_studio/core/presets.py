@@ -780,6 +780,41 @@ def layer_note(depth_mm, layer_mm, first_mm=0.0, what="black"):
     return f"{head}: {alts} prints whole layers (face up it depends on the part)"
 
 
+# NEW, not REF's (contract barrier 10, Zach 2026-10-20 night: "values
+# automatically set by preset, using information like nozzle width, print
+# height etc. Of course you can always override it"). Versioned like `cells`:
+# a change to the rule is a new HEIGHTS_RULE, never an edit of this one.
+HEIGHTS_RULE = 1
+BLACK_PRINT_MM = 0.5            # the black at least this deep (the colour under it hidden)
+WHITE_PRINT_MM = 1.8            # the white tile at least this tall
+BLACK_LEGACY_MM = -_slabs_module.BLACK_HEIGHT   # 0.6: the heights before the rule
+WHITE_LEGACY_MM = _slabs_module.WHITE_HEIGHT    # 2.0
+
+
+def driven_heights(layer_mm, first_layer_mm):
+    """The 3D heights a preset drives (rule HEIGHTS_RULE), mm: {"rule",
+    "black_mm", "white_mm", "layers"}. With a layer height AND a first
+    layer, each is whole layers printed face down -- the first layer + k x
+    the layer, the fewest k that reaches BLACK_PRINT_MM (the black) or
+    WHITE_PRINT_MM (the white): 0.2 + 1 x 0.32 = 0.52 and 0.2 + 5 x 0.32 =
+    1.80 for the Aruco profile, so layer_note says nothing. Without them
+    (the built-in Default: layers 0) BLACK_LEGACY_MM / WHITE_LEGACY_MM, the
+    heights every tag had before; "layers" False."""
+    try:
+        lay, first = float(layer_mm or 0.0), float(first_layer_mm or 0.0)
+    except (TypeError, ValueError):
+        lay = first = 0.0
+    if not (math.isfinite(lay) and math.isfinite(first) and lay > 0 and first > 0):
+        return {"rule": HEIGHTS_RULE, "black_mm": BLACK_LEGACY_MM, "white_mm": WHITE_LEGACY_MM,
+                "layers": False}
+
+    def whole(least):
+        k = max(0, math.ceil((least - first) / lay - 1e-9))
+        return round(first + k * lay, 6)
+    return {"rule": HEIGHTS_RULE, "black_mm": whole(BLACK_PRINT_MM),
+            "white_mm": whole(WHITE_PRINT_MM), "layers": True}
+
+
 # ============================================ the preset library's pure half
 # Verbatim from REF ArucoMarkers/aruco_preset_library.py at c8216ff (its SCHEMA is
 # LIBRARY_SCHEMA here: this module's SCHEMA is the presets file's). Not here: the recent
