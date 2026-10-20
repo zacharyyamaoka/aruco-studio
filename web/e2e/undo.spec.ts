@@ -3,7 +3,7 @@
 // Each check measures the probe's numbers: the document, the plan the core
 // drew, and the history's canUndo / canRedo.
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, coreReady, dragWorld, idle, openStudio, planOutline, state } from "./helpers";
+import { CORE, coreReady, dragWorld, idle, openStudio, panelTab, planOutline, state } from "./helpers";
 
 async function blank(page: Page): Promise<void> {
   await openStudio(page);
@@ -12,7 +12,7 @@ async function blank(page: Page): Promise<void> {
   await page.getByTestId("cmd-new").click();
 }
 
-/** R, a 60 × 60 rectangle about the origin, A: the panel open on the new feature. Returns its id. */
+/** R, a 60 × 60 rectangle about the origin, A (it is the profile): the panel open on the new feature. Returns its id. */
 async function rectAndExtrude(page: Page): Promise<string> {
   await page.keyboard.press("r");
   await dragWorld(page, [-30, -30], [30, 30]);
@@ -35,7 +35,7 @@ test.describe(`undo / redo (${CORE} core)`, () => {
     await blank(page);
     const fid = await rectAndExtrude(page);
     const sA = await state(page);
-    const rid = sA.feature.rectId as string;
+    const rid = sA.feature.profile.outer as string;   // A on the drawn rectangle: it is the profile
     expect(sA.feature.marker.auto).toBe(true);
     const driven = sA.plan.marker_mm as number;
     expect(Math.abs(driven - 12)).toBeGreaterThan(1);
@@ -137,6 +137,7 @@ test.describe(`undo / redo (${CORE} core)`, () => {
   test("c · Ctrl+Z in a focused field is the field's: the document stays", async ({ page }) => {
     await blank(page);
     await rectAndExtrude(page);
+    await panelTab(page, "marker");
     const s0 = await state(page);
     expect(s0.canUndo).toBe(true);
 

@@ -34,8 +34,34 @@ function capacityOf(dict: string): number {
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
+/** A request with the box its marker goes in. */
+type Placed = PlanRequest & { rect: Rect };
+
+/** A loop of four corners at right angles as a rectangle (rotated too). */
+function loopRect(loop: Loop): Rect | null {
+  if (loop.length !== 4) return null;
+  const e = loop.map((p, i) => [loop[(i + 1) % 4][0] - p[0], loop[(i + 1) % 4][1] - p[1]]);
+  const len = (v: number[]) => Math.hypot(v[0], v[1]);
+  const dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1];
+  const tol = 1e-6 * Math.max(len(e[0]), len(e[1]), 1);
+  if (Math.abs(dot(e[0], e[1])) > tol * len(e[0]) || Math.abs(dot(e[1], e[2])) > tol * len(e[1])) return null;
+  const cx = loop.reduce((a, p) => a + p[0], 0) / 4, cy = loop.reduce((a, p) => a + p[1], 0) / 4;
+  return { cx: r2(cx), cy: r2(cy), w: r2(len(e[0])), h: r2(len(e[1])), angle_deg: r2((Math.atan2(e[0][1], e[0][0]) * 180) / Math.PI) };
+}
+
+/** The box the marker goes in (contract barrier 9): the legacy rect when
+ *  sent, a rectangle profile as it is, else the largest clear box in it. */
+function placed(req: PlanRequest): Placed {
+  const pr = req.profile;
+  const holes = req.holes ?? "avoid";
+  const r = req.rect ?? (pr?.loops.length
+    ? (pr.loops.length === 1 || holes === "ignore" ? loopRect(pr.loops[0]) : null) ?? inscribeOf(pr, holes) : null);
+  if (!r) throw new Error("nothing fits in the profile (mock core)");
+  return { ...req, rect: r };
+}
+
 /** The sizes in the marker's own frame: marker, checker, separation, outer. */
-function sizes(req: PlanRequest) {
+function sizes(req: Placed) {
   const m = req.marker;
   const n = bitsOf(m.dictionary) + 2;
   const q = m.quiet_modules / n;          // quiet zone per marker side, in markers
@@ -72,6 +98,12 @@ function bits(id: number, n: number): boolean[] {
   return out;
 }
 
+function rectLoop(r: Rect): Loop {
+  const a = (r.angle_deg * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a);
+  return ([[-r.w / 2, -r.h / 2], [r.w / 2, -r.h / 2], [r.w / 2, r.h / 2], [-r.w / 2, r.h / 2]] as Vec2[])
+    .map(([u, v]) => [r2(r.cx + u * c - v * s), r2(r.cy + u * s + v * c)] as Vec2);
+}
+
 function sq(x0: number, y0: number, s: number): Loop {
   return [[x0, y0], [x0 + s, y0], [x0 + s, y0 + s], [x0, y0 + s]];
 }
@@ -87,10 +119,10 @@ function markerPolys(id: number, x0: number, y0: number, size: number, b: number
   return { outer: sq(x0, y0, size), holes };
 }
 
-function place(req: PlanRequest, p: Vec2): Vec2 {
+function place(req: Placed, p: Vec2): Vec2 {
   const m = req.marker, r = req.rect;
   let [u, v] = p;
-  if (m.flip && !req.reference_face) u = -u;
+  if (m.flip) u = -u;   // barrier 10: Flip applies on a reference face too
   const t = (m.turn * Math.PI) / 180;
   [u, v] = [u * Math.cos(t) - v * Math.sin(t), u * Math.sin(t) + v * Math.cos(t)];
   const a = (r.angle_deg * Math.PI) / 180;
@@ -103,7 +135,8 @@ function resolveText(t: string, ids: number[], req: PlanRequest): string {
     .replace(/\{ids\}/g, range).replace(/\{dict\}/g, req.marker.dictionary.replace("DICT_", "")).replace(/\{type\}/g, req.marker.type);
 }
 
-function planOf(req: PlanRequest): MarkerPlan {
+function planOf(req0: PlanRequest): MarkerPlan {
+  const req = placed(req0);
   const m = req.marker, r = req.rect;
   const z = sizes(req);
   const b = bitsOf(m.dictionary);
@@ -158,18 +191,53 @@ function planOf(req: PlanRequest): MarkerPlan {
   }
   // the Joint Origin: x along the marker's turned u, y along v; the centre
   // of a single marker, the bottom-left of a board's black
-  const t = ((m.turn + r.angle_deg) * Math.PI) / 180, fl = m.flip && !req.reference_face ? -1 : 1;
+  const t = ((m.turn + r.angle_deg) * Math.PI) / 180, fl = m.flip ? -1 : 1;
   const c = Math.cos(t), s = Math.sin(t);
   const o = m.type === "single" ? [r.cx, r.cy] : place(req, [x0, y0]);
   const origin = [fl * c, -s, 0, o[0], fl * s, c, 0, o[1], 0, 0, fl, 0, 0, 0, 0, 1];
   const kind = m.type === "single" ? "Single" : m.type === "grid" ? `Grid ${z.cols}×${z.rows}` : `ChArUco ${z.cols}×${z.rows}`;
+  // the cut: the marker's quiet zone, else the profile with its holes (a
+  // legacy request without one: its rect); "rectangle" reads as "profile"
+  const pr = req.profile?.loops;
+  const cut_shape: Polygon = req.trim === "marker" ? { outer, holes: [] }
+    : pr?.length ? { outer: pr[0], holes: pr.slice(1) } : { outer: rectLoop(r), holes: [] };
   const idTxt = ids.length > 1 ? `#${ids[0]}–${ids[ids.length - 1]}` : `#${ids[0]}`;
+  // as the core: the heights only when the request asks (it always does since barrier 10)
+  const extrude = req0.extrude ? extrudeOf(req0, warnings) : undefined;
   return {
     ok: !warnings.some((w) => w.level === "error"), ids, black, outer, outer_mm: [r2(ow), r2(oh)], marker_mm: r2(z.marker),
     checker_mm: r2(z.checker), separation_mm: r2(z.sep), cols: z.cols, rows: z.rows, cell_mm: r2(z.cell), auto: m.auto,
-    overflow_mm: overflow, origin, label, warnings,
+    overflow_mm: overflow, fit_rect: r, cut: cut_shape.outer, cut_shape, origin, label, warnings, extrude,
     summary: `${kind} ${m.dictionary} ${idTxt} · ${r2(z.marker)} mm · outer ${r2(ow)} × ${r2(oh)} mm (mock core)`,
   };
+}
+
+/** The heights as planned (contract barrier 10), as the core's rule 1 has
+ *  them: an unset field is driven -- the mode auto (black on a reference
+ *  face, both in open space), the white and the black in whole layers of the
+ *  preset (first + n × layer, white >= 1.8 mm, black >= 0.5 mm; 2.0 / 0.6
+ *  without layers), the paper the preset's thickness. A set value is used as
+ *  typed; a 0 height is refused (an error), a white thinner than the black warns. */
+function extrudeOf(req: PlanRequest, warnings: Issue[]): MarkerPlan["extrude"] {
+  const e = req.extrude ?? {}, p = req.preset;
+  const driven: NonNullable<MarkerPlan["extrude"]>["driven"] = [];
+  const whole = (min: number, none: number) => {
+    const lay = p.layer_mm, first = p.first_layer_mm;
+    return lay && first ? r2(first + Math.max(0, Math.ceil((min - first) / lay - 1e-9)) * lay) : none;
+  };
+  const pick = <K extends "white_mm" | "black_mm" | "paper_mm">(k: K, d: number): number => {
+    const v = e[k];
+    if (v === undefined) { driven.push(k); return d; }
+    if (v <= 0 && k !== "paper_mm") { warnings.push({ field: `extrude.${k}`, level: "error", text: `a height of ${v} mm makes nothing: ${d} mm used (mock core)` }); return d; }
+    return v;
+  };
+  let mode: "both" | "black" | "white";
+  if (e.mode === undefined || e.mode === "auto") { driven.push("mode"); mode = req.reference_face ? "black" : "both"; } else mode = e.mode;
+  const white_mm = pick("white_mm", whole(1.8, 2.0)), black_mm = pick("black_mm", whole(0.5, 0.6));
+  const paper_mm = pick("paper_mm", p.thickness_mm ?? 0.1);
+  if (p.method === "print3d" && mode === "both" && black_mm > white_mm) warnings.push({ field: "extrude.black_mm", level: "warn",
+    text: `the black (${black_mm} mm) is deeper than the white (${white_mm} mm): it runs out of the tile (mock core)` });
+  return { method: p.method, mode, white_mm, black_mm, paper_mm, flipped: req.marker.flip, driven };
 }
 
 /** The largest clear axis-aligned rectangle, on a sampled grid (crude). */
@@ -214,7 +282,8 @@ function inscribeOf(profile: Profile, holes: "avoid" | "ignore"): Rect | null {
   return { cx: r2((x0 + x1) / 2), cy: r2((y0 + y1) / 2), w: r2(x1 - x0), h: r2(y1 - y0), angle_deg: 0 };
 }
 
-function suggestOf(req: PlanRequest): Suggestion[] {
+function suggestOf(req0: PlanRequest): Suggestion[] {
+  const req = placed(req0);
   const m = req.marker;
   const out: Suggestion[] = [];
   if (m.type === "single") {
@@ -301,6 +370,10 @@ function sheetOf(req: SheetRequest): Sheet {
   return { pages: 1, svg: [svg], pdf_base64: pdfOf(plan, page), warnings };
 }
 
+/** Every plan request the mock answered, newest last: window.__mockPlanRequests. */
+const planRequests: PlanRequest[] = [];
+if (typeof window !== "undefined") (window as unknown as { __mockPlanRequests: PlanRequest[] }).__mockPlanRequests = planRequests;
+
 export function createMockCore(onReady: () => void, delay = 900): CoreApi {
   const ready = wait(delay).then(onReady);
   const call = async <T>(f: () => T): Promise<T> => {
@@ -316,7 +389,8 @@ export function createMockCore(onReady: () => void, delay = 900): CoreApi {
     info: () => call(() => info),
     presets: () => call(() => PRESETS.map((p) => ({ ...p }))),
     inscribe: (profile, holes) => call(() => inscribeOf(profile, holes)),
-    plan: (req) => call(() => planOf(req)),
+    // the plan requests are kept for the e2e (the real core's are seen in the worker's messages)
+    plan: (req) => call(() => { planRequests.push(structuredClone(req)); return planOf(req); }),
     suggest: (req) => call(() => suggestOf(req)),
     svg: (req) => call(() => svgOf(planOf(req)).svg),
     sheet: (req) => call(() => sheetOf(req)),

@@ -1,7 +1,8 @@
-// Trim (Zach, 2026-10-18): the sticker is cut to the profile, the marker
-// rectangle (default) or the marker, and everything inside the cut is white
-// -- on the canvas (the plan's cut_shape under the marker) and in Export SVG.
-// On the plate's inscribed rectangle; every check measures the white path's
+// Trim (Zach, 2026-10-18; 2026-10-20 evening): the sticker is cut to the
+// profile (default) or the marker, and everything inside the cut is white --
+// on the canvas (the plan's cut_shape under the marker) and in Export SVG.
+// "There is no longer trim to rectangle": a rectangle sticker is a rectangle
+// profile trimmed to profile. On the plate's face; every check measures the white path's
 // box on screen (getBoundingClientRect), its fill at a point (isPointInFill)
 // or the exported file's numbers. Screenshots (1280 × 800) go to TRIM_SHOTS
 // (default test-results/trim).
@@ -23,7 +24,7 @@ async function plateFeature(page: Page): Promise<string> {
   await page.keyboard.press("a");
   await idle(page);
   const s = await state(page);
-  expect(s.feature.profile, "the feature keeps the face it was inscribed from").toBeTruthy();
+  expect(s.feature.profile, "the feature's profile is the face").toEqual({ outer: "plate", holes: ["plate-h1", "plate-h2"] });
   return s.panel.featureId as string;
 }
 
@@ -70,7 +71,8 @@ async function exportedWhite(page: Page): Promise<{ box: Box; loops: number }> {
   return { box: boxOf(pts), loops: subs.length };
 }
 
-/** The plan's cut_shape in the rectangle's own frame, as the SVG has it (y down). */
+/** The plan's cut_shape in the frame of the box the marker was placed in
+ *  (fit_rect), as the SVG has it (y down). */
 function cutInFile(plan: any, r: any): Box {
   const a = (r.angle_deg * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a);
   const pts = plan.cut_shape.outer.map(([x, y]: number[]) => {
@@ -83,30 +85,28 @@ function cutInFile(plan: any, r: any): Box {
 test.describe(`trim (${CORE} core)`, () => {
   test.skip(CORE === "mock", "trim is the real core's (the mock has no cut_shape)");
 
-  test("the sticker's white is the rectangle, the face with its holes, or the quiet zone; Export SVG carries it", async ({ page }) => {
+  test("the sticker's white is the face with its holes, or the quiet zone; Export SVG carries it", async ({ page }) => {
     const fid = await plateFeature(page);
     const s0 = await state(page);
-    const r = s0.doc.shapes.find((x: any) => x.id === s0.feature.rectId);
+    const r = s0.plan.fit_rect;
+    expect(r, "the core placed the marker (fit_rect)").toBeTruthy();
     const holes = s0.doc.shapes.filter((x: any) => x.kind === "circle");
     expect(holes).toHaveLength(2);
 
-    // Rectangle is the default, driven (grey) until set
-    expect(s0.feature.trim).toBe("rectangle");
+    // Profile is the default, driven (grey) until set; exactly Profile | Marker
+    expect(s0.feature.trim).toBe("profile");
     await expect(page.locator('[data-drv="trim"]')).toHaveAttribute("data-driven", "1");
-    await expect(page.locator('[data-row="trim"] .kit-seg-btn[data-value="profile"]')).toBeEnabled();
+    await expect(page.locator('[data-row="trim"] .kit-seg-btn')).toHaveCount(2);
 
     const shots: Record<string, string> = {};
-    for (const trim of ["rectangle", "profile", "marker"]) {
+    for (const trim of ["profile", "marker"]) {
       await pickTrim(page, trim);
       const s = await state(page);
       const w = await screenBox(page, `[data-cut-white="${fid}"]`);
-      if (trim === "rectangle") {
-        near(w, await screenBox(page, `[data-shape="${r.id}"]`), 1, "white vs the rectangle");
-        expect(await white(page, fid, 5, 5), "the plate outside the rectangle").toBe(false);
-      } else if (trim === "profile") {
+      if (trim === "profile") {
         near(w, await screenBox(page, '[data-shape="plate"]'), 1, "white vs the plate face");
         for (const h of holes) expect(await white(page, fid, h.cx, h.cy), `hole ${h.id}'s centre`).toBe(false);
-        expect(await white(page, fid, 5, 5), "the plate outside the rectangle").toBe(true);
+        expect(await white(page, fid, 5, 5), "the plate's corner, outside the marker's box").toBe(true);
       } else {
         near(w, await screenBox(page, `[data-marker="${fid}"] [data-marker-outline]`), 1, "white vs the marker's outline");
         expect(await white(page, fid, r.cx, r.cy - r.h / 2 + 0.2), "the label band, outside the quiet zone").toBe(false);
@@ -127,10 +127,10 @@ test.describe(`trim (${CORE} core)`, () => {
       await page.screenshot({ path: shots[trim] });
     }
 
-    // ↺: back to the driven rectangle
+    // ↺: back to the driven profile
     await page.locator('[data-reset="trim"]').click();
     await idle(page);
-    expect((await state(page)).feature.trim).toBe("rectangle");
+    expect((await state(page)).feature.trim).toBe("profile");
     await expect(page.locator('[data-drv="trim"]')).toHaveAttribute("data-driven", "1");
   });
 
@@ -157,7 +157,10 @@ test.describe(`trim (${CORE} core)`, () => {
     await page.screenshot({ path: path.join(SHOTS, "trim-marker-label-on-marker.png") });
   });
 
-  test("Profile needs a profile: a drawn rectangle's feature has it disabled, with why", async ({ page }) => {
+  // WHY replaced (2026-10-20 evening): Profile no longer needs a face (every
+  // feature has a profile); "if you want trim to rectangle then just make your
+  // profile a rectangle and trim to profile!"
+  test("a rectangle sticker: a drawn rectangle's feature is cut to the rectangle by Trim Profile (the default)", async ({ page }) => {
     await openStudio(page);
     await coreReady(page);
     await page.getByTestId("menu-file").click();
@@ -167,9 +170,14 @@ test.describe(`trim (${CORE} core)`, () => {
     await page.keyboard.press("a");
     await expect(page.getByTestId("extrude-panel")).toBeVisible();
     await idle(page);
+    const s = await state(page);
+    const fid = s.feature.id as string;
+    expect(s.feature.trim).toBe("profile");
     const btn = page.locator('[data-row="trim"] .kit-seg-btn[data-value="profile"]');
-    await expect(btn).toBeDisabled();
-    await expect(btn).toHaveAttribute("title", /Needs a profile/);
-    expect((await state(page)).feature.trim).toBe("rectangle");
+    await expect(btn).toBeEnabled();
+    near(await screenBox(page, `[data-cut-white="${fid}"]`), await screenBox(page, `[data-shape="${s.feature.profile.outer}"]`), 1,
+      "white vs the drawn rectangle");
+    // the marker fills the rectangle: the core used it as the box
+    expect(s.plan.fit_rect).toMatchObject({ cx: 0, cy: 0, w: 40, h: 30 });
   });
 });

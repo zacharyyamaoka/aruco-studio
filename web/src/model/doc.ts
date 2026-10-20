@@ -1,29 +1,44 @@
 // The document: one sketch (closed shapes, ../sketch/model.ts) and any number
 // of ArUco Extrude features, with the preset they are made by. Pure: the
 // store (../store.ts) calls these; vitest covers them. Saved as
-// `.arucostudio-web.json` (format "arucostudio-web", version 2; a version 1
-// file, which held one feature, is migrated on open).
-import type { IdItem, IdRequest, IdResult, LabelParams, MarkerParams, MarkerType, PlanRequest, Preset, Suggestion, Trim, Turn } from "../core/contract";
-import { profileLoops, rectOf, type ProfileRef, type RectShape, type Shape } from "../sketch/model";
+// `.arucostudio-web.json` (format "arucostudio-web", version 3; a version 1
+// file, which held one feature, and a version 2 file, whose features filled
+// a rectangle, are migrated on open).
+//
+// WHY a feature references a PROFILE (Zach, 2026-10-20 evening: "if we just
+// have the idea of a profile, and you want a custom location, then you draw a
+// rectangle profile … it's just going to be a profile"): the core places the
+// marker in the profile, like an extrude; a rectangle profile is used exactly
+// (contract.ts PlanRequest, barrier 9).
+import type { ExtrudeParams, IdItem, IdRequest, IdResult, LabelParams, MarkerParams, MarkerType, PlanRequest, Preset, Suggestion, Trim, Turn } from "../core/contract";
+import { dimShapes, type SketchDim } from "../sketch/constraints";
+import { plainRect, profileLoops, sameProfile, type ProfileRef, type RectShape, type Shape } from "../sketch/model";
 
 export type Holes = "avoid" | "ignore";
 
-/** An ArUco Extrude feature: the marker rectangle it fills, the profile it
- *  came from (the reference face: Flip does not apply), the marker's and the
- *  label's numbers, and which of them were set by hand. */
+/** An ArUco Extrude feature: the profile the core places its marker in (a
+ *  region's outer shape and its holes, or a rectangle alone: the custom
+ *  placement), the marker's and the label's numbers, and which of them were
+ *  set by hand. */
 export interface Feature {
   /** made once, never changes, saved in the file */
   id: string;
   /** the stable key auto id hashes (IdItem.key); the id by default */
   key: string;
-  rectId: string | null;
+  /** null only while the panel waits for one: OK without a profile makes nothing */
   profile: ProfileRef | null;
+  /** the profile's holes: the marker keeps off them ("avoid") or not */
   holes: Holes;
-  /** what the sticker is cut to (contract Trim); "rectangle" by default,
+  /** what the sticker is cut to (contract Trim): the profile by default,
    *  driven until set ("trim" in `set`) */
   trim: Trim;
   marker: MarkerParams;
   label: LabelParams;
+  /** the heights (contract barrier 10): ONLY the fields set by hand are present;
+   *  an absent one is driven from the preset (the plan's MarkerPlan.extrude says
+   *  its value). The Make tab's rows and the 3D view's drag arrows both write it
+   *  through setField("extrude.<key>") / resetField. */
+  extrude: ExtrudeParams;
   /** the fields typed by hand among those the contract has no driven
    *  encoding for ("marker.cols", "label.gap_mm", ...). The rest say it in
    *  their own value: see isSet(). */
@@ -32,21 +47,25 @@ export interface Feature {
 
 export interface Doc {
   format: "arucostudio-web";
-  version: 2;
+  version: 3;
   name: string;
   shapes: Shape[];
+  /** the sketch's driving dimensions (D; ../sketch/constraints.ts): a file
+   *  from before them has none */
+  dims: SketchDim[];
   features: Feature[];
   /** auto id: key -> the first id already given out (IdRequest.ledger) */
   id_ledger: Record<string, number>;
   preset: Preset | null;
 }
 
-export const DOC_VERSION = 2;
+export const DOC_VERSION = 3;
 
-export const TRIMS: readonly Trim[] = ["profile", "rectangle", "marker"];
-// WHY rectangle (Zach, 2026-10-18): "the desired use case usually is we draw
-// the outer allowed shape, and then we are expecting a sticker that is that shape"
-export const DEFAULT_TRIM: Trim = "rectangle";
+export const TRIMS: readonly Trim[] = ["profile", "marker"];
+// WHY profile (Zach, 2026-10-20 evening): "there is no longer trim to rectangle.
+// If you want trim to rectangle then just make your profile a rectangle and trim
+// to profile!" An old "rectangle" reads as "profile" (readFeature).
+export const DEFAULT_TRIM: Trim = "profile";
 
 export const DEFAULT_MARKER: MarkerParams = {
   type: "single", dictionary: "DICT_4X4_50", first_id: 0, auto: true, marker_mm: 30, checker_mm: 0, separation_mm: 0,
@@ -63,14 +82,19 @@ export function newId(prefix = "s"): string {
   return `${prefix}${Date.now().toString(36)}${seq}`;
 }
 
-export function newFeature(rectId: string | null, profile: ProfileRef | null, id = newId("f")): Feature {
+/** A rectangle on its own as a profile: its outer edges, whatever is inside it. */
+export function rectProfile(rectId: string): ProfileRef {
+  return { outer: rectId, holes: [] };
+}
+
+export function newFeature(profile: ProfileRef | null, id = newId("f")): Feature {
   return {
-    id, key: id, rectId, profile, holes: "avoid", trim: DEFAULT_TRIM, marker: { ...DEFAULT_MARKER }, label: { ...DEFAULT_LABEL, offset_mm: [0, 0] }, set: [],
+    id, key: id, profile, holes: "avoid", trim: DEFAULT_TRIM, marker: { ...DEFAULT_MARKER }, label: { ...DEFAULT_LABEL, offset_mm: [0, 0] }, extrude: {}, set: [],
   };
 }
 
 export function emptyDoc(name = "Untitled", shapes: Shape[] = [], preset: Preset | null = null): Doc {
-  return { format: "arucostudio-web", version: 2, name, shapes, features: [], id_ledger: {}, preset };
+  return { format: "arucostudio-web", version: 3, name, shapes, dims: [], features: [], id_ledger: {}, preset };
 }
 
 // ------------------------------------------------------------ shapes
@@ -83,13 +107,13 @@ export function setShape(doc: Doc, s: Shape): Doc {
   return { ...doc, shapes: doc.shapes.map((x) => (x.id === s.id ? s : x)) };
 }
 
-/** Delete a shape; a feature that fills it goes with it (a feature is
- *  reached by clicking its marker: one without a rectangle could not be),
- *  and a profile that named it is no longer a reference. */
+/** Delete a shape; a feature whose profile it bounds goes with it (a feature
+ *  is reached by clicking its marker: one without a profile could not be),
+ *  a profile it was a hole of loses that hole, and a dimension naming it goes. */
 export function deleteShape(doc: Doc, id: string): Doc {
-  const features = doc.features.filter((f) => f.rectId !== id).map((f) =>
-    f.profile && (f.profile.outer === id || f.profile.holes.includes(id)) ? { ...f, profile: null } : f);
-  return { ...doc, shapes: doc.shapes.filter((x) => x.id !== id), features };
+  const features = doc.features.filter((f) => f.profile?.outer !== id).map((f) =>
+    f.profile?.holes.includes(id) ? { ...f, profile: { ...f.profile, holes: f.profile.holes.filter((h) => h !== id) } } : f);
+  return { ...doc, shapes: doc.shapes.filter((x) => x.id !== id), dims: doc.dims.filter((d) => !dimShapes(d).includes(id)), features };
 }
 
 // ------------------------------------------------------------ features
@@ -98,9 +122,15 @@ export function getFeature(doc: Doc, id: string | null | undefined): Feature | n
   return (id && doc.features.find((f) => f.id === id)) || null;
 }
 
-/** The feature that fills a rectangle, if any. */
+/** The feature whose profile is this one, if any (one marker per profile:
+ *  the core would place a second in the same spot). */
+export function featureOfProfile(doc: Doc, ref: ProfileRef): Feature | null {
+  return doc.features.find((f) => sameProfile(f.profile, ref)) ?? null;
+}
+
+/** The feature whose profile is this rectangle on its own, if any. */
 export function featureOfRect(doc: Doc, rectId: string): Feature | null {
-  return doc.features.find((f) => f.rectId === rectId) ?? null;
+  return featureOfProfile(doc, rectProfile(rectId));
 }
 
 export function addFeature(doc: Doc, f: Feature): Doc {
@@ -127,10 +157,17 @@ export function featureNumber(doc: Doc, id: string): number {
   return doc.features.findIndex((f) => f.id === id) + 1;
 }
 
+/** The rectangle a feature's profile is, when it is a rectangle with nothing
+ *  inside it (the custom placement: the marker fills it, a drag moves both). */
 export function featureRect(doc: Doc, f: Feature | null): RectShape | null {
-  const id = f?.rectId;
-  const s = id ? doc.shapes.find((r) => r.id === id) : null;
-  return s && s.kind === "rect" ? s : null;
+  return f?.profile ? plainRect(doc.shapes, f.profile) : null;
+}
+
+/** A face (body) under the marker: it sets Z, so Flip does not apply.
+ *  WHY not for a rectangle profile: a rectangle drawn for the custom placement
+ *  is sketch geometry, as the old marker rectangle was (no reference face). */
+export function referenceFace(doc: Doc, f: Feature): boolean {
+  return !!f.profile && !featureRect(doc, f);
 }
 
 // ------------------------------------------------------------ driven vs set
@@ -149,6 +186,11 @@ const ENCODED: Record<string, (f: Feature) => boolean> = {
   "marker.separation_mm": (f) => f.marker.separation_mm > 0,
   "label.height_mm": (f) => f.label.height_mm > 0,
   "marker.origin_square": (f) => f.marker.origin_square != null,   // driven = null: OpenCV's board corner
+  // barrier 10: an extrude field is set when present (absent = driven by the preset)
+  "extrude.mode": (f) => f.extrude.mode !== undefined,
+  "extrude.white_mm": (f) => f.extrude.white_mm !== undefined,
+  "extrude.black_mm": (f) => f.extrude.black_mm !== undefined,
+  "extrude.paper_mm": (f) => f.extrude.paper_mm !== undefined,
 };
 
 /** The fields a row can set that the contract has no driven encoding for. */
@@ -183,7 +225,8 @@ const unmark = (set: string[], paths: string[]) => set.filter((p) => !paths.incl
  *  flags overflow). */
 export function setField(f: Feature, path: string, value: unknown): Feature {
   if (path === "trim") return { ...f, trim: value as Trim, set: mark(f.set, path) };
-  const [part, key] = path.split(".") as ["marker" | "label", string];
+  const [part, key] = path.split(".") as ["marker" | "label" | "extrude", string];
+  if (part === "extrude") return { ...f, extrude: { ...f.extrude, [key]: value } };
   if (part === "label") {
     return { ...f, label: { ...f.label, [key]: value }, set: (LISTED as readonly string[]).includes(path) ? mark(f.set, path) : f.set };
   }
@@ -204,7 +247,12 @@ export function resetField(f: Feature, path: string): Feature {
   if (path === "label.height_mm") return { ...f, label: { ...f.label, height_mm: 0 } };
   if (path === "marker.origin_square") return { ...f, marker: { ...f.marker, origin_square: null } };
   if (path === "trim") return { ...f, trim: DEFAULT_TRIM, set: unmark(f.set, [path]) };
-  const [part, key] = path.split(".") as ["marker" | "label", string];
+  const [part, key] = path.split(".") as ["marker" | "label" | "extrude", string];
+  if (part === "extrude") {
+    const extrude = { ...f.extrude };
+    delete extrude[key as keyof ExtrudeParams];
+    return { ...f, extrude };
+  }
   const set = unmark(f.set, [path]);
   if (part === "label") return { ...f, label: { ...f.label, [key]: drivenValue(f.marker, path) }, set };
   if (key === "type") {
@@ -262,26 +310,19 @@ export function idRange(m: MarkerParams, ids?: number[]): string {
 
 // ------------------------------------------------------------ the requests
 
-/** The feature's plan request. Trim "profile" also sends the profile's loops
- *  (as inscribe gets them); without them the core cuts to the rectangle and
- *  says so. */
+/** The feature's plan request: the profile's loops (the outer counter-
+ *  clockwise, the holes clockwise) and what to do with its holes. No `rect`:
+ *  the core places the marker and answers MarkerPlan.fit_rect. */
 export function planRequest(doc: Doc, f: Feature | null): PlanRequest | null {
-  const r = featureRect(doc, f);
-  if (!f || !r || !doc.preset) return null;
-  const req: PlanRequest = {
-    trim: effectiveTrim(f), rect: rectOf(r), marker: f.marker, label: f.label, preset: doc.preset,
-    reference_face: !!f.profile,
+  const profile = f?.profile ? profileLoops(doc.shapes, f.profile) : null;
+  if (!f || !profile || !doc.preset) return null;
+  return {
+    trim: f.trim, profile, holes: f.holes, marker: f.marker, label: f.label, preset: doc.preset,
+    reference_face: referenceFace(doc, f),
+    // always, even {}: the core answers MarkerPlan.extrude (the driven heights the
+    // Make tab and the 3D view show grey) only when the request asks
+    extrude: f.extrude,
   };
-  const profile = req.trim === "profile" && f.profile ? profileLoops(doc.shapes, f.profile) : null;
-  if (profile) req.profile = profile;
-  return req;
-}
-
-/** The trim the core gets: a feature set to Profile whose profile was cleared
- *  is cut to the rectangle (the panel says so under Trim); its own choice
- *  stays, so picking a profile again brings Profile back. */
-export function effectiveTrim(f: Feature): Trim {
-  return f.trim === "profile" && !f.profile ? "rectangle" : f.trim;
 }
 
 /** Print's sheet: one item per feature that plans, in the order made. */
@@ -334,14 +375,24 @@ export function serialise(doc: Doc): string {
 
 /** A saved feature with what it lacks filled in from the defaults. */
 function readFeature(raw: Record<string, unknown>): Feature {
-  const base = newFeature(null, null, typeof raw.id === "string" && raw.id ? raw.id : undefined);
+  const base = newFeature(null, typeof raw.id === "string" && raw.id ? raw.id : undefined);
+  const { rectId, ...rest } = raw;
   const f: Feature = {
-    ...base, ...raw,
-    marker: { ...DEFAULT_MARKER, ...(raw.marker as object) }, label: { ...DEFAULT_LABEL, ...(raw.label as object) },
+    ...base, ...rest,
+    marker: { ...DEFAULT_MARKER, ...(rest.marker as object) }, label: { ...DEFAULT_LABEL, ...(rest.label as object) },
   } as Feature;
   if (typeof f.key !== "string" || !f.key) f.key = f.id;
   if (!Array.isArray(f.set)) f.set = [];
-  // a file from before trim (2026-10-18), or an unknown one: the rectangle, driven
+  // before barrier 10 (2026-10-20 night) there were no heights: all driven
+  if (!f.extrude || typeof f.extrude !== "object" || Array.isArray(f.extrude)) f.extrude = {};
+  // version 2 (2026-10-18 .. 20): the marker filled the rectangle `rectId` (drawn,
+  // or inscribed in the face `profile`); that rectangle on its own is the profile
+  // now, so the marker stays where it was
+  if (typeof rectId === "string" && rectId) f.profile = rectProfile(rectId);
+  else if ("rectId" in raw) f.profile = null;
+  // "rectangle" (deprecated 2026-10-20 evening) is a rectangle profile cut to
+  // the profile; a file from before trim (2026-10-18), or an unknown one: the
+  // profile, driven
   if (!TRIMS.includes(f.trim)) { f.trim = DEFAULT_TRIM; f.set = f.set.filter((p) => p !== "trim"); }
   return f;
 }
@@ -364,16 +415,26 @@ export function migrateV1(d: Record<string, unknown>): Record<string, unknown> {
   return { ...rest, version: 2, features, id_ledger: {} };
 }
 
+/** Version 2's features filled a rectangle (rectId); readFeature turns each
+ *  into that rectangle as its profile. */
+export function migrateV2(d: Record<string, unknown>): Record<string, unknown> {
+  return { ...d, version: 3 };
+}
+
 /** Read a saved file; throws with a readable reason when it is not one. */
 export function parseDoc(text: string): Doc {
   let d = JSON.parse(text);
   if (!d || d.format !== "arucostudio-web") throw new Error("not an .arucostudio-web.json file");
   if (d.version === 1) d = migrateV1(d);
-  if (d.version !== DOC_VERSION) throw new Error(`file version ${d.version}: this Studio reads versions 1 and ${DOC_VERSION}`);
+  if (d.version === 2) d = migrateV2(d);
+  if (d.version !== DOC_VERSION) throw new Error(`file version ${d.version}: this Studio reads versions 1 to ${DOC_VERSION}`);
   const shapes: Shape[] = Array.isArray(d.shapes) ? d.shapes.filter((s: Shape) => s && ["rect", "circle", "poly"].includes(s.kind)) : [];
   const features: Feature[] = Array.isArray(d.features) ? d.features.filter((f: unknown) => f && typeof f === "object").map(readFeature) : [];
   const ledger = d.id_ledger && typeof d.id_ledger === "object" ? d.id_ledger as Record<string, number> : {};
+  const ids = new Set(shapes.map((s) => s.id));
+  const dims: SketchDim[] = Array.isArray(d.dims)
+    ? d.dims.filter((x: SketchDim) => x && typeof x.id === "string" && dimShapes(x).every((id) => ids.has(id))) : [];
   return {
-    format: "arucostudio-web", version: 2, name: String(d.name ?? "Untitled"), shapes, features, id_ledger: ledger, preset: d.preset ?? null,
+    format: "arucostudio-web", version: 3, name: String(d.name ?? "Untitled"), shapes, dims, features, id_ledger: ledger, preset: d.preset ?? null,
   };
 }

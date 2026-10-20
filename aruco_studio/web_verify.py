@@ -89,8 +89,7 @@ def _label(req: dict, d: dict):
     On the marker's black (Zach, 2026-10-20) it is white: the letters are
     paper knocked out of the border row, which is what the detector must
     still read past; the pixel font (3D) as its own boxes."""
-    m = req["marker"]
-    flip = bool(m.get("flip")) and not req.get("reference_face")
+    flip = _W.flip_of(req)                         # on a reference face too (barrier 10)
     fl = _W._planned(req)[2]
     lab = _W.placed_label(req, d["layout"]["kind"], d["marker"]["dictionary"], d["ids"], fl)
     if lab is None or flip:

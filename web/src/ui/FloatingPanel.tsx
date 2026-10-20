@@ -11,9 +11,11 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@bam/ui";
 import { placeBeside, type Box, type Placement } from "./anchor";
 
-export function FloatingPanel({ title, icon, children, footer, collapsed, onCollapse, testid, width = 300, anchor, anchorKey, avoid }: {
+export function FloatingPanel({ title, icon, children, footer, collapsed, onCollapse, testid, width = 300, anchor, anchorKey, avoid, className }: {
   title: ReactNode; icon?: ReactNode; children: ReactNode; footer?: ReactNode; collapsed: boolean;
   onCollapse: (c: boolean) => void; testid?: string; width?: number;
+  /** the panel's own class, for its layout (never a skin's) */
+  className?: string;
   /** the box to open beside (container px), or null for the default spot */
   anchor?: Box | null;
   /** what the anchor is (the feature's id): a new one forgets a drag */
@@ -59,7 +61,7 @@ export function FloatingPanel({ title, icon, children, footer, collapsed, onColl
 
   const at = pos ?? (auto ? { x: auto.x, y: auto.y } : null);
   return (
-    <div ref={ref} className={cn("fpanel", collapsed && "collapsed", at && "moved")} data-testid={testid} data-collapsed={collapsed ? "1" : "0"}
+    <div ref={ref} className={cn("fpanel", className, collapsed && "collapsed", at && "moved")} data-testid={testid} data-collapsed={collapsed ? "1" : "0"}
       data-anchored={!pos && auto ? auto.side : undefined}
       style={at ? { left: at.x, top: at.y, width, ...(!pos && auto ? { maxHeight: auto.maxH } : {}) } : { width }}>
       <div className="fpanel-head"

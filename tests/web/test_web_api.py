@@ -215,7 +215,7 @@ def test_turn_90_swaps_the_outline_axes():
     assert (r90["origin"][0], r90["origin"][4]) != (r0["origin"][0], r0["origin"][4])
 
 
-def test_flip_mirrors_and_a_reference_face_ignores_it():
+def test_flip_mirrors_on_a_reference_face_too():
     m = {"auto": False, "marker_mm": 15.0, "first_id": 7}
     a = W.plan(req(m, pre=INK_NO_SNAP))
     f = W.plan(req(dict(m, flip=True), pre=INK_NO_SNAP))
@@ -225,9 +225,12 @@ def test_flip_mirrors_and_a_reference_face_ignores_it():
     assert f["origin"][10] == -a["origin"][10]               # z flipped
     for poly in f["black"]:                                   # still CCW outers, CW holes
         assert W._area2(poly["outer"]) > 0 and all(W._area2(h) < 0 for h in poly["holes"])
+    # contract barrier 10 (Zach, 2026-10-20 night): Flip ALWAYS applies; the
+    # reference face only picks the starting side (it was ignored there)
     face = W.plan(req(dict(m, flip=True), pre=INK_NO_SNAP, face=True))
-    assert face["black"] == W.plan(req(m, pre=INK_NO_SNAP, face=True))["black"]
-    assert any(w["field"] == "marker.flip" and w["level"] == "info" for w in face["warnings"])
+    assert face["black"] == f["black"] != W.plan(req(m, pre=INK_NO_SNAP, face=True))["black"]
+    assert face["origin"][10] == -a["origin"][10]
+    assert not [w for w in face["warnings"] if w["field"] == "marker.flip"]
 
 
 def test_every_type_plans():

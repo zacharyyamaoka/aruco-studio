@@ -15,7 +15,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { coreReady, clickAt, dragWorld, featureRect, idle, loadExample, openStudio, state } from "./helpers";
+import { coreReady, clickAt, dragWorld, fitRect, idle, loadExample, openStudio, panelTab, state } from "./helpers";
 
 const DIR = process.env.REPORT_SHOTS_DIR ?? "";
 const facts: Record<string, unknown> = {};
@@ -70,10 +70,14 @@ async function unionClip(page: Page, name: string, locs: Locator[], pad = 8, hid
   return clip;
 }
 
-/** The selected feature on the sketch: its rectangle, marker, label and dimensions. */
+/** The selected feature on the sketch: its marker, the box it was placed in
+ *  (the dashed fit box, or its rectangle profile) and its dimensions. */
 async function sketchOf(page: Page, name: string, pad = 14): Promise<Box> {
   const s = await state(page);
-  const locs = [page.locator(`[data-shape="${s.feature?.rectId ?? s.doc.features.at(-1).rectId}"]`)];
+  const f = s.feature ?? s.doc.features.at(-1);
+  const locs = [page.locator(`[data-marker="${f.id}"]`)];
+  if (await page.locator(`[data-fit-rect="${f.id}"]`).count()) locs.push(page.locator(`[data-fit-rect="${f.id}"]`));
+  if (f.profile && !f.profile.holes.length) locs.push(page.locator(`[data-shape="${f.profile.outer}"]`));
   if (await page.getByTestId("dims").count()) locs.push(page.getByTestId("dims"));
   return unionClip(page, name, locs, pad, OVER);
 }
@@ -168,7 +172,7 @@ test("1 · click-to-inspect: the panel opens beside the clicked marker; toolbar 
   const tb = (await page.getByTestId("toolbar").boundingBox())!;
   expect(overlap(pb, mk)).toBe(false);
   const gap = pb.x >= mk.x + mk.width ? pb.x - (mk.x + mk.width) : mk.x - (pb.x + pb.width);
-  const r = await featureRect(page);
+  const r = await fitRect(page);
   const s = await state(page);
   facts.inspect = {
     panel: pb, marker: mk, gap_px: +gap.toFixed(1), side: pb.x >= mk.x + mk.width ? "right" : "left",
@@ -186,6 +190,7 @@ test("1 · click-to-inspect: the panel opens beside the clicked marker; toolbar 
 
 test("2 · driven vs set: the marker dimension typed on the sketch turns from grey to solid; ↺ in the panel", async ({ page }) => {
   await plateWithMarker(page);
+  await panelTab(page, "marker");
   await seg(page, "marker.type", "grid").click();
   await idle(page);
   const before = await dims(page);
@@ -225,7 +230,7 @@ test("2 · driven vs set: the marker dimension typed on the sketch turns from gr
 test("3 · Label: inside the rectangle, two lines, a typed X offset (no offset dimension); 3D print draws it in the pixel font", async ({ page }) => {
   await plateWithMarker(page);
   const at0 = (await state(page)).plan.label.at as [number, number];
-  await page.locator('[role=tab][data-tab="label"]').click();
+  await panelTab(page, "label");
   const text = page.locator('textarea[data-path="label.text"]');
   await text.fill("PLATE\n#{ids}");
   await text.blur();
@@ -239,11 +244,11 @@ test("3 · Label: inside the rectangle, two lines, a typed X offset (no offset d
   expect(s.feature.label.offset_mm).toEqual([3, 0]);
   const svgText = await page.locator('[data-testid="viewport"] svg text').allTextContents();
   expect(svgText.some((t) => /offset/i.test(t))).toBe(false);
-  const r = await featureRect(page);
+  const r = await fitRect(page);
   facts.label = {
     text: s.feature.label.text, lines: s.plan.label.lines, font: s.plan.label.font, at0, at: s.plan.label.at,
     dx_mm: +(s.plan.label.at[0] - at0[0]).toFixed(4), height_mm: s.plan.label.height_mm, side: s.feature.label.side,
-    rect: { x0: r.cx! - r.w! / 2, x1: r.cx! + r.w! / 2, y0: r.cy! - r.h! / 2, y1: r.cy! + r.h! / 2 },
+    rect: { x0: r.cx - r.w / 2, x1: r.cx + r.w / 2, y0: r.cy - r.h / 2, y1: r.cy + r.h / 2 },
     offset_dim: await page.locator('[data-dim="label.offset_mm"]').count(),
     preset: (await page.getByTestId("preset-chip").textContent())?.trim(),
   };
@@ -260,6 +265,7 @@ test("3 · Label: inside the rectangle, two lines, a typed X offset (no offset d
 
 test("4 · ChArUco: the Joint Origin at the board corner, then in square [1, 1]", async ({ page }) => {
   await plateWithMarker(page);
+  await panelTab(page, "marker");
   await seg(page, "marker.type", "charuco").click();
   await idle(page);
   const fid = (await state(page)).panel.featureId;
@@ -284,6 +290,7 @@ test("4 · ChArUco: the Joint Origin at the board corner, then in square [1, 1]"
 
 test("5 · Suggest: one dropdown, each option with its whole reason", async ({ page }) => {
   await plateWithMarker(page);
+  await panelTab(page, "marker");
   await seg(page, "marker.type", "grid").click();
   await idle(page);
   await expect(page.getByTestId("suggestion")).toHaveCount(0);
@@ -312,20 +319,21 @@ test("6 · auto id: two markers get different driven ids; a typed clash is red u
   const id1 = s.plans[f1].ids[0], id2 = s.plans[f2].ids[0];
   expect(id1).not.toBe(id2);
   await clickMarker(page, f2);
+  await panelTab(page, "marker");
   await expect(page.locator('[data-drv="marker.first_id"]')).toHaveAttribute("data-driven", "1");
   // a marker near the viewport's right edge: does the panel still stay off it?
   const pb = (await page.getByTestId("extrude-panel").boundingBox())!;
   const mk2 = (await page.locator(`[data-marker="${f2}"]`).boundingBox())!;
-  const rc2 = (await page.locator(`[data-shape="${s.doc.features[1].rectId}"]`).boundingBox())!;
+  const rc2 = (await page.locator(`[data-shape="${s.doc.features[1].profile.outer}"]`).boundingBox())!;
   const bk2 = (await page.locator(`[data-marker="${f2}"] [data-marker-black]`).boundingBox())!;
   facts.autoid_panel = { panel: pb, marker: mk2, black: bk2, rect: rc2, zoom: s.camera.zoom,
     marker_covered_px: +Math.max(0, mk2.x + mk2.width - pb.x).toFixed(1), black_covered_px: +Math.max(0, bk2.x + bk2.width - pb.x).toFixed(1),
     rect_covered_px: +Math.max(0, rc2.x + rc2.width - pb.x).toFixed(1) };
   await shot(page, "06-two-markers");
   await unionClip(page, "06a-id-driven", [page.locator('[data-row="marker.dictionary"]'), page.locator('[data-row="marker.first_id"]')], 6);
-  await page.locator('[data-testid="panel-advanced"] summary').click();
+  // the key: a plain row of Marker since V1 Command Dialog (2026-10-20 night: no Advanced fold)
   const key = await page.locator('input[data-path="feature.key"]').inputValue();
-  await unionClip(page, "06c-key", [page.locator('[data-testid="panel-advanced"]')], 6);
+  await unionClip(page, "06c-key", [page.locator('[data-row="feature.key"]')], 6);
   const idIn = page.locator('input[data-path="marker.first_id"]');
   await idIn.fill(String(id1));
   await idIn.press("Enter");
@@ -431,9 +439,9 @@ test("9 · Sheet: eight stickers, Tight | Spaced and Fewest cuts | Fewest sheets
   facts.sheet = out;
 });
 
-test("10 · the plate's sticker on the page: the whole rectangle, the label inside with white from the cut", async ({ page }) => {
+test("10 · the plate's sticker on the page: the whole face (Trim Profile), the label inside with white from the cut", async ({ page }) => {
   await plateWithMarker(page);
-  await page.locator('[role=tab][data-tab="label"]').click();
+  await panelTab(page, "label");
   const text = page.locator('textarea[data-path="label.text"]');
   await text.fill("plate #{ids}");
   await text.blur();

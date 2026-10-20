@@ -1,11 +1,14 @@
 // window.__aruco: a small probe for the e2e tests. State getters in
 // millimetres, a world → client mapping for pointer drags, and idle(),
-// which resolves once no core call is in flight or scheduled.
-import { callsInFlight, coreKind, coreStatus } from "./coreSource";
+// which resolves once no core call is in flight or scheduled; plan() asks the
+// core directly (an e2e compares a request the UI no longer sends).
+import type { MarkerPlan, PlanRequest } from "./core/contract";
+import { callsInFlight, core, coreKind, coreStatus } from "./coreSource";
 import { toScreen } from "./model/geom";
 import { plannerBusy } from "./planner";
 import { getFeature } from "./model/doc";
 import { activeFeatureId, useStudio } from "./store";
+import { view3d, type View3DProbe } from "./view3d/probe3d";
 
 export interface Probe {
   kind: "real" | "mock";
@@ -13,7 +16,14 @@ export interface Probe {
   /** a sketch point (mm) as client pixels in the page */
   toClient: (x: number, y: number) => [number, number];
   idle: (timeoutMs?: number) => Promise<void>;
+  plan: (req: PlanRequest) => Promise<MarkerPlan>;
   printHook: (() => void) | null;
+  /** the 3D view's arrows (client px), heights and solids; null in 2D */
+  view3d: () => Omit<View3DProbe, "project" | "top"> | null;
+  /** a 3D scene point (mm, z along the face normal) as client pixels; null in 2D */
+  project3d: (x: number, y: number, z: number) => [number, number] | null;
+  /** the 3D camera straight down on the feature in focus (marks false: no arrows / boxes) */
+  top3d: (marks?: boolean) => void;
 }
 
 /** `feature` and `plan` are the feature in focus (the panel's, the selected
@@ -25,8 +35,10 @@ function snapshot() {
     core: coreStatus(), doc: s.doc, sel: s.sel, tool: s.tool, camera: s.camera, view: s.view,
     panel: { open: s.panel.open, featureId: s.panel.featureId, tab: s.panel.tab, selector: s.panel.selector, collapsed: s.panel.collapsed },
     feature: getFeature(s.doc, active), plan: active ? s.plans[active] ?? null : null, plans: s.plans,
-    suggestions: s.suggestions, modal: s.modal, inscribing: s.inscribing,
-    canUndo: s.canUndo, canRedo: s.canRedo,
+    suggestions: s.suggestions, modal: s.modal,
+    canUndo: s.canUndo, canRedo: s.canRedo, view3d: s.view3d,
+    // the sketch lane (2026-10-20 night): every selected shape, the selected sketch dim
+    selection: s.multi, dimSel: s.dimSel,
   };
 }
 
@@ -43,7 +55,7 @@ function idle(timeoutMs = 15000): Promise<void> {
   return new Promise((resolve, reject) => {
     let quiet = 0;
     const tick = () => {
-      const busy = callsInFlight() > 0 || plannerBusy() || useStudio.getState().inscribing;
+      const busy = callsInFlight() > 0 || plannerBusy();
       quiet = busy ? 0 : quiet + 1;
       if (quiet >= 3) return resolve();
       if (performance.now() - t0 > timeoutMs) return reject(new Error("core calls still in flight"));
@@ -54,6 +66,11 @@ function idle(timeoutMs = 15000): Promise<void> {
 }
 
 export function installProbe(): void {
-  const probe: Probe = { kind: coreKind, state: snapshot, toClient, idle, printHook: null };
+  const probe: Probe = {
+    kind: coreKind, state: snapshot, toClient, idle, plan: (req) => core.plan(req), printHook: null,
+    view3d: () => { const p = view3d.probe?.(); if (!p) return null; const { project: _p, top: _t, ...rest } = p; return rest; },
+    project3d: (x, y, z) => view3d.probe?.().project(x, y, z) ?? null,
+    top3d: (marks) => view3d.probe?.().top(marks),
+  };
   (window as unknown as { __aruco: Probe }).__aruco = probe;
 }

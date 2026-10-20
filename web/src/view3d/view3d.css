@@ -1,0 +1,17 @@
+/* The 3D view (./View3D.tsx) and the 2D | 3D toggle (./ViewToggle.tsx), on the kit's tokens. */
+.view3d { position: absolute; inset: 0; overflow: hidden; background: var(--canvas-3d); touch-action: none; user-select: none; }
+.view3d canvas { display: block; }
+/* the value box at an arrow (Fusion's "20.00 mm"): grey while driven */
+.v3-box { position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; gap: 2px; padding: 2px;
+  background: var(--panel); border: 1px solid var(--accent); border-radius: var(--radius-sm); box-shadow: var(--shadow); z-index: 4; }
+.v3-input { width: 74px; height: 22px; padding: 0 5px; border: 0; outline: 0; background: transparent; color: var(--text);
+  font: inherit; font-variant-numeric: tabular-nums; text-align: right; }
+.v3-box.driven .v3-input { color: var(--muted); }
+.v3-input:focus { background: var(--field); color: var(--text); }
+.v3-reset { height: 22px; min-width: 20px; padding: 0 3px; border: 0; border-radius: var(--radius-sm); background: transparent;
+  color: var(--muted); cursor: pointer; font: inherit; }
+.v3-reset:hover { background: var(--hover); color: var(--text); }
+/* the 2D | 3D toggle: the stage's top-left, under the ruler */
+.v3-toggle { position: absolute; left: 10px; top: 26px; z-index: 6; box-shadow: var(--shadow); border-radius: var(--radius-sm); }
+.v3-toggle .kit-seg { background: var(--panel); }
+.v3-toggle .kit-seg-btn.words { min-width: 34px; font-weight: 600; }

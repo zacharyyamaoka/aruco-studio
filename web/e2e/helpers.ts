@@ -57,13 +57,28 @@ export async function dragWorld(page: Page, from: [number, number], to: [number,
   await page.mouse.up();
 }
 
-/** The rectangle (mm) of the feature in focus (the probe's `feature`). */
-export async function featureRect(page: Page): Promise<Shape> {
+/** The box (mm) the core placed the marker of the feature in focus in (the
+ *  probe's `plan.fit_rect`): the profile is the input, this is the answer. */
+export async function fitRect(page: Page): Promise<Rect> {
+  await expect.poll(async () => !!(await state(page)).plan?.fit_rect, { message: "the plan has a fit_rect" }).toBe(true);
+  return (await state(page)).plan.fit_rect;
+}
+
+/** The rectangle shape (mm) that is the profile of the feature in focus (a
+ *  rectangle profile: the custom placement). */
+export async function profileRect(page: Page): Promise<Shape> {
   const s = await state(page);
-  const id = s.feature?.rectId;
-  const r = s.doc.shapes.find((x: Shape) => x.id === id);
-  expect(r, "the feature has a rectangle").toBeTruthy();
+  const ref = s.feature?.profile;
+  expect(ref?.holes, "the feature's profile is a rectangle on its own").toEqual([]);
+  const r = s.doc.shapes.find((x: Shape) => x.id === ref.outer);
+  expect(r?.kind, "the feature's profile is a rectangle").toBe("rect");
   return r;
+}
+
+/** Double-click a sketch point (mm). */
+export async function dblClickAt(page: Page, x: number, y: number): Promise<void> {
+  const [cx, cy] = await toClient(page, x, y);
+  await page.mouse.dblclick(cx, cy);
 }
 
 /** The plan's outline centre and size (mm), from its loop. */
@@ -85,4 +100,13 @@ export function circleGap(c: { cx: number; cy: number; r: number }, r: Rect): nu
  *  by more than a hair (tangent is fine: the core may place an edge on the rim). */
 export function overlaps(c: { cx: number; cy: number; r: number }, r: Rect, eps = 1e-3): boolean {
   return circleGap(c, r) < -eps;
+}
+
+/** Open one of the ArUco Extrude panel's tabs (V1 Command Dialog, 2026-10-20
+ *  night: Make | Marker | Label). A new feature opens on Make; a reopened one
+ *  keeps the tab the panel last had. */
+export async function panelTab(page: Page, tab: "make" | "marker" | "label"): Promise<void> {
+  const t = page.locator(`[data-testid="extrude-panel"] [role=tab][data-tab="${tab}"]`);
+  await t.click();
+  await expect(page.locator(`[data-testid="extrude-panel"] [data-tab-body="${tab}"]`)).toBeVisible();
 }

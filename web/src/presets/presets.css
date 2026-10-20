@@ -23,3 +23,18 @@
 .pl-info-head .kit-btn { margin-left: auto; }
 .pl-info-note { padding: 8px 10px 0; font-size: 11px; }
 .pl-info .times { color: var(--muted); }
+
+/* the middle: the presets listed by method (V1 Command Dialog's library), one
+   row each -- a small thumb, the name over its numbers, where it lives, "current" */
+.presets-lib .pl-list { flex: 1; min-height: 0; overflow: auto; padding: 6px 8px 10px; background: var(--panel); }
+.presets-lib .pl-group + .pl-group { margin-top: 6px; }
+.presets-lib .pl-group-head { padding: 6px 8px 3px; font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.presets-lib .pl-list .card.pl-item { flex-direction: row; align-items: center; gap: 10px; padding: 6px 8px; border-color: transparent;
+  border-radius: var(--radius); background: transparent; box-shadow: none; }
+.presets-lib .pl-list .card.pl-item:hover { border-color: var(--line-soft); }
+.presets-lib .pl-list .card.pl-item.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-soft); background: var(--accent-soft); }
+.presets-lib .pl-list .card .thumb { flex: none; width: 34px; height: 40px; padding: 2px; border-radius: 3px; }
+.presets-lib .pl-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.presets-lib .pl-list .card .where { flex: none; }
+.presets-lib .pl-list .card-mark { position: static; flex: none; }
+.presets-lib .empty { padding: 12px 8px; color: var(--muted); }

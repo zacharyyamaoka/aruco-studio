@@ -1,35 +1,75 @@
 // The sketch viewport: renders the sketch model (./model.ts) and what the
 // core planned, and turns pointer events into the store's actions. y up,
-// millimetres; pan with the middle or right button or Space-drag, zoom at
-// the cursor, F fits. Every feature's marker, outline, Joint Origin and
+// millimetres; pan with the middle button or Space-drag, zoom at the cursor,
+// F fits. A right-button drag is a selection box (a window left to right, a
+// crossing right to left); Shift+click adds or removes a shape; a drag on a
+// selected shape moves every selected one. D dimensions (./constraints.ts):
+// pick an edge, a circle, or two references, drag (or click) to place, type
+// the value. Drawing a rectangle or a circle shows Fusion's value boxes on
+// the rubber band; a typed value is a driving dimension. Every feature's marker, outline, Joint Origin and
 // label are drawn as its plan() returned them: no marker geometry is made
-// here. The sticker's white is the plan's cut_shape (the trim: the
-// rectangle, the profile with its holes, or the quiet zone), under the marker. The turn arc belongs to the feature in focus; the selected feature's
-// dimensions (./Dims.tsx) are typed into in place, the marker following as
-// you type. A drag (move, resize, the label) is one undo step.
+// here. The sticker's white is the plan's cut_shape (the trim: the profile
+// with its holes, or the quiet zone), under the marker. The turn arc belongs
+// to the feature in focus; the selected feature's dimensions (./Dims.tsx)
+// stand outside the box the core placed its marker in (MarkerPlan.fit_rect)
+// and are typed into in place, the marker following as you type. A drag
+// (move, resize, the label) is one undo step; moving or resizing a profile's
+// shapes re-plans its marker (a rectangle profile: the marker follows it).
 import { useEffect, useRef, useState, type ReactElement } from "react";
-import type { MarkerPlan, Polygon, Vec2 } from "../core/contract";
+import type { MarkerPlan, Polygon, Rect, Vec2 } from "../core/contract";
 import {
-  featureOfRect, featureRect, getFeature, isSet, resetField, setField, updateFeature, type Feature,
+  featureOfProfile, featureOfRect, featureRect, getFeature, isSet, newId, rectProfile, resetField, setField, updateFeature, type Doc, type Feature,
 } from "../model/doc";
 import {
-  boxOf, fromLocal, handlePoint, HANDLES, loopD, niceStep, rectFromCorners, toLocal, toScreen, toWorld, zoomAt,
+  boxOf, fromLocal, handlePoint, HANDLES, loopD, niceStep, rectCorners, rectFromCorners, toLocal, toScreen, toWorld, zoomAt,
   type Handle,
 } from "../model/geom";
 import { activeFeatureId, selectedFeatureId, useStudio } from "../store";
 import { DimEditor, Dims, layoutDims, type LaidDim } from "./Dims";
+import { diameterLocked, dimFromPicks, refusal, resizable, typedValue, type DimRef, type SketchDim } from "./constraints";
 import {
-  circleFrom, hitTest, inShape, moveShape, plainRect, profileLoops, resizeShape, sameProfile, shapeLoop, type Hit, type Shape,
+  boxPick, circleFrom, hitTest, inShape, profileLoops, rectAt, rectOf, resizeShape, sameProfile, shapeLoop,
+  type Hit, type ProfileRef, type Shape,
 } from "./model";
+import { pointer } from "./pointer";
+import { SketchDims, ValueBox, laySketchDim, type LaidSketchDim } from "./SketchDims";
 
 type Drag =
   | { kind: "pan"; sx: number; sy: number; cx: number; cy: number }
-  | { kind: "move"; id: string; from: Vec2; orig: Shape; moved: boolean }
+  /** every shape in `ids` from where it was (`base`); `click`: what a press that does not move does */
+  | { kind: "move"; ids: string[]; from: Vec2; base: Shape[]; moved: boolean; click?: () => void }
   | { kind: "resize"; id: string; handle: Handle; orig: Shape }
   | { kind: "label"; fid: string; from: Vec2; orig: Vec2; at: Vec2 }
-  | { kind: "draw"; tool: "rect" | "circle"; a: Vec2; b: Vec2 };
+  /** `clicked`: the first corner was a click: the band follows the pointer until the next click (Fusion) */
+  | { kind: "draw"; tool: "rect" | "circle"; a: Vec2; b: Vec2; clicked: boolean }
+  /** the right-button selection box, in view px */
+  | { kind: "box"; a: Vec2; b: Vec2; add: boolean; moved: boolean }
+  /** D: pressed on a pick; a drag from it places the dimension */
+  | { kind: "dim"; press: Vec2 };
+
+/** The draw boxes' typed values (a key absent: it follows the pointer) and the one keys go to. */
+interface DrawVals { w?: string; h?: string; d?: string; active: "w" | "h" | "d" }
+
+const num = (t: string | undefined): number | null => {
+  const v = Number((t ?? "").trim().replace(",", "."));
+  return t !== undefined && t.trim() !== "" && Number.isFinite(v) && v > 0 ? v : null;
+};
+const sameRef = (a: DimRef, b: DimRef) => JSON.stringify(a) === JSON.stringify(b);
+/** A handle's sides: -1 / +1 along x and y (0: it does not move that way). */
+const handleSides = (h: Handle): [-1 | 0 | 1, -1 | 0 | 1] => [h.includes("e") ? 1 : h.includes("w") ? -1 : 0, h.includes("n") ? 1 : h.includes("s") ? -1 : 0];
 
 const EDGE_PX = 6;
+/** how far a press must travel (px) to be a drag, not a click */
+const DRAG_PX = 4;
+/** the selection boxes: a window solid blue, a crossing dashed green (Fusion's) */
+// WHY inline (the stylesheet is not this lane's): D's centre crosses, the pick under the pointer, the picks
+const PICK_CSS = `
+.vp-svg .pick-centre { fill: none; stroke: var(--muted); stroke-width: 1.2; }
+.vp-svg .pick-hover { fill: none; stroke: var(--accent); stroke-width: 3; opacity: 0.6; }
+.vp-svg .pick-on { fill: none; stroke: var(--pick); stroke-width: 3; }
+`;
+const WINDOW_BOX = { fill: "rgba(59, 130, 246, 0.10)", stroke: "rgb(59, 130, 246)", strokeWidth: 1 };
+const CROSSING_BOX = { fill: "rgba(34, 197, 94, 0.10)", stroke: "rgb(34, 160, 80)", strokeWidth: 1, strokeDasharray: "6 4" };
 // WHY: the core stacks a label's lines (1 + LINE_GAP) caps apart
 // (aruco_studio/core/rect_fill.py LINE_GAP, the pixel font's 2 px of 5)
 const LINE_GAP = 0.4;
@@ -45,6 +85,20 @@ const OUTLINE = { fill: "transparent" };
  *  trim, the mock) its cut, else the marker's outline as before. */
 const cutShape = (p: MarkerPlan): Polygon => p.cut_shape ?? { outer: p.cut ?? p.outer, holes: [] };
 
+/** The box the core placed a feature's marker in: the plan's fit_rect, else
+ *  (a core from before barrier 9) the rectangle profile, else the outline's box. */
+function placeBox(doc: Doc, f: Feature, plan: MarkerPlan): Rect {
+  if (plan.fit_rect) return plan.fit_rect;
+  const r = featureRect(doc, f);
+  if (r) return rectOf(r);
+  const b = boxOf(plan.outer);
+  return { cx: (b.x0 + b.x1) / 2, cy: (b.y0 + b.y1) / 2, w: b.x1 - b.x0, h: b.y1 - b.y0, angle_deg: 0 };
+}
+
+/** How long after a Profile-row pick a double-click still picks for the panel
+ *  (its first click picked the region; the double-click means the rectangle). */
+const DBL_MS = 700;
+
 export function Viewport() {
   const host = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
@@ -52,6 +106,8 @@ export function Viewport() {
   const camera = useStudio((s) => s.camera);
   const view = useStudio((s) => s.view);
   const sel = useStudio((s) => s.sel);
+  const multi = useStudio((s) => s.multi);
+  const dimSel = useStudio((s) => s.dimSel);
   const tool = useStudio((s) => s.tool);
   const plans = useStudio((s) => s.plans);
   const panel = useStudio((s) => s.panel);
@@ -61,6 +117,15 @@ export function Viewport() {
   /** the dimension being typed into, and its feature as it was when the editor opened (Esc puts it back) */
   const [dimEdit, setDimEdit] = useState<{ fid: string; field: string; start: Feature } | null>(null);
   const lastDim = useRef<LaidDim | null>(null);
+  /** D: the references picked so far, where the pointer is, and the new dim whose value box is open */
+  const [picks, setPicks] = useState<DimRef[]>([]);
+  const [cursorAt, setCursorAt] = useState<Vec2 | null>(null);
+  const [placing, setPlacing] = useState<SketchDim | null>(null);
+  /** the sketch dim being typed into */
+  const [sdimEdit, setSdimEdit] = useState<string | null>(null);
+  const [drawVals, setDrawVals] = useState<DrawVals>({ active: "w" });
+  /** the last Profile-row pick: a double-click right after it re-picks for the same feature */
+  const picked = useRef<{ fid: string; at: number } | null>(null);
   const space = useRef(false);
   const fitted = useRef(false);
 
@@ -107,10 +172,10 @@ export function Viewport() {
   // docks over the bottom of the canvas, so when it opens on a feature (and again once that feature first
   // plans) the canvas fits the marker into the part above the panel
   const editId = panel.open ? panel.featureId : null;
-  const editRect = editId ? doc.features.find((f) => f.id === editId)?.rectId ?? null : null;
+  const editProfile = editId ? JSON.stringify(doc.features.find((f) => f.id === editId)?.profile ?? null) : null;
   const editPlanned = !!(editId && plans[editId]);
   useEffect(() => {
-    if (!editId || !editRect || !window.matchMedia?.("(max-width: 640px)").matches) return;
+    if (!editId || !editProfile || editProfile === "null" || !window.matchMedia?.("(max-width: 640px)").matches) return;
     const raf = requestAnimationFrame(() => {
       const vp = host.current?.getBoundingClientRect();
       if (!vp) return;
@@ -120,14 +185,23 @@ export function Viewport() {
       useStudio.getState().fitFeature(editId, RULER, Math.max(0, vp.bottom - Math.min(...tops)));
     });
     return () => cancelAnimationFrame(raf);
-  }, [editId, editRect, editPlanned]);
+  }, [editId, editProfile, editPlanned]);
 
-  // Esc while drawing drops the draft (the app's Esc does the rest)
+  // Esc while drawing drops the draft, and D's picks (the app's Esc does the rest)
   useEffect(() => {
-    const k = (e: KeyboardEvent) => { if (e.key === "Escape") setDrag((d) => (d?.kind === "draw" ? null : d)); };
+    const k = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setDrag((d) => (d?.kind === "draw" || d?.kind === "box" ? null : d));
+      setPicks([]);
+    };
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
   }, []);
+  // leaving D drops its picks; leaving a draw tool drops its draft
+  useEffect(() => {
+    if (tool !== "dim") { setPicks([]); setPlacing(null); }
+    if (tool !== "rect" && tool !== "circle") setDrag((d) => (d?.kind === "draw" ? null : d));
+  }, [tool]);
 
   const local = (e: { clientX: number; clientY: number }): Vec2 => {
     const r = host.current!.getBoundingClientRect();
@@ -137,25 +211,134 @@ export function Viewport() {
   const scr = (p: Vec2): Vec2 => toScreen(camera, w, h, p);
 
   /** The shape the handles and a drag inside act on: the selected shape, or
-   *  the selected feature's rectangle. */
+   *  the selected feature's rectangle profile. */
   const selectedShape = (): Shape | undefined => {
     const st = useStudio.getState();
     const s = st.sel;
+    if (st.multi.length > 1) return undefined;
     if (s?.kind === "shape") return st.doc.shapes.find((x) => x.id === s.id);
     if (s?.kind === "feature" || s?.kind === "origin" || s?.kind === "text") return featureRect(st.doc, getFeature(st.doc, s.id)) ?? undefined;
     return undefined;
+  };
+
+  /** D's pick at p: a centre, else an edge (a rectangle's side, a circle's
+   *  outline), else an origin axis. */
+  const pickAt = (p: Vec2): DimRef | null => {
+    const shapes = useStudio.getState().doc.shapes;
+    const tol = EDGE_PX / z;
+    for (const s of shapes) if (s.kind !== "poly" && Math.hypot(p[0] - s.cx, p[1] - s.cy) <= tol * 1.5) return { shape: s.id, at: "c" };
+    const hit = hitTest(shapes, p, tol);
+    const s = hit?.kind === "edge" ? shapes.find((x) => x.id === hit.id) : undefined;
+    if (s?.kind === "circle") return { shape: s.id, at: "o" };
+    if (s?.kind === "rect") {
+      const [u, v] = toLocal(s, p);
+      const sides: [DimRef & { shape: string }, number][] = [
+        [{ shape: s.id, at: "l" }, Math.abs(u + s.w / 2)], [{ shape: s.id, at: "r" }, Math.abs(u - s.w / 2)],
+        [{ shape: s.id, at: "b" }, Math.abs(v + s.h / 2)], [{ shape: s.id, at: "t" }, Math.abs(v - s.h / 2)],
+      ];
+      return sides.reduce((a, b) => (b[1] < a[1] ? b : a))[0];
+    }
+    if (Math.abs(p[0]) <= tol) return { axis: "y" };
+    if (Math.abs(p[1]) <= tol) return { axis: "x" };
+    return null;
+  };
+
+  /** D: the picks make a dimension placed at p: its value box opens (or a note says why not). */
+  const placeDim = (p: Vec2, refs = picks) => {
+    const st = useStudio.getState();
+    const r = dimFromPicks(st.doc.shapes, refs, p, newId("d"));
+    if (!r) return;
+    setPicks([]);
+    if ("error" in r) { st.say(r.error); return; }
+    const why = refusal(st.doc.shapes, st.doc.dims, r.dim);
+    if (why) { st.say(why); return; }
+    setPlacing(r.dim);
+  };
+
+  /** The draft as drawn now: the pointer's corner, or a typed size from the first corner (snapped). */
+  const draftShape = (d: Extract<Drag, { kind: "draw" }>, vals: DrawVals): Shape => {
+    if (d.tool === "circle") {
+      const c = circleFrom(d.a, d.b, "draft");
+      const dia = num(vals.d);
+      return dia ? { ...c, r: dia / 2 } : c;
+    }
+    const live = rectFromCorners(d.a, d.b);
+    const tw = num(vals.w), th = num(vals.h);
+    if (!tw && !th) return { kind: "rect", id: "draft", ...live };
+    const a = rectFromCorners(d.a, d.a);
+    const sx = d.b[0] >= d.a[0] ? 1 : -1, sy = d.b[1] >= d.a[1] ? 1 : -1;
+    const W = tw ?? live.w, H = th ?? live.h;
+    const x0 = sx > 0 ? a.cx : a.cx - W, y0 = sy > 0 ? a.cy : a.cy - H;
+    return { kind: "rect", id: "draft", cx: x0 + W / 2, cy: y0 + H / 2, w: W, h: H, angle_deg: 0 };
+  };
+
+  /** The draft into the sketch, its typed values as driving dims (one undo step). */
+  const commitDraw = (d: Extract<Drag, { kind: "draw" }>, vals: DrawVals) => {
+    const st = useStudio.getState();
+    const sh = draftShape(d, vals);
+    const sx = d.b[0] >= d.a[0] ? 1 : -1, sy = d.b[1] >= d.a[1] ? 1 : -1;
+    setDrag(null);
+    const out = 24 / z;   // the dims stand this far outside the edge the box was on
+    if (sh.kind === "rect") {
+      if (sh.w < 1 || sh.h < 1) return;
+      const id = newId("r");
+      const dims: SketchDim[] = [];
+      if (num(vals.w)) dims.push({ id: newId("d"), kind: "w", shape: id, value: sh.w, at: [0, sy * (sh.h / 2 + out)] });
+      if (num(vals.h)) dims.push({ id: newId("d"), kind: "h", shape: id, value: sh.h, at: [sx * (sh.w / 2 + out), 0] });
+      st.addShape({ ...sh, id }, dims);
+    } else if (sh.kind === "circle") {
+      if (sh.r < 0.5) return;
+      const id = newId("c");
+      const u = Math.hypot(d.b[0] - d.a[0], d.b[1] - d.a[1]) > 1e-9 ? [(d.b[0] - d.a[0]), (d.b[1] - d.a[1])] : [1, 1];
+      const k = (sh.r + out) / Math.hypot(u[0], u[1]);
+      st.addShape({ ...sh, id }, num(vals.d) ? [{ id: newId("d"), kind: "d", shape: id, value: sh.r * 2, at: [u[0] * k, u[1] * k] }] : []);
+    }
+    st.setTool("select");
+  };
+
+  /** Start moving a shape: every selected one when it is among them. */
+  const startMove = (sh: Shape, p: Vec2, click?: () => void) => {
+    const st = useStudio.getState();
+    const ids = st.multi.length > 1 && st.multi.includes(sh.id) ? st.multi : [sh.id];
+    st.gesture(true);
+    setDrag({ kind: "move", ids, from: p, base: st.doc.shapes, moved: false, click });
+  };
+  /** A press on a shape that is one of several selected: it drags them all, and only a click selects it alone. */
+  const inGroup = (id: string | undefined) => {
+    const m = useStudio.getState().multi;
+    return !!id && m.length > 1 && m.includes(id);
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
     const st = useStudio.getState();
     const target = e.target as Element;
     (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
-    if (e.button === 1 || e.button === 2 || space.current) {
+    if (drag?.kind === "draw" && drag.clicked && e.button === 0) {
+      // the second click of a clicked rectangle or circle
+      commitDraw({ ...drag, b: world(e) }, drawVals);
+      return;
+    }
+    if (e.button === 2 && !space.current) {
+      setDrag({ kind: "box", a: local(e), b: local(e), add: e.shiftKey, moved: false });
+      return;
+    }
+    if (e.button === 1 || space.current) {
       setDrag({ kind: "pan", sx: e.clientX, sy: e.clientY, cx: camera.cx, cy: camera.cy });
       return;
     }
     if (e.button !== 0) return;
     const p = world(e);
+    if (tool === "dim") {
+      if (placing) return;   // its value box is open: leaving it sets it
+      const ref = pickAt(p);
+      if (ref) {
+        const again = picks.length === 1 && sameRef(ref, picks[0]);
+        if (!again) setPicks(picks.length >= 2 ? [ref] : [...picks, ref]);
+        setCursorAt(p);
+        setDrag({ kind: "dim", press: local(e) });
+      } else if (picks.length) placeDim(p);
+      return;
+    }
     const hEl = target.closest("[data-handle]");
     if (hEl) {
       const orig = selectedShape();
@@ -174,57 +357,106 @@ export function Viewport() {
       return;
     }
     if (tool === "rect" || tool === "circle") {
-      setDrag({ kind: "draw", tool, a: p, b: p });
+      setDrawVals({ active: tool === "rect" ? "w" : "d" });
+      setDrag({ kind: "draw", tool, a: p, b: p, clicked: false });
       return;
     }
     const hit = hitTest(st.doc.shapes, p, EDGE_PX / z);
     const selShape = selectedShape();
-    const move = (sh: Shape) => { st.gesture(true); setDrag({ kind: "move", id: sh.id, from: p, orig: sh, moved: false }); };
+    const move = (sh: Shape, click?: () => void) => startMove(sh, p, click);
     // WHY WYSIWYG (Zach, 2026-10-18): "just clicking the marker on the screen is
-    // what brings up the relevant inspector window". A click on a marker, on
-    // its rectangle's edge or inside that rectangle selects the feature and
-    // opens its panel; a press-drag moves the rectangle. Empty canvas closes it.
+    // what brings up the relevant inspector window". A click on a marker selects
+    // the feature and opens its panel; a press-drag on a rectangle profile's
+    // marker moves the rectangle, and the marker follows (the custom placement).
+    // A marker placed in a face does not drag the face. Empty canvas closes it.
     const markerId = st.panel.selector ? null : target.closest("[data-marker]")?.getAttribute("data-marker");
-    const markerRect = markerId ? featureRect(st.doc, getFeature(st.doc, markerId)) : null;
-    if (markerId && markerRect) {
+    const markerOf = markerId ? getFeature(st.doc, markerId) : null;
+    if (markerId && markerOf) {
+      const r = featureRect(st.doc, markerOf);
+      if (e.shiftKey && r) { st.toggleShape(r.id); return; }
+      if (r && inGroup(r.id)) { move(r, () => st.inspect(markerId)); return; }
       st.inspect(markerId);
-      move(markerRect);
+      if (r) move(r);
       return;
     }
     if (hit?.kind === "edge") {
+      // the Profile row takes a region or a double-clicked rectangle, not an edge
+      if (st.panel.selector) return;
       const s = st.doc.shapes.find((x) => x.id === hit.id)!;
-      if (st.panel.selector === "rect" && s.kind === "rect") st.useRect(s.id);
-      else if (st.panel.selector) return;
-      else {
-        const owner = featureOfRect(st.doc, s.id);
+      if (e.shiftKey) { st.toggleShape(s.id); return; }
+      const owner = featureOfRect(st.doc, s.id);
+      const pickIt = () => {
         if (owner) st.inspect(owner.id);
         else { if (st.panel.open) st.ok(); st.select({ kind: "shape", id: s.id }); }
-      }
+      };
+      if (inGroup(s.id)) { move(s, pickIt); return; }
+      pickIt();
       move(s);
       return;
     }
-    // inside the selected shape: drag it (as after picking it in a CAD)
+    // inside a selected shape: drag it, and every other selected one (as after picking them in a CAD)
+    const inside = st.multi.length > 1 ? st.doc.shapes.find((x) => st.multi.includes(x.id) && inShape(x, p)) : undefined;
+    if (inside) { move(inside); return; }
     if (selShape && inShape(selShape, p)) {
       move(selShape);
       return;
     }
     if (hit?.kind === "region") {
-      if (st.panel.open && st.panel.selector === "profile" && getFeature(st.doc, st.panel.featureId)?.rectId) st.setProfile(hit.ref);
-      else if (st.panel.open && st.panel.selector) void st.useProfile(hit.ref);
-      else {
-        const plain = plainRect(st.doc.shapes, hit.ref);
-        const owner = plain ? featureOfRect(st.doc, plain.id) : null;
-        if (owner && plain) { st.inspect(owner.id); move(plain); return; }
-        if (st.panel.open) st.ok();
-        st.select({ kind: "profile", ref: hit.ref });
+      if (st.panel.open && st.panel.selector) { pickProfile(hit.ref); return; }
+      const owner = featureOfProfile(st.doc, hit.ref);
+      if (owner) {
+        const r = featureRect(st.doc, owner);
+        if (r && inGroup(r.id)) { move(r, () => st.inspect(owner.id)); return; }
+        st.inspect(owner.id);
+        if (r) move(r);
+        return;
       }
+      if (st.panel.open) st.ok();
+      st.select({ kind: "profile", ref: hit.ref });
       return;
     }
     st.closePanel();
   };
 
+  /** The Profile row's pick, noted so a double-click that follows re-picks. */
+  const pickProfile = (ref: ProfileRef) => {
+    const st = useStudio.getState();
+    const fid = st.panel.featureId;
+    st.useProfile(ref);
+    picked.current = fid ? { fid, at: performance.now() } : null;
+  };
+
+  /** A double-click on a rectangle (its edge or inside it): its outer edges
+   *  alone are the profile, whatever is inside it (Zach, 2026-10-20 evening:
+   *  "you could double click on a rectangle and it would select the outer
+   *  edges"). For the Profile row while it waits (or right after its first
+   *  click picked the region), else as the selection. */
+  const onDoubleClick = (e: React.MouseEvent) => {
+    const st = useStudio.getState();
+    const target = e.target as Element;
+    if (tool !== "select" || e.button !== 0) return;
+    if (target.closest("[data-dim-label],[data-sdim-label],[data-label],[data-turn],[data-handle],input")) return;
+    const p = world(e);
+    const onEdge = hitTest(st.doc.shapes, p, EDGE_PX / z)?.kind === "edge";
+    // a marker is its feature's: a double-click on it picks nothing else
+    if (!onEdge && target.closest("[data-marker]")) return;
+    const r = rectAt(st.doc.shapes, p, EDGE_PX / z);
+    if (!r) return;
+    const ref = rectProfile(r.id);
+    const last = picked.current;
+    const forPanel = st.panel.open && (st.panel.selector === "profile"
+      || (!!last && last.fid === st.panel.featureId && performance.now() - last.at < DBL_MS));
+    if (forPanel) { pickProfile(ref); return; }
+    const owner = featureOfProfile(st.doc, ref);
+    if (owner) { st.inspect(owner.id); return; }
+    if (st.panel.open) st.ok();
+    st.select({ kind: "profile", ref });
+  };
+
   const onPointerMove = (e: React.PointerEvent) => {
     const st = useStudio.getState();
+    pointer.at = world(e);
+    if (tool === "dim") setCursorAt(world(e));
     if (!drag) {
       if (tool === "select") setHover(hitTest(st.doc.shapes, world(e), EDGE_PX / z));
       else if (hover) setHover(null);
@@ -234,35 +466,69 @@ export function Viewport() {
       st.setCamera({ ...camera, cx: drag.cx - (e.clientX - drag.sx) / z, cy: drag.cy + (e.clientY - drag.sy) / z });
       return;
     }
+    if (drag.kind === "box") {
+      const b = local(e);
+      setDrag({ ...drag, b, moved: drag.moved || Math.hypot(b[0] - drag.a[0], b[1] - drag.a[1]) > DRAG_PX });
+      return;
+    }
+    if (drag.kind === "dim") return;
     const p = world(e);
     if (drag.kind === "draw") setDrag({ ...drag, b: p });
     else if (drag.kind === "move") {
       const dx = p[0] - drag.from[0], dy = p[1] - drag.from[1];
       if (!drag.moved && Math.hypot(dx, dy) * z < 3) return;
       if (!drag.moved) setDrag({ ...drag, moved: true });
-      st.updateShape(moveShape(drag.orig, dx, dy));
-    } else if (drag.kind === "resize") st.updateShape(resizeShape(drag.orig, drag.handle, p));
-    else if (drag.kind === "label") {
+      st.moveShapes(drag.base, drag.ids, dx, dy);
+    } else if (drag.kind === "resize") {
+      // WHY (Fusion): a dimensioned size, or a dimensioned edge, holds under a handle
+      let next = resizeShape(drag.orig, drag.handle, p);
+      const o = drag.orig;
+      if (next.kind === "rect" && o.kind === "rect") {
+        const [su, sv] = handleSides(drag.handle);
+        const xs = !su || resizable(st.doc.shapes, st.doc.dims, o.id, "x", su), ys = !sv || resizable(st.doc.shapes, st.doc.dims, o.id, "y", sv);
+        if (!xs) next = { ...next, cx: o.cx, w: o.w };
+        if (!ys) next = { ...next, cy: o.cy, h: o.h };
+        if ((!xs || !ys) && !st.note) st.say("Held: a dimension sets that size or edge.");
+      } else if (o.kind === "circle" && diameterLocked(st.doc.dims, o.id)) {
+        next = o;
+        if (!st.note) st.say("Held: a dimension sets that Ø.");
+      }
+      st.updateShape(next);
+    } else if (drag.kind === "label") {
       const dx = p[0] - drag.from[0], dy = p[1] - drag.from[1];
       setLabelAt({ fid: drag.fid, at: [drag.at[0] + dx, drag.at[1] + dy] });
       st.setLabel("offset_mm", [+(drag.orig[0] + dx).toFixed(1), +(drag.orig[1] + dy).toFixed(1)], drag.fid);
     }
   };
 
-  const onPointerUp = () => {
+  const onPointerUp = (e: React.PointerEvent) => {
     const st = useStudio.getState();
     if (drag?.kind === "draw") {
-      const id = `${drag.tool === "rect" ? "r" : "c"}${Date.now().toString(36)}`;
-      if (drag.tool === "rect") {
-        const r = rectFromCorners(drag.a, drag.b);
-        if (r.w >= 1 && r.h >= 1) { st.addShape({ kind: "rect", id, ...r }); st.setTool("select"); }
-      } else {
-        const c = circleFrom(drag.a, drag.b, id);
-        if (c.r >= 0.5) { st.addShape(c); st.setTool("select"); }
+      if (drag.clicked) return;
+      // a press without a drag: the first corner (centre) was a click, the band follows the pointer (Fusion)
+      const [ax, ay] = scr(drag.a), [bx, by] = scr(drag.b);
+      if (Math.hypot(bx - ax, by - ay) <= DRAG_PX) { setDrag({ ...drag, clicked: true }); return; }
+      commitDraw(drag, drawVals);
+      return;
+    }
+    if (drag?.kind === "box") {
+      if (drag.moved) {
+        const [x0, y1] = toWorld(camera, w, h, [Math.min(drag.a[0], drag.b[0]), Math.min(drag.a[1], drag.b[1])]);
+        const [x1, y0] = toWorld(camera, w, h, [Math.max(drag.a[0], drag.b[0]), Math.max(drag.a[1], drag.b[1])]);
+        st.selectShapes(boxPick(st.doc.shapes, { x0, y0, x1, y1 }, drag.b[0] < drag.a[0]), drag.add);
       }
+      setDrag(null);
+      return;
+    }
+    if (drag?.kind === "dim") {
+      const q = local(e);
+      if (Math.hypot(q[0] - drag.press[0], q[1] - drag.press[1]) > DRAG_PX) placeDim(world(e));
+      setDrag(null);
+      return;
     }
     if (drag?.kind === "label") setLabelAt(null);
     if (drag?.kind === "move" || drag?.kind === "resize" || drag?.kind === "label") st.gesture(false);
+    if (drag?.kind === "move" && !drag.moved) drag.click?.();
     setDrag(null);
   };
 
@@ -308,18 +574,26 @@ export function Viewport() {
   };
   const selShape = selectedShape();
   const selId = selShape?.id ?? null;
-  // every feature that has a rectangle and a plan; the one in focus gets the
-  // turn arc
+  const selIds = new Set([...multi, ...(selId ? [selId] : [])]);
+  // every feature that has a profile and a plan, with the box its marker was
+  // placed in; the one in focus gets the turn arc
   const drawn = doc.features
-    .map((f) => ({ f, rect: featureRect(doc, f), plan: plans[f.id] as MarkerPlan | undefined }))
-    .filter((d): d is { f: Feature; rect: NonNullable<ReturnType<typeof featureRect>>; plan: MarkerPlan } => !!d.rect && !!d.plan);
+    .filter((f) => !!f.profile && !!plans[f.id])
+    .map((f) => ({ f, plan: plans[f.id], rect: placeBox(doc, f, plans[f.id]) }));
   const activeId = activeFeatureId({ doc, sel, panel });
-  const featureRects = new Set(doc.features.map((f) => f.rectId));
+  const featureRects = new Set(doc.features.map((f) => featureRect(doc, f)?.id));
 
   // the selected feature's dimensions (the panel's feature, or the one the selection names)
   const dimFid = panel.open ? panel.featureId : selectedFeatureId(doc, sel);
   const dimOf = drawn.find((d) => d.f.id === dimFid);
   const laid: LaidDim[] = dimOf ? layoutDims(dimOf.f, dimOf.rect, dimOf.plan, scr, z) : [];
+  // WHY draw the fit box (dashed, faint, only for the selected feature, only
+  // when the profile is not itself a rectangle): with the core placing the
+  // marker, the box it chose is what the dims, the label band and overflow are
+  // measured against, so it has to be visible; dashed reads as construction
+  // geometry (not a shape to pick or a cut line), and drawing it on every
+  // marker, or over a rectangle profile's own edges, would only repeat lines.
+  const fitBoxOf = dimOf && !featureRect(doc, dimOf.f) && dimOf.plan.fit_rect ? dimOf : null;
   // the editor stays over the value's last place should the value be hidden while it changes
   const editDim = dimEdit && dimEdit.fid === dimFid
     ? laid.find((d) => d.field === dimEdit.field) ?? (lastDim.current?.field === dimEdit.field ? lastDim.current : null) : null;
@@ -440,28 +714,77 @@ export function Viewport() {
     }
   }
 
-  // the draft being drawn
+  // the draft being drawn, and its value boxes on the rubber band (Fusion's):
+  // W on the edge the pointer's corner is on, H on its side, Ø by the pointer
   let draft: ReactElement | null = null;
+  const drawBoxes: ReactElement[] = [];
   if (drag?.kind === "draw") {
-    if (drag.tool === "rect") {
-      const r = rectFromCorners(drag.a, drag.b);
-      draft = <g><path d={sl(shapeLoop({ kind: "rect", id: "draft", ...r }))} className="edge draft" />
-        <text className="draft-dim" x={scr(drag.b)[0] + 10} y={scr(drag.b)[1] - 8}>{fmt(r.w)} × {fmt(r.h)}</text></g>;
-    } else {
-      const c = circleFrom(drag.a, drag.b, "draft");
-      draft = <g><path d={sl(shapeLoop(c))} className="edge draft" />
-        <text className="draft-dim" x={scr(drag.b)[0] + 10} y={scr(drag.b)[1] - 8}>Ø {fmt(c.r * 2)}</text></g>;
+    const sh = draftShape(drag, drawVals);
+    draft = <path d={sl(shapeLoop(sh))} className="edge draft" data-draft={sh.kind} />;
+    const type = (k: "w" | "h" | "d") => (t: string) => setDrawVals((v) => ({ ...v, [k]: t }));
+    const box = (k: "w" | "h" | "d", at: Vec2, live: number, label: string) => (
+      <ValueBox key={k} testid={`draw-${k}`} label={label} at={at} active={drawVals.active === k}
+        value={drawVals[k] ?? fmt(live)} onType={type(k)}
+        onTab={() => setDrawVals((v) => ({ ...v, active: sh.kind === "rect" ? (v.active === "w" ? "h" : "w") : "d" }))}
+        onCommit={() => commitDraw(drag, drawVals)}
+        onCancel={() => { setDrag(null); useStudio.getState().setTool("select"); }} />
+    );
+    if (sh.kind === "rect") {
+      const sx = drag.b[0] >= drag.a[0] ? 1 : -1, sy = drag.b[1] >= drag.a[1] ? 1 : -1;
+      const wAt = scr([sh.cx, sh.cy + (sy * sh.h) / 2]), hAt = scr([sh.cx + (sx * sh.w) / 2, sh.cy]);
+      drawBoxes.push(box("w", [wAt[0], wAt[1] - sy * 16], sh.w, "Width (mm)"), box("h", [hAt[0] + sx * 34, hAt[1]], sh.h, "Height (mm)"));
+    } else if (sh.kind === "circle") {
+      const b = scr(drag.b);
+      drawBoxes.push(box("d", [b[0] + 40, b[1] - 18], sh.r * 2, "Diameter (mm)"));
     }
   }
 
+  // the sketch's dims, the D tool's preview and what it has picked
+  const sketchDims = doc.dims.map((d) => laySketchDim(shapes, d, scr, z)).filter((d): d is LaidSketchDim => !!d);
+  const pendingDim = placing ?? (tool === "dim" && picks.length && cursorAt ? (() => {
+    const r = dimFromPicks(shapes, picks, cursorAt, "preview");
+    return r && "dim" in r ? r.dim : null;
+  })() : null);
+  const previewDim = pendingDim ? laySketchDim(shapes, pendingDim, scr, z) : null;
+  const editSketchDim = sdimEdit ? sketchDims.find((d) => d.dim.id === sdimEdit) ?? null : null;
+  const hoverPick = tool === "dim" && cursorAt && !drag && !placing ? pickAt(cursorAt) : null;
+  const refMark = (ref: DimRef, cls: string): ReactElement | null => {
+    if ("axis" in ref) {
+      const o = scr([0, 0]);
+      return ref.axis === "y" ? <line key={cls + "ay"} x1={o[0]} x2={o[0]} y1={0} y2={h} className={cls} /> : <line key={cls + "ax"} x1={0} x2={w} y1={o[1]} y2={o[1]} className={cls} />;
+    }
+    const s = shapes.find((x) => x.id === ref.shape);
+    if (!s || s.kind === "poly") return null;
+    if (ref.at === "c") { const c = scr([s.cx, s.cy]); return <circle key={cls + ref.shape + "c"} cx={c[0]} cy={c[1]} r={4.5} className={cls} />; }
+    if (ref.at === "o" || s.kind === "circle") return <path key={cls + ref.shape} d={sl(shapeLoop(s))} className={cls} />;
+    const x0 = s.cx - s.w / 2, x1 = s.cx + s.w / 2, y0 = s.cy - s.h / 2, y1 = s.cy + s.h / 2;
+    const seg: Record<string, [Vec2, Vec2]> = { l: [[x0, y0], [x0, y1]], r: [[x1, y0], [x1, y1]], b: [[x0, y0], [x1, y0]], t: [[x0, y1], [x1, y1]] };
+    const [a, b] = seg[ref.at].map(scr);
+    return <line key={cls + ref.shape + ref.at} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} className={cls} />;
+  };
+
+  /** A value typed into a sketch dim's box: the geometry follows (one undo step). */
+  const commitSketchDim = (d: SketchDim, text: string, fresh: boolean) => {
+    const st = useStudio.getState();
+    const v = Number(text.trim().replace(",", "."));
+    const ok = Number.isFinite(v) && (d.kind === "x" || d.kind === "y" ? v >= 0 : v > 0);
+    if (fresh) {
+      setPlacing(null);
+      if (ok && st.addDim({ ...d, value: typedValue(d, v) })) st.selectDim(d.id);
+    } else {
+      setSdimEdit(null);
+      if (ok && Math.abs(typedValue(d, v) - d.value) > 1e-9) st.setDimValue(d.id, typedValue(d, v));
+    }
+  };
+
   // the selected shape's handles
   const handles: ReactElement[] = [];
-  if (selShape?.kind === "rect") {
+  if (selShape?.kind === "rect" && tool === "select") {
     for (const hn of HANDLES) {
       const [x, y] = scr(handlePoint(selShape, hn));
       handles.push(<rect key={hn} data-handle={hn} x={x - 4} y={y - 4} width={8} height={8} className={`handle h-${hn}`} />);
     }
-  } else if (selShape?.kind === "circle") {
+  } else if (selShape?.kind === "circle" && tool === "select") {
     const [x, y] = scr([selShape.cx + selShape.r, selShape.cy]);
     handles.push(<rect key="e" data-handle="e" x={x - 4} y={y - 4} width={8} height={8} className="handle h-e" />);
   }
@@ -471,7 +794,7 @@ export function Viewport() {
   return (
     <div ref={host} className="viewport" data-testid="viewport" data-tool={tool} style={{ cursor }}
       onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
-      onPointerLeave={() => !drag && setHover(null)}
+      onPointerLeave={() => { pointer.at = null; if (!drag) setHover(null); }} onDoubleClick={onDoubleClick}
       onContextMenu={(e) => e.preventDefault()}>
       <svg ref={svg} width={w} height={h} className="vp-svg" data-zoom={z}>
         <defs>
@@ -502,18 +825,40 @@ export function Viewport() {
             <path key={s.id} d={sl(shapeLoop(s))} data-shape={s.id} data-kind={s.kind}
               className={[
                 "edge",
-                s.id === selId && "on",
+                selIds.has(s.id) && "on",
                 hover?.kind === "edge" && hover.id === s.id && "hover",
                 featureRects.has(s.id) && "marker-rect",
               ].filter(Boolean).join(" ")} />
           ))}
         </g>
         {draft}
+        {tool === "dim" && (
+          <g className="dim-picks" data-testid="dim-picks" data-picks={picks.length}>
+            <style>{PICK_CSS}</style>
+            {shapes.filter((s) => s.kind !== "poly").map((s) => {
+              const c = scr([(s as { cx: number }).cx, (s as { cy: number }).cy]);
+              return <path key={s.id} d={`M${c[0] - 3} ${c[1]}L${c[0] + 3} ${c[1]}M${c[0]} ${c[1] - 3}L${c[0]} ${c[1] + 3}`} className="pick-centre" />;
+            })}
+            {hoverPick && refMark(hoverPick, "pick-hover")}
+            {picks.map((r) => refMark(r, "pick-on"))}
+          </g>
+        )}
+        <SketchDims dims={sketchDims} selected={dimSel} editing={sdimEdit ?? placing?.id ?? null} preview={previewDim}
+          onSelect={(id) => useStudio.getState().selectDim(id)} onEdit={(id) => setSdimEdit(id)} />
+        {fitBoxOf && (
+          <path d={sl(rectCorners(fitBoxOf.rect))} data-fit-rect={fitBoxOf.f.id} className="fit-rect"
+            style={{ fill: "none", stroke: "var(--muted)", strokeWidth: 1, strokeDasharray: "5 4", opacity: 0.7, pointerEvents: "none" }} />
+        )}
         {dimOf && <Dims fid={dimOf.f.id} dims={laid} editing={editDim?.field ?? null} onEdit={(field) => setDimEdit({ fid: dimOf.f.id, field, start: dimOf.f })} />}
         {triads}
         {arc}
         {labels}
         <g className="handles">{handles}</g>
+        {drag?.kind === "box" && drag.moved && (
+          <rect x={Math.min(drag.a[0], drag.b[0])} y={Math.min(drag.a[1], drag.b[1])} width={Math.abs(drag.b[0] - drag.a[0])} height={Math.abs(drag.b[1] - drag.a[1])}
+            data-testid="select-box" data-select-box={drag.b[0] < drag.a[0] ? "crossing" : "window"}
+            style={drag.b[0] < drag.a[0] ? CROSSING_BOX : WINDOW_BOX} />
+        )}
         <g className="ruler">
           <rect x={0} y={0} width={w} height={RULER} className="ruler-bg" />
           {ticks}
@@ -524,9 +869,18 @@ export function Viewport() {
           onLive={(t) => applyDim(dimFid, editDim.field, t, true)}
           onCommit={(t) => commitDim(dimFid, editDim.field, t)} onCancel={() => revertDim(dimFid, dimEdit.start)} />
       )}
+      {drawBoxes.length > 0 && <div data-testid="draw-values">{drawBoxes}</div>}
+      {placing && previewDim && (
+        <ValueBox key={placing.id} testid="sdim-input" label="Dimension (mm)" at={previewDim.at} value={previewDim.text.replace("Ø", "")}
+          onCommit={(t) => commitSketchDim(placing, t, true)} onCancel={() => setPlacing(null)} />
+      )}
+      {editSketchDim && (
+        <ValueBox key={editSketchDim.dim.id} testid="sdim-input" label="Dimension (mm)" at={editSketchDim.at} value={editSketchDim.text.replace("Ø", "")}
+          onCommit={(t) => commitSketchDim(editSketchDim.dim, t, false)} onCancel={() => setSdimEdit(null)} />
+      )}
       {panel.selector && (
         <div className="vp-hint" data-testid="selector-hint">
-          {panel.selector === "rect" ? "Select a rectangle (its edge) or a profile (inside a region)" : "Select a profile (click inside a region)"}
+          Select a profile: click inside a region, or double-click a rectangle
         </div>
       )}
     </div>

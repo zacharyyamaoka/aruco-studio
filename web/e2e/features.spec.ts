@@ -5,7 +5,7 @@
 // computed colours. Screenshots go to E2E_SHOTS (default test-results/shots).
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, dragWorld, idle, openStudio, state } from "./helpers";
+import { CORE, clickAt, coreReady, dragWorld, idle, openStudio, panelTab, state } from "./helpers";
 
 const SHOTS = process.env.E2E_SHOTS ?? "test-results/shots";
 const FIXTURE = path.join(import.meta.dirname, "fixtures", "v1-plate.arucostudio-web.json");
@@ -31,6 +31,7 @@ async function extrudeOk(page: Page, firstId?: number): Promise<string> {
   await page.keyboard.press("a");
   await expect(page.getByTestId("extrude-panel")).toBeVisible();
   if (firstId !== undefined) {
+    await panelTab(page, "marker");
     const id = page.locator('input[data-path="marker.first_id"]');
     await id.fill(String(firstId));
     await id.press("Enter");
@@ -67,7 +68,8 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     expect(f1).not.toBe(f2);
 
     const s = await state(page);
-    expect(s.doc.features.map((f: any) => [f.id, f.key, f.rectId])).toEqual([[f1, f1, r1], [f2, f2, r2]]);
+    // A on a drawn (selected) rectangle: that rectangle on its own is the profile
+    expect(s.doc.features.map((f: any) => [f.id, f.key, f.profile])).toEqual([[f1, f1, { outer: r1, holes: [] }], [f2, f2, { outer: r2, holes: [] }]]);
     expect(Object.keys(s.plans).sort()).toEqual([f1, f2].sort());
 
     // drawn: two black paths, each inside its own rectangle's box
@@ -96,6 +98,7 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
       await clickMarker(page, f);
       await expect(page.getByTestId("extrude-panel")).toBeVisible();
       await expect(page.getByTestId("extrude-panel")).toContainText(`ArUco Extrude ${n}`);
+      await panelTab(page, "marker");
       await expect(page.locator('input[data-path="marker.first_id"]')).toHaveValue(first);
       const st = await state(page);
       expect(st.panel.featureId).toBe(f);
@@ -147,13 +150,14 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     await drawRect(page, [-20, -20], [20, 20]);
     await page.keyboard.press("a");
     await idle(page);
+    await panelTab(page, "marker");
     const marker = page.locator('input[data-path="marker.marker_mm"]');
     const markerBox = page.locator('[data-drv="marker.marker_mm"]');
     await expect(page.locator('[data-path="marker.auto"]')).toHaveCount(0);   // no Auto switch
 
     // driven: the plan's value, grey, its driver in the tooltip
     await expect(markerBox).toHaveAttribute("data-driven", "1");
-    await expect(markerBox).toHaveAttribute("title", /fills the rectangle/);
+    await expect(markerBox).toHaveAttribute("title", /fills the profile/);
     let s = await state(page);
     const v0 = Number(await marker.inputValue());
     expect(v0).toBeCloseTo(s.plan.marker_mm, 4);
@@ -237,11 +241,12 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     await expect(page.getByTestId("note")).toContainText("Opened v1-plate");
     await idle(page);
     const s = await state(page);
-    expect(s.doc).toMatchObject({ version: 2, name: "Old plate", id_ledger: {} });
+    expect(s.doc).toMatchObject({ version: 3, name: "Old plate", id_ledger: {} });
     expect(s.doc.features).toHaveLength(1);
     const f = s.doc.features[0];
     expect(f.key).toBe(f.id);
-    expect(f.rectId).toBe("r1");
+    // its rectangle on its own is its profile now (2026-10-20 evening)
+    expect(f.profile).toEqual({ outer: "r1", holes: [] });
     expect(s.plans[f.id]?.ids).toEqual([4, 5, 6, 7]);
     const black = (await page.locator(`[data-marker="${f.id}"] [data-marker-black]`).boundingBox())!;
     const rect = (await page.locator('[data-shape="r1"]').boundingBox())!;
@@ -249,6 +254,7 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     // its typed values are set, the rest driven
     await clickMarker(page, f.id);
     await expect(page.getByTestId("extrude-panel")).toBeVisible();
+    await panelTab(page, "marker");
     await expect(page.locator('[data-drv="marker.first_id"]')).toHaveAttribute("data-driven", "0");
     await expect(page.locator('[data-drv="marker.marker_mm"]')).toHaveAttribute("data-driven", "1");
     await expect(page.locator('[data-drv="marker.cols"]')).toHaveAttribute("data-driven", "1");
@@ -260,6 +266,7 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     await clickAt(page, 60, 40);
     await page.keyboard.press("a");
     await idle(page);
+    await panelTab(page, "marker");
     await page.locator('[data-path="marker.type"] [data-value="grid"]').click();
     await idle(page);
     const s = await state(page);
@@ -316,11 +323,11 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     expect(tools.y + tools.height).toBeLessThanOrEqual(panel.y);
     expect(Math.abs(tools.x + tools.width / 2 - 195)).toBeLessThanOrEqual(1);
     const vp = (await page.getByTestId("viewport").boundingBox())!;
-    const rectId = (await state(page)).feature.rectId;
+    const fid = (await state(page)).feature.id;
     await expect.poll(async () => {
-      const boxes = [await page.locator("[data-marker-outline]").boundingBox(), await page.locator(`[data-shape="${rectId}"]`).boundingBox()];
+      const boxes = [await page.locator("[data-marker-outline]").boundingBox(), await page.locator(`[data-fit-rect="${fid}"]`).boundingBox()];
       return boxes.every((m) => !!m && m.y >= vp.y + 18 && m.y + m.height <= tools.y && m.x >= 0 && m.x + m.width <= 390);
-    }, { message: "the marker and its rectangle are fully between the ruler and the toolbar" }).toBe(true);
+    }, { message: "the marker and the box it was placed in are fully between the ruler and the toolbar" }).toBe(true);
     const m = (await page.locator("[data-marker-outline]").boundingBox())!;
     expect(m.height).toBeGreaterThan(60);   // fitted, not a speck
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -339,7 +346,7 @@ test("label keystrokes land on the marker they were typed into, even with an imm
   const f2 = await extrudeOk(page);
   await clickMarker(page, f1);                                   // marker 1's panel
   await expect.poll(async () => (await state(page)).panel.featureId).toBe(f1);
-  await page.locator('[role=tab][data-tab="label"]').click();
+  await panelTab(page, "label");
   const before2 = (await state(page)).doc.features.find((f: any) => f.id === f2).label.text;
   await page.locator('textarea[data-path="label.text"]').fill("RACE");
   await clickMarker(page, f2);                                   // marker 2, inside the 120 ms window
@@ -348,5 +355,5 @@ test("label keystrokes land on the marker they were typed into, even with an imm
     { timeout: 3000 }).toBe("RACE");
   const s = await state(page);
   expect(s.doc.features.find((f: any) => f.id === f2).label.text).toBe(before2);
-  expect(s.doc.features.find((f: any) => f.id === f1).rectId).toBe(r1);
+  expect(s.doc.features.find((f: any) => f.id === f1).profile).toEqual({ outer: r1, holes: [] });
 });

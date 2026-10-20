@@ -3,7 +3,7 @@ import { loopArea } from "../model/geom";
 import { EXAMPLES } from "./examples";
 import {
   circleFrom, circleShape, contains, directChildren, edgeDistance, hitTest, moveShape, plainRect, profileAt, profileLoops,
-  rectShape, resizeShape, sameProfile, shapeLoop, type Shape,
+  rectAt, rectShape, resizeShape, sameProfile, shapeLoop, type Shape,
 } from "./model";
 
 const plate = EXAMPLES.find((e) => e.id === "plate")!.shapes;
@@ -43,6 +43,19 @@ describe("profiles", () => {
     const shapes: Shape[] = [rectShape("r", 0, 0, 80, 60)];
     expect(plainRect(shapes, profileAt(shapes, [5, 5])!)?.id).toBe("r");
     expect(plainRect(plate, profileAt(plate, [60, 40])!)).toBeNull();
+  });
+
+  it("a double-click picks a rectangle: its edge, else the innermost rectangle around the point; holes do not count", () => {
+    const shapes: Shape[] = [...plate, rectShape("in", 50, 30, 80, 60), circleShape("c", 65, 45, 6)];
+    expect(rectAt(shapes, [60, 40], 0.5)?.id).toBe("in");          // inside the drawn rectangle
+    expect(rectAt(shapes, [65, 45], 0.5)?.id).toBe("in");          // inside its circle: still that rectangle
+    expect(rectAt(shapes, [10, 10], 0.5)?.id).toBe("plate");       // the plate's material
+    expect(rectAt(shapes, [25, 55], 0.5)?.id).toBe("plate");       // inside a circle hole: the plate around it
+    expect(rectAt(shapes, [50.2, 70], 0.5)?.id).toBe("plate");     // outside "in", near nothing
+    expect(rectAt(shapes, [50.2, 40], 0.5)?.id).toBe("in");        // on its edge, from outside
+    expect(rectAt(shapes, [120.3, 40], 0.5)?.id).toBe("plate");    // the plate's edge, from outside
+    expect(rectAt(shapes, [-10, -10], 0.5)).toBeNull();
+    expect(rectAt([circleShape("c", 0, 0, 10)], [0, 0], 0.5)).toBeNull();
   });
 
   it("containment needs every point inside and a smaller shape", () => {

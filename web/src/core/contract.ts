@@ -132,7 +132,7 @@ export interface PlanRequest {
   /** legacy: the box to place in. The core fits one in `profile` when this is
    *  absent (and returns it as MarkerPlan.fit_rect); the UI stops sending it in
    *  the profile-first lane, which also makes this field optional. */
-  rect: Rect;
+  rect?: Rect;
   marker: MarkerParams;
   label: LabelParams;
   preset: Preset;

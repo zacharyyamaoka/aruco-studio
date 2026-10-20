@@ -16,8 +16,10 @@ import { startPlanner } from "./planner";
 import { PresetsModal } from "./presets/PresetsModal";
 import { PrintDialog } from "./print/PrintDialog";
 import { VerifyDialog } from "./verify/VerifyDialog";
-import { ShapeDims } from "./sketch/ShapeDims";
+import { pointer } from "./sketch/pointer";
 import { Viewport } from "./sketch/Viewport";
+import { View3D } from "./view3d/View3D";
+import { ViewToggle } from "./view3d/ViewToggle";
 import { loadCoreFacts, useStudio } from "./store";
 
 /** A key the tool should not take: typing in a field, or a list / menu / dialog open. */
@@ -42,18 +44,42 @@ function onUndoKey(e: KeyboardEvent): boolean {
   return true;
 }
 
+/** Ctrl+C / Ctrl+X / Ctrl+V (Cmd on a Mac): the selected shapes, the features
+ *  on them and their dims; a paste lands at the pointer. In a field they are the field's own. */
+function onClipKey(e: KeyboardEvent): boolean {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return false;
+  const k = e.key.toLowerCase();
+  if (k !== "c" && k !== "x" && k !== "v") return false;
+  if (keyIsElsewhere(e) || window.getSelection()?.toString()) return true;
+  e.preventDefault();
+  const st = useStudio.getState();
+  if (k === "c") st.copy();
+  else if (k === "x") st.cut();
+  else st.paste(pointer.at);
+  return true;
+}
+
+/** The arrows nudge the selected shapes 1 mm (Shift: 10 mm), one undo step each. */
+const NUDGE: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
+
 function onKey(e: KeyboardEvent) {
   if (onUndoKey(e)) return;
+  if (onClipKey(e)) return;
   if (e.ctrlKey || e.metaKey || e.altKey || keyIsElsewhere(e)) return;
   const st = useStudio.getState();
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  // a sketch tool in 3D goes back to the sketch first (as entering a sketch does in Fusion)
+  if (st.view3d && (k === "r" || k === "c" || k === "d")) st.setView3d(false);
   if (k === "v") st.setTool("select");
   else if (k === "r") st.setTool("rect");
   else if (k === "c") st.setTool("circle");
+  else if (k === "d") st.setTool("dim");
+  else if (NUDGE[k]) { const [x, y] = NUDGE[k], n = e.shiftKey ? 10 : 1; st.nudge(x * n, y * n); }
   else if (k === "a") void st.extrude();
   else if (k === "f") st.fit();
   else if (k === "s" || k === "p") openPrint();   // Sheet (P kept: the print key everyone tries)
   else if (k === "k") openVerify();
+  else if (k === "3") st.setView3d(!st.view3d);   // the 2D | 3D toggle
   else if (k === "Escape") {
     if (st.tool !== "select") st.setTool("select");
     else if (st.panel.selector) st.setSelector(null);
@@ -66,6 +92,7 @@ function onKey(e: KeyboardEvent) {
 
 export function App() {
   const note = useStudio((s) => s.note);
+  const view3d = useStudio((s) => s.view3d);
   useEffect(() => {
     const stop = startPlanner();
     window.addEventListener("keydown", onKey);
@@ -91,9 +118,11 @@ export function App() {
       <div className="app" data-testid="app">
         <TopBar />
         <main className="stage">
-          <Viewport />
+          {/* WHY hidden, not unmounted: back in 2D the sketch keeps its camera */}
+          <div className="vp-2d" style={{ display: view3d ? "none" : "contents" }}><Viewport /></div>
+          {view3d && <View3D />}
+          <ViewToggle />
           <Toolbar />
-          <ShapeDims />
           <ExtrudePanel />
           {note && <div className="toast" role="status" data-testid="note">{note}</div>}
         </main>

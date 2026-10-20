@@ -15,25 +15,25 @@
 // its type takes (CONTROLS).
 //
 // WHY screen-space rings: the core stands each dimension offset_mm outside
-// the rectangle, rings a few mm apart, which collapse into one line when
+// the box it placed the marker in (MarkerPlan.fit_rect: "the rectangle"
+// below), rings a few mm apart, which collapse into one line when
 // zoomed out. Here the core's order on each side is kept but the rings are
 // whole pixels apart, so the values stay legible at any zoom; a value that
 // would still overlap one already placed is hidden. Every line stands outside
 // the rectangle, so none crosses the marker's ink.
 import { useEffect, useRef } from "react";
-import type { Dimension, MarkerPlan, Vec2 } from "../core/contract";
+import type { Dimension, MarkerPlan, Rect, Vec2 } from "../core/contract";
 import { isSet, type Feature } from "../model/doc";
 import { toLocal } from "../model/geom";
-import type { RectShape } from "./model";
 
-const GAP = 14;        // px from the rectangle's edge to the first ring
-const RING = 22;       // px between rings
-const ARROW = 8;       // arrowhead length, px
-const EXT_GAP = 3;     // px between the geometry and its extension line
-const EXT_OVER = 4;    // px an extension line runs past the dimension line
-const TEXT_H = 15;     // the value's chip height, px
-const FONT_PX = 11;
-const LIVE_MS = 120;   // a typed value sets this long after the last keystroke, as the label's text does
+const GAP = 14;               // px from the rectangle's edge to the first ring
+const RING = 22;              // px between rings
+export const ARROW = 8;       // arrowhead length, px
+export const EXT_GAP = 3;     // px between the geometry and its extension line
+export const EXT_OVER = 4;    // px an extension line runs past the dimension line
+export const TEXT_H = 15;     // the value's chip height, px
+export const FONT_PX = 11;
+const LIVE_MS = 120;          // a typed value sets this long after the last keystroke, as the label's text does
 
 /** The dims each marker type draws: the sizes typed into it, and only those. */
 const CONTROLS: Record<string, string[]> = {
@@ -80,7 +80,7 @@ export interface LaidDim {
 }
 
 let ctx: CanvasRenderingContext2D | null | undefined;
-function textWidth(text: string, bold: boolean): number {
+export function textWidth(text: string, bold: boolean): number {
   if (ctx === undefined) ctx = typeof document !== "undefined" ? document.createElement("canvas").getContext("2d") : null;
   if (!ctx) return text.length * 7;
   const family = getComputedStyle(document.documentElement).getPropertyValue("--font").trim() || "sans-serif";
@@ -94,8 +94,9 @@ const unit = (v: Vec2): Vec2 => { const n = Math.hypot(v[0], v[1]) || 1; return 
 
 type Side = "top" | "bottom" | "left" | "right";
 
-/** Lay out the plan's dims for one feature in screen px (scr: sketch -> screen). */
-export function layoutDims(f: Feature, rect: RectShape, plan: MarkerPlan, scr: (p: Vec2) => Vec2, z: number): LaidDim[] {
+/** Lay out the plan's dims for one feature in screen px (scr: sketch -> screen),
+ *  standing outside `rect`: the box the core placed the marker in. */
+export function layoutDims(f: Feature, rect: Rect, plan: MarkerPlan, scr: (p: Vec2) => Vec2, z: number): LaidDim[] {
   const fields = CONTROLS[f.marker.type] ?? [];
   const dims = (plan.dims ?? []).filter((d) => fields.includes(d.field) && Math.hypot(d.b[0] - d.a[0], d.b[1] - d.a[1]) > 1e-6);
   // each dim's side of the rectangle (its offset normal in the rectangle's frame) and how far its geometry is inside that edge
@@ -165,7 +166,8 @@ function hideOverlaps(dims: LaidDim[]): LaidDim[] {
   return dims.filter((d) => kept.includes(d));
 }
 
-const CSS = `
+/** The dims' look, shared with the sketch's own dims (SketchDims.tsx). */
+export const DIM_CSS = `
 .cad-dim .val, .cad-dim .val * { pointer-events: auto; }
 .cad-dim line { stroke: var(--muted); stroke-width: 1; }
 .cad-dim line.ext { stroke-width: 0.7; }
@@ -184,7 +186,7 @@ const CSS = `
 `;
 
 /** An arrowhead, its tip first (the e2e reads the tip as the path's first point). */
-const arrow = (tip: Vec2, toward: Vec2) => {
+export const arrow = (tip: Vec2, toward: Vec2) => {
   const u = unit(sub(toward, tip)), w: Vec2 = [-u[1], u[0]];
   const base = add(tip, u, ARROW);
   const l = add(base, w, 3), r = add(base, w, -3);
@@ -199,7 +201,7 @@ export function Dims({ fid, dims, editing, onEdit }: {
 }) {
   return (
     <g className="cad-dims" data-testid="dims" data-feature={fid}>
-      <style>{CSS}</style>
+      <style>{DIM_CSS}</style>
       {dims.map((d) => {
         const dir = unit(sub(d.q, d.p));
         const n = unit(sub(d.p, d.a));

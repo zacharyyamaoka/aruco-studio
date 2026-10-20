@@ -7,11 +7,12 @@
 // Nothing outside web/src/sketch/ and Viewport.tsx knows how a shape is
 // drawn or picked.
 //
-// Fusion's selection: a click on a shape's EDGE picks the shape (a picked
-// rectangle is the marker rectangle); a click INSIDE a region picks the
-// profile there: the innermost closed shape around the point minus the
-// closed shapes directly inside it (its holes). A profile goes to
-// core.inscribe() to become a rectangle; plan() only ever sees a rectangle.
+// Fusion's selection: a click on a shape's EDGE picks the shape (to move or
+// resize it); a click INSIDE a region picks the profile there: the innermost
+// closed shape around the point minus the closed shapes directly inside it
+// (its holes); a DOUBLE-click on a rectangle (its edge or inside it) picks the
+// rectangle's outer edges alone as the profile (rectAt). plan() gets the
+// profile and places the marker in it (contract.ts, barrier 9).
 import type { Loop, Profile, Rect, Vec2 } from "../core/contract";
 import {
   boxOf, boxUnion, circleLoop, inLoop, loopArea, rectCorners, resizeRect, snap, toLocal, type Box, type Handle,
@@ -98,8 +99,8 @@ export function profileLoops(shapes: Shape[], ref: ProfileRef): Profile | null {
   return { loops: [shapeLoop(outer), ...holes.map((h) => [...shapeLoop(h)].reverse())] };
 }
 
-/** A profile that is just a rectangle with nothing inside: the marker goes
- *  in that rectangle itself, not in an inscribed copy. */
+/** A profile that is just a rectangle with nothing inside: the marker fills
+ *  that rectangle itself (the core uses a rectangle profile exactly). */
 export function plainRect(shapes: Shape[], ref: ProfileRef): RectShape | null {
   const s = shapes.find((x) => x.id === ref.outer);
   return s && s.kind === "rect" && !ref.holes.length ? s : null;
@@ -146,6 +147,44 @@ export function hitTest(shapes: Shape[], p: Vec2, tol: number): Hit {
   if (best) return { kind: "edge", id: best.id };
   const ref = profileAt(shapes, p);
   return ref ? { kind: "region", ref } : null;
+}
+
+/** The rectangle a double-click at p picks: the nearest rectangle edge within
+ *  `tol` mm (the smallest rectangle wins a tie), else the innermost rectangle
+ *  around p. null = no rectangle there. */
+export function rectAt(shapes: Shape[], p: Vec2, tol: number): RectShape | null {
+  const rects = shapes.filter((s): s is RectShape => s.kind === "rect");
+  const hit = hitTest(rects, p, tol);
+  if (hit?.kind === "edge") return rects.find((s) => s.id === hit.id) ?? null;
+  const around = rects.filter((s) => inShape(s, p));
+  if (!around.length) return null;
+  return around.reduce((a, b) => (b.w * b.h < a.w * a.h ? b : a));
+}
+
+// ------------------------------------------------------------ box selection
+
+function segsCross(a: Vec2, b: Vec2, c: Vec2, d: Vec2): boolean {
+  const o = (p: Vec2, q: Vec2, r: Vec2) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]));
+  return o(a, b, c) !== o(a, b, d) && o(c, d, a) !== o(c, d, b);
+}
+
+/** The shapes a selection box picks (a box in sketch mm). A WINDOW (dragged
+ *  left to right) takes the shapes wholly inside it; a CROSSING (right to
+ *  left) also takes those its edges touch: the CAD convention (Fusion,
+ *  AutoCAD). A box wholly inside a shape does not touch it. */
+export function boxPick(shapes: Shape[], box: Box, crossing: boolean): string[] {
+  const inBox = (p: Vec2) => p[0] >= box.x0 && p[0] <= box.x1 && p[1] >= box.y0 && p[1] <= box.y1;
+  const edges: [Vec2, Vec2][] = [
+    [[box.x0, box.y0], [box.x1, box.y0]], [[box.x1, box.y0], [box.x1, box.y1]],
+    [[box.x1, box.y1], [box.x0, box.y1]], [[box.x0, box.y1], [box.x0, box.y0]],
+  ];
+  return shapes.filter((s) => {
+    const loop = shapeLoop(s);
+    if (loop.every(inBox)) return true;
+    if (!crossing) return false;
+    if (loop.some(inBox)) return true;
+    return loop.some((p, i) => edges.some(([c, d]) => segsCross(p, loop[(i + 1) % loop.length], c, d)));
+  }).map((s) => s.id);
 }
 
 // ------------------------------------------------------------ edits
