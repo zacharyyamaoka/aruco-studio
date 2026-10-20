@@ -315,8 +315,9 @@ export function planRequest(doc: Doc, f: Feature | null): PlanRequest | null {
   return {
     trim: f.trim, profile, holes: f.holes, marker: f.marker, label: f.label, preset: doc.preset,
     reference_face: referenceFace(doc, f),
-    // only when something is set: an all-driven feature's request is byte for byte what it was
-    ...(Object.keys(f.extrude).length ? { extrude: f.extrude } : {}),
+    // always, even {}: the core answers MarkerPlan.extrude (the driven heights the
+    // Make tab and the 3D view show grey) only when the request asks
+    extrude: f.extrude,
   };
 }
 
