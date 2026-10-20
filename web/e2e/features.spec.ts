@@ -73,9 +73,15 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     // drawn: two black paths, each inside its own rectangle's box
     await expect(page.locator("[data-marker-black]")).toHaveCount(2);
     for (const [f, r] of [[f1, r1], [f2, r2]]) {
-      const black = (await page.locator(`[data-marker="${f}"] [data-marker-black]`).boundingBox())!;
+      // WHY a poll (2026-10-20, ~1 run in 12 under parallel load): idle() settles
+      // on the store; React can paint the marker a frame later, so the box read
+      // right after it was 0 px wide. The final width must still be the marker's.
+      const ink = page.locator(`[data-marker="${f}"] [data-marker-black]`);
+      await expect.poll(async () => (await ink.boundingBox())?.width ?? 0, { timeout: 5000 }).toBeGreaterThan(20);
+      const black = (await ink.boundingBox())!;
       const rect = (await page.locator(`[data-shape="${r}"]`).boundingBox())!;
-      expect(black.width).toBeGreaterThan(20);
+      const pl = (await state(page)).plans[f];
+      expect(black.width, `marker ${f}: plan ok=${pl?.ok} black=${pl?.black?.length} ids=${JSON.stringify(pl?.ids)} warnings=${JSON.stringify((pl?.warnings ?? []).filter((w: any) => w.level !== "info"))}`).toBeGreaterThan(20);
       expect(inside(rect, black), `marker ${f} ${JSON.stringify(black)} in rectangle ${r} ${JSON.stringify(rect)}`).toBe(true);
     }
     await page.screenshot({ path: path.join(SHOTS, "two-features-canvas.png") });
