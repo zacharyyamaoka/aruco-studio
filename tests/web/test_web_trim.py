@@ -1,7 +1,9 @@
 """Trim (contract barrier 5, Zach 2026-10-18): the sticker is cut to the
-profile, the marker rectangle (default) or the marker, everything inside the
-cut is white, and every export carries that white -- web_api.plan's cut /
-cut_shape, svg, sheet and the inkjet paper layer."""
+profile or the marker, everything inside the cut is white, and every export
+carries that white -- web_api.plan's cut / cut_shape, svg, sheet and the
+inkjet paper layer. Barrier 9 (2026-10-20 evening): "profile" is the default,
+a rect-only request's profile is its rect, and the deprecated "rectangle"
+reads as "profile" (tests/web/test_web_profile_first.py)."""
 from __future__ import annotations
 
 import math
@@ -62,7 +64,8 @@ def issues(p, field, level):
 @pytest.mark.parametrize("rect", [CLEAR, TURNED], ids=["square", "turned"])
 def test_cut_shape_per_trim(rect):
     for label in ({"on": False}, {"on": True, "text": "#{id}"}):
-        rp = W.plan(trimmed("rectangle", rect, label))
+        # a rect-only request: the rect is its profile (barrier 9; it was trim "rectangle")
+        rp = W.plan(trimmed("profile", rect, label, profile=None))
         assert rp["cut_shape"]["holes"] == [] and same_loop(rp["cut_shape"]["outer"], corners(rect))
         assert rp["cut"] == rp["cut_shape"]["outer"]
         pp = W.plan(trimmed("profile", rect, label))
@@ -80,19 +83,24 @@ def test_cut_shape_per_trim(rect):
         assert not [w for w in issues(pp, "tag", "info") if "profile" in w["text"]]
 
 
-def test_the_default_trim_is_the_rectangle():
+def test_the_default_trim_is_the_profile():
+    # barrier 9 (2026-10-20 evening): the default was "rectangle"
     for label in ({"on": False}, {"on": True, "text": "#{id}"}):
-        r = req(rect=CLEAR, label=label)
+        r = dict(req(rect=CLEAR, label=label), profile=PLATE)
         assert "trim" not in r
-        assert W.plan(r) == W.plan(dict(r, trim="rectangle"))
-        assert W.svg(r) == W.svg(dict(r, trim="rectangle"))
+        assert W.plan(r) == W.plan(dict(r, trim="profile"))
+        assert W.svg(r) == W.svg(dict(r, trim="profile"))
+        assert len(W.plan(r)["cut_shape"]["holes"]) == 2
 
 
-def test_profile_without_a_profile_is_the_rectangle_said_on_tag():
+def test_profile_without_a_profile_is_the_rectangle_unsaid():
+    # barrier 9: a rect-only request's profile IS its rect, so trim "profile"
+    # cuts to it without a word (it was an info on "tag")
     for prof in (None, {"loops": []}):
         p = W.plan(trimmed("profile", profile=prof))
         assert same_loop(p["cut_shape"]["outer"], corners(CLEAR)) and p["cut_shape"]["holes"] == []
-        assert issues(p, "tag", "info") and "profile" in issues(p, "tag", "info")[0]["text"]
+        assert not [w for w in issues(p, "tag", "info") if "profile" in w["text"]]
+        assert not issues(p, "trim", "info")
 
 
 def test_a_rectangle_poking_out_of_the_profile_is_a_warning():
@@ -190,8 +198,11 @@ def test_svg_of_a_turned_profile_is_in_the_rectangles_frame():
 # ------------------------------------------------------------------ sheet
 
 def test_every_sheet_sticker_is_its_cut():
-    items = [trimmed("rectangle", dict(CLEAR, w=30.0, h=24.0)),
-             trimmed("rectangle", dict(CLEAR, w=30.0, h=40.0), {"on": True, "text": "#{id}"}),
+    # rectangle stickers: rect-only requests (barrier 9: trim "rectangle" with a
+    # profile now cuts to the profile)
+    items = [trimmed("profile", dict(CLEAR, w=30.0, h=24.0), profile=None),
+             trimmed("profile", dict(CLEAR, w=30.0, h=40.0), {"on": True, "text": "#{id}"},
+                     profile=None),
              trimmed("profile"),
              trimmed("profile", TURNED, {"on": True, "text": "lid"}),
              trimmed("marker", dict(CLEAR, w=30.0, h=40.0)),
