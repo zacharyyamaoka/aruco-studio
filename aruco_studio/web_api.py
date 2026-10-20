@@ -16,15 +16,17 @@ Fusion composes a Joint Origin: core.geometry.jo_compose).
 | contract | core |
 |---|---|
 | `marker.type`, `dictionary`, `first_id` | `settings.layout`, `settings.dictionary`, `numbers.marker_id` |
-| `marker.auto` true | `numbers.size` 0 (a ChArUco checker 0 too); a grid / ChArUco keeps its typed count (`settings.force`), which Auto fills the rectangle with (autosize.fill_count) |
+| `marker.auto` true | `numbers.size` 0; a grid / ChArUco keeps its typed count (`settings.force`), which Auto fills the rectangle with (autosize.fill_count). A SET checker / separation is still honoured (barrier 7): a ChArUco `numbers.square` as typed, the marker the largest it holds (autosize._typed: the core's marker / checker rule) |
 | `marker.marker_mm`, `checker_mm`, `separation_mm` (auto false) | `numbers.size`, `numbers.square`, `numbers.separation` (grid; 0 = the gap rule) |
+| `marker.quiet_modules` | `settings.quiet_modules` as typed (0 too; absent = 1) |
 | `marker.cols`, `rows` | `settings.force`: the counts along the rectangle's x / y, before the turn (a board turned 90 builds rows x cols, `MarkerPlan.outer_mm` is in its own frame) |
 | `marker.turn`, `quiet_modules`, `corner_mark` | `settings.turn` (+ `origin_v` 2), `settings.quiet_modules`, `settings.corner_mark` |
 | `preset` (method inkjet) | `settings.make` = core.make.new_make("sticker", profile): rule 2, its page, margins and paper thickness |
 | `preset` (method print3d) | `settings.make` = new_make("print3d") |
 | `preset.cell_step_mm`, `min_cell_mm` | `settings.cells` {"of": "cell", "mm": step} (0 = no snap: {"of": "marker", "mm": 0.5}, the legacy step) |
 | `reference_face` | the target is a "profile" with a body (Flip does not apply) else "free" |
-| `label` on (2026-10-18) | core.rect_fill.fill: a band inside the rectangle on `label.side`; the marker is planned in the box it leaves (the target), centred there; "sans" text for an inkjet preset, the pixel font's ink for 3D |
+| `label` on, `place` "outside" (2026-10-18) | core.rect_fill.fill: a band inside the rectangle on `label.side`; the marker is planned in the box it leaves (the target), centred there; "sans" text for an inkjet preset, the pixel font's ink for 3D. `height_mm` 0: one module of the marker drawn (the search in _outside) |
+| `label` on, `place` "on_marker" (default, 2026-10-20) | core.rect_fill.on_marker on the marker planned in the whole rectangle (marker_geo): `surface` "black" knocks the text out of the border row (ChArUco: a black square), "white" prints it in the quiet zone; `height_mm` 0: core.label's row rule (half a module), one module in a ChArUco square |
 | `marker.origin_square` | core.rect_fill.square_origin on OpenCV's board frame |
 | `MarkerPlan.layers`, `cells`, `pattern_to_sketch`, `origin_z_mm` (CAD shells, N-6) | the TagPlan's `layers` placed like `black`; core.markers.cell_boxes; the matrix `black` is placed with; `origin`'s z (the printed surface: inkjet t, 3D the tile's top, on a face 0; Flip negates) |
 | `trim` (2026-10-18) -> `MarkerPlan.cut`, `cut_shape` | not the core's: the rectangle (default), `profile`'s loops as given, or `outer`; the plan is the same for all three. svg, sheet and the inkjet paper layer (`sticker`) are cut to it, white inside |
@@ -69,7 +71,7 @@ FIELDS = {"numbers.size": "marker.marker_mm", "numbers.square": "marker.checker_
 PRESET_FIELDS = ("settings.cells", "settings.make")
 TYPE_WORDS = {"single": "ArUco", "grid": "Grid", "charuco": "ChArUco"}
 LABEL_TEMPLATE = "#{ids}"           # an empty label text
-LABEL_CAP = _RF.LABEL_CAP          # height 0: 0.12 x the short side, within 2.5 .. 12 mm
+DRIVE_STEPS = 8                     # _outside: plans to settle a driven cap on the marker's module
 CAP_EM = _SH.CAP_EM                 # Helvetica's cap height / em (core.sheet prints the label with it)
 ND = 6                              # JSON numbers: 1e-6 mm
 ND_DIM = 9                          # a dimension's endpoints (plan_dims)
@@ -173,7 +175,8 @@ def spec_of(req: dict, issues: list) -> TagSpec:
     auto = bool(m.get("auto"))
     s = {"layout": kind, "dictionary": m["dictionary"], "origin_v": 2, "as_typed": True,
          "mode": "auto", "turn": int(m.get("turn") or 0),
-         "quiet_modules": float(m.get("quiet_modules") or 1.0),
+         # WHY `is None`, not `or` (barrier 7): a typed 0 was read as 1 without a word
+         "quiet_modules": 1.0 if m.get("quiet_modules") is None else float(m["quiet_modules"]),
          "corner_mark": m.get("corner_mark") or "none",
          "make": make_of(req.get("preset") or {}, issues),
          "cells": cells_of(req.get("preset") or {})}
@@ -184,6 +187,13 @@ def spec_of(req: dict, issues: list) -> TagSpec:
         n["size"] = float(m.get("marker_mm") or 0.0)
         if kind == "charuco":
             n["square"] = float(m.get("checker_mm") or 0.0)
+    elif kind == "charuco" and float(m.get("checker_mm") or 0.0) > 0:
+        # WHY (contract barrier 7, Zach 2026-10-20: "we should always have
+        # complete control"): a set checker is drawn as typed with Auto on
+        # too; the marker is the largest it holds (autosize._typed), and an
+        # overhang is drawn and flagged as a typed marker size's is. It was
+        # dropped, so a typed 20 mm checker drew 15.41 mm
+        n["square"] = float(m["checker_mm"])
     if kind == "grid" and float(m.get("separation_mm") or 0.0) > 0:
         n["separation"] = float(m["separation_mm"])
     face = bool(req.get("reference_face"))
@@ -192,9 +202,38 @@ def spec_of(req: dict, issues: list) -> TagSpec:
     return TagSpec(settings=s, numbers=n, target=t, name="", key="marker")
 
 
+def tag_plan(req: dict, issues: list) -> dict:
+    """The core's TagPlan (dict) of a request (spec_of). Auto with a SET grid
+    separation that leaves no room for any marker (contract barrier 7: a set
+    value is honoured, Auto or not): the smallest marker the preset prints
+    well (its cell minimum, else autosize's module floor) laid out as typed
+    with that separation, its overhang drawn and flagged as a typed size's
+    is, instead of a refusal; said on "marker.separation_mm"."""
+    spec = spec_of(req, issues)
+    d = plan_tag(spec).data
+    n, st = spec.numbers, spec.settings
+    if d["ok"] or st["layout"] != "grid" or not n.get("separation") or n.get("size"):
+        return d
+    cell = float(st["cells"].get("min_mm") or 0.0) or _A.MIN_MODULE_M * 1000.0
+    step = float(st["cells"].get("mm") or 0.0) if st["cells"].get("of") == "cell" else 0.0
+    if step > 0:                                   # up onto the grid, never under the minimum
+        cell = math.ceil(cell / step - 1e-9) * step
+    least = _r(cell * _D.dictionary_info(st["dictionary"])["modules"])
+    got = plan_tag(TagSpec(settings=st, numbers=dict(n, size=least), target=spec.target,
+                           name=spec.name, key=spec.key)).data
+    if not got["ok"]:
+        return d
+    issues.append({"field": "marker.separation_mm", "level": "warn",
+                   "text": f"the {_mm(n['separation'])} mm separation leaves no room for a marker: "
+                           f"the smallest that prints well ({_mm(least)} mm) is drawn"})
+    return got
+
+
 def field_of(f: str, text: str) -> str:
     if text.startswith("Over the page"):
         return "preset"                            # the page lint (core.make.lint_text)
+    if text.startswith("cell multiple: checker"):
+        return "marker.checker_mm"                 # a typed checker snapped to the cells: under its row
     if f in FIELDS:
         return FIELDS[f]
     if f.startswith(PRESET_FIELDS):
@@ -278,11 +317,6 @@ def label_text(template: str, kind: str, dictionary: str, ids: list) -> str:
     return re.sub(r"\{(\w+)\}", lambda mt: words.get(mt.group(1), mt.group(0)), t)
 
 
-def label_height(lab: dict, w: float, h: float) -> float:
-    hm = float(lab.get("height_mm") or 0.0)
-    return hm if hm > 0 else _RF.auto_cap(w, h)
-
-
 def text_width(text: str, cap_mm: float) -> float:
     """The label's width (mm) in Helvetica at a cap height (core.sheet's metrics)."""
     return _RF.sans_width(text, cap_mm)
@@ -300,23 +334,81 @@ def _line_mm(preset: dict) -> float:
     return float(pr.get("line_mm") or pr.get("nozzle_mm") or 0.0)
 
 
-def label_fill(req: dict, kind: str, dictionary: str, ids: list):
-    """The rectangle filled (core.rect_fill): the label's band, the box the
-    marker fills; None when the label is off."""
+def place_of(lab: dict, issues=None) -> str:
+    """`label.place`: "on_marker" (the default, contract barrier 7) or
+    "outside"; anything else is "on_marker", said in `issues`."""
+    p = lab.get("place") or "on_marker"
+    if p not in _RF.PLACES:
+        if issues is not None:
+            issues.append({"field": "label.place", "level": "warn",
+                           "text": f"place {p!r} is not on_marker or outside: on_marker"})
+        p = "on_marker"
+    return p
+
+
+def label_fill(req: dict, kind: str, dictionary: str, ids: list, cap: float = 0.0,
+               band_cap: float = 0.0):
+    """The rectangle filled for a label OUTSIDE the marker (core.rect_fill):
+    the label's band, the box the marker fills; None when the label is off.
+    `cap` > 0: the driven cap (one module, _outside) when none is typed;
+    `band_cap`: the band reserved for it (rect_fill.fill's band_cap_mm)."""
     lab = req.get("label") or {}
     if not lab.get("on"):
         return None
     rect = req["rect"]
     pr = req.get("preset") or {}
+    typed = float(lab.get("height_mm") or 0.0)
     # WHY offset_mm in the rectangle's own frame (it was the sketch's while the
     # label sat outside): Zach's "you set the origin of the label" -- an offset
     # inside the sticker, so the label stays where it was when the rectangle turns
     return _RF.fill(float(rect["w"]), float(rect["h"]),
                     label_text(lab.get("text") or "", kind, dictionary, ids),
-                    font=font_of(pr), cap_mm=float(lab.get("height_mm") or 0.0),
+                    font=font_of(pr), cap_mm=typed if typed > 0 else cap,
                     side=lab.get("side") or "below", gap_mm=float(lab.get("gap_mm") or 0.0),
                     offset=tuple(float(v) for v in (lab.get("offset_mm") or [0.0, 0.0])),
-                    line_mm=_line_mm(pr))
+                    line_mm=_line_mm(pr), band_cap_mm=band_cap if typed <= 0 else 0.0,
+                    driven=typed <= 0 and cap > 0)
+
+
+def module_mm(d: dict) -> float:
+    """One module (cell) of a plan's marker, mm."""
+    mk = d["marker"]
+    return mk["marker_length_m"] * 1000.0 / _D.dictionary_info(mk["dictionary"])["modules"]
+
+
+def marker_geo(d: dict):
+    """The plan's marker in the rectangle's own frame (centre 0, unturned;
+    never Flip: the sticker as printed), what a label ON it is fitted to
+    (core.rect_fill.Geo): core.label's marker_squares, ChArUco's black
+    squares (label rule 3) and inner corners, the quiet-zone edge."""
+    spec = _M.TagSpec.from_dict(d["marker"], lambda _t: None, "plan")
+    L = sketch_of_pattern({"cx": 0.0, "cy": 0.0, "angle_deg": 0.0}, d, False)
+    kind = d["layout"]["kind"]
+    sq, corners, S = (), (), 0.0
+    if kind == "charuco":
+        sq = tuple(_bbox(L, _rect_loop(r)) for r in _AL.charuco_black_squares(spec))
+        corners = tuple((L[0] * u + L[1] * v + L[3], L[4] * u + L[5] * v + L[7])
+                        for u, v in _AL.charuco_corners_mm(spec))
+        S = spec.square_length_m * 1000.0
+    return _RF.Geo(kind=kind, module=module_mm(d), outline=_bbox(L, _rect_loop(d["guides"]["sticker"])),
+                   markers=tuple(_bbox(L, _rect_loop(r)) for _i, r in _AL.marker_squares(spec)),
+                   squares=sq, square_mm=S, corners=corners)
+
+
+def marker_label(req: dict, d: dict):
+    """The label ON the plan's marker (core.rect_fill.on_marker)."""
+    lab = req.get("label") or {}
+    rect = req["rect"]
+    pr = req.get("preset") or {}
+    mk = d["marker"]
+    return _RF.on_marker(float(rect["w"]), float(rect["h"]),
+                         label_text(lab.get("text") or "", d["layout"]["kind"], mk["dictionary"],
+                                    list(d["ids"])),
+                         marker_geo(d), font=font_of(pr),
+                         cap_mm=float(lab.get("height_mm") or 0.0),
+                         side=lab.get("side") or "below", surface=lab.get("surface") or "black",
+                         offset=tuple(float(v) for v in (lab.get("offset_mm") or [0.0, 0.0])),
+                         line_mm=_line_mm(pr))
 
 
 def rect_matrix(rect: dict):
@@ -330,25 +422,33 @@ def line_centres(fl) -> list:
     """Each line's centre in the rectangle's own frame (its cap box's: the
     baseline at y - cap / 2), as the core stacks the lines: sans as
     rect_fill's runs, pixel as core.label.block_boxes (LINE_GAP_PX pixels
-    between lines), every line centred on the block's x."""
+    between lines), every line centred on the block's x; a turned label
+    (fl.rot) stacks along its own up."""
     if fl.font != "pixel":
         return [t.at for t in fl.runs]
-    top = fl.at[1] + fl.block[1] / 2.0
     pitch = fl.cap + _AL.LINE_GAP_PX * fl.stroke
-    return [(fl.at[0], top - fl.cap / 2.0 - k * pitch) for k in range(len(fl.drawn))]
+    dys = [fl.block[1] / 2.0 - fl.cap / 2.0 - k * pitch for k in range(len(fl.drawn))]
+    if not fl.rot:
+        return [(fl.at[0], fl.at[1] + dy) for dy in dys]
+    s = 1.0 if fl.rot > 0 else -1.0                 # up is -u (reads upward) or +u
+    return [(fl.at[0] - s * dy, fl.at[1]) for dy in dys]
 
 
 def placed_label(req: dict, kind: str, dictionary: str, ids: list, fl=None):
     """The contract's PlacedLabel: inside the rectangle, its text block's
     centre `at` (the band's centre + offset_mm, both in the rectangle's own
-    frame), its band `box`, and the pixel font's ink as `polygons`."""
-    fl = fl or label_fill(req, kind, dictionary, ids)
+    frame), its band `box` (on the marker: the border row's, the black
+    square's or the quiet zone's room for it), the pixel font's ink as
+    `polygons` (knocked out of the black on surface "black"), `angle_deg` the
+    text's (a label on the marker's left reads upward, its right downward).
+    `fl`: the request's Fill (_planned's), planned here when not given."""
+    fl = fl if fl is not None else _planned(req)[2]
     if fl is None:
         return None
     rect = req["rect"]
     R = rect_matrix(rect)
     return {"text": "\n".join(fl.lines), "at": _pt(R, *fl.at), "height_mm": _r(fl.cap),
-            "angle_deg": _r(float(rect.get("angle_deg") or 0.0)), "lines": list(fl.lines),
+            "angle_deg": _r(float(rect.get("angle_deg") or 0.0) + fl.rot), "lines": list(fl.lines),
             "lines_at": [_pt(R, *c) for c in line_centres(fl)],
             "font": fl.font,
             "polygons": [{"outer": _loop(R, _rect_loop(r), True), "holes": []} for r in fl.ink],
@@ -457,8 +557,8 @@ def trim_of(req: dict, issues=None):
     (default "rectangle"); "profile" with its loops (sketch frame, outer
     counter-clockwise, holes clockwise), or the rectangle when the request
     has no profile (said, on "tag"). Appends to `issues`: the rectangle
-    poking out of the profile ("rect"), a label left outside a
-    marker-trimmed sticker ("label.on")."""
+    poking out of the profile ("rect"), a label placed outside a
+    marker-trimmed sticker ("label.on"; a label ON the marker is inside it)."""
     issues = [] if issues is None else issues
     t = req.get("trim") or "rectangle"
     if t not in TRIMS:
@@ -484,7 +584,8 @@ def trim_of(req: dict, issues=None):
             issues.append({"field": "rect", "level": "warn",
                            "text": "the rectangle pokes outside the profile: the sticker is cut "
                                    "to the profile, so what hangs out is cut off"})
-    if t == "marker" and (req.get("label") or {}).get("on"):
+    lab = req.get("label") or {}
+    if t == "marker" and lab.get("on") and place_of(lab) == "outside":
         issues.append({"field": "label.on", "level": "warn",
                        "text": "the label is outside a marker-trimmed sticker: the sticker and "
                                "its svg carry the marker only"})
@@ -517,28 +618,84 @@ def _ids_guess(m: dict) -> list:
     return list(range(first, first + max(1, n)))
 
 
+def _in_box(req: dict, fl):
+    """(the plan in the box the label `fl` leaves, its issues, the box's w, h)."""
+    bw, bh = (_r(v) for v in fl.box_size)
+    issues = []
+    d = tag_plan(dict(req, rect=dict(req["rect"], w=bw, h=bh)), issues)
+    return d, issues, bw, bh
+
+
+def _outside(req: dict):
+    """A label OUTSIDE the marker: (plan, issues, its Fill, the box's w, h).
+    The marker is planned in the box the label's band leaves. A typed cap is
+    drawn as typed; a driven one is one module of the marker drawn (Zach,
+    2026-10-20: "the text should be sized ... to be the height of a single
+    cell"), and the marker's size depends on the band: from the marker that
+    fills the whole rectangle, each step plans with the band for the last
+    module. The modules alternate round the answer (a smaller band, a bigger
+    marker), so a band b whose marker's module t is no bigger always holds
+    text of cap t: the last such pair is kept (t = b once it settles, the
+    usual case), within DRIVE_STEPS plans."""
+    m = req["marker"]
+    lab = req["label"]
+    ids = _ids_guess(m)
+    if float(lab.get("height_mm") or 0.0) > 0:
+        for _k in range(2):                        # again only when the ids were guessed wrong
+            fl = label_fill(req, m["type"], m["dictionary"], ids)
+            d, issues, bw, bh = _in_box(req, fl)
+            if not d["ok"] or list(d["ids"]) == ids:
+                break
+            ids = list(d["ids"])
+        return d, issues, fl, bw, bh
+    whole = tag_plan(req, [])
+    b = module_mm(whole) if whole["ok"] else _RF.auto_cap(float(req["rect"]["w"]), float(req["rect"]["h"]))
+    ids = list(whole["ids"]) if whole["ok"] else ids
+    kept = None
+    for _k in range(DRIVE_STEPS):
+        fl = label_fill(req, m["type"], m["dictionary"], ids, b, b)
+        d, issues, bw, bh = _in_box(req, fl)
+        if not d["ok"]:
+            break
+        if list(d["ids"]) != ids:                  # the text names other ids: lay it out again
+            ids = list(d["ids"])
+            continue
+        t = module_mm(d)
+        if t <= b + 1e-9:
+            kept = (b, t, d, issues, bw, bh)
+            if b - t <= 1e-9:
+                break
+        b = t
+    if kept is None:
+        return d, issues, fl, bw, bh
+    b, t, d, issues, bw, bh = kept
+    return d, issues, label_fill(req, m["type"], m["dictionary"], ids, t, b), bw, bh
+
+
 def _planned(req: dict):
     """(the core's TagPlan dict, the request's issues, the rectangle's
-    core.rect_fill.Fill or None) of a PlanRequest. With the label on the
-    marker is planned in the box the label leaves (Fill.box), so Auto sizes
-    it to that box; the core's words about "the W × H mm rectangle" then
-    name that box."""
+    core.rect_fill.Fill or None) of a PlanRequest. A label ON the marker
+    (the default `place`) leaves the marker the whole rectangle and is
+    fitted to the marker planned there (marker_label). A label OUTSIDE it:
+    the marker is planned in the box the label leaves (Fill.box, _outside),
+    so Auto sizes it to that box; the core's words about "the W × H mm
+    rectangle" then name that box."""
     issues = []
     lab = req.get("label") or {}
     if not lab.get("on"):
-        d = plan_tag(spec_of(req, issues)).data
+        d = tag_plan(req, issues)
         trim_of(req, issues)
         return d, issues, None
-    m = req["marker"]
-    ids = _ids_guess(m)
-    for _k in range(2):                            # again only when the ids were guessed wrong
-        fl = label_fill(req, m["type"], m["dictionary"], ids)
-        bw, bh = (_r(v) for v in fl.box_size)
-        issues = []
-        d = plan_tag(spec_of(dict(req, rect=dict(req["rect"], w=bw, h=bh)), issues)).data
-        if not d["ok"] or list(d["ids"]) == ids:
-            break
-        ids = list(d["ids"])
+    if place_of(lab, issues) == "on_marker":
+        d = tag_plan(req, issues)
+        fl = marker_label(req, d) if d["ok"] else None
+        if fl is not None:
+            issues += [{"field": f, "level": lv, "text": t} for f, lv, t in fl.issues]
+        trim_of(req, issues)
+        return d, issues, fl
+    pre = issues
+    d, issues, fl, bw, bh = _outside(req)
+    issues = pre + issues
 
     def beside(mt):                                # the core's size of its target, any format
         a, b = float(mt.group(1)), float(mt.group(2))
@@ -651,7 +808,38 @@ def _notched(p: dict, tools: list) -> list:
     return [{"outer": q[0], "holes": q[1:]} for q in _RG.polygons(traps)]
 
 
-def cad_layers(d: dict, M, paper=None, label=None) -> list:
+def _rigid_inv(T):
+    """The inverse of a rigid row-major 4x4 (a turn and a shift)."""
+    Rt = [T[0], T[4], T[8], T[1], T[5], T[9], T[2], T[6], T[10]]
+    t = (T[3], T[7], T[11])
+    s = [-sum(Rt[3 * i + k] * t[k] for k in range(3)) for i in range(3)]
+    return [Rt[0], Rt[1], Rt[2], s[0], Rt[3], Rt[4], Rt[5], s[1], Rt[6], Rt[7], Rt[8], s[2],
+            0.0, 0.0, 0.0, 1.0]
+
+
+def pattern_cutout(req: dict, d: dict, fl, flip: bool):
+    """A pixel label knocked out of the black, as loops in the plan's
+    pattern frame (cad_layers' `cutout`), or None."""
+    if fl is None or not fl.knockout or not fl.ink:
+        return None
+    P = _rigid_inv(_local(d, fl, flip))
+    return [[(P[0] * u + P[1] * v + P[3], P[4] * u + P[5] * v + P[7]) for u, v in _rect_loop(r)]
+            for r in fl.ink]
+
+
+def knocked(polys: list, tools: list) -> list:
+    """Polygons {outer, holes} (mm, any frame) less the tool loops that reach
+    into them (_notched), every number _r's: the black with a knocked-out
+    label's letters taken out, so no ink is printed there."""
+    out = []
+    for p in polys:
+        for q in _notched(p, tools):
+            out.append({"outer": [[_r(u), _r(v)] for u, v in q["outer"]],
+                        "holes": [[[_r(u), _r(v)] for u, v in hl] for hl in q["holes"]]})
+    return out
+
+
+def cad_layers(d: dict, M, paper=None, label=None, cutout=None) -> list:
     """The contract's `layers`: the TagPlan's layers (plan/layers.py: REF's
     bodies in build order) placed in the sketch by M -- polygons as `black`,
     z along the sketch normal (Flip turns the marker over: [lo, hi] becomes
@@ -667,7 +855,11 @@ def cad_layers(d: dict, M, paper=None, label=None) -> list:
     built before it, so the ink and its pocket / recess carry the notch; in
     a tile (the white tile's corner cut) it is a cut layer into that tile.
     `label` (the plan's PlacedLabel): the pixel font's ink is the layer
-    "label_ink", black, at the black's z; a sans label is text, no layer."""
+    "label_ink", black, at the black's z; a sans label is text, no layer.
+    `cutout` (pattern-frame loops): a pixel label knocked out of the black
+    (on the marker, 2026-10-20) -- taken out of the footprint's polygons as
+    the board's corner cut is (the white under shows: core.label's "cut"
+    role), so no label layer."""
     layers = d["layers"]
     first = {}
     for L in layers:
@@ -697,6 +889,7 @@ def cad_layers(d: dict, M, paper=None, label=None) -> list:
             if L["part"] in FOLD_PARTS:
                 tools = [p["outer"] for S in layers[i + 1:] if S["step"] == "sub"
                          and (S["part"], S["solid"]) == (L["part"], L["solid"]) for p in S["polygons"]]
+                tools += list(cutout or [])
                 if tools:
                     polys = [q for p in polys for q in _notched(p, tools)]
             polys = placed(polys)
@@ -705,7 +898,7 @@ def cad_layers(d: dict, M, paper=None, label=None) -> list:
         if L["op"] != "add":
             row["into"] = into[L["part"]]
         out.append(row)
-    if label is not None and label.get("font") == "pixel" and label.get("polygons"):
+    if label is not None and label.get("font") == "pixel" and label.get("polygons") and not cutout:
         z = next((R["z"] for R in out if R["colour"] == "black"), None)
         if z is not None:
             out.append({"name": "label_ink", "part": "label", "colour": "black", "op": "add",
@@ -758,12 +951,16 @@ def plan(req: dict) -> dict:
     mk = d["marker"]
     L = _local(d, fl, flip)
     # WHY two ways: with the label off the matrix is exactly today's, so
-    # those plans keep every number byte for byte (only cut and dims are new)
-    M = sketch_of_pattern(req["rect"], d, flip) if fl is None else _mul(rect_matrix(req["rect"]), L)
+    # those plans keep every number byte for byte (only cut and dims are new);
+    # a label on the marker leaves it the whole rectangle, as off does
+    inside = fl is None or fl.place == "on_marker"
+    M = sketch_of_pattern(req["rect"], d, flip) if inside else _mul(rect_matrix(req["rect"]), L)
     black = []
     for poly in _ME.top(d).get("black", []):
         black.append({"outer": _loop(M, poly[0], True), "holes": [_loop(M, hl, False)
                                                                   for hl in poly[1:]]})
+    if fl is not None and fl.knockout and fl.ink:
+        black = knocked(black, [_loop(rect_matrix(req["rect"]), _rect_loop(r), True) for r in fl.ink])
     sticker = d["guides"]["sticker"]
     outer_mm = [_r(sticker[2] - sticker[0]), _r(sticker[3] - sticker[1])]
     label = placed_label(req, kind, mk["dictionary"], list(d["ids"]), fl)
@@ -774,7 +971,7 @@ def plan(req: dict) -> dict:
     rect = req["rect"]
     w, h = float(rect["w"]), float(rect["h"])
     overflow = _r(max(d.get("overflow_mm") or [0.0]))
-    if fl is not None:                             # measured against the rectangle, not the box
+    if not inside:                                 # measured against the rectangle, not the box
         u0, v0, u1, v1 = _bbox(L, _rect_loop(sticker))
         overflow = _r(max(0.0, u1 - w / 2.0, -w / 2.0 - u0, v1 - h / 2.0, -h / 2.0 - v0))
     outer = _loop(M, _rect_loop(sticker), True)
@@ -796,7 +993,8 @@ def plan(req: dict) -> dict:
             "auto": bool(m.get("auto")), "overflow_mm": overflow,
             "origin": origin, "label": label,
             "dims": plan_dims(req, d, fl, L, lay),
-            "layers": cad_layers(d, M, cut, label), "cells": pattern_cells(d),
+            "layers": cad_layers(d, M, cut, label, cutout=pattern_cutout(req, d, fl, flip)),
+            "cells": pattern_cells(d),
             # WHY full precision, the one field that is (every other number is
             # 1e-6, ND): a CAD shell composes this matrix with its own frames
             # and places every cell by it, so a rounded rotation (an error of
@@ -857,9 +1055,12 @@ def sticker_parts(req: dict, planned=None):
     {"outer", "holes"} (cut_local; white inside), "ink": the marker's black
     [[outer, hole, ...], ...], "label_ink": the pixel label's, "texts": the
     sans label's lines [{"text", "at" (its cap box's centre; baseline at -
-    cap / 2), "cap_mm"}], "font"}, or None when the plan is refused. A
-    marker-trimmed sticker has no label (it is outside the cut: trim_of
-    says so). core.sheet's PrintItem takes cut / ink as cut_mm / ink_mm (the
+    cap / 2 along its own up), "cap_mm", and when not 0 / black: "rot" (90
+    reads upward, -90 downward), "grey" 1.0 (knocked out: white over the
+    black)}], "font"}, or None when the plan is refused. A pixel label
+    knocked out of the black is holes in "ink", not "label_ink". A
+    marker-trimmed sticker has no label outside the marker (it is outside
+    the cut: trim_of says so); a label on the marker stays. core.sheet's PrintItem takes cut / ink as cut_mm / ink_mm (the
     sticker frame is any frame they share). `planned`: _planned(req) when
     the caller has it."""
     d, _issues, fl = planned or _planned(req)
@@ -868,16 +1069,29 @@ def sticker_parts(req: dict, planned=None):
     trim, loops = trim_of(req)
     cut = cut_local(req, d, fl, trim, loops)
     x0, y0, x1, y1 = _bbox([1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0], cut["outer"])
-    lab = fl if trim != "marker" else None
+    lab = fl if fl is not None and (trim != "marker" or fl.place == "on_marker") else None
     L = _local(d, fl, False)
     one = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
     ink = [[_loop(L, poly[0], True)] + [_loop(L, hl, False) for hl in poly[1:]]
            for poly in _ME.top(d).get("black", [])]
+    out = lab is not None and lab.knockout
+    if out and lab.ink:                            # the letters are paper: no ink there
+        ink = [[q["outer"]] + q["holes"] for q in
+               knocked([{"outer": p[0], "holes": p[1:]} for p in ink],
+                       [_loop(one, _rect_loop(r), True) for r in lab.ink])]
+    texts = []
+    for t in (lab.runs if lab else []):
+        row = {"text": t.text, "at": [_r(t.at[0]), _r(t.at[1])], "cap_mm": _r(t.cap)}
+        if out:
+            row["grey"] = 1.0                      # white text over the black (knocked out)
+        if lab.rot:
+            row["rot"] = lab.rot
+        texts.append(row)
     return {"w_mm": _r(x1 - x0), "h_mm": _r(y1 - y0), "cut": cut,
             "ink": ink,
-            "label_ink": [[_loop(one, _rect_loop(r), True)] for r in (lab.ink if lab else [])],
-            "texts": [{"text": t.text, "at": [_r(t.at[0]), _r(t.at[1])], "cap_mm": _r(t.cap)}
-                      for t in (lab.runs if lab else [])],
+            "label_ink": [[_loop(one, _rect_loop(r), True)] for r in (lab.ink if lab and not out
+                                                                       else [])],
+            "texts": texts,
             "font": fl.font if fl else None}
 
 
@@ -907,9 +1121,13 @@ def svg(req: dict) -> str:
         out.append(f'<path data-label="1" fill="#000000" fill-rule="evenodd" '
                    f'd="{_X.path_d(sp["label_ink"])}"/>')
     for t in sp["texts"]:
+        # a turned line is drawn unturned round its cap box's centre, then turned there
+        rot = t.get("rot", 0)
+        tr = (f' transform="rotate({f(-rot)} {f(t["at"][0])} {f(-t["at"][1])})"' if rot else "")
         out.append(f'<text data-label="1" x="{f(t["at"][0])}" y="{f(-(t["at"][1] - t["cap_mm"] / 2.0))}" '
                    f'font-family="Helvetica, Arial, sans-serif" font-size="{f(t["cap_mm"] / CAP_EM)}" '
-                   f'text-anchor="middle" fill="#000000">{_xml(t["text"])}</text>')
+                   f'text-anchor="middle" fill="{"#ffffff" if t.get("grey") else "#000000"}"{tr}>'
+                   f'{_xml(t["text"])}</text>')
     return "".join(out) + "</svg>"
 
 
@@ -962,7 +1180,7 @@ def sheet(req: dict, date=None) -> dict:
                              "text": f"item {i + 1} is not printed: " + "; ".join(d["errors"])})
             continue
         first = first or it
-        lab = placed_label(it, d["layout"]["kind"], d["marker"]["dictionary"], d["ids"])
+        lab = placed_label(it, d["layout"]["kind"], d["marker"]["dictionary"], d["ids"], got[2])
         p = _SS.sticker_item(SimpleNamespace(name=""), d)
         ids = d["ids"]
         idw = f"#{ids[0]}" if len(ids) == 1 else f"#{ids[0]}-{ids[-1]}"
@@ -978,7 +1196,7 @@ def sheet(req: dict, date=None) -> dict:
         sp = sticker_parts(it, got)
         p.cut_mm = sp["cut"]
         p.ink_mm = sp["ink"] + sp["label_ink"]
-        if lab and trim_of(it)[0] != "marker":
+        if lab and (trim_of(it)[0] != "marker" or got[2].place == "on_marker"):
             p.texts_mm = sp["texts"]
         items.append(p)
         if not is_box(p.cut_mm):

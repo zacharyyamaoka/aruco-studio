@@ -86,11 +86,6 @@ export function ExtrudePanel() {
   const refFace = !!f.profile;
   const shown = shownRows(m, l.on, refFace);
   const issues: Issue[] = plan && f.rectId ? [...plan.warnings] : [];
-  // WHY: the contract hands the core a typed checker only with a typed marker
-  // size (web_api.spec_of), so say so rather than show a value that is not drawn
-  if (m.type === "charuco" && isSet(f, "marker.checker_mm") && !isSet(f, "marker.marker_mm")) {
-    issues.push({ field: "marker.checker_mm", level: "warn", text: "Used only with a set Marker size: the board fills the rectangle" });
-  }
   // auto id's issues for this feature (Issue.key): a collision, a full dictionary
   for (const i of st.idIssues) if (i.key === f.key) issues.push({ ...i, field: "marker.first_id" });
   const routed = routeIssues(issues, shown);

@@ -30,8 +30,11 @@ def req(marker=None, rect=None, label=None, pre=None, face=False):
          "marker_mm": 0.0, "checker_mm": 0.0, "separation_mm": 0.0, "cols": 1, "rows": 1,
          "turn": 0, "flip": False, "quiet_modules": 1.0, "corner_mark": "none"}
     m.update(marker or {})
+    # WHY "outside" (barrier 7, 2026-10-20): this file is about the band the
+    # label takes INSIDE the rectangle beside the marker, the default before
+    # "on_marker" (tests/web/test_web_label_place.py has the label on it)
     lb = {"on": False, "text": "", "height_mm": 0.0, "side": "below", "gap_mm": 2.0,
-          "offset_mm": [0.0, 0.0]}
+          "offset_mm": [0.0, 0.0], "place": "outside"}
     lb.update(label or {})
     return {"rect": dict({"cx": 0.0, "cy": 0.0, "w": 50.0, "h": 80.0, "angle_deg": 0.0},
                          **(rect or {})),

@@ -203,7 +203,7 @@ def test_a_two_line_label_sits_in_its_band_below_the_marker_and_is_all_in_view()
     r = single(mm=0.0, auto=True)
     r = dict(r, rect={"cx": 0.0, "cy": 0.0, "w": 60.0, "h": 70.0, "angle_deg": 0.0},
              label={"on": True, "text": "PLATE\n#{ids}", "height_mm": 6.0, "side": "below",
-                    "gap_mm": 2.0, "offset_mm": [0.0, 0.0]})
+                    "gap_mm": 2.0, "offset_mm": [0.0, 0.0], "place": "outside"})
     d = V._plan(r)
     lab = V._label(r, d)
     u0, v0, u1, v1 = d["guides"]["sticker"]                     # the marker's outline, pattern frame
