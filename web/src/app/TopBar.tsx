@@ -1,10 +1,11 @@
 // The top bar: the name, File and Export, the Download for CAD menu, the
-// preset chip (opens the presets modal), the core chip, the theme, the
-// GitHub link.
+// preset chip (opens the presets modal), the core chip, the skin, the theme,
+// the GitHub link.
 import { Glyph, Menu, MenuItem, MenuSeparator, useTheme } from "@bam/ui";
 import { LoaderCircle, Moon, Sun } from "lucide-react";
 import { coreKind, useCoreStatus } from "../coreSource";
 import { useStudio } from "../store";
+import { SKINS, useSkin } from "../skins/skins";
 import { exportPdf, exportSvg, openDoc, openPrint, saveDoc } from "./commands";
 
 const GITHUB = "https://github.com/zacharyyamaoka/aruco-studio";
@@ -65,10 +66,26 @@ function CadMenu() {
   );
 }
 
+/** The skin (../skins/skins.ts): how the Studio looks, CAD program by CAD
+ *  program. Only tokens change, never the layout. */
+function SkinMenu() {
+  const [skin, setSkin] = useSkin();
+  return (
+    <Menu icon="skin" label="Skin" testid="menu-skin" align="end">
+      {SKINS.map((s) => (
+        <MenuItem key={s.id} testid={`skin-${s.id}`} onClick={() => setSkin(s.id)}
+          hint={s.theme ? `${s.theme} only` : undefined}
+          label={<>{s.name}{s.id === skin.id && <span className="skin-tick"> ✓</span>}</>} />
+      ))}
+    </Menu>
+  );
+}
+
 export function TopBar() {
   const preset = useStudio((s) => s.doc.preset);
   const name = useStudio((s) => s.doc.name);
   const [theme, setTheme] = useTheme();
+  const [skin] = useSkin();
   const st = useStudio.getState;
   return (
     <header className="topbar" data-testid="topbar">
@@ -94,7 +111,10 @@ export function TopBar() {
         <span className="chip-text">{preset ? preset.name : "Preset…"}</span>
       </button>
       <CoreChip />
-      <button type="button" className="kit-ib" data-testid="theme-toggle" title={theme === "dark" ? "Light theme" : "Dark theme"}
+      <SkinMenu />
+      {/* a one-theme skin (Fusion dark, Onshape light) greys the toggle out */}
+      <button type="button" className="kit-ib" data-testid="theme-toggle" disabled={!!skin.theme}
+        title={skin.theme ? `${skin.name} is ${skin.theme} only` : theme === "dark" ? "Light theme" : "Dark theme"}
         aria-label="Toggle theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
         {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
       </button>

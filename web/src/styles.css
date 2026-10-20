@@ -1,7 +1,27 @@
 /* The online Studio's layout. Every colour is a kit token (@bam/ui/tokens.css),
    so a host restyles the whole screen by overriding the variables. */
+/* The app's own tokens beside the kit's: what a skin (./skins/) sets besides
+   the colours and the density: the text size, the menus' background, the
+   fields' border, the floating panel's corners and title bar. */
+:root {
+  --font-size: 12px;
+  --popup: var(--panel);
+  --field-line: var(--line);
+  --selbox: var(--field);
+  --selbox-line: var(--line);
+  --panel-radius: 8px;
+  --head-h: 30px;
+  --head-bg: var(--panel-2);
+  --head-text: var(--text);
+  --head-line: var(--line-soft);
+  --head-size: 11px;
+  --head-weight: 600;
+  --head-case: uppercase;
+  --head-tracking: 0.05em;
+  --tab-h: 30px;
+}
 html, body, #root { height: 100%; margin: 0; }
-body { font: 12px/1.35 var(--font); background: var(--bg); color: var(--text); overflow: hidden; -webkit-font-smoothing: antialiased; }
+body { font: var(--font-size)/1.35 var(--font); background: var(--bg); color: var(--text); overflow: hidden; -webkit-font-smoothing: antialiased; }
 * { box-sizing: border-box; }
 .muted { color: var(--muted); }
 .pad { padding: 12px; }
@@ -27,6 +47,12 @@ body { font: 12px/1.35 var(--font); background: var(--bg); color: var(--text); o
 .chip-core.st-error { color: var(--bad); }
 .chip-core.st-error .dot { background: var(--bad); }
 a.kit-ib { text-decoration: none; }
+/* the kit's fields and popups, on the app's tokens (Studio: the kit's own values) */
+.kit-num, .kit-text, .kit-select-trigger, .kit-seg { border-color: var(--field-line); }
+.kit-select-popup, .kit-menu-popup { background: var(--popup); }
+.kit-select-popup, .kit-menu-popup, .kit-dialog, .kit-palette { font-size: var(--font-size); }
+/* the skin menu: the current one is ticked */
+.skin-tick { color: var(--accent); }
 /* Download for CAD: two doors, both coming soon */
 .kit-menu-item:has(.cad-item) { height: auto; min-height: 26px; padding: 5px 8px; }
 .cad-item { display: flex; flex-direction: column; gap: 1px; }
@@ -96,7 +122,7 @@ a.kit-ib { text-decoration: none; }
 .tb-tool.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 .tb-tool.on .kit-glyph { --accent: currentColor; }
 .tb-key { font: 600 9px/1 var(--mono); color: var(--muted); padding: 2px 3px; border: 1px solid var(--line-soft); border-radius: 3px; background: var(--panel-2); }
-.tb-tool.on .tb-key { color: #fff; background: rgba(0, 0, 0, 0.22); border-color: rgba(255, 255, 255, 0.35); }
+.tb-tool.on .tb-key { color: var(--accent-text); background: rgba(0, 0, 0, 0.22); border-color: rgba(255, 255, 255, 0.35); }
 
 /* the selected shape's size */
 .dims-box { position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: var(--panel);
@@ -110,23 +136,24 @@ a.kit-ib { text-decoration: none; }
 
 /* ------------------------------------------------------------ the floating panel */
 .fpanel { position: absolute; top: 26px; right: 10px; max-height: calc(100% - 36px); display: flex; flex-direction: column; background: var(--panel);
-  border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); z-index: 20; overflow: hidden; }
+  border: 1px solid var(--line); border-radius: var(--panel-radius); box-shadow: var(--shadow); z-index: 20; overflow: hidden; }
 .fpanel.moved { right: auto; }
-.fpanel-head { display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 4px 0 10px; background: var(--panel-2); border-bottom: 1px solid var(--line-soft);
+.fpanel-head { display: flex; align-items: center; gap: 7px; height: var(--head-h); padding: 0 4px 0 10px; background: var(--head-bg); color: var(--head-text);
+  border-bottom: 1px solid var(--head-line);
   cursor: move; user-select: none; touch-action: none; }
-.fpanel-title { flex: 1; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.fpanel-title { flex: 1; font-size: var(--head-size); font-weight: var(--head-weight); letter-spacing: var(--head-tracking); text-transform: var(--head-case); }
 .fpanel.collapsed .fpanel-head { border-bottom: 0; }
 .fpanel-body { overflow-y: auto; overflow-x: hidden; flex: 1; min-height: 0; padding: 4px 0; }
 .fpanel-foot { display: flex; justify-content: flex-end; gap: 6px; padding: 7px 10px; border-top: 1px solid var(--line-soft); background: var(--panel-2); }
 .fpanel .kit-tabs { margin-top: 4px; }
-.fpanel .kit-tab { height: 30px; }
+.fpanel .kit-tab { height: var(--tab-h); }
 .fpanel .tab-body { padding: 4px 0; }
 .selrow { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; height: var(--ctl); padding: 0 7px; border: 1px solid var(--line);
-  border-radius: var(--radius-sm); background: var(--field); color: var(--muted); font: inherit; cursor: pointer; text-align: left; }
+  border-radius: var(--radius-sm); background: var(--selbox); color: var(--muted); font: inherit; cursor: pointer; text-align: left; border-color: var(--selbox-line); }
 .selrow.filled { color: var(--text); }
 .selrow.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); color: var(--accent); }
 .selrow-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.preset-pick { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; height: var(--ctl); padding: 0 7px; border: 1px solid var(--line);
+.preset-pick { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; height: var(--ctl); padding: 0 7px; border: 1px solid var(--field-line);
   border-radius: var(--radius-sm); background: var(--field); color: var(--text); font: inherit; cursor: pointer; text-align: left; }
 .preset-pick:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
 .preset-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -231,13 +258,13 @@ a.kit-ib { text-decoration: none; }
   .fpanel-head { cursor: default; }
   /* above the docked panel (45 vh open, its 31 px head collapsed) */
   .toolbar { bottom: 8px; }
-  .stage:has(.fpanel) .toolbar { bottom: calc(31px + 8px); }
+  .stage:has(.fpanel) .toolbar { bottom: calc(var(--head-h) + 1px + 8px); }
   .stage:has(.fpanel:not(.collapsed)) .toolbar { bottom: calc(45vh + 8px); }
   .stage:has(.fpanel) .toast { bottom: calc(45vh + 60px); }
   .toolbar .kit-tool { width: 32px; height: 32px; }
   .tb-tool { padding: 0 7px; }
   .tb-tool .tb-name, .tb-tool .tb-key { display: none; }
-  [data-testid="menu-cad"] > span { display: none; }
+  [data-testid="menu-cad"] > span, [data-testid="menu-skin"] > span { display: none; }
   .dims-box { left: 6px; bottom: 6px; }
   .vp-hint { top: 24px; }
 }

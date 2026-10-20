@@ -1,0 +1,73 @@
+/* Fusion 360: dark only (skins.ts pins data-theme="dark"). Extends Unstyled
+   (unstyled.css). The colours are sampled from Zach's own Fusion screenshots
+   (zach_brain/Sources/Images/, 2026-10-18):
+     Pasted image 20261018123334.png  the Edit ArUco Extrude panel: panel #3b4454,
+       fields #2b3440 with no visible border, the open dropdown #454f60 with its
+       highlighted item #3e84aa, rows 26 px, the uppercase title on the panel's
+       own grey, the viewport around it #2a2a2a;
+     Pasted image 20261018123353.png  the presets modal: the tab underline #0a92d2,
+       the selected collection #254b63, square corners;
+     Pasted image 20261018120821.png  a selected face drawn in blue.
+   Fusion's UI font is Autodesk's Artifakt Element (not shipped here); Segoe UI
+   is what Fusion falls back to on Windows. */
+:root[data-skin="fusion"] {
+  --bg: #2a2a2a;
+  --panel: #3b4454;
+  --panel-2: #374050;
+  --field: #2b3440;
+  --field-hover: #323c4a;
+  --line: #4c5668;
+  --line-soft: #46505f;
+  --text: #e6e8eb;
+  --muted: #a3acb9;
+  --accent: #0a92d2;
+  --accent-soft: rgba(40, 160, 220, 0.38);
+  --accent-text: #ffffff;
+  --ok: #6cc56c;
+  --warn: #f0b44c;
+  --bad: #ff6b5e;
+  --pick: #45b5ff;
+  --hover: rgba(255, 255, 255, 0.07);
+  --shadow: 0 4px 14px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.25);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --backdrop: rgba(0, 0, 0, 0.5);
+  --canvas: #2a2a2a;
+  --canvas-3d: #262626;
+  --grid: rgba(255, 255, 255, 0.06);
+  --grid-major: rgba(255, 255, 255, 0.12);
+  --grid-axis: rgba(10, 146, 210, 0.55);
+  --shape-line: #9aa3ad;
+  --shape-fill: rgba(150, 160, 175, 0.12);
+  --shape-fill-body: rgba(150, 160, 175, 0.28);
+  --t-body: #7f8893;
+  --thumb-bg: #e6e9ed;
+  --code-bg: #2b3440;
+  /* density and shape: 26 px rows, 2 px corners */
+  --row: 26px;
+  --ctl: 22px;
+  --radius: 2px;
+  --radius-sm: 2px;
+  --font: "Artifakt Element", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-size: 12px;
+  /* fields without a border, the dropdown a lighter grey, the title on the panel's grey */
+  --popup: #454f60;
+  --field-line: #2b3440;
+  --selbox: #2b3440;
+  --selbox-line: #2b3440;
+  --panel-radius: 2px;
+  --head-h: 26px;
+  --head-bg: var(--panel);
+  --head-text: #e6e8eb;
+  --head-line: var(--line-soft);
+  --head-size: 11.5px;
+  --head-weight: 400;
+  --head-case: uppercase;
+  --head-tracking: 0.03em;
+  --tab-h: 28px;
+  color-scheme: dark;
+}
+/* a picked segment is outlined in the blue on its own grey, its text stays light
+   (the Type icons in 123334.png); the accent's text on the accent's tint is unreadable here */
+:root[data-skin="fusion"] .kit-seg-btn.on { color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
+/* a row's label is in the text's light grey, not muted (123334.png: Preset, Type, Dictionary) */
+:root[data-skin="fusion"] .kit-field:not(.has-error, .has-warn) .row-label { color: var(--text); }

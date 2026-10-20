@@ -1,0 +1,99 @@
+/* Unstyled: a neutral, near-browser-default skin (Zach, 2026-10-20: "for the
+   panel we have an unstyled version that we then match for those different
+   programs"). The system font, the browser's plain field borders (Chrome's
+   #767676 / #858585) on a native dialog's grey (ButtonFace #f0f0f0), square
+   corners, no shadows and no brand accent: a near-black (light) or near-white
+   (dark) one. It is what a CAD shell would restyle, and the base the CAD
+   skins (fusion.css, onshape.css) extend: they take its density and shape
+   and set their own colours over it.
+   Every rule here only sets tokens (the kit's tokens.css, ../styles.css). */
+:root[data-skin="unstyled"], :root[data-skin="fusion"], :root[data-skin="onshape"] {
+  --bg: #ffffff;
+  --panel: #f0f0f0;
+  --panel-2: #e6e6e6;
+  --field: #ffffff;
+  --field-hover: #f5f5f5;
+  --line: #767676;
+  --line-soft: #d4d4d4;
+  --text: #000000;
+  --muted: #6d6d6d;
+  --accent: #222222;
+  --accent-soft: rgba(0, 0, 0, 0.09);
+  --accent-text: #ffffff;
+  --ok: #007a3d;
+  --warn: #8a5a00;
+  --bad: #c00000;
+  --pick: #d46b00;
+  --hover: rgba(0, 0, 0, 0.05);
+  --shadow: none;
+  --shadow-sm: none;
+  --backdrop: rgba(0, 0, 0, 0.3);
+  --canvas: #ffffff;
+  --canvas-3d: #fafafa;
+  --grid: rgba(0, 0, 0, 0.06);
+  --grid-major: rgba(0, 0, 0, 0.12);
+  --grid-axis: rgba(0, 0, 0, 0.35);
+  --shape-line: #555555;
+  --shape-fill: rgba(0, 0, 0, 0.06);
+  --shape-fill-body: rgba(0, 0, 0, 0.16);
+  --t-body: #c8c8c8;
+  --thumb-bg: #f2f2f2;
+  --code-bg: #f5f5f5;
+  /* density and shape */
+  --row: 24px;
+  --ctl: 22px;
+  --gap: 6px;
+  --radius: 2px;
+  --radius-sm: 2px;
+  --font: system-ui, sans-serif;
+  --mono: ui-monospace, monospace;
+  /* WHY 12 px, not the browser's 13: the panel is 320 px wide for 12 px text;
+     at 13 the Trim and Type segments overflow their column */
+  --font-size: 12px;
+  /* the app's tokens */
+  --popup: var(--panel);
+  --field-line: var(--line);
+  --selbox: var(--field);
+  --selbox-line: var(--line);
+  --panel-radius: 2px;
+  --head-h: 30px;
+  --head-bg: var(--panel-2);
+  --head-text: var(--text);
+  --head-line: var(--line-soft);
+  --head-size: 13px;
+  --head-weight: 600;
+  --head-case: none;
+  --head-tracking: normal;
+  --tab-h: 30px;
+}
+:root[data-skin="unstyled"][data-theme="dark"] {
+  --bg: #121212;
+  --panel: #1e1e1e;
+  --panel-2: #2a2a2a;
+  --field: #3b3b3b;
+  --field-hover: #454545;
+  --line: #858585;
+  --line-soft: #3d3d3d;
+  --text: #f0f0f0;
+  --muted: #a0a0a0;
+  --accent: #e0e0e0;
+  --accent-soft: rgba(255, 255, 255, 0.14);
+  --accent-text: #111111;
+  --ok: #5ac87f;
+  --warn: #e0b050;
+  --bad: #ff6b6b;
+  --pick: #ff9f1c;
+  --hover: rgba(255, 255, 255, 0.07);
+  --backdrop: rgba(0, 0, 0, 0.55);
+  --canvas: #121212;
+  --canvas-3d: #161616;
+  --grid: rgba(255, 255, 255, 0.05);
+  --grid-major: rgba(255, 255, 255, 0.10);
+  --grid-axis: rgba(255, 255, 255, 0.35);
+  --shape-line: #b0b0b0;
+  --shape-fill: rgba(255, 255, 255, 0.08);
+  --shape-fill-body: rgba(255, 255, 255, 0.20);
+  --t-body: #8a8a8a;
+  --thumb-bg: #e6e6e6;
+  --code-bg: #1a1a1a;
+}
