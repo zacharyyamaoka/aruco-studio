@@ -9,12 +9,19 @@
 // value but make it kinda like grey outed that indicates that its like being
 // driven as supposed to having been set". No Auto switch: typing sets.
 //
-// Keys: Enter commits (an edited value is set, even when it equals the driven
-// one); Esc reverts the edit; an empty field + Enter returns it to driven.
+// Keys: a valid value sets as you type (~120 ms after the last keystroke, as
+// the label's text does); Enter commits (an edited value is set, even when it
+// equals the driven one); Esc puts back the value from when the field was
+// focused; an empty field + Enter returns it to driven.
+//
+// WHY live (Zach, 2026-10-20): "when I manually edit the dimensions, they
+// should update in real time!" -- the panel's rows as the canvas dimensions.
 // ArrowUp / ArrowDown step (Shift: ten); a drag on the unit scrubs. The kit
 // (studio/packages/bam-ui) is not edited: this uses its classes and tokens.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn, fmtNumber } from "@bam/ui";
+
+const LIVE_MS = 120;
 
 /** The ↺ beside a set value. Its space is kept while driven, so rows line up. */
 function ResetButton({ path, driven, driver, onReset }: { path: string; driven: boolean; driver: string; onReset: () => void }) {
@@ -47,25 +54,46 @@ export function DrivenField({ path, value, driven, driver, onSet, onReset, unit,
   const dirty = useRef(false);
   const skip = useRef(false);
   const scrub = useRef<{ x: number; v: number; last: number } | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  /** the value and its state when the field was focused (Esc), and whether a typed value went out since */
+  const start = useRef<{ value: number | null | undefined; driven: boolean; sent: boolean }>({ value, driven, sent: false });
+  const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** this render's props, for a commit from outside it (a press elsewhere) */
+  const now = useRef({ onSet, onReset, driven, shown });
+  now.current = { onSet, onReset, driven, shown };
   useEffect(() => { if (!focus) setText(shown); }, [shown, focus]);
   const s = step ?? (int ? 1 : 0.1);
 
   const ok = (v: number) => Number.isFinite(v) && !(int && !Number.isInteger(v)) && !(min !== undefined && v < min) && !(max !== undefined && v > max);
+  const cancel = () => { if (pending.current) clearTimeout(pending.current); pending.current = null; };
   const commit = () => {
+    cancel();
     if (skip.current) { skip.current = false; return; }
-    const t = text.trim().replace(",", ".");
+    const t = (input.current?.value ?? text).trim().replace(",", ".");
     const was = dirty.current;
     dirty.current = false;
     if (!was) return;
-    if (t === "") { if (!driven) onReset(); else setText(shown); return; }
+    const p = now.current;
+    if (t === "") { if (!p.driven) p.onReset(); else setText(p.shown); return; }
     const v = Number(t);
-    if (!ok(v)) { setText(shown); return; }   // never sent: the field shows what holds
-    onSet(v);
+    if (!ok(v)) { setText(p.shown); return; }   // never sent: the field shows what holds
+    p.onSet(v);
   };
+  // WHY commit on a press anywhere else, before it acts: a press on another
+  // marker opens its panel first and the blur comes after, so a commit at the
+  // blur (or a live one still waiting) would land on that marker instead
+  useEffect(() => {
+    if (!focus) return;
+    const down = (e: PointerEvent) => { if (e.target !== input.current) commit(); };
+    window.addEventListener("pointerdown", down, true);
+    return () => window.removeEventListener("pointerdown", down, true);
+  }, [focus]);
+  useEffect(() => cancel, []);
   const stepBy = (n: number) => {
     const base = Number(text.replace(",", ".")) || Number(value) || 0;
     const v = +(Math.round((base + n * s) / s) * s).toFixed(6);
     if (!ok(v)) return;
+    cancel();
     setText(fmtNumber(v, int));
     dirty.current = false;
     onSet(v);
@@ -75,13 +103,32 @@ export function DrivenField({ path, value, driven, driver, onSet, onReset, unit,
     <>
       <span className={cn("kit-num drv", driven ? "driven" : "set", bad && "bad")} data-driven={driven ? "1" : "0"} data-drv={path}
         title={tip(driven, driver)}>
-        <input type="text" inputMode="decimal" value={text} data-path={path} aria-label={path}
-          onFocus={() => setFocus(true)}
+        <input ref={input} type="text" inputMode="decimal" value={text} data-path={path} aria-label={path}
+          onFocus={() => { start.current = { value, driven, sent: false }; setFocus(true); }}
           onBlur={() => { setFocus(false); commit(); }}
-          onChange={(e) => { dirty.current = true; setText(e.target.value); }}
+          onChange={(e) => {
+            const t = e.target.value;
+            dirty.current = true;
+            setText(t);
+            cancel();
+            const v = Number(t.trim().replace(",", "."));
+            if (t.trim() === "" || !ok(v)) return;
+            // WHY the onSet of THIS render, as ui/TextArea.tsx does
+            const to = onSet;
+            pending.current = setTimeout(() => { pending.current = null; start.current.sent = true; to(v); }, LIVE_MS);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-            if (e.key === "Escape") { skip.current = true; dirty.current = false; setText(shown); (e.target as HTMLInputElement).blur(); }
+            if (e.key === "Escape") {
+              cancel();
+              skip.current = true;
+              dirty.current = false;
+              const s0 = start.current;
+              setText(fmtNumber(s0.value, int));
+              // what went out while typing is taken back
+              if (s0.sent) { if (s0.driven) onReset(); else if (s0.value != null) onSet(Number(s0.value)); }
+              (e.target as HTMLInputElement).blur();
+            }
             if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); stepBy((e.key === "ArrowUp" ? 1 : -1) * (e.shiftKey ? 10 : 1)); }
             e.stopPropagation();
           }} />
