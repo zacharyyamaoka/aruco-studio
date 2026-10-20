@@ -19,9 +19,13 @@ LIVE site:
   shots/*.png, shots/facts.json   the stills:
       (cd web && E2E_BASE_URL=https://arucostudio.com REPORT_SHOTS_DIR=<src>/shots \
           npx playwright test --project=e2e e2e/report.spec.ts)
-  shots/type-*.png, shots/trim-*.png   single / grid / ChArUco and the three
+  shots/type-*.png, shots/trim-*.png   single / grid / ChArUco and the two
       trims on the plate: extra.spec.ts beside them (run with a config whose
       baseURL is the live site; it imports web/e2e/helpers.ts)
+  fusion.mp4 or fusion.webm (optional)   a screen recording of the add-in in
+      Fusion 360. --media speeds it up FUSION_SPEED times into a muted, looping
+      media/fusion.mp4 with a poster; the page shows the "In Fusion 360" figure
+      only while media/fusion.mp4 exists (no placeholder before that).
 
 Every number in the copy is read from facts.json (the numbers used are kept
 in web/public/about/media/facts.json, so the page rebuilds without the raw
@@ -46,8 +50,9 @@ FFMPEG, FFPROBE = "/usr/bin/ffmpeg", "/usr/bin/ffprobe"
 
 SITE = "https://arucostudio.com"
 GITHUB = "https://github.com/zacharyyamaoka/aruco-studio"
+RELEASES = f"{GITHUB}/releases"
 TITLE = "ArUco Studio: a free ArUco and ChArUco marker generator for print and CAD"
-DESCRIPTION = ("ArUco marker generator in your browser: draw a rectangle, get a printable, CAD-ready ArUco, "
+DESCRIPTION = ("ArUco marker generator in your browser: pick a profile, get a printable, CAD-ready ArUco, "
                "grid or ChArUco board. Prints at true scale, verifies with OpenCV, Fusion 360 add-in coming.")
 # WHY a 3 MB cap: the page is the site's front door and has to load fast on a phone.
 BUDGET = 3 * 1024 * 1024
@@ -58,6 +63,8 @@ BUDGET = 3 * 1024 * 1024
 # to just after the toggle). The cut skips the size and label edits between.
 HERO_SPANS = [("core_ready", 0.5, "grid", 1.0), ("label", 1.1, "sheet_toggled", 0.4)]
 HERO_POSTER_AT = ("grid", 0.6)   # the grid on the plate, the panel beside it
+# The Fusion 360 recording plays this many times faster than it was recorded.
+FUSION_SPEED = 4
 
 # out name -> (raw still, width px). Full-window shots are 2560 x 1600 (2x).
 STILLS = {
@@ -70,7 +77,6 @@ STILLS = {
     "set": ("02d-rows-set.png", 660),
     "autoid": ("06-two-markers.png", 1280),
     "trim-profile": ("trim-profile.png", 720),
-    "trim-rectangle": ("trim-rectangle.png", 720),
     "trim-marker": ("trim-marker.png", 720),
     "sheet-sheets": ("09a-sheet-fewest-sheets.png", 1280),
     "sheet-cuts": ("09b-sheet-fewest-cuts.png", 1280),
@@ -112,6 +118,20 @@ def encode_media() -> None:
             "verify": {"legend": facts["verify"]["legend"], "calc": {"text": facts["verify"]["calc"]["text"]}},
             "core_ready_s": facts["core_ready_s"]}
     (MEDIA / "facts.json").write_text(json.dumps(used, indent=2, ensure_ascii=False) + "\n")
+    encode_fusion()
+
+
+def encode_fusion() -> None:
+    """The add-in in Fusion 360, sped up, muted and looping, with a poster from its middle."""
+    raw = next((p for p in (SRC / "fusion.mp4", SRC / "fusion.webm") if p.exists()), None)
+    if raw is None:
+        return
+    out = MEDIA / "fusion.mp4"
+    run([FFMPEG, "-v", "error", "-y", "-i", str(raw), "-vf", f"setpts=PTS/{FUSION_SPEED},scale=960:-2:flags=lanczos,format=yuv420p",
+         "-c:v", "libx264", "-preset", "slow", "-crf", "24", "-r", "25", "-movflags", "+faststart", "-an", str(out)])
+    duration = float(run([FFPROBE, "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(out)]).strip())
+    run([FFMPEG, "-v", "error", "-y", "-ss", f"{duration / 2:.2f}", "-i", str(out), "-frames:v", "1",
+         "-q:v", "4", str(MEDIA / "fusion-poster.jpg")])
 
 
 # ---------------------------------------------------------------- the page
@@ -145,7 +165,7 @@ JSON_LD = {
     "@type": "SoftwareApplication",
     "name": "ArUco Studio",
     "url": f"{SITE}/",
-    "description": "Draw a rectangle, get a printable, CAD-ready ArUco / ChArUco marker. Runs in your browser.",
+    "description": "Pick a profile, get a printable, CAD-ready ArUco / ChArUco marker. Runs in your browser.",
     "applicationCategory": "DesignApplication",
     "operatingSystem": "Web",
     "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
@@ -160,12 +180,13 @@ def features(facts: dict) -> str:
     plural = lambda n, w: f"{n} {w}{'' if n == 1 else 's'}"
     v = facts["verify"]
     return f"""
-<section class="feature" id="rectangle">
-  <h3>The marker rectangle</h3>
-  <p>A marker is a rectangle. Draw one (<kbd>R</kbd>), or click inside a face and press <kbd>A</kbd>: the core
-  inscribes the largest clear rectangle, avoiding the holes or ignoring them. The <em>ArUco Extrude</em> panel opens
-  beside the marker, and the rectangle stays an ordinary sketch rectangle you can move and resize.</p>
-  <figure class="shot"><picture><source srcset="/about/media/inspect-dark.webp" media="(prefers-color-scheme: dark)">{img("inspect", "The plate example: a single ArUco marker fills the rectangle inscribed between two holes, with the ArUco Extrude panel open beside it")}</picture>
+<section class="feature" id="profile">
+  <h3>The profile</h3>
+  <p>A marker starts from a profile, the way an extrude does. Click inside a face and press <kbd>A</kbd>
+  (<em>ArUco Extrude</em>): the marker is placed for you in the largest clear spot, avoiding the holes or ignoring
+  them. Want it somewhere exact? Draw a rectangle (<kbd>R</kbd>) and double-click it to pick its outer edges as the
+  profile: the marker goes exactly there. The <em>ArUco Extrude</em> panel opens beside the marker.</p>
+  <figure class="shot"><picture><source srcset="/about/media/inspect-dark.webp" media="(prefers-color-scheme: dark)">{img("inspect", "The plate example: a single ArUco marker placed in the clear space between two holes, with the ArUco Extrude panel open beside it")}</picture>
   <figcaption>File › Examples › Plate: click between the holes, press A.</figcaption></figure>
 </section>
 
@@ -183,7 +204,7 @@ def features(facts: dict) -> str:
   <p>No “Auto” switches. Each field shows the actual value: in grey when the core worked it out, in black once you
   type it. A typed value is kept until you press ↺, which hands it back to the core. A value that no longer fits
   turns red but never blocks you.</p>
-  {row(fig("driven", "The panel rows with the marker size, separation and columns in grey: driven", "Driven: the core sized the grid to fill the rectangle."),
+  {row(fig("driven", "The panel rows with the marker size, separation and columns in grey: driven", "Driven: the core sized the grid to fill the profile."),
        fig("set", "The same rows after typing a 16 mm marker: the size is black, with a reset arrow", "Set: 16 mm typed; the note says how it lands on whole printer dots."))}
 </section>
 
@@ -197,10 +218,9 @@ def features(facts: dict) -> str:
 
 <section class="feature" id="trim">
   <h3>Trim</h3>
-  <p>What the sticker is cut to: the whole face (holes cut out), the marker rectangle, or just the marker and its quiet
-  zone. Everything inside the cut is white.</p>
+  <p>What the sticker is cut to: the profile (the whole face, holes cut out) or just the marker and its quiet zone.
+  Everything inside the cut is white. For a rectangular sticker, draw a rectangle profile and trim to Profile.</p>
   {row(fig("trim-profile", "Trim Profile: the whole plate face is white", "Profile"),
-       fig("trim-rectangle", "Trim Rectangle: only the marker rectangle is white", "Rectangle"),
        fig("trim-marker", "Trim Marker: only the marker and its quiet zone are white", "Marker"))}
 </section>
 
@@ -256,11 +276,11 @@ def page(facts: dict) -> str:
         ("Is it open source?",
          "The source is public on GitHub. A licence has not been chosen yet."),
         ("Can I use it in Fusion 360?",
-         "Not yet. The Fusion 360 add-in runs on the same Python core, but it is not downloadable yet; the "
-         "<em>Download for CAD</em> menu says “coming soon”. Today you can export the marker as a true-size SVG or the "
-         "page as a PDF."),
+         f"Not yet. The Fusion 360 add-in is being rebuilt on this same Python core; watch the "
+         f"<a href=\"{RELEASES}\">GitHub Releases</a> page for it (see <a href=\"#download\">Download</a>). Until then, "
+         "Try Online and export the marker as a true-size SVG or the page as a PDF."),
         ("What does it cost?",
-         "Nothing. It is a static website: no account, no sign-up."),
+         "Nothing. Try Online is a static website: no account, no sign-up."),
     ]
     qa_html = "\n".join(f'<div class="qa"><h3>{esc(q)}</h3><p>{a}</p></div>' for q, a in qa)
     principles = [
@@ -289,6 +309,18 @@ def page(facts: dict) -> str:
     principles_html = "\n".join(
         f'<div class="principle"><h3>{esc(t)}</h3><p>{esc(body)}</p>{quote(q)}</div>' for t, body, q in principles)
     ld = json.dumps(JSON_LD, indent=2, ensure_ascii=False)
+    fusion = ""
+    if (MEDIA / "fusion.mp4").exists():
+        fw, fh = size_of(MEDIA / "fusion.mp4")
+        fusion = f"""
+  <figure class="hero-media fusion" id="in-fusion">
+    <video src="/about/media/fusion.mp4" poster="/about/media/fusion-poster.jpg" width="{fw}" height="{fh}"
+      autoplay muted loop playsinline controls preload="metadata"
+      aria-label="Recording of the add-in in Fusion 360, sped up {FUSION_SPEED} times">
+      <img src="/about/media/fusion-poster.jpg" alt="ArUco Studio's add-in in Fusion 360">
+    </video>
+    <figcaption>In Fusion 360, sped up {FUSION_SPEED}×.</figcaption>
+  </figure>"""
     gh_mark = ('<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 '
                '3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 '
                '1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 '
@@ -349,6 +381,7 @@ nav.top {{ display: flex; align-items: center; justify-content: space-between; g
 .links {{ display: flex; gap: 16px; align-items: center; font-size: 15px; }}
 .links a {{ color: var(--muted); text-decoration: none; }}
 .links a:hover {{ color: var(--fg); }}
+.links a.gh {{ display: inline-flex; color: var(--fg); }}
 header.hero {{ text-align: center; padding: 48px 0 28px; }}
 header.hero .logo {{ width: 72px; height: 72px; margin: 0 auto 18px; display: block; }}
 h1 {{ font-size: clamp(32px, 6vw, 52px); line-height: 1.1; letter-spacing: -0.02em; margin: 0 auto 14px; max-width: 780px; text-wrap: balance; }}
@@ -358,10 +391,13 @@ h1 {{ font-size: clamp(32px, 6vw, 52px); line-height: 1.1; letter-spacing: -0.02
   text-decoration: none; border: 1px solid var(--line); color: var(--fg); background: var(--bg); }}
 .btn.primary {{ background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }}
 .btn:hover {{ filter: brightness(1.05); }}
+.btn[disabled] {{ color: var(--muted); background: var(--soft); cursor: not-allowed; filter: none; font: inherit; font-weight: 600; }}
 .note {{ color: var(--muted); font-size: 14px; margin-top: 14px; }}
 .hero-media {{ margin: 32px auto 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--soft);
   box-shadow: 0 12px 40px rgba(0,0,0,0.08); }}
 .hero-media video {{ width: 100%; }}
+.hero-media.fusion {{ margin-top: 28px; }}
+.hero-media.fusion figcaption {{ text-align: center; margin: 0; padding: 8px 0; border-top: 1px solid var(--line); }}
 .hero-cap {{ color: var(--muted); font-size: 14px; text-align: center; margin: 10px 0 0; }}
 main section.block {{ padding: 56px 0 8px; }}
 h2 {{ font-size: clamp(24px, 3.4vw, 32px); letter-spacing: -0.01em; margin: 0 0 8px; }}
@@ -379,12 +415,16 @@ figcaption {{ color: var(--muted); font-size: 14px; margin-top: 6px; }}
 .principles {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }}
 .principle {{ background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; }}
 .principle p {{ margin: 0 0 10px; }}
+.principle.first {{ margin: 18px 0 22px; border-left: 4px solid var(--accent); }}
+.principle.first h3 {{ font-size: 22px; }}
+.principle.first p {{ max-width: 760px; margin: 0; }}
 blockquote {{ margin: 0; padding-left: 12px; border-left: 3px solid var(--line); color: var(--quote); }}
 blockquote p {{ margin: 0; font-style: italic; }}
 blockquote cite {{ display: block; color: var(--muted); font-size: 13px; font-style: normal; margin-top: 4px; }}
 .cad {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }}
 .cad div {{ border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }}
 .cad b {{ display: block; }}
+.card-actions {{ display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 14px; }}
 .tag {{ display: inline-block; font-size: 12px; font-weight: 600; border-radius: 99px; padding: 1px 9px; margin-top: 6px;
   background: var(--soft); border: 1px solid var(--line); color: var(--muted); }}
 .tag.live {{ color: #1a7f37; border-color: #1a7f3755; }}
@@ -405,16 +445,16 @@ footer .ctas {{ justify-content: flex-start; margin-bottom: 16px; }}
 <div class="wrap">
 <nav class="top" aria-label="Site">
   <a class="brand" href="/about/">{icon}<span>ArUco Studio</span></a>
-  <span class="links"><a class="hide-sm" href="#philosophy">Philosophy</a><a class="hide-sm" href="#qa">Q&amp;A</a><a href="{GITHUB}">GitHub</a><a href="/">Open Studio</a></span>
+  <span class="links"><a class="hide-sm" href="#philosophy">Philosophy</a><a class="hide-sm" href="#qa">Q&amp;A</a><a class="hide-sm" href="#download">Download</a><a href="/">Try Online</a><a class="gh" href="{GITHUB}" aria-label="GitHub" title="GitHub">{gh_mark.replace('width="16" height="16"', 'width="22" height="22"', 1)}</a></span>
 </nav>
 
 <header class="hero">
   {icon.replace('class="logo"', 'class="logo big"', 1)}
   <h1>ArUco markers at the level of intent</h1>
-  <p class="sub">Draw a rectangle, get a printable, CAD-ready ArUco / ChArUco marker. Runs in your browser.</p>
+  <p class="sub">Pick a profile, get a printable, CAD-ready ArUco / ChArUco marker. Runs in your browser.</p>
   <div class="ctas">
-    <a class="btn primary" href="/" data-cta="studio">Open Studio</a>
-    <a class="btn" href="{GITHUB}" data-cta="github">{gh_mark}GitHub</a>
+    <a class="btn primary" href="#download" data-cta="download">Download</a>
+    <a class="btn" href="/" data-cta="online">Try Online</a>
   </div>
   <p class="note">Free, no account. The Python core loaded in {ready_txt} in our tests.</p>
   <div class="hero-media">
@@ -425,32 +465,40 @@ footer .ctas {{ justify-content: flex-start; margin-bottom: 16px; }}
     </video>
   </div>
   <p class="hero-cap">Recorded on arucostudio.com: Examples › Plate, click the face, <kbd>A</kbd>, Grid, then the Sheet's
-  Fewest cuts | Fewest sheets. One cut skips a size and label edit.</p>
+  Fewest cuts | Fewest sheets. One cut skips a size and label edit.</p>{fusion}
 </header>
 
 <main>
 <section class="block" id="what">
   <h2>What it does</h2>
-  <p class="lead text">The marker tools in a CAD program, minus the CAD program: ArUco Extrude on a sketch, then print.</p>
+  <p class="lead text">The marker tools of the CAD add-in, in your browser: pick a profile, ArUco Extrude, then print.</p>
   {features(facts)}
 </section>
 
 <section class="block" id="philosophy">
   <h2>Philosophy</h2>
+  <div class="principle first" id="where-you-cad">
+    <h3>Make markers where you CAD</h3>
+    <p>A marker is tied to a physical place: the part it is stuck on, where on that part, and how that part sits in
+    the rest of the assembly. So it belongs in the CAD model, next to the part, not in a separate generator whose
+    output you copy across and line up by hand. That is why the core is CAD-free and the CAD add-ins are thin shells
+    over it. Try Online runs the same core, to try it out and to print without CAD.</p>
+  </div>
   <p class="lead text">The principles the Studio is built on, with the line each one comes from.</p>
   <div class="principles">
 {principles_html}
   </div>
 </section>
 
-<section class="block" id="cad">
-  <h2>For CAD</h2>
-  <p class="text">ArUco markers belong where you model the part, so the Studio's core is CAD-free and the CAD add-ins are
-  thin shells over it. The browser Studio is the place to try it, and to print without CAD.</p>
+<section class="block" id="download">
+  <h2>Download</h2>
+  <p class="text">Install it in your CAD program, or use it online. Nothing to download yet: here is where each one stands.</p>
   <div class="cad">
-    <div><b>Browser Studio</b>Sketch, ArUco Extrude, Sheet, Verify. SVG and PDF export.<br><span class="tag live">Live</span></div>
-    <div><b>Fusion 360 add-in</b>Runs on the same Python core. Not downloadable yet.<br><span class="tag">Coming</span></div>
-    <div><b>Onshape</b>A placeholder in the Download for CAD menu.<br><span class="tag">Planned</span></div>
+    <div class="card" data-cad="fusion"><b>Fusion 360</b>The add-in is being rebuilt on this core.<br><span class="tag">In progress</span>
+      <span class="card-actions"><button class="btn" type="button" disabled>Coming soon</button><a href="{RELEASES}">Watch for the release</a></span></div>
+    <div class="card" data-cad="onshape"><b>Onshape</b>An Onshape version is planned.<br><span class="tag">Planned</span></div>
+    <div class="card" data-cad="online"><b>Online</b>Profile, ArUco Extrude, Sheet, Verify. SVG and PDF export.<br><span class="tag live">Live</span>
+      <span class="card-actions"><a class="btn primary" href="/">Try Online</a></span></div>
   </div>
 </section>
 
@@ -462,8 +510,8 @@ footer .ctas {{ justify-content: flex-start; margin-bottom: 16px; }}
 
 <footer>
   <div class="ctas">
-    <a class="btn primary" href="/">Open Studio</a>
-    <a class="btn" href="{GITHUB}">{gh_mark}GitHub</a>
+    <a class="btn primary" href="#download">Download</a>
+    <a class="btn" href="/">Try Online</a>
   </div>
   ArUco Studio by Zach Yamaoka. Source on <a href="{GITHUB}">GitHub</a>; no licence chosen yet.
 </footer>
