@@ -507,7 +507,7 @@ footer .ctas {{ justify-content: flex-start; margin-bottom: 16px; }}
 <div class="wrap">
 <nav class="top" aria-label="Site">
   <a class="brand" href="/about/">{icon}<span>ArUco Studio</span></a>
-  <span class="links"><a class="hide-sm" href="#philosophy">Philosophy</a><a class="hide-sm" href="#qa">Q&amp;A</a><a class="hide-sm" href="#download">Download</a><a href="/">Try Online</a><a class="gh" href="{GITHUB}" aria-label="GitHub" title="GitHub">{gh_mark.replace('width="16" height="16"', 'width="22" height="22"', 1)}</a></span>
+  <span class="links"><a class="hide-sm" href="#philosophy">Philosophy</a><a class="hide-sm" href="#qa">Q&amp;A</a><a class="hide-sm" href="#download">Download</a><a href="/guides/">Guides</a><a href="/">Try Online</a><a class="gh" href="{GITHUB}" aria-label="GitHub" title="GitHub">{gh_mark.replace('width="16" height="16"', 'width="22" height="22"', 1)}</a></span>
 </nav>
 
 <header class="hero">
@@ -576,7 +576,7 @@ footer .ctas {{ justify-content: flex-start; margin-bottom: 16px; }}
     <a class="btn" href="/">Try Online</a>
   </div>
   ArUco Studio by Zach Yamaoka. Source on <a href="{GITHUB}">GitHub</a>; no licence chosen yet.
-  <br><a href="/privacy/">Privacy Policy</a> &middot; <a href="/terms/">Terms of Use</a>
+  <br><a href="/guides/">Guides</a> &middot; <a href="/privacy/">Privacy Policy</a> &middot; <a href="/terms/">Terms of Use</a>
 </footer>
 </div>
 </body>
