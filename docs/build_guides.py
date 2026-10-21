@@ -1379,8 +1379,8 @@ class Guide:
 
 GUIDE_LIST = [
     Guide("label-placement", "Where to put a label, and a corner mark",
-          "On the black border row at the Studio's size, or outside the quiet zone; never in it. Measured by Verify on "
-          "a test board you can open."),
+          "A short id on the black border row at the Studio's size, or outside the quiet zone; never in it. Measured "
+          "by Verify, on both OpenCV 4.11 and 5.0, on a test board you can open."),
     Guide("profile-first", "Profile first",
           "Pick a profile like an extrude; the marker goes in its largest clear box. Draw a rectangle to place it exactly."),
     Guide("size-step", "Exact sizes, and the size step",

@@ -1,0 +1,2065 @@
+{
+  "format": "arucostudio-web",
+  "version": 4,
+  "name": "Label placement test board",
+  "shapes": [
+    {
+      "kind": "rect",
+      "id": "lp-A1-r",
+      "cx": 15.0,
+      "cy": -15.0,
+      "w": 30.0,
+      "h": 30.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-B1-r",
+      "cx": 57.0,
+      "cy": -15.0,
+      "w": 30.0,
+      "h": 30.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-B2-r",
+      "cx": 99.0,
+      "cy": -15.0,
+      "w": 30.0,
+      "h": 30.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-B3-r",
+      "cx": 141.0,
+      "cy": -15.0,
+      "w": 30.0,
+      "h": 30.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-B4-r",
+      "cx": 183.0,
+      "cy": -15.0,
+      "w": 30.0,
+      "h": 30.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-B5-r",
+      "cx": 15.0,
+      "cy": -59.0,
+      "w": 30.0,
+      "h": 30.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-B6-r",
+      "cx": 57.0,
+      "cy": -59.0,
+      "w": 30.0,
+      "h": 30.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-B7-r",
+      "cx": 99.0,
+      "cy": -59.0,
+      "w": 30.0,
+      "h": 30.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-B8-r",
+      "cx": 141.0,
+      "cy": -59.0,
+      "w": 30.0,
+      "h": 30.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-B9-r",
+      "cx": 183.0,
+      "cy": -59.0,
+      "w": 30.0,
+      "h": 30.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-C1-r",
+      "cx": 15.0,
+      "cy": -103.0,
+      "w": 30.0,
+      "h": 30.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-C2-r",
+      "cx": 57.0,
+      "cy": -103.0,
+      "w": 30.0,
+      "h": 30.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-C3-r",
+      "cx": 99.0,
+      "cy": -103.0,
+      "w": 30.0,
+      "h": 30.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-C4-r",
+      "cx": 141.0,
+      "cy": -103.0,
+      "w": 30.0,
+      "h": 30.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-D1-r",
+      "cx": 15.0,
+      "cy": -150.788333,
+      "w": 30.0,
+      "h": 37.576667,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-D2-r",
+      "cx": 57.0,
+      "cy": -149.788333,
+      "w": 30.0,
+      "h": 35.576667,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-D3-r",
+      "cx": 99.0,
+      "cy": -148.871667,
+      "w": 30.0,
+      "h": 33.743334,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-D4-r",
+      "cx": 141.0,
+      "cy": -147.955,
+      "w": 30.0,
+      "h": 31.91,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-D5-r",
+      "cx": 15.0,
+      "cy": -202.365,
+      "w": 30.0,
+      "h": 37.576667,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-D6-r",
+      "cx": 62.664054,
+      "cy": -198.576667,
+      "w": 41.328107,
+      "h": 30.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-D7-r",
+      "cx": 115.992161,
+      "cy": -198.576667,
+      "w": 41.328107,
+      "h": 30.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-E1-r",
+      "cx": 30.0,
+      "cy": -265.153334,
+      "w": 60.0,
+      "h": 60.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-E2-r",
+      "cx": 102.0,
+      "cy": -259.153334,
+      "w": 60.0,
+      "h": 48.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-E3-r",
+      "cx": 174.0,
+      "cy": -259.153334,
+      "w": 60.0,
+      "h": 48.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-E4-r",
+      "cx": 246.0,
+      "cy": -259.153334,
+      "w": 60.0,
+      "h": 48.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-F1-r",
+      "cx": 15.0,
+      "cy": -324.153334,
+      "w": 30.0,
+      "h": 30.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-F2-r",
+      "cx": 72.0,
+      "cy": -339.153334,
+      "w": 60.0,
+      "h": 60.0,
+      "angle_deg": 0
+    },
+    {
+      "kind": "rect",
+      "id": "lp-F3-r",
+      "cx": 144.0,
+      "cy": -333.153334,
+      "w": 60.0,
+      "h": 48.0,
+      "angle_deg": 0
+    }
+  ],
+  "dims": [],
+  "features": [
+    {
+      "id": "lp-A1",
+      "key": "lp-A1",
+      "profile": {
+        "outer": "lp-A1-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 0,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": false,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "below",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ]
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": []
+    },
+    {
+      "id": "lp-B1",
+      "key": "lp-B1",
+      "profile": {
+        "outer": "lp-B1-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 1,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "below",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "on_marker",
+        "surface": "black"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on"
+      ]
+    },
+    {
+      "id": "lp-B2",
+      "key": "lp-B2",
+      "profile": {
+        "outer": "lp-B2-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 2,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "above",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "on_marker",
+        "surface": "black"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on",
+        "label.side"
+      ]
+    },
+    {
+      "id": "lp-B3",
+      "key": "lp-B3",
+      "profile": {
+        "outer": "lp-B3-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 3,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "left",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "on_marker",
+        "surface": "black"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on",
+        "label.side"
+      ]
+    },
+    {
+      "id": "lp-B4",
+      "key": "lp-B4",
+      "profile": {
+        "outer": "lp-B4-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 4,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "right",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "on_marker",
+        "surface": "black"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on",
+        "label.side"
+      ]
+    },
+    {
+      "id": "lp-B5",
+      "key": "lp-B5",
+      "profile": {
+        "outer": "lp-B5-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 5,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 2.75,
+        "side": "below",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "on_marker",
+        "surface": "black"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on"
+      ]
+    },
+    {
+      "id": "lp-B6",
+      "key": "lp-B6",
+      "profile": {
+        "outer": "lp-B6-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 6,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 3.666667,
+        "side": "below",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "on_marker",
+        "surface": "black"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on"
+      ]
+    },
+    {
+      "id": "lp-B7",
+      "key": "lp-B7",
+      "profile": {
+        "outer": "lp-B7-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 7,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids} {dict}",
+        "height_mm": 0,
+        "side": "below",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "on_marker",
+        "surface": "black"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on"
+      ]
+    },
+    {
+      "id": "lp-B8",
+      "key": "lp-B8",
+      "profile": {
+        "outer": "lp-B8-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 8,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids} {dict} {type}",
+        "height_mm": 0,
+        "side": "below",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "on_marker",
+        "surface": "black"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on"
+      ]
+    },
+    {
+      "id": "lp-B9",
+      "key": "lp-B9",
+      "profile": {
+        "outer": "lp-B9-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 9,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "below",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          3.666667
+        ],
+        "place": "on_marker",
+        "surface": "black"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on"
+      ]
+    },
+    {
+      "id": "lp-C1",
+      "key": "lp-C1",
+      "profile": {
+        "outer": "lp-C1-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 10,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "below",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "on_marker",
+        "surface": "white"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on"
+      ]
+    },
+    {
+      "id": "lp-C2",
+      "key": "lp-C2",
+      "profile": {
+        "outer": "lp-C2-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 11,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "above",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "on_marker",
+        "surface": "white"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on",
+        "label.side"
+      ]
+    },
+    {
+      "id": "lp-C3",
+      "key": "lp-C3",
+      "profile": {
+        "outer": "lp-C3-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 12,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "left",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "on_marker",
+        "surface": "white"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on",
+        "label.side"
+      ]
+    },
+    {
+      "id": "lp-C4",
+      "key": "lp-C4",
+      "profile": {
+        "outer": "lp-C4-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 13,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "right",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "on_marker",
+        "surface": "white"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on",
+        "label.side"
+      ]
+    },
+    {
+      "id": "lp-D1",
+      "key": "lp-D1",
+      "profile": {
+        "outer": "lp-D1-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 14,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "below",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "outside"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on"
+      ]
+    },
+    {
+      "id": "lp-D2",
+      "key": "lp-D2",
+      "profile": {
+        "outer": "lp-D2-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 15,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "below",
+        "gap_mm": 0.0,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "outside"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on",
+        "label.gap_mm"
+      ]
+    },
+    {
+      "id": "lp-D3",
+      "key": "lp-D3",
+      "profile": {
+        "outer": "lp-D3-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 16,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "below",
+        "gap_mm": -1.833333,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "outside"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on",
+        "label.gap_mm"
+      ]
+    },
+    {
+      "id": "lp-D4",
+      "key": "lp-D4",
+      "profile": {
+        "outer": "lp-D4-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 17,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "below",
+        "gap_mm": -3.666667,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "outside"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on",
+        "label.gap_mm"
+      ]
+    },
+    {
+      "id": "lp-D5",
+      "key": "lp-D5",
+      "profile": {
+        "outer": "lp-D5-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 18,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "above",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "outside"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on",
+        "label.side"
+      ]
+    },
+    {
+      "id": "lp-D6",
+      "key": "lp-D6",
+      "profile": {
+        "outer": "lp-D6-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 19,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "left",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "outside"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on",
+        "label.side"
+      ]
+    },
+    {
+      "id": "lp-D7",
+      "key": "lp-D7",
+      "profile": {
+        "outer": "lp-D7-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 20,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "right",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "outside"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "label.on",
+        "label.side"
+      ]
+    },
+    {
+      "id": "lp-E1",
+      "key": "lp-E1",
+      "profile": {
+        "outer": "lp-E1-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "grid",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 21,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 2,
+        "rows": 2,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "below",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "on_marker",
+        "surface": "black"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "marker.type",
+        "marker.cols",
+        "marker.rows",
+        "label.on"
+      ]
+    },
+    {
+      "id": "lp-E2",
+      "key": "lp-E2",
+      "profile": {
+        "outer": "lp-E2-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "charuco",
+        "dictionary": "DICT_4X4_100",
+        "first_id": 50,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 5,
+        "rows": 4,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "below",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "on_marker",
+        "surface": "black"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "marker.type",
+        "marker.dictionary",
+        "marker.cols",
+        "marker.rows",
+        "label.on"
+      ]
+    },
+    {
+      "id": "lp-E3",
+      "key": "lp-E3",
+      "profile": {
+        "outer": "lp-E3-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "charuco",
+        "dictionary": "DICT_4X4_100",
+        "first_id": 60,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 5,
+        "rows": 4,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "below",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ],
+        "place": "on_marker",
+        "surface": "white"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "marker.type",
+        "marker.dictionary",
+        "marker.cols",
+        "marker.rows",
+        "label.on"
+      ]
+    },
+    {
+      "id": "lp-E4",
+      "key": "lp-E4",
+      "profile": {
+        "outer": "lp-E4-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "charuco",
+        "dictionary": "DICT_4X4_100",
+        "first_id": 70,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 5,
+        "rows": 4,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "none"
+      },
+      "label": {
+        "on": true,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "below",
+        "gap_mm": 2,
+        "offset_mm": [
+          3.5,
+          3.5
+        ],
+        "place": "on_marker",
+        "surface": "black"
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "marker.type",
+        "marker.dictionary",
+        "marker.cols",
+        "marker.rows",
+        "label.on"
+      ]
+    },
+    {
+      "id": "lp-F1",
+      "key": "lp-F1",
+      "profile": {
+        "outer": "lp-F1-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "single",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 25,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 1,
+        "rows": 1,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "triangle"
+      },
+      "label": {
+        "on": false,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "below",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ]
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "marker.corner_mark"
+      ]
+    },
+    {
+      "id": "lp-F2",
+      "key": "lp-F2",
+      "profile": {
+        "outer": "lp-F2-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "grid",
+        "dictionary": "DICT_4X4_50",
+        "first_id": 26,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 2,
+        "rows": 2,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "triangle"
+      },
+      "label": {
+        "on": false,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "below",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ]
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "marker.type",
+        "marker.cols",
+        "marker.rows",
+        "marker.corner_mark"
+      ]
+    },
+    {
+      "id": "lp-F3",
+      "key": "lp-F3",
+      "profile": {
+        "outer": "lp-F3-r",
+        "holes": []
+      },
+      "holes": "avoid",
+      "trim": "profile",
+      "marker": {
+        "type": "charuco",
+        "dictionary": "DICT_4X4_100",
+        "first_id": 80,
+        "auto": true,
+        "marker_mm": 30,
+        "checker_mm": 0,
+        "separation_mm": 0,
+        "cols": 5,
+        "rows": 4,
+        "turn": 0,
+        "flip": false,
+        "quiet_modules": 1,
+        "corner_mark": "triangle"
+      },
+      "label": {
+        "on": false,
+        "text": "#{ids}",
+        "height_mm": 0,
+        "side": "below",
+        "gap_mm": 2,
+        "offset_mm": [
+          0,
+          0
+        ]
+      },
+      "extrude": {},
+      "preset": {
+        "id": "builtin:inkjet-letter-vinyl",
+        "name": "Inkjet · Letter vinyl",
+        "builtin": true,
+        "min_cell_mm": 1.0,
+        "cell_step_mm": 0.0,
+        "method": "inkjet",
+        "page": "Letter",
+        "page_mm": [
+          215.9,
+          279.4
+        ],
+        "margin_mm": 10.0,
+        "thickness_mm": 0.1,
+        "dpi": 600,
+        "size_step": {
+          "of": "mm",
+          "mm": 0.5
+        }
+      },
+      "set": [
+        "marker.type",
+        "marker.dictionary",
+        "marker.cols",
+        "marker.rows",
+        "marker.corner_mark"
+      ]
+    }
+  ],
+  "id_ledger": {
+    "lp-A1": 0,
+    "lp-B1": 1,
+    "lp-B2": 2,
+    "lp-B3": 3,
+    "lp-B4": 4,
+    "lp-B5": 5,
+    "lp-B6": 6,
+    "lp-B7": 7,
+    "lp-B8": 8,
+    "lp-B9": 9,
+    "lp-C1": 10,
+    "lp-C2": 11,
+    "lp-C3": 12,
+    "lp-C4": 13,
+    "lp-D1": 14,
+    "lp-D2": 15,
+    "lp-D3": 16,
+    "lp-D4": 17,
+    "lp-D5": 18,
+    "lp-D6": 19,
+    "lp-D7": 20,
+    "lp-E1": 21,
+    "lp-E2": 50,
+    "lp-E3": 60,
+    "lp-E4": 70,
+    "lp-F1": 25,
+    "lp-F2": 26,
+    "lp-F3": 80
+  },
+  "default_preset": {
+    "id": "builtin:inkjet-letter-vinyl",
+    "name": "Inkjet · Letter vinyl",
+    "builtin": true,
+    "min_cell_mm": 1.0,
+    "cell_step_mm": 0.0,
+    "method": "inkjet",
+    "page": "Letter",
+    "page_mm": [
+      215.9,
+      279.4
+    ],
+    "margin_mm": 10.0,
+    "thickness_mm": 0.1,
+    "dpi": 600,
+    "size_step": {
+      "of": "mm",
+      "mm": 0.5
+    }
+  }
+}

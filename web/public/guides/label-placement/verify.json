@@ -1,0 +1,8084 @@
+{
+ "generated": "2026-10-21",
+ "core_version": "0.1.0",
+ "commit": "03cd721",
+ "verify_version": 1,
+ "grid": {
+  "camera": {
+   "resolution": [1920, 1080],
+   "hfov_deg": 70.0
+  },
+  "px_per_cell": [3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 13.0, 16.0],
+  "blur_px": [0.5, 1.0, 1.5, 2.0, 2.5],
+  "tilt_deg": [0.0, 45.0],
+  "noise": 0.1,
+  "seeds": 4
+ },
+ "studio_opencv": "4.11.0.86",
+ "detectors": [
+  {
+   "opencv": "4.11.0",
+   "numpy": "1.26.4",
+   "python": "3.11.15",
+   "seconds": 152,
+   "studio": true
+  },
+  {
+   "opencv": "5.0.0",
+   "numpy": "2.3.5",
+   "python": "3.11.15",
+   "seconds": 173,
+   "studio": false
+  }
+ ],
+ "thresholds": {
+  "marginal_pts": 1.0,
+  "unsafe_pts": 5.0,
+  "p_max": 0.05,
+  "easy_px_per_cell": 8.0,
+  "easy_blur_px": 1.0,
+  "easy_share": 0.02,
+  "easy_min": 2,
+  "pose_marginal": 0.2,
+  "pose_unsafe": 1.0,
+  "pose_sharp_cells": 0.1,
+  "pose_min_views": 10
+ },
+ "board": "/examples/label-placement.arucostudio-web.json",
+ "board_sha256": "a6cf97fa20f65464dccefd77ff2f7ae4de28e33feb04842a3865b37cff5662c9",
+ "cases": [
+  {
+   "key": "A1",
+   "group": "ref",
+   "title": "No label, no corner mark",
+   "feature": "lp-A1",
+   "number": 1,
+   "plan": {
+    "ids": [0],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #0 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": null
+   },
+   "where": {
+    "cap_cells": null,
+    "from_black_cells": null
+   },
+   "rules": {
+    "verdict": "safe",
+    "hits": []
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": false,
+      "corner_mark": false,
+      "reads": {
+       "marked": 214,
+       "bare": 214
+      },
+      "lost": 0,
+      "gained": 0,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "no label or corner mark drawn: nothing to cost",
+      "map": [
+       [
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [2, 2, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [3, 3, 8],
+        [1, 1, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [5, 5, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 13,
+       "marked_mm": 0.1951,
+       "bare_mm": 0.1951,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": false,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2031.9,
+      "bare": 2031.9
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": false,
+      "corner_mark": false,
+      "reads": {
+       "marked": 204,
+       "bare": 204
+      },
+      "lost": 0,
+      "gained": 0,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "no label or corner mark drawn: nothing to cost",
+      "map": [
+       [
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [1, 1, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [7, 7, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [2, 2, 8],
+        [1, 1, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 5, 8],
+        [3, 3, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 13,
+       "marked_mm": 0.1941,
+       "bare_mm": 0.1941,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": false,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2031.9,
+      "bare": 2031.9
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    }
+   },
+   "verdict": "safe"
+  },
+  {
+   "key": "B1",
+   "group": "black",
+   "title": "Below",
+   "feature": "lp-B1",
+   "number": 2,
+   "plan": {
+    "ids": [1],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #1 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 1.833333
+   },
+   "where": {
+    "cap_cells": 0.5,
+    "from_black_cells": null
+   },
+   "rules": {
+    "verdict": "safe",
+    "hits": []
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 253,
+       "bare": 253
+      },
+      "lost": 1,
+      "gained": 1,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost 1 of the bare marker's 253 reads (and gained 1)",
+      "map": [
+       [
+        [8, 8, 8],
+        [7, 7, 8],
+        [3, 2, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 7, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [3, 3, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [6, 6, 8],
+        [3, 3, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [6, 6, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [7, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 13,
+       "marked_mm": 0.1951,
+       "bare_mm": 0.1951,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 1256.770245933061,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 1
+      }
+     ]
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 242,
+       "bare": 243
+      },
+      "lost": 1,
+      "gained": 0,
+      "cost_pts": 0.41,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost 1 of the bare marker's 243 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [7, 7, 8],
+        [2, 2, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 6, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [1, 1, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [4, 4, 8],
+        [3, 3, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [4, 4, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [6, 6, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [7, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 13,
+       "marked_mm": 0.1941,
+       "bare_mm": 0.1941,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 1256.770245933061,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 1
+      }
+     ]
+    }
+   },
+   "verdict": "safe"
+  },
+  {
+   "key": "B2",
+   "group": "black",
+   "title": "Above",
+   "feature": "lp-B2",
+   "number": 3,
+   "plan": {
+    "ids": [2],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #2 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 1.833333
+   },
+   "where": {
+    "cap_cells": 0.5,
+    "from_black_cells": null
+   },
+   "rules": {
+    "verdict": "safe",
+    "hits": []
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 263,
+       "bare": 262
+      },
+      "lost": 0,
+      "gained": 1,
+      "cost_pts": -0.38,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 262 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [2, 1, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [1, 1, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 14,
+       "marked_mm": 0.2045,
+       "bare_mm": 0.2045,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 256,
+       "bare": 255
+      },
+      "lost": 0,
+      "gained": 1,
+      "cost_pts": -0.39,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 255 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [1, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 5, 8],
+        [4, 4, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [3, 3, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 14,
+       "marked_mm": 0.2036,
+       "bare_mm": 0.2036,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    }
+   },
+   "verdict": "safe"
+  },
+  {
+   "key": "B3",
+   "group": "black",
+   "title": "Left",
+   "feature": "lp-B3",
+   "number": 4,
+   "plan": {
+    "ids": [3],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #3 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 1.833333
+   },
+   "where": {
+    "cap_cells": 0.5,
+    "from_black_cells": null
+   },
+   "rules": {
+    "verdict": "safe",
+    "hits": []
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 271,
+       "bare": 268
+      },
+      "lost": 0,
+      "gained": 3,
+      "cost_pts": -1.12,
+      "p": 0.25,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 268 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 5, 8],
+        [2, 2, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 5, 8],
+        [2, 2, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [4, 3, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 15,
+       "marked_mm": 0.2005,
+       "bare_mm": 0.2005,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 254,
+       "bare": 254
+      },
+      "lost": 0,
+      "gained": 0,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 254 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [7, 7, 8],
+        [2, 2, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [1, 1, 8],
+        [1, 1, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [3, 3, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 15,
+       "marked_mm": 0.2052,
+       "bare_mm": 0.2052,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    }
+   },
+   "verdict": "safe"
+  },
+  {
+   "key": "B4",
+   "group": "black",
+   "title": "Right",
+   "feature": "lp-B4",
+   "number": 5,
+   "plan": {
+    "ids": [4],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #4 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 1.833333
+   },
+   "where": {
+    "cap_cells": 0.5,
+    "from_black_cells": null
+   },
+   "rules": {
+    "verdict": "safe",
+    "hits": []
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 250,
+       "bare": 245
+      },
+      "lost": 0,
+      "gained": 5,
+      "cost_pts": -2.04,
+      "p": 0.0625,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 245 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 6, 8],
+        [2, 1, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 3, 8],
+        [2, 2, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [8, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 13,
+       "marked_mm": 0.1951,
+       "bare_mm": 0.1951,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 238,
+       "bare": 235
+      },
+      "lost": 0,
+      "gained": 3,
+      "cost_pts": -1.28,
+      "p": 0.25,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 235 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [1, 1, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [1, 1, 8],
+        [1, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 5, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [7, 6, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 13,
+       "marked_mm": 0.1941,
+       "bare_mm": 0.1941,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    }
+   },
+   "verdict": "safe"
+  },
+  {
+   "key": "B5",
+   "group": "black",
+   "title": "Letters ¾ cell tall",
+   "feature": "lp-B5",
+   "number": 6,
+   "plan": {
+    "ids": [5],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #5 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 2.75
+   },
+   "where": {
+    "cap_cells": 0.75,
+    "from_black_cells": null
+   },
+   "rules": {
+    "verdict": "unsafe",
+    "hits": [
+     "2.75 mm letters are over the 1.83 mm the border row holds (a border row keeps a quarter module of black above and below its text, or the detector may miss it)",
+     "the label's 1 line stand 2.75 mm, the border row holds 1.83 mm: the text runs out of it"
+    ]
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 176,
+       "bare": 245
+      },
+      "lost": 69,
+      "gained": 0,
+      "cost_pts": 28.16,
+      "p": 0.0,
+      "easy": {
+       "lost": 31,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "unsafe",
+      "verdict": "unsafe",
+      "text": "the label lost 69 of the bare marker's 245 reads, 31 of them in sharp, well-resolved views",
+      "map": [
+       [
+        [1, 8, 8],
+        [4, 5, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [7, 8, 8],
+        [8, 8, 8],
+        [2, 2, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [4, 8, 8],
+        [7, 8, 8],
+        [6, 6, 8],
+        [1, 2, 8],
+        [0, 0, 8]
+       ],
+       [
+        [3, 8, 8],
+        [6, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [0, 0, 8]
+       ],
+       [
+        [4, 8, 8],
+        [5, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [4, 8, 8],
+        [4, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [4, 8, 8],
+        [4, 8, 8],
+        [4, 8, 8],
+        [7, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [4, 8, 8],
+        [4, 8, 8],
+        [4, 8, 8],
+        [5, 8, 8],
+        [4, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 7,
+       "marked_mm": 0.293,
+       "bare_mm": 0.293,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": false,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": false,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": null,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": {
+      "view": {
+       "px_per_cell": 16.0,
+       "blur_px": 0.5,
+       "tilt_deg": 0.0,
+       "seed": 0,
+       "conditions": {
+        "camera": {
+         "distance_mm": 314.19256148326525,
+         "resolution": [1920, 1080],
+         "hfov_deg": 70.0
+        },
+        "tilt_deg": 0.0,
+        "yaw_deg": 0.0,
+        "blur_px": 0.5,
+        "noise": 0.1,
+        "glare": 0.0,
+        "occlusion": 0.0,
+        "seed": 0
+       }
+      },
+      "images": [
+       {
+        "kind": "bare",
+        "file": "b5-cv4110-bare.webp",
+        "missing": []
+       },
+       {
+        "kind": "marked",
+        "file": "b5-cv4110-marked.webp",
+        "missing": [5]
+       }
+      ]
+     },
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 1675.6936612440813,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 0.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 1
+      },
+      {
+       "camera": {
+        "distance_mm": 1675.6936612440813,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 0.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 2
+      },
+      {
+       "camera": {
+        "distance_mm": 1675.6936612440813,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 0.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 3
+      }
+     ]
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 244,
+       "bare": 246
+      },
+      "lost": 2,
+      "gained": 0,
+      "cost_pts": 0.81,
+      "p": 0.5,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost 2 of the bare marker's 246 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [5, 5, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [2, 2, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [0, 2, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 14,
+       "marked_mm": 0.2036,
+       "bare_mm": 0.2036,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 1005.4161967464488,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 2.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 1
+      },
+      {
+       "camera": {
+        "distance_mm": 1005.4161967464488,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 2.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 3
+      }
+     ]
+    }
+   },
+   "verdict": "unsafe"
+  },
+  {
+   "key": "B6",
+   "group": "black",
+   "title": "Letters a whole cell tall",
+   "feature": "lp-B6",
+   "number": 7,
+   "plan": {
+    "ids": [6],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #6 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 3.666667
+   },
+   "where": {
+    "cap_cells": 1.0,
+    "from_black_cells": null
+   },
+   "rules": {
+    "verdict": "unsafe",
+    "hits": [
+     "3.67 mm letters are over the 1.83 mm the border row holds (a border row keeps a quarter module of black above and below its text, or the detector may miss it)",
+     "the label's 1 line stand 3.67 mm, the border row holds 1.83 mm: the text runs out of it"
+    ]
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 186,
+       "bare": 243
+      },
+      "lost": 60,
+      "gained": 3,
+      "cost_pts": 23.46,
+      "p": 0.0,
+      "easy": {
+       "lost": 25,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "unsafe",
+      "verdict": "unsafe",
+      "text": "the label lost 60 of the bare marker's 243 reads (and gained 3), 25 of them in sharp, well-resolved views",
+      "map": [
+       [
+        [4, 8, 8],
+        [3, 8, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [0, 8, 8],
+        [0, 8, 8],
+        [0, 5, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 5, 8],
+        [2, 1, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 1, 8]
+       ],
+       [
+        [4, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [5, 5, 8]
+       ],
+       [
+        [7, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [0, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [0, 8, 8],
+        [4, 8, 8],
+        [5, 8, 8],
+        [7, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 1,
+       "marked_mm": 11.965,
+       "bare_mm": 0.256,
+       "worse": 1,
+       "better": 0,
+       "p": 1.0,
+       "judged": false,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": false,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": null,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 1161.8,
+      "bare": 2031.9
+     },
+     "pictures": {
+      "view": {
+       "px_per_cell": 16.0,
+       "blur_px": 0.5,
+       "tilt_deg": 0.0,
+       "seed": 0,
+       "conditions": {
+        "camera": {
+         "distance_mm": 314.19256148326525,
+         "resolution": [1920, 1080],
+         "hfov_deg": 70.0
+        },
+        "tilt_deg": 0.0,
+        "yaw_deg": 0.0,
+        "blur_px": 0.5,
+        "noise": 0.1,
+        "glare": 0.0,
+        "occlusion": 0.0,
+        "seed": 0
+       }
+      },
+      "images": [
+       {
+        "kind": "bare",
+        "file": "b6-cv4110-bare.webp",
+        "missing": []
+       },
+       {
+        "kind": "marked",
+        "file": "b6-cv4110-marked.webp",
+        "missing": [6]
+       }
+      ]
+     },
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 1675.6936612440813,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 0.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 1
+      },
+      {
+       "camera": {
+        "distance_mm": 1675.6936612440813,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 0.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 1
+      },
+      {
+       "camera": {
+        "distance_mm": 1675.6936612440813,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 0.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 2
+      }
+     ]
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 224,
+       "bare": 235
+      },
+      "lost": 11,
+      "gained": 0,
+      "cost_pts": 4.68,
+      "p": 0.000977,
+      "easy": {
+       "lost": 10,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "unsafe",
+      "verdict": "unsafe",
+      "text": "the label lost 11 of the bare marker's 235 reads, 10 of them in sharp, well-resolved views",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [3, 3, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 5, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [3, 3, 8]
+       ],
+       [
+        [8, 8, 8],
+        [6, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [8, 8, 8]
+       ],
+       [
+        [5, 8, 8],
+        [7, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [4, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 11,
+       "marked_mm": 0.1879,
+       "bare_mm": 0.1879,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 1845.8,
+      "bare": 1945.1
+     },
+     "pictures": {
+      "view": {
+       "px_per_cell": 16.0,
+       "blur_px": 1.0,
+       "tilt_deg": 0.0,
+       "seed": 0,
+       "conditions": {
+        "camera": {
+         "distance_mm": 314.19256148326525,
+         "resolution": [1920, 1080],
+         "hfov_deg": 70.0
+        },
+        "tilt_deg": 0.0,
+        "yaw_deg": 0.0,
+        "blur_px": 1.0,
+        "noise": 0.1,
+        "glare": 0.0,
+        "occlusion": 0.0,
+        "seed": 0
+       }
+      },
+      "images": [
+       {
+        "kind": "bare",
+        "file": "b6-cv500-bare.webp",
+        "missing": []
+       },
+       {
+        "kind": "marked",
+        "file": "b6-cv500-marked.webp",
+        "missing": [6]
+       }
+      ]
+     },
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 1005.4161967464488,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 1
+      },
+      {
+       "camera": {
+        "distance_mm": 502.7080983732244,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 2
+      },
+      {
+       "camera": {
+        "distance_mm": 502.7080983732244,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 3
+      }
+     ]
+    }
+   },
+   "verdict": "unsafe"
+  },
+  {
+   "key": "B7",
+   "group": "black",
+   "title": "Longer text: “#{ids} {dict}”",
+   "feature": "lp-B7",
+   "number": 8,
+   "plan": {
+    "ids": [7],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #7 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 1.833333
+   },
+   "where": {
+    "cap_cells": 0.5,
+    "from_black_cells": null
+   },
+   "rules": {
+    "verdict": "safe",
+    "hits": []
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 259,
+       "bare": 267
+      },
+      "lost": 14,
+      "gained": 6,
+      "cost_pts": 3.0,
+      "p": 0.115318,
+      "easy": {
+       "lost": 5,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "unsafe",
+      "verdict": "unsafe",
+      "text": "the label lost 14 of the bare marker's 267 reads (and gained 6), 5 of them in sharp, well-resolved views",
+      "map": [
+       [
+        [8, 8, 8],
+        [6, 7, 8],
+        [1, 2, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 7, 8],
+        [2, 2, 8],
+        [1, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 5, 8],
+        [2, 2, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 6, 8],
+        [5, 4, 8]
+       ],
+       [
+        [7, 8, 8],
+        [4, 8, 8],
+        [7, 8, 8],
+        [8, 8, 8],
+        [7, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 15,
+       "marked_mm": 0.1977,
+       "bare_mm": 0.1977,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": {
+      "view": {
+       "px_per_cell": 13.0,
+       "blur_px": 2.5,
+       "tilt_deg": 0.0,
+       "seed": 1,
+       "conditions": {
+        "camera": {
+         "distance_mm": 386.6985372101726,
+         "resolution": [1920, 1080],
+         "hfov_deg": 70.0
+        },
+        "tilt_deg": 0.0,
+        "yaw_deg": 0.0,
+        "blur_px": 2.5,
+        "noise": 0.1,
+        "glare": 0.0,
+        "occlusion": 0.0,
+        "seed": 1
+       }
+      },
+      "images": [
+       {
+        "kind": "bare",
+        "file": "b7-cv4110-bare.webp",
+        "missing": []
+       },
+       {
+        "kind": "marked",
+        "file": "b7-cv4110-marked.webp",
+        "missing": [7]
+       }
+      ]
+     },
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 1675.6936612440813,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 1
+      },
+      {
+       "camera": {
+        "distance_mm": 1675.6936612440813,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 2
+      },
+      {
+       "camera": {
+        "distance_mm": 1256.770245933061,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 2
+      }
+     ]
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 254,
+       "bare": 258
+      },
+      "lost": 9,
+      "gained": 5,
+      "cost_pts": 1.55,
+      "p": 0.42395,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost 9 of the bare marker's 258 reads (and gained 5)",
+      "map": [
+       [
+        [8, 8, 8],
+        [6, 7, 8],
+        [1, 2, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [7, 8, 8],
+        [5, 4, 8],
+        [0, 2, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [3, 3, 8],
+        [1, 1, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [3, 3, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 15,
+       "marked_mm": 0.1962,
+       "bare_mm": 0.1962,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 1675.6936612440813,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 0
+      },
+      {
+       "camera": {
+        "distance_mm": 1675.6936612440813,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 2
+      },
+      {
+       "camera": {
+        "distance_mm": 1256.770245933061,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 0
+      }
+     ]
+    }
+   },
+   "verdict": "unsafe"
+  },
+  {
+   "key": "B8",
+   "group": "black",
+   "title": "Text longer than the row: “#{ids} {dict} {type}”",
+   "feature": "lp-B8",
+   "number": 9,
+   "plan": {
+    "ids": [8],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #8 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 1.833333
+   },
+   "where": {
+    "cap_cells": 0.5,
+    "from_black_cells": null
+   },
+   "rules": {
+    "verdict": "unsafe",
+    "hits": [
+     "the label is 7.3 mm longer than the border row holds"
+    ]
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 229,
+       "bare": 234
+      },
+      "lost": 6,
+      "gained": 1,
+      "cost_pts": 2.14,
+      "p": 0.125,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost 6 of the bare marker's 234 reads (and gained 1)",
+      "map": [
+       [
+        [8, 8, 8],
+        [2, 3, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [7, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 8, 8],
+        [3, 6, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 5, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 13,
+       "marked_mm": 0.3248,
+       "bare_mm": 0.1951,
+       "worse": 8,
+       "better": 5,
+       "p": 0.581055,
+       "judged": true,
+       "growth": 0.6652,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 1979.4
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 1675.6936612440813,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 0
+      },
+      {
+       "camera": {
+        "distance_mm": 1005.4161967464488,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 3
+      },
+      {
+       "camera": {
+        "distance_mm": 837.8468306220407,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 0
+      }
+     ]
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 230,
+       "bare": 234
+      },
+      "lost": 4,
+      "gained": 0,
+      "cost_pts": 1.71,
+      "p": 0.125,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "unsafe",
+      "text": "the label lost 4 of the bare marker's 234 reads; where the bare pose is sharp, the pose came out worse in 13 views and better in 0: a mean error of 0.549 mm against 0.194 mm bare",
+      "map": [
+       [
+        [8, 8, 8],
+        [2, 3, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 6, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [3, 5, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 13,
+       "marked_mm": 0.549,
+       "bare_mm": 0.1941,
+       "worse": 13,
+       "better": 0,
+       "p": 0.000244,
+       "judged": true,
+       "growth": 1.8288,
+       "verdict": "unsafe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 2014.2,
+      "bare": 1979.4
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 1675.6936612440813,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 0
+      },
+      {
+       "camera": {
+        "distance_mm": 837.8468306220407,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 2.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 1
+      },
+      {
+       "camera": {
+        "distance_mm": 628.3851229665305,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 2.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 0
+      }
+     ]
+    }
+   },
+   "verdict": "unsafe"
+  },
+  {
+   "key": "B9",
+   "group": "black",
+   "title": "Moved up one cell, onto the data cells",
+   "feature": "lp-B9",
+   "number": 10,
+   "plan": {
+    "ids": [9],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #9 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 1.833333
+   },
+   "where": {
+    "cap_cells": 0.5,
+    "from_black_cells": null
+   },
+   "rules": {
+    "verdict": "safe",
+    "hits": []
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 239,
+       "bare": 239
+      },
+      "lost": 0,
+      "gained": 0,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 239 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 5, 8],
+        [1, 1, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [3, 3, 8],
+        [1, 1, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [4, 4, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 14,
+       "marked_mm": 0.1994,
+       "bare_mm": 0.1994,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2031.9,
+      "bare": 2031.9
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 234,
+       "bare": 234
+      },
+      "lost": 0,
+      "gained": 0,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 234 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 5, 8],
+        [1, 1, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [1, 1, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [3, 3, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [7, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 14,
+       "marked_mm": 0.1985,
+       "bare_mm": 0.1985,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2031.9,
+      "bare": 2031.9
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    }
+   },
+   "verdict": "safe"
+  },
+  {
+   "key": "C1",
+   "group": "white",
+   "title": "Below",
+   "feature": "lp-C1",
+   "number": 11,
+   "plan": {
+    "ids": [10],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #10 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 1.833333
+   },
+   "where": {
+    "cap_cells": 0.5,
+    "from_black_cells": 0.25
+   },
+   "rules": {
+    "verdict": "unsafe",
+    "hits": [
+     "black text in the quiet zone: any ink in the white ring round the black costs the detector (core.label's study: about 11 points of reads for a grey id, up to 40 once the dots spread)"
+    ]
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 275,
+       "bare": 275
+      },
+      "lost": 1,
+      "gained": 1,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost 1 of the bare marker's 275 reads (and gained 1)",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 7, 8],
+        [2, 2, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [2, 3, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 13,
+       "marked_mm": 0.1951,
+       "bare_mm": 0.1951,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 1005.4161967464488,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 2.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 2
+      }
+     ]
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 259,
+       "bare": 259
+      },
+      "lost": 2,
+      "gained": 2,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost 2 of the bare marker's 259 reads (and gained 2)",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [2, 3, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 5, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [5, 5, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 6, 8],
+        [0, 1, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 13,
+       "marked_mm": 0.1941,
+       "bare_mm": 0.1941,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 1675.6936612440813,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 2
+      },
+      {
+       "camera": {
+        "distance_mm": 837.8468306220407,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 2.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 3
+      }
+     ]
+    }
+   },
+   "verdict": "unsafe"
+  },
+  {
+   "key": "C2",
+   "group": "white",
+   "title": "Above",
+   "feature": "lp-C2",
+   "number": 12,
+   "plan": {
+    "ids": [11],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #11 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 1.833333
+   },
+   "where": {
+    "cap_cells": 0.5,
+    "from_black_cells": 0.25
+   },
+   "rules": {
+    "verdict": "unsafe",
+    "hits": [
+     "black text in the quiet zone: any ink in the white ring round the black costs the detector (core.label's study: about 11 points of reads for a grey id, up to 40 once the dots spread)"
+    ]
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 252,
+       "bare": 251
+      },
+      "lost": 1,
+      "gained": 2,
+      "cost_pts": -0.4,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost 1 of the bare marker's 251 reads (and gained 2)",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 6, 8],
+        [3, 2, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [2, 2, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 14,
+       "marked_mm": 0.1864,
+       "bare_mm": 0.1864,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2031.9,
+      "bare": 2031.9
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 628.3851229665305,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 2.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 1
+      }
+     ]
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 237,
+       "bare": 235
+      },
+      "lost": 0,
+      "gained": 2,
+      "cost_pts": -0.85,
+      "p": 0.5,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 235 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [2, 1, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [6, 6, 8],
+        [1, 1, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [3, 3, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 14,
+       "marked_mm": 0.1855,
+       "bare_mm": 0.1855,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2031.9,
+      "bare": 2031.9
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    }
+   },
+   "verdict": "unsafe"
+  },
+  {
+   "key": "C3",
+   "group": "white",
+   "title": "Left",
+   "feature": "lp-C3",
+   "number": 13,
+   "plan": {
+    "ids": [12],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #12 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 1.833333
+   },
+   "where": {
+    "cap_cells": 0.5,
+    "from_black_cells": 0.25
+   },
+   "rules": {
+    "verdict": "unsafe",
+    "hits": [
+     "black text in the quiet zone: any ink in the white ring round the black costs the detector (core.label's study: about 11 points of reads for a grey id, up to 40 once the dots spread)"
+    ]
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 229,
+       "bare": 228
+      },
+      "lost": 0,
+      "gained": 1,
+      "cost_pts": -0.44,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 228 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [2, 2, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 5, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [2, 2, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [2, 2, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 6, 8],
+        [7, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 13,
+       "marked_mm": 0.1951,
+       "bare_mm": 0.1951,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 1962.1,
+      "bare": 1962.1
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 218,
+       "bare": 218
+      },
+      "lost": 0,
+      "gained": 0,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 218 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [5, 5, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [1, 1, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [1, 1, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 5, 8],
+        [1, 1, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 5, 8],
+        [6, 6, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 14,
+       "marked_mm": 0.7986,
+       "bare_mm": 0.1985,
+       "worse": 1,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 3.023,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 1962.1,
+      "bare": 1962.1
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    }
+   },
+   "verdict": "unsafe"
+  },
+  {
+   "key": "C4",
+   "group": "white",
+   "title": "Right",
+   "feature": "lp-C4",
+   "number": 14,
+   "plan": {
+    "ids": [13],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #13 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 1.833333
+   },
+   "where": {
+    "cap_cells": 0.5,
+    "from_black_cells": 0.25
+   },
+   "rules": {
+    "verdict": "unsafe",
+    "hits": [
+     "black text in the quiet zone: any ink in the white ring round the black costs the detector (core.label's study: about 11 points of reads for a grey id, up to 40 once the dots spread)"
+    ]
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 262,
+       "bare": 268
+      },
+      "lost": 6,
+      "gained": 0,
+      "cost_pts": 2.24,
+      "p": 0.03125,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "marginal",
+      "verdict": "marginal",
+      "text": "the label lost 6 of the bare marker's 268 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [1, 2, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 5, 8],
+        [1, 2, 8],
+        [0, 0, 8]
+       ],
+       [
+        [6, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [3, 3, 8]
+       ],
+       [
+        [6, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 13,
+       "marked_mm": 0.1951,
+       "bare_mm": 0.1951,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": {
+      "view": {
+       "px_per_cell": 6.0,
+       "blur_px": 0.5,
+       "tilt_deg": 45.0,
+       "seed": 0,
+       "conditions": {
+        "camera": {
+         "distance_mm": 837.8468306220407,
+         "resolution": [1920, 1080],
+         "hfov_deg": 70.0
+        },
+        "tilt_deg": 45.0,
+        "yaw_deg": 0.0,
+        "blur_px": 0.5,
+        "noise": 0.1,
+        "glare": 0.0,
+        "occlusion": 0.0,
+        "seed": 0
+       }
+      },
+      "images": [
+       {
+        "kind": "bare",
+        "file": "c4-cv4110-bare.webp",
+        "missing": []
+       },
+       {
+        "kind": "marked",
+        "file": "c4-cv4110-marked.webp",
+        "missing": [13]
+       }
+      ]
+     },
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 1675.6936612440813,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 1
+      },
+      {
+       "camera": {
+        "distance_mm": 1256.770245933061,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 2.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 1
+      },
+      {
+       "camera": {
+        "distance_mm": 1005.4161967464488,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 0.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 0
+      }
+     ]
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 253,
+       "bare": 253
+      },
+      "lost": 1,
+      "gained": 1,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost 1 of the bare marker's 253 reads (and gained 1)",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [1, 1, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 5, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 5, 8],
+        [1, 1, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [4, 4, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 14,
+       "marked_mm": 0.4481,
+       "bare_mm": 0.1985,
+       "worse": 1,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 1.2576,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 1005.4161967464488,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 2
+      }
+     ]
+    }
+   },
+   "verdict": "unsafe"
+  },
+  {
+   "key": "D1",
+   "group": "outside",
+   "title": "Below, Gap 2 mm (the default)",
+   "feature": "lp-D1",
+   "number": 15,
+   "plan": {
+    "ids": [14],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #14 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 3.666667
+   },
+   "where": {
+    "cap_cells": 1.0,
+    "from_black_cells": 1.547
+   },
+   "rules": {
+    "verdict": "safe",
+    "hits": []
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 233,
+       "bare": 233
+      },
+      "lost": 2,
+      "gained": 2,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost 2 of the bare marker's 233 reads (and gained 2)",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 7, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [2, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [2, 2, 8],
+        [2, 1, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 5, 8],
+        [2, 2, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [8, 8, 8],
+        [5, 5, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 13,
+       "marked_mm": 0.1951,
+       "bare_mm": 0.1951,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 1256.770245933061,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 0
+      },
+      {
+       "camera": {
+        "distance_mm": 1256.770245933061,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 3
+      }
+     ]
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 216,
+       "bare": 216
+      },
+      "lost": 0,
+      "gained": 0,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 216 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [5, 5, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [7, 7, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [3, 3, 8],
+        [2, 2, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [6, 6, 8],
+        [3, 3, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 14,
+       "marked_mm": 0.1985,
+       "bare_mm": 0.1985,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2049.7,
+      "bare": 2049.7
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    }
+   },
+   "verdict": "safe"
+  },
+  {
+   "key": "D2",
+   "group": "outside",
+   "title": "Below, Gap 0: touching the quiet zone",
+   "feature": "lp-D2",
+   "number": 16,
+   "plan": {
+    "ids": [15],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #15 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 3.666667
+   },
+   "where": {
+    "cap_cells": 1.0,
+    "from_black_cells": 1.001
+   },
+   "rules": {
+    "verdict": "safe",
+    "hits": []
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 254,
+       "bare": 250
+      },
+      "lost": 0,
+      "gained": 4,
+      "cost_pts": -1.6,
+      "p": 0.125,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 250 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [1, 1, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 6, 8],
+        [1, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 7, 8],
+        [2, 2, 8],
+        [1, 1, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 5, 8],
+        [1, 1, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [6, 5, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 14,
+       "marked_mm": 0.1994,
+       "bare_mm": 0.1994,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 242,
+       "bare": 243
+      },
+      "lost": 2,
+      "gained": 1,
+      "cost_pts": 0.41,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost 2 of the bare marker's 243 reads (and gained 1)",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [1, 1, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 5, 8],
+        [0, 1, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [3, 3, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 14,
+       "marked_mm": 0.1985,
+       "bare_mm": 0.1985,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 1945.1,
+      "bare": 1945.1
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 1256.770245933061,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 1
+      },
+      {
+       "camera": {
+        "distance_mm": 837.8468306220407,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 2.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 2
+      }
+     ]
+    }
+   },
+   "verdict": "safe"
+  },
+  {
+   "key": "D3",
+   "group": "outside",
+   "title": "Below, Gap −½ cell: half way into the quiet zone",
+   "feature": "lp-D3",
+   "number": 17,
+   "plan": {
+    "ids": [16],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #16 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 3.666667
+   },
+   "where": {
+    "cap_cells": 1.0,
+    "from_black_cells": 0.501
+   },
+   "rules": {
+    "verdict": "unsafe",
+    "hits": [
+     "a gap of -1.83333 mm: the label's band overlaps the marker's box by 1.83333 mm"
+    ]
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 264,
+       "bare": 269
+      },
+      "lost": 7,
+      "gained": 2,
+      "cost_pts": 1.86,
+      "p": 0.179688,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost 7 of the bare marker's 269 reads (and gained 2)",
+      "map": [
+       [
+        [8, 8, 8],
+        [6, 8, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [1, 3, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 8, 8],
+        [3, 2, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 7, 8],
+        [5, 5, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 14,
+       "marked_mm": 0.188,
+       "bare_mm": 0.188,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 1945.1,
+      "bare": 2067.7
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 1675.6936612440813,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 0
+      },
+      {
+       "camera": {
+        "distance_mm": 1675.6936612440813,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 3
+      },
+      {
+       "camera": {
+        "distance_mm": 1256.770245933061,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 2.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 1
+      }
+     ]
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 254,
+       "bare": 253
+      },
+      "lost": 0,
+      "gained": 1,
+      "cost_pts": -0.4,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 253 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [1, 1, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [4, 3, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 15,
+       "marked_mm": 0.1917,
+       "bare_mm": 0.1917,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    }
+   },
+   "verdict": "unsafe"
+  },
+  {
+   "key": "D4",
+   "group": "outside",
+   "title": "Below, Gap −1 cell: touching the black",
+   "feature": "lp-D4",
+   "number": 18,
+   "plan": {
+    "ids": [17],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #17 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 3.666667
+   },
+   "where": {
+    "cap_cells": 1.0,
+    "from_black_cells": 0.001
+   },
+   "rules": {
+    "verdict": "unsafe",
+    "hits": [
+     "a gap of -3.66667 mm: the label's band overlaps the marker's box by 3.66667 mm"
+    ]
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 87,
+       "bare": 271
+      },
+      "lost": 186,
+      "gained": 2,
+      "cost_pts": 67.9,
+      "p": 0.0,
+      "easy": {
+       "lost": 28,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "unsafe",
+      "verdict": "unsafe",
+      "text": "the label lost 186 of the bare marker's 271 reads (and gained 2), 28 of them in sharp, well-resolved views",
+      "map": [
+       [
+        [6, 8, 8],
+        [1, 8, 8],
+        [2, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [0, 8, 8],
+        [0, 8, 8],
+        [0, 4, 8],
+        [0, 4, 8],
+        [0, 0, 8]
+       ],
+       [
+        [4, 8, 8],
+        [1, 8, 8],
+        [1, 8, 8],
+        [2, 5, 8],
+        [1, 1, 8]
+       ],
+       [
+        [4, 8, 8],
+        [4, 8, 8],
+        [1, 8, 8],
+        [2, 8, 8],
+        [3, 5, 8]
+       ],
+       [
+        [6, 8, 8],
+        [3, 8, 8],
+        [0, 8, 8],
+        [0, 8, 8],
+        [0, 8, 8]
+       ],
+       [
+        [6, 8, 8],
+        [0, 8, 8],
+        [1, 8, 8],
+        [3, 8, 8],
+        [3, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [1, 8, 8],
+        [0, 8, 8],
+        [2, 8, 8],
+        [3, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [4, 8, 8],
+        [4, 8, 8],
+        [0, 8, 8],
+        [3, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 13,
+       "marked_mm": 5.9241,
+       "bare_mm": 0.1951,
+       "worse": 3,
+       "better": 10,
+       "p": 0.092285,
+       "judged": true,
+       "growth": 29.3679,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 70,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 1019.1,
+      "bare": 2049.7
+     },
+     "pictures": {
+      "view": {
+       "px_per_cell": 16.0,
+       "blur_px": 1.0,
+       "tilt_deg": 45.0,
+       "seed": 0,
+       "conditions": {
+        "camera": {
+         "distance_mm": 314.19256148326525,
+         "resolution": [1920, 1080],
+         "hfov_deg": 70.0
+        },
+        "tilt_deg": 45.0,
+        "yaw_deg": 0.0,
+        "blur_px": 1.0,
+        "noise": 0.1,
+        "glare": 0.0,
+        "occlusion": 0.0,
+        "seed": 0
+       }
+      },
+      "images": [
+       {
+        "kind": "bare",
+        "file": "d4-cv4110-bare.webp",
+        "missing": []
+       },
+       {
+        "kind": "marked",
+        "file": "d4-cv4110-marked.webp",
+        "missing": [17]
+       }
+      ]
+     },
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 1675.6936612440813,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 0.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 2
+      },
+      {
+       "camera": {
+        "distance_mm": 1675.6936612440813,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 0.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 3
+      },
+      {
+       "camera": {
+        "distance_mm": 1675.6936612440813,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 1
+      }
+     ]
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 252,
+       "bare": 247
+      },
+      "lost": 0,
+      "gained": 5,
+      "cost_pts": -2.02,
+      "p": 0.0625,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 247 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [2, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 3, 8],
+        [3, 2, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [7, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 13,
+       "marked_mm": 0.1941,
+       "bare_mm": 0.1941,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2049.7,
+      "bare": 2049.7
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    }
+   },
+   "verdict": "unsafe"
+  },
+  {
+   "key": "D5",
+   "group": "outside",
+   "title": "Above, Gap 2 mm",
+   "feature": "lp-D5",
+   "number": 19,
+   "plan": {
+    "ids": [18],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #18 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 3.666667
+   },
+   "where": {
+    "cap_cells": 1.0,
+    "from_black_cells": 1.847
+   },
+   "rules": {
+    "verdict": "safe",
+    "hits": []
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 257,
+       "bare": 256
+      },
+      "lost": 0,
+      "gained": 1,
+      "cost_pts": -0.39,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 256 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [7, 7, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 5, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [4, 4, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [3, 3, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 12,
+       "marked_mm": 0.1847,
+       "bare_mm": 0.1847,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2085.9,
+      "bare": 2085.9
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 253,
+       "bare": 252
+      },
+      "lost": 0,
+      "gained": 1,
+      "cost_pts": -0.4,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 252 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [7, 6, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [3, 3, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [3, 3, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 12,
+       "marked_mm": 0.1875,
+       "bare_mm": 0.1875,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2085.9,
+      "bare": 2085.9
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    }
+   },
+   "verdict": "safe"
+  },
+  {
+   "key": "D6",
+   "group": "outside",
+   "title": "Left, Gap 2 mm",
+   "feature": "lp-D6",
+   "number": 20,
+   "plan": {
+    "ids": [19],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #19 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 3.666667
+   },
+   "where": {
+    "cap_cells": 1.0,
+    "from_black_cells": 1.547
+   },
+   "rules": {
+    "verdict": "safe",
+    "hits": []
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 242,
+       "bare": 242
+      },
+      "lost": 0,
+      "gained": 0,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 242 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [5, 5, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [2, 2, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [1, 1, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [3, 3, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 16,
+       "marked_mm": 0.1831,
+       "bare_mm": 0.1831,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 2014.2,
+      "bare": 2014.2
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 235,
+       "bare": 235
+      },
+      "lost": 0,
+      "gained": 0,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 235 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [2, 2, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [2, 2, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [3, 3, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 14,
+       "marked_mm": 0.1791,
+       "bare_mm": 0.1791,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 1979.4,
+      "bare": 1979.4
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    }
+   },
+   "verdict": "safe"
+  },
+  {
+   "key": "D7",
+   "group": "outside",
+   "title": "Right, Gap 2 mm",
+   "feature": "lp-D7",
+   "number": 21,
+   "plan": {
+    "ids": [20],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #20 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": 3.666667
+   },
+   "where": {
+    "cap_cells": 1.0,
+    "from_black_cells": 1.547
+   },
+   "rules": {
+    "verdict": "safe",
+    "hits": []
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 259,
+       "bare": 259
+      },
+      "lost": 2,
+      "gained": 2,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost 2 of the bare marker's 259 reads (and gained 2)",
+      "map": [
+       [
+        [8, 8, 8],
+        [6, 6, 8],
+        [1, 1, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [2, 2, 8],
+        [3, 3, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 6, 8],
+        [4, 4, 8],
+        [3, 2, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 8, 8],
+        [6, 7, 8],
+        [4, 4, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 12,
+       "marked_mm": 0.2008,
+       "bare_mm": 0.2008,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2049.7
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 837.8468306220407,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 0
+      },
+      {
+       "camera": {
+        "distance_mm": 837.8468306220407,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 2.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 2
+      }
+     ]
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 238,
+       "bare": 238
+      },
+      "lost": 0,
+      "gained": 0,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 238 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [6, 6, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [7, 7, 8],
+        [0, 0, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [2, 2, 8],
+        [1, 1, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [4, 4, 8],
+        [1, 1, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 7, 8],
+        [5, 5, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 12,
+       "marked_mm": 0.2002,
+       "bare_mm": 0.2002,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 80,
+      "bare": 80
+     },
+     "limit_mm": {
+      "marked": 2049.7,
+      "bare": 2049.7
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    }
+   },
+   "verdict": "safe"
+  },
+  {
+   "key": "E1",
+   "group": "boards",
+   "title": "Grid 2 × 2: in its border row",
+   "feature": "lp-E1",
+   "number": 22,
+   "plan": {
+    "ids": [21, 22, 23, 24],
+    "cell_mm": 3.916667,
+    "outer_mm": [59.333333, 59.333333],
+    "marker_mm": 23.5,
+    "summary": "Grid 2×2 DICT_4X4_50 #21–24 · 23.5 mm · outer 59.3 × 59.3 mm",
+    "label_cap_mm": 1.958333
+   },
+   "where": {
+    "cap_cells": 0.5,
+    "from_black_cells": null
+   },
+   "rules": {
+    "verdict": "safe",
+    "hits": []
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 4,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 1038,
+       "bare": 1041
+      },
+      "lost": 7,
+      "gained": 4,
+      "cost_pts": 0.29,
+      "p": 0.548828,
+      "easy": {
+       "lost": 1,
+       "gained": 0,
+       "bare": 256
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost 7 of the bare marker's 1041 reads (and gained 4), 1 of them in sharp, well-resolved views",
+      "map": [
+       [
+        [32, 31, 32],
+        [24, 24, 32],
+        [4, 4, 32],
+        [0, 0, 32],
+        [0, 0, 32]
+       ],
+       [
+        [32, 32, 32],
+        [31, 31, 32],
+        [22, 22, 32],
+        [5, 5, 32],
+        [0, 0, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [30, 30, 32],
+        [15, 12, 32],
+        [4, 4, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [30, 30, 32],
+        [17, 17, 32]
+       ],
+       [
+        [32, 32, 32],
+        [31, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [31, 31, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [31, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [31, 32, 32],
+        [28, 32, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32]
+       ]
+      ],
+      "pose": {
+       "views": 22,
+       "marked_mm": 0.2363,
+       "bare_mm": 0.2363,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 271.3546496131349,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 2095.9,
+      "bare": 2095.9
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 671.2295631687939,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 2
+      },
+      {
+       "camera": {
+        "distance_mm": 536.9836505350352,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 2
+      },
+      {
+       "camera": {
+        "distance_mm": 413.06434656541165,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 2.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 3
+      }
+     ]
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 4,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 1030,
+       "bare": 1029
+      },
+      "lost": 0,
+      "gained": 1,
+      "cost_pts": -0.1,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 256
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 1029 reads",
+      "map": [
+       [
+        [30, 30, 32],
+        [22, 22, 32],
+        [4, 4, 32],
+        [0, 0, 32],
+        [0, 0, 32]
+       ],
+       [
+        [32, 32, 32],
+        [31, 31, 32],
+        [19, 19, 32],
+        [3, 3, 32],
+        [0, 0, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [29, 29, 32],
+        [13, 12, 32],
+        [2, 2, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [29, 29, 32],
+        [17, 17, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [31, 31, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32]
+       ]
+      ],
+      "pose": {
+       "views": 21,
+       "marked_mm": 0.2348,
+       "bare_mm": 0.2348,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 271.3546496131349,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 2095.9,
+      "bare": 2095.9
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    }
+   },
+   "verdict": "safe"
+  },
+  {
+   "key": "E2",
+   "group": "boards",
+   "title": "ChArUco 5 × 4: in a black square",
+   "feature": "lp-E2",
+   "number": 23,
+   "plan": {
+    "ids": [50, 51, 52, 53, 54, 55, 56, 57, 58, 59],
+    "cell_mm": 1.5,
+    "outer_mm": [60.0, 48.0],
+    "marker_mm": 9.0,
+    "summary": "ChArUco 5×4 DICT_4X4_100 #50–59 · 12.0 / 9.0 mm · outer 60.0 × 48.0 mm",
+    "label_cap_mm": 1.5
+   },
+   "where": {
+    "cap_cells": 1.0,
+    "from_black_cells": null
+   },
+   "rules": {
+    "verdict": "safe",
+    "hits": []
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 10,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 2479,
+       "bare": 2479
+      },
+      "lost": 0,
+      "gained": 0,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 640
+      },
+      "wrong": 5,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 2479 reads",
+      "map": [
+       [
+        [68, 68, 80],
+        [47, 47, 80],
+        [4, 4, 80],
+        [0, 0, 80],
+        [0, 0, 80]
+       ],
+       [
+        [80, 80, 80],
+        [78, 78, 80],
+        [37, 37, 80],
+        [5, 5, 80],
+        [0, 0, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [64, 64, 80],
+        [33, 33, 80],
+        [8, 8, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [75, 75, 80],
+        [58, 58, 80],
+        [27, 27, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [76, 76, 80],
+        [63, 63, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [77, 77, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [79, 79, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80]
+       ]
+      ],
+      "pose": {
+       "views": 102,
+       "marked_mm": 0.0935,
+       "bare_mm": 0.0935,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 103.92304845413264,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 761.7,
+      "bare": 761.7
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 10,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 2387,
+       "bare": 2387
+      },
+      "lost": 0,
+      "gained": 0,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 640
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 2387 reads",
+      "map": [
+       [
+        [68, 68, 80],
+        [41, 41, 80],
+        [1, 1, 80],
+        [0, 0, 80],
+        [0, 0, 80]
+       ],
+       [
+        [80, 80, 80],
+        [75, 75, 80],
+        [22, 22, 80],
+        [3, 3, 80],
+        [0, 0, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [55, 55, 80],
+        [19, 19, 80],
+        [4, 4, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [71, 71, 80],
+        [49, 49, 80],
+        [22, 22, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [71, 71, 80],
+        [59, 59, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [79, 79, 80],
+        [70, 70, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [78, 78, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80]
+       ]
+      ],
+      "pose": {
+       "views": 170,
+       "marked_mm": 0.0458,
+       "bare_mm": 0.0458,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 103.92304845413264,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 755.1,
+      "bare": 755.1
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    }
+   },
+   "verdict": "safe"
+  },
+  {
+   "key": "E3",
+   "group": "boards",
+   "title": "ChArUco 5 × 4: in a white square's margin",
+   "feature": "lp-E3",
+   "number": 24,
+   "plan": {
+    "ids": [60, 61, 62, 63, 64, 65, 66, 67, 68, 69],
+    "cell_mm": 1.5,
+    "outer_mm": [60.0, 48.0],
+    "marker_mm": 9.0,
+    "summary": "ChArUco 5×4 DICT_4X4_100 #60–69 · 12.0 / 9.0 mm · outer 60.0 × 48.0 mm",
+    "label_cap_mm": 0.75
+   },
+   "where": {
+    "cap_cells": 0.5,
+    "from_black_cells": null
+   },
+   "rules": {
+    "verdict": "unsafe",
+    "hits": [
+     "black text in the quiet zone: any ink in the white ring round the black costs the detector (core.label's study: about 11 points of reads for a grey id, up to 40 once the dots spread)"
+    ]
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 10,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 2491,
+       "bare": 2492
+      },
+      "lost": 4,
+      "gained": 3,
+      "cost_pts": 0.04,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 640
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost 4 of the bare marker's 2492 reads (and gained 3)",
+      "map": [
+       [
+        [68, 68, 80],
+        [46, 46, 80],
+        [1, 1, 80],
+        [0, 0, 80],
+        [0, 0, 80]
+       ],
+       [
+        [80, 80, 80],
+        [79, 79, 80],
+        [36, 35, 80],
+        [6, 6, 80],
+        [0, 0, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [62, 66, 80],
+        [28, 28, 80],
+        [7, 7, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [77, 76, 80],
+        [60, 60, 80],
+        [32, 32, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [79, 78, 80],
+        [71, 71, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [79, 79, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80]
+       ]
+      ],
+      "pose": {
+       "views": 103,
+       "marked_mm": 0.0942,
+       "bare_mm": 0.0942,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 103.92304845413264,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 781.9,
+      "bare": 781.9
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 411.306625941729,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 0
+      },
+      {
+       "camera": {
+        "distance_mm": 411.306625941729,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 1
+      },
+      {
+       "camera": {
+        "distance_mm": 411.306625941729,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 2
+      }
+     ]
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 10,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 2422,
+       "bare": 2417
+      },
+      "lost": 0,
+      "gained": 5,
+      "cost_pts": -0.21,
+      "p": 0.0625,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 640
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost none of the bare marker's 2417 reads",
+      "map": [
+       [
+        [68, 68, 80],
+        [44, 44, 80],
+        [0, 0, 80],
+        [0, 0, 80],
+        [0, 0, 80]
+       ],
+       [
+        [80, 80, 80],
+        [76, 76, 80],
+        [34, 33, 80],
+        [2, 2, 80],
+        [0, 0, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [60, 58, 80],
+        [20, 20, 80],
+        [4, 4, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [74, 74, 80],
+        [49, 48, 80],
+        [18, 18, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [75, 75, 80],
+        [65, 65, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [78, 78, 80],
+        [75, 74, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80]
+       ]
+      ],
+      "pose": {
+       "views": 175,
+       "marked_mm": 0.0484,
+       "bare_mm": 0.0461,
+       "worse": 2,
+       "better": 2,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0491,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 103.92304845413264,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 748.5,
+      "bare": 748.5
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    }
+   },
+   "verdict": "unsafe"
+  },
+  {
+   "key": "E4",
+   "group": "boards",
+   "title": "ChArUco 5 × 4: moved toward a chessboard corner",
+   "feature": "lp-E4",
+   "number": 25,
+   "plan": {
+    "ids": [70, 71, 72, 73, 74, 75, 76, 77, 78, 79],
+    "cell_mm": 1.5,
+    "outer_mm": [60.0, 48.0],
+    "marker_mm": 9.0,
+    "summary": "ChArUco 5×4 DICT_4X4_100 #70–79 · 12.0 / 9.0 mm · outer 60.0 × 48.0 mm",
+    "label_cap_mm": 1.5
+   },
+   "where": {
+    "cap_cells": 1.0,
+    "from_black_cells": null
+   },
+   "rules": {
+    "verdict": "unsafe",
+    "hits": [
+     "the label comes within 1.75 mm of a chessboard corner (the detector refines them: keep 0.3 square, 3.60 mm, clear)"
+    ]
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 10,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 2520,
+       "bare": 2520
+      },
+      "lost": 3,
+      "gained": 3,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 640
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the label lost 3 of the bare marker's 2520 reads (and gained 3)",
+      "map": [
+       [
+        [68, 68, 80],
+        [45, 45, 80],
+        [8, 8, 80],
+        [0, 0, 80],
+        [0, 0, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [48, 48, 80],
+        [8, 8, 80],
+        [0, 0, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [65, 66, 80],
+        [37, 38, 80],
+        [8, 8, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [78, 78, 80],
+        [57, 56, 80],
+        [29, 28, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [79, 79, 80],
+        [70, 70, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80]
+       ]
+      ],
+      "pose": {
+       "views": 101,
+       "marked_mm": 0.1042,
+       "bare_mm": 0.093,
+       "worse": 57,
+       "better": 6,
+       "p": 0.0,
+       "judged": true,
+       "growth": 0.1197,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 103.92304845413264,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 768.4,
+      "bare": 768.4
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 514.1332824271612,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 2.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 1
+      },
+      {
+       "camera": {
+        "distance_mm": 411.306625941729,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 0
+      },
+      {
+       "camera": {
+        "distance_mm": 411.306625941729,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 2.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 1
+      }
+     ]
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 10,
+      "label": true,
+      "corner_mark": false,
+      "reads": {
+       "marked": 2445,
+       "bare": 2445
+      },
+      "lost": 1,
+      "gained": 1,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 640
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "marginal",
+      "text": "the label lost 1 of the bare marker's 2445 reads (and gained 1); where the bare pose is sharp, the pose came out worse in 86 views and better in 32: a mean error of 0.081 mm against 0.048 mm bare",
+      "map": [
+       [
+        [65, 65, 80],
+        [44, 44, 80],
+        [3, 3, 80],
+        [0, 0, 80],
+        [0, 0, 80]
+       ],
+       [
+        [80, 80, 80],
+        [79, 78, 80],
+        [39, 39, 80],
+        [6, 6, 80],
+        [0, 0, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [63, 64, 80],
+        [32, 32, 80],
+        [6, 6, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [77, 77, 80],
+        [45, 45, 80],
+        [21, 21, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [74, 74, 80],
+        [62, 62, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [79, 79, 80],
+        [72, 72, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [78, 78, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80]
+       ]
+      ],
+      "pose": {
+       "views": 178,
+       "marked_mm": 0.0805,
+       "bare_mm": 0.0477,
+       "worse": 86,
+       "better": 32,
+       "p": 1e-06,
+       "judged": true,
+       "growth": 0.6879,
+       "verdict": "marginal"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 103.92304845413264,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 768.4,
+      "bare": 768.4
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 411.306625941729,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 1.5,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 0
+      }
+     ]
+    }
+   },
+   "verdict": "unsafe"
+  },
+  {
+   "key": "F1",
+   "group": "corner",
+   "title": "Single: black triangle",
+   "feature": "lp-F1",
+   "number": 26,
+   "plan": {
+    "ids": [25],
+    "cell_mm": 3.666667,
+    "outer_mm": [29.333333, 29.333333],
+    "marker_mm": 22.0,
+    "summary": "Single DICT_4X4_50 #25 · 22.0 mm · outer 29.3 × 29.3 mm",
+    "label_cap_mm": null
+   },
+   "where": {
+    "cap_cells": null,
+    "from_black_cells": null
+   },
+   "rules": {
+    "verdict": "safe",
+    "hits": []
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": false,
+      "corner_mark": true,
+      "reads": {
+       "marked": 266,
+       "bare": 263
+      },
+      "lost": 0,
+      "gained": 3,
+      "cost_pts": -1.14,
+      "p": 0.25,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the corner mark lost none of the bare marker's 263 reads",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [2, 1, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [5, 5, 8],
+        [1, 1, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [5, 5, 8],
+        [3, 1, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 14,
+       "marked_mm": 0.2448,
+       "bare_mm": 0.2028,
+       "worse": 2,
+       "better": 0,
+       "p": 0.5,
+       "judged": true,
+       "growth": 0.2071,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 1,
+      "label": false,
+      "corner_mark": true,
+      "reads": {
+       "marked": 255,
+       "bare": 254
+      },
+      "lost": 2,
+      "gained": 3,
+      "cost_pts": -0.39,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 64
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the corner mark lost 2 of the bare marker's 254 reads (and gained 3)",
+      "map": [
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [1, 1, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [4, 4, 8],
+        [0, 0, 8],
+        [0, 0, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [6, 6, 8],
+        [2, 3, 8],
+        [1, 1, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 7, 8],
+        [4, 3, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [7, 8, 8],
+        [6, 5, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ],
+       [
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8],
+        [8, 8, 8]
+       ]
+      ],
+      "pose": {
+       "views": 15,
+       "marked_mm": 0.2446,
+       "bare_mm": 0.2055,
+       "worse": 1,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.1905,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 254.03414153744612,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 2067.7,
+      "bare": 2067.7
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 1005.4161967464488,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 0.0,
+       "yaw_deg": 0.0,
+       "blur_px": 2.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 3
+      },
+      {
+       "camera": {
+        "distance_mm": 628.3851229665305,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 2.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 0
+      }
+     ]
+    }
+   },
+   "verdict": "safe"
+  },
+  {
+   "key": "F2",
+   "group": "corner",
+   "title": "Grid 2 × 2: black triangle",
+   "feature": "lp-F2",
+   "number": 27,
+   "plan": {
+    "ids": [26, 27, 28, 29],
+    "cell_mm": 3.916667,
+    "outer_mm": [59.333333, 59.333333],
+    "marker_mm": 23.5,
+    "summary": "Grid 2×2 DICT_4X4_50 #26–29 · 23.5 mm · outer 59.3 × 59.3 mm",
+    "label_cap_mm": null
+   },
+   "where": {
+    "cap_cells": null,
+    "from_black_cells": null
+   },
+   "rules": {
+    "verdict": "safe",
+    "hits": []
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 4,
+      "label": false,
+      "corner_mark": true,
+      "reads": {
+       "marked": 981,
+       "bare": 978
+      },
+      "lost": 1,
+      "gained": 4,
+      "cost_pts": -0.31,
+      "p": 0.375,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 256
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the corner mark lost 1 of the bare marker's 978 reads (and gained 4)",
+      "map": [
+       [
+        [32, 32, 32],
+        [19, 19, 32],
+        [0, 0, 32],
+        [0, 0, 32],
+        [0, 0, 32]
+       ],
+       [
+        [32, 32, 32],
+        [31, 31, 32],
+        [11, 10, 32],
+        [3, 2, 32],
+        [0, 0, 32]
+       ],
+       [
+        [32, 32, 32],
+        [31, 31, 32],
+        [24, 24, 32],
+        [9, 8, 32],
+        [3, 3, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [28, 28, 32],
+        [23, 24, 32],
+        [9, 8, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [22, 22, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32]
+       ]
+      ],
+      "pose": {
+       "views": 22,
+       "marked_mm": 0.2373,
+       "bare_mm": 0.2373,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 271.3546496131349,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 2077.7,
+      "bare": 2077.7
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 894.9727508917252,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 2.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 0
+      }
+     ]
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 4,
+      "label": false,
+      "corner_mark": true,
+      "reads": {
+       "marked": 946,
+       "bare": 945
+      },
+      "lost": 2,
+      "gained": 3,
+      "cost_pts": -0.11,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 256
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the corner mark lost 2 of the bare marker's 945 reads (and gained 3)",
+      "map": [
+       [
+        [32, 32, 32],
+        [16, 16, 32],
+        [0, 0, 32],
+        [0, 0, 32],
+        [0, 0, 32]
+       ],
+       [
+        [32, 32, 32],
+        [30, 30, 32],
+        [9, 9, 32],
+        [1, 0, 32],
+        [0, 0, 32]
+       ],
+       [
+        [32, 32, 32],
+        [29, 29, 32],
+        [20, 20, 32],
+        [8, 7, 32],
+        [1, 1, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [26, 26, 32],
+        [17, 19, 32],
+        [9, 8, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [31, 31, 32],
+        [30, 30, 32],
+        [19, 19, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [28, 28, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32]
+       ],
+       [
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32],
+        [32, 32, 32]
+       ]
+      ],
+      "pose": {
+       "views": 22,
+       "marked_mm": 0.4424,
+       "bare_mm": 0.2361,
+       "worse": 1,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.8735,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 271.3546496131349,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 2077.7,
+      "bare": 2077.7
+     },
+     "pictures": null,
+     "views_lost_sample": [
+      {
+       "camera": {
+        "distance_mm": 894.9727508917252,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 2.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 0
+      },
+      {
+       "camera": {
+        "distance_mm": 894.9727508917252,
+        "resolution": [1920, 1080],
+        "hfov_deg": 70.0
+       },
+       "tilt_deg": 45.0,
+       "yaw_deg": 0.0,
+       "blur_px": 2.0,
+       "noise": 0.1,
+       "glare": 0.0,
+       "occlusion": 0.0,
+       "seed": 3
+      }
+     ]
+    }
+   },
+   "verdict": "safe"
+  },
+  {
+   "key": "F3",
+   "group": "corner",
+   "title": "ChArUco 5 × 4: the black square's corner cut",
+   "feature": "lp-F3",
+   "number": 28,
+   "plan": {
+    "ids": [80, 81, 82, 83, 84, 85, 86, 87, 88, 89],
+    "cell_mm": 1.5,
+    "outer_mm": [60.0, 48.0],
+    "marker_mm": 9.0,
+    "summary": "ChArUco 5×4 DICT_4X4_100 #80–89 · 12.0 / 9.0 mm · outer 60.0 × 48.0 mm",
+    "label_cap_mm": null
+   },
+   "where": {
+    "cap_cells": null,
+    "from_black_cells": null
+   },
+   "rules": {
+    "verdict": "safe",
+    "hits": []
+   },
+   "verify": {
+    "4.11.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 10,
+      "label": false,
+      "corner_mark": true,
+      "reads": {
+       "marked": 2507,
+       "bare": 2507
+      },
+      "lost": 0,
+      "gained": 0,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 640
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the corner mark lost none of the bare marker's 2507 reads",
+      "map": [
+       [
+        [68, 68, 80],
+        [45, 45, 80],
+        [11, 11, 80],
+        [0, 0, 80],
+        [0, 0, 80]
+       ],
+       [
+        [80, 80, 80],
+        [76, 76, 80],
+        [40, 40, 80],
+        [11, 11, 80],
+        [0, 0, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [70, 70, 80],
+        [30, 30, 80],
+        [12, 12, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [58, 58, 80],
+        [24, 24, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [78, 78, 80],
+        [68, 68, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [76, 76, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80]
+       ]
+      ],
+      "pose": {
+       "views": 102,
+       "marked_mm": 0.0936,
+       "bare_mm": 0.0936,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 103.92304845413264,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 768.4,
+      "bare": 768.4
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    },
+    "5.0.0": {
+     "marks": {
+      "version": 1,
+      "views": 320,
+      "ids": 10,
+      "label": false,
+      "corner_mark": true,
+      "reads": {
+       "marked": 2454,
+       "bare": 2454
+      },
+      "lost": 0,
+      "gained": 0,
+      "cost_pts": 0.0,
+      "p": 1.0,
+      "easy": {
+       "lost": 0,
+       "gained": 0,
+       "bare": 640
+      },
+      "wrong": 0,
+      "reads_verdict": "safe",
+      "verdict": "safe",
+      "text": "the corner mark lost none of the bare marker's 2454 reads",
+      "map": [
+       [
+        [68, 68, 80],
+        [42, 42, 80],
+        [10, 10, 80],
+        [0, 0, 80],
+        [0, 0, 80]
+       ],
+       [
+        [80, 80, 80],
+        [74, 74, 80],
+        [38, 38, 80],
+        [8, 8, 80],
+        [0, 0, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [62, 62, 80],
+        [25, 25, 80],
+        [9, 9, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [79, 79, 80],
+        [50, 50, 80],
+        [19, 19, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [76, 76, 80],
+        [61, 61, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [73, 73, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80]
+       ],
+       [
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80],
+        [80, 80, 80]
+       ]
+      ],
+      "pose": {
+       "views": 176,
+       "marked_mm": 0.0483,
+       "bare_mm": 0.0483,
+       "worse": 0,
+       "better": 0,
+       "p": 1.0,
+       "judged": true,
+       "growth": 0.0,
+       "verdict": "safe"
+      }
+     },
+     "bench_reads": true,
+     "bench": {
+      "distance_mm": 103.92304845413264,
+      "resolution": [1280, 960],
+      "hfov_deg": 60.0
+     },
+     "sweep_reads_to_deg": {
+      "marked": 75,
+      "bare": 75
+     },
+     "limit_mm": {
+      "marked": 768.4,
+      "bare": 768.4
+     },
+     "pictures": null,
+     "views_lost_sample": []
+    }
+   },
+   "verdict": "safe"
+  }
+ ]
+}
