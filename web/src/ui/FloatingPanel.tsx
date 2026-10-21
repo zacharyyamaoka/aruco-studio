@@ -45,15 +45,37 @@ export function FloatingPanel({ title, icon, children, footer, collapsed, onColl
   };
 
   // beside the anchor, measured after every render: the panel's own height
-  // changes with its tab and rows (set only when it moved, so no loop)
+  // changes with its tab and rows (set only when it moved)
+  // WHY measured never short (arucostudio.com went blank, 2026-10-21: React
+  // #185): at 150 % or a page zoom the panel is a fraction of a px tall, and
+  // offsetHeight / scrollHeight round it, down while the panel is free and up
+  // while its own max-height clips it. Lifted off the floor, a 448.44 px panel
+  // got max-height 448, was clipped, measured 449, moved 1 px up, measured 448,
+  // moved back ... on every render, until React gave up and unmounted the app.
+  // Taken from the boxes as laid out, rounded up, plus the px scrollHeight can
+  // drop, the max-height never clips a panel that fits: nothing feeds back.
+  const moves = useRef(0);
+  const warned = useRef(false);
   useLayoutEffect(() => {
     const el = ref.current, host = el?.offsetParent as HTMLElement | null;
     if (!el || !host || !anchor || pos || docked()) { if (auto) setAuto(null); return; }
     const body = el.querySelector<HTMLElement>(".fpanel-body");
-    const natural = el.offsetHeight - (body?.clientHeight ?? 0) + (body?.scrollHeight ?? 0);
+    // its height with the body unclipped: the panel, less the body's box, plus the body's content
+    const box = el.getBoundingClientRect().height, bodyBox = body?.getBoundingClientRect().height ?? 0;
+    const natural = Math.ceil(box - bodyBox + (body?.scrollHeight ?? 0)) + 1;
     const p = placeBeside(anchor, { w: el.offsetWidth, h: natural }, { w: host.clientWidth, h: host.clientHeight }, { top: topClear(host) }, avoid);
     const near = (a: number, b: number | undefined) => b !== undefined && Math.abs(a - b) < 0.5;
-    if (!auto || !near(p.x, auto.x) || !near(p.y, auto.y) || !near(p.maxH, auto.maxH) || p.side !== auto.side) setAuto(p);
+    if (auto && near(p.x, auto.x) && near(p.y, auto.y) && near(p.maxH, auto.maxH) && p.side === auto.side) return;
+    // WHY a cap all the same: the panel is placed from measuring itself, so a
+    // future style that feeds back must leave it where it is, never blank the
+    // page; four moves in one synchronous run of renders is a cycle
+    if (moves.current >= 4) {
+      if (!warned.current) console.warn("FloatingPanel: the placement did not settle; the panel stays where it is", p);
+      warned.current = true;
+      return;
+    }
+    if (moves.current++ === 0) queueMicrotask(() => { moves.current = 0; });
+    setAuto(p);
   });
 
   // keep a dragged panel inside its container when the window shrinks
