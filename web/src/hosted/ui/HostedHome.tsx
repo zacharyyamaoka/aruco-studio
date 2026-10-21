@@ -3,13 +3,15 @@
 // Miro / Canva / tldraw.com's "Your files" page) rebuilt in the Studio's kit,
 // over the copied hooks (../react, verbatim), as ./HostedDialogs.tsx rebuilt
 // its dialogs. Same behaviour: cards with search, a New tile and a Trash view;
-// opening a card (or New) goes to the editor. Signed out (the Studio's
+// opening a card (or New) goes to the editor. Each card is the file's picture
+// (its `preview`): the open file drawn live, every other one from its own
+// bytes (../../app/thumbs.ts). Signed out (the Studio's
 // addition): "Sign in to save online", the work on this device and the
 // examples as cards.
 // WHY the editor stays mounted (hidden) under Home (the registry's reason):
 // the document and the editor's own state survive a look at the file list.
 // The view itself is app/home.ts's (a history entry: Back returns Home).
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { Button, cn } from "@bam/ui";
 import { ArrowLeft, Clock, FileText, LogIn, Plus, Trash2 } from "lucide-react";
 import { daysUntil, relativeTime, type FileMeta } from "../core";
@@ -17,7 +19,7 @@ import { matches, useFiles, useHostedFiles, useHostedFilesActions } from "../rea
 import { UsageLine, initials, usePlan } from "./HostedDialogs";
 import { EXAMPLES } from "../../model/examples";
 import { ExampleThumb, ShapesThumb, openExample } from "../../app/ExamplesDialog";
-import { useDocMarks } from "../../app/thumbs";
+import { useDocMarks, useFileThumb } from "../../app/thumbs";
 import { BrandCube } from "../../app/TopBar";
 import { leaveHome, useHome } from "../../app/home";
 import { useStudio } from "../../store";
@@ -47,13 +49,45 @@ function DocPic() {
   return <ShapesThumb shapes={shapes} marks={useDocMarks()} />;
 }
 
+/** True once the element has come on screen (near it): a card's bytes are read then, not before. */
+function useSeen(ref: RefObject<Element | null>): boolean {
+  const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || seen) return;
+    if (typeof IntersectionObserver === "undefined") { setSeen(true); return; }
+    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) setSeen(true); }, { rootMargin: "200px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref, seen]);
+  return seen;
+}
+
+/** Any other cloud file, drawn from its own bytes (../../app/thumbs.ts): its
+ *  shapes and markers, the empty canvas for an empty one. The file icon only
+ *  when its bytes are not a document the Studio reads.
+ *  WHY (Zach, 2026-10-21): only the open file had a picture; every other card,
+ *  a copy included, was the file icon. */
+function FilePic({ file }: { file: FileMeta }) {
+  const { hostedFiles } = useHostedFiles();
+  const box = useRef<HTMLSpanElement>(null);
+  const read = useCallback((f: FileMeta) => hostedFiles.files.read(f.id, { version: f.version }), [hostedFiles]);
+  const thumb = useFileThumb(file, read, useSeen(box));
+  return (
+    <span ref={box} className="home-thumb" data-thumb-state={thumb.kind}>
+      {thumb.kind === "drawn" && <ShapesThumb shapes={thumb.shapes} marks={thumb.marks} />}
+      {thumb.kind === "broken" && <FileText size={26} className="home-file-ic" />}
+    </span>
+  );
+}
+
 function FileCard({ file, current }: { file: FileMeta; current: boolean }) {
   const actions = useHostedFilesActions();
   const trashed = !!file.trashedAt;
   const open = trashed ? undefined : () => { void actions.open(file.id).then(leaveHome); };
   return (
     <Card testid="home-file" id={file.id} name={file.name} current={current} onOpen={open}
-      pic={current ? <DocPic /> : <FileText size={26} className="home-file-ic" />}
+      pic={current ? <DocPic /> : <FilePic file={file} />}
       meta={trashed ? `Deleted in ${daysUntil(file.purgeAt)} days` : <>Edited {relativeTime(file.updatedAt)}{current && <span className="kit-pill t-accent">Open</span>}{file.locked && <span className="kit-pill">View-only</span>}</>}>
       {trashed && (
         <Button size="sm" className="home-restore" testid="home-restore" onClick={() => void actions.restore(file)}>Restore</Button>

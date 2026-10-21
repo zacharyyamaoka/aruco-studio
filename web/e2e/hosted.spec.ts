@@ -7,7 +7,7 @@
 // page's own bearer.
 import fs from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
-import { clickAt, dragWorld, idle, openMenu, state } from "./helpers";
+import { clickAt, dragWorld, idle, loadExample, openMenu, state } from "./helpers";
 
 const HOSTED = process.env.E2E_HOSTED_SERVER ?? "";
 test.skip(!HOSTED, "needs a local Simple Hosted Files: E2E_HOSTED_SERVER=http://localhost:<port>");
@@ -336,5 +336,72 @@ test.describe("Simple Hosted Files", () => {
     await expect(dialog.getByTestId("shf-file-row")).toHaveCount(1);
     await expect(dialog.getByTestId("shf-file-row")).toContainText("Kept");
     await expect(dialog.getByTestId("shf-file-row")).toHaveAttribute("data-file-id", id);
+  });
+
+  test("i · Home draws every file from its bytes: one autosaved here and its copy (no read: the save kept the picture, the copy is the same bytes), an empty one; another browser draws them from the server's bytes", async ({ page, browser }) => {
+    await open(page);
+    const email = newEmail();
+    await signIn(page, email);
+    const reads: string[] = [];
+    const count = (p: Page) => p.on("request", (r) => { const m = r.url().match(/\/v1\/files\/([^/?]+)\/content/); if (m && r.method() === "GET") reads.push(m[1]); });
+    count(page);
+    // a sticker sheet: its first edit is a file (autosave "all"), named as the document
+    await loadExample(page, "sticker-sheet");
+    await idle(page);
+    await saved(page);
+    const marks = Object.keys((await state(page)).plans).length;
+    expect(marks).toBeGreaterThan(1);
+    const sheet = await openFileId(page);
+    const shapes = (await state(page)).doc.shapes.length;
+    // its copy, from Open… (a list: nothing opens)
+    await (await openMenu(page, "file")).getByTestId("shf-action-files").click();
+    const dialog = page.getByTestId("shf-files-dialog");
+    await dialog.locator(`[data-file-id="${sheet}"]`).getByTestId("shf-file-duplicate").click();
+    await expect(dialog.getByTestId("shf-file-row")).toHaveCount(2);
+    const copy = (await dialog.getByTestId("shf-file-row").evaluateAll((rows) => rows.map((r) => r.getAttribute("data-file-id")))).find((x) => x !== sheet)!;
+    await page.keyboard.press("Escape");
+    // an empty one, saved: the open file now
+    await (await openMenu(page, "file")).getByTestId("cmd-new").click();
+    await expect(page.getByTestId("doc-name")).toHaveText("Untitled");
+    await expect(page.getByTestId("main-menu")).toHaveCount(0);
+    await saveAs(page, "Empty");
+
+    const thumb = (p: Page, id: string) => p.getByTestId("home").locator(`[data-testid=home-file][data-id="${id}"]`);
+    const blacks = (p: Page, id: string) => thumb(p, id).locator("[data-thumb-black]");
+    const inked = (p: Page, id: string) => blacks(p, id).evaluateAll((es) => es.filter((e) => { const b = (e as SVGPathElement).getBBox(); return b.width * b.height > 0; }).length);
+    const outlines = (p: Page, id: string) => thumb(p, id).locator(".ex-fill").evaluate((e) => (e.getAttribute("d")?.match(/M/g) ?? []).length);
+    await page.getByTestId("menu-main").click();
+    await page.getByTestId("cmd-home").click();
+    await expect(page.getByTestId("home-file")).toHaveCount(3);
+    for (const id of [sheet, copy]) {
+      await expect(blacks(page, id), `${id}: its markers`).toHaveCount(marks);
+      expect(await inked(page, id)).toBe(marks);
+      expect(await outlines(page, id)).toBe(shapes);
+      await expect(thumb(page, id).locator(".home-file-ic")).toHaveCount(0);
+    }
+    expect(reads.filter((id) => id === sheet || id === copy), "drawn from what the save kept").toEqual([]);
+    await page.screenshot({ path: test.info().outputPath("home-real-server.png") });
+
+    // another browser, the same account: nothing kept there, every picture from the server's bytes
+    const other = await browser.newContext();
+    const there = await other.newPage();
+    count(there);
+    await open(there);
+    await signIn(there, email);
+    await there.getByTestId("menu-main").click();
+    await there.getByTestId("cmd-home").click();
+    await expect(there.getByTestId("home-file")).toHaveCount(3);
+    for (const id of [sheet, copy]) {
+      await expect(blacks(there, id), `${id}: its markers, planned there`).toHaveCount(marks, { timeout: 30_000 });
+      expect(await inked(there, id)).toBe(marks);
+      expect(await outlines(there, id)).toBe(shapes);
+    }
+    const empty = (await (await api(page, "/v1/files?app=aruco-studio")).json()).files.find((f: { name: string }) => f.name === "Empty").id;
+    await expect(thumb(there, empty).locator("svg[data-thumb=empty]")).toHaveCount(1);
+    await expect(there.locator(".home-file-ic")).toHaveCount(0);
+    // the sheet and its copy are the same bytes: read once
+    expect(reads.filter((id) => id === sheet || id === copy)).toHaveLength(1);
+    await there.screenshot({ path: test.info().outputPath("home-other-browser.png") });
+    await other.close();
   });
 });

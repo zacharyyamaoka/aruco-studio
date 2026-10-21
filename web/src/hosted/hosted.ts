@@ -4,9 +4,10 @@
 // WHY once per page, outside React: the instance owns window listeners
 // (Ctrl+S, focus, pagehide) and the session; StrictMode would make two in a
 // component (simple-hosted-files web/src/notes.ts does the same).
-import { HostedFiles } from "./core";
+import { HostedFiles, type FileMeta } from "./core";
 import { studioAdapter, type StudioAdapter } from "./adapter";
 import { HOSTED_APP, hostedServer } from "./config";
+import { keepSaved } from "../app/thumbs";
 import { isFilling, useStudio } from "../store";
 
 export const APP_NAME = "ArUco Studio";
@@ -27,11 +28,22 @@ export function hostedFiles(): HostedFiles {
   hosted = new HostedFiles({ server: hostedServer(), app: HOSTED_APP, appName: APP_NAME, warnOnUnsavedClose: false, ...adapter.options });
   adapter.bind(hosted);
   oneName(hosted, adapter);
+  keepPictures(hosted, adapter);
   // SPEC v2.11: Duplicate opens "Copy of <name>" in a new tab at ?file=<id>;
   // this opens that file there (and takes the parameter off the address).
   // Once per page, so here, where the one instance is made.
   void hosted.openFromUrl();
   return hosted;
+}
+
+/** Every save, autosave included, keeps the picture of what it wrote for
+ *  Home's card (app/thumbs.ts keepSaved): the document in the editor and its
+ *  bytes, taken as the save lands, before anything else replaces them. */
+function keepPictures(h: HostedFiles, adapter: StudioAdapter): void {
+  h.on("save", (meta: FileMeta) => {
+    const text = adapter.options.getContent();
+    if (typeof text === "string") keepSaved(meta, text, useStudio.getState().doc);
+  });
 }
 
 /** The cloud file's name IS the document's name (Zach, 2026-10-20 night):
