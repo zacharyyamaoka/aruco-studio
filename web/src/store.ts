@@ -82,6 +82,7 @@ export interface Studio {
   /** a new document state; edits sharing a `key` (one value, typed) within
    *  IDLE_MS of each other are one undo step */
   setDoc: (doc: Doc, key?: string) => void;
+  /** a document opened (a file, an example, New): its history starts fresh */
   loadDoc: (doc: Doc) => void;
   newDoc: (exampleId?: string) => void;
   setTool: (t: Tool) => void;
@@ -293,8 +294,15 @@ export const useStudio = create<Studio>((set, get) => {
     setDoc: (doc, key) => put({ doc }, key),
     loadDoc: (doc) => {
       const preset = doc.default_preset ?? get().doc.default_preset;
+      // WHY a fresh history (as Excalidraw and Figma do): Ctrl+Z after Open,
+      // an example or New must not bring the previous document back -- an
+      // autosave would then write it into the file just opened
+      past.length = 0;
+      future = [];
+      last = null;
+      held = null;
       openAt = -1;
-      put({ doc: fillPresets({ ...doc, dims: doc.dims ?? [], default_preset: preset }, preset), ...only(null), panel: PANEL0, plans: {}, planErrors: {}, idIssues: [], suggestions: [], tool: "select" });
+      set({ doc: fillPresets({ ...doc, dims: doc.dims ?? [], default_preset: preset }, preset), ...only(null), panel: PANEL0, plans: {}, planErrors: {}, idIssues: [], suggestions: [], tool: "select", ...flags() });
       get().fit();
     },
     newDoc: (exampleId) => {
