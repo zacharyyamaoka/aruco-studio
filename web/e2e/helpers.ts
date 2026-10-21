@@ -41,11 +41,12 @@ export async function openPresets(page: Page): Promise<Locator> {
 }
 
 /** The main menu (the logo with ⌄, top left, Figma UI3's): open it, then its
- *  `sub` submenu (File, Edit, Export, View, Preferences, Help), the pointer
+ *  `sub` submenu (File, Edit, Export, View, Preferences, Help and account), the pointer
  *  moved onto it as a hand moves it. WHY the mouse, not locator.hover(): the
  *  open submenu marks its parent inert for Playwright's actionability check,
  *  while a real pointer moves from one submenu to the next. */
-export async function openMenu(page: Page, sub: "file" | "edit" | "export" | "view" | "prefs" | "help"): Promise<Locator> {
+export type MainSub = "file" | "edit" | "export" | "view" | "prefs" | "account";
+export async function openMenu(page: Page, sub: MainSub): Promise<Locator> {
   if (!(await page.getByTestId("main-menu").isVisible())) await page.getByTestId("menu-main").click();
   await expect(page.getByTestId("main-menu")).toBeVisible();
   // on a phone the submenus are groups in the menu itself: no trigger to move onto
@@ -59,7 +60,7 @@ export async function openMenu(page: Page, sub: "file" | "edit" | "export" | "vi
   return popup;
 }
 
-/** Open the document's ⌄ menu (the cloud file and the account; on a phone also Download for CAD), run `fn`, close it. */
+/** Open the document's ⌄ menu (this file: its status, Rename, Duplicate, Version history, Move to trash; on a phone also Download for CAD), run `fn`, close it. */
 export async function inDocMenu(page: Page, fn: (menu: Locator) => Promise<void>): Promise<void> {
   const menu = page.getByTestId("doc-menu");
   if (!(await menu.count())) await page.getByTestId("menu-doc").click();

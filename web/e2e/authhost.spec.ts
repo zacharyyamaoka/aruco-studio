@@ -11,6 +11,7 @@
 //   E2E_AUTH_HOST=1 E2E_BASE_URL=http://localhost:8879 E2E_HOSTED_SERVER=http://localhost:8878 E2E_AUTH_CLIENT_ID=<fake> npx playwright test e2e/authhost.spec.ts --project e2e
 // Google itself is stubbed: the test stops at its authorize URL.
 import { expect, test } from "@playwright/test";
+import { openMenu } from "./helpers";
 
 const HOSTED = process.env.E2E_HOSTED_SERVER ?? "";
 const CLIENT_ID = process.env.E2E_AUTH_CLIENT_ID ?? ""; // the fake GOOGLE_CLIENT_ID_ARUCO_STUDIO given to hosted-files
@@ -31,8 +32,8 @@ test("Continue with Google opens the sign-in pop-up on the Studio's own origin, 
   const studio = new URL(page.url()).origin;
   expect(studio).not.toBe(new URL(HOSTED).origin);
 
-  if (!(await page.getByTestId("doc-menu").count())) await page.getByTestId("menu-doc").click();
-  await page.getByTestId("doc-menu").getByTestId("shf-signin").click();
+  // Help and account › Sign in (the main menu's, Figma's split: SPEC v2.9)
+  await (await openMenu(page, "account")).getByTestId("shf-action-signin").click();
   const dialog = page.getByTestId("shf-signin-dialog");
   await expect(dialog.getByTestId("shf-signin-google")).toBeVisible();
   await Promise.all([page.waitForEvent("popup"), dialog.getByTestId("shf-signin-google").click()]);
