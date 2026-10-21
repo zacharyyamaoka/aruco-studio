@@ -31,6 +31,7 @@ import { FloatingPanel } from "../ui/FloatingPanel";
 import { TextArea } from "../ui/TextArea";
 import { routeIssues, tabLevel, tabRows } from "./issues";
 import { SuggestSelect } from "./SuggestSelect";
+import { PlanLine, PresetWait } from "./Waiting";
 import "./panel.css";
 
 const TYPES: Opt[] = [
@@ -177,7 +178,7 @@ export function ExtrudePanel() {
         <button type="button" className="preset-pick" data-testid="panel-preset" onClick={() => st.openModal("presets")}
           title="How it is made: open the presets">
           <Glyph name={method === "print3d" ? "print3d" : "inkjet"} />
-          <span className="preset-name">{doc.preset ? doc.preset.name : "Loading…"}{modified && <i className="modified"> (modified)</i>}</span>
+          <span className="preset-name">{doc.preset ? doc.preset.name : <PresetWait />}{modified && <i className="modified"> (modified)</i>}</span>
         </button>
         <button type="button" className="kit-ib" title="Presets…" aria-label="Presets" data-testid="panel-preset-more" onClick={() => st.openModal("presets")}>
           <Glyph name="dots" />
@@ -385,7 +386,7 @@ export function ExtrudePanel() {
       footer={
         <>
           <div className="summary" data-testid="plan-summary">
-            <div className="summary-line">{!f.profile ? "Select a profile: click inside a region, or double-click a rectangle" : showPlan ? showPlan.summary : planError ? `Plan failed: ${planError}` : "Planning…"}</div>
+            <div className="summary-line"><PlanLine profile={!!f.profile} summary={showPlan?.summary ?? null} error={planError} /></div>
             <Messages path="summary" issues={kit(routed.summary)} />
           </div>
           <div className="xp-actions">

@@ -13,7 +13,7 @@
 // WHY (Zach, 2026-10-20): "You should support Ctrl Z to undo any changes that are done."
 import { create } from "zustand";
 import type { CoreInfo, IdResult, Issue, LabelParams, MarkerPlan, Preset, Suggestion } from "./core/contract";
-import { core } from "./coreSource";
+import { core, coreStatus } from "./coreSource";
 import {
   addFeature, addShape, applyIds, deleteShape, emptyDoc, featureOfProfile, featureOfRect, getFeature, keyOwner, newFeature, newId, nextTurn, pickSuggestion,
   rectProfile, removeFeature, resetField, setField, setShape, updateFeature, type Doc, type Feature, type Holes,
@@ -31,6 +31,9 @@ export type Modal = null | "presets" | "print" | "examples" | "verify" | "reid";
 /** the panel's tabs (Zach, 2026-10-20 night, V1 Command Dialog): Make holds the
  *  profile, the preset, trim and the heights; then Marker; then Label */
 export type Tab = "make" | "marker" | "label";
+/** What loadCoreFacts has got: nothing asked yet, asking (its tries), the
+ *  dictionaries and presets, or the last try's error. */
+export interface Facts { state: "idle" | "asking" | "ok" | "error"; error?: string }
 
 export interface PanelState {
   open: boolean;
@@ -64,6 +67,7 @@ export interface Studio {
   suggestions: Suggestion[];
   info: CoreInfo | null;
   builtins: Preset[];
+  facts: Facts;
   note: string | null;
   /** the history has a step to undo / to redo */
   canUndo: boolean;
@@ -277,6 +281,7 @@ export const useStudio = create<Studio>((set, get) => {
     suggestions: [],
     info: null,
     builtins: [],
+    facts: { state: "idle" },
     note: null,
     canUndo: false,
     canRedo: false,
@@ -612,14 +617,43 @@ export const useStudio = create<Studio>((set, get) => {
   };
 });
 
+/** Tries at the core's facts, and the pause before each try after the first (ms). */
+const FACT_TRIES = 3;
+const FACT_BACKOFF_MS = [600, 1800];
+let asking: Promise<void> | null = null;
+
 /** Load what the core knows once it answers: the dictionaries and the
- *  built-in presets (the first is the document's preset until one is picked). */
-export async function loadCoreFacts(): Promise<void> {
-  const [info, builtins] = await Promise.all([core.info(), core.presets()]);
-  const s = useStudio.getState();
-  useStudio.setState({ info, builtins });
-  // WHY inkjet first: Zach moved to inkjet stickers on vinyl (2026-10-17, CF-13);
-  // 3D-printed markers stay a placeholder, so a new document starts on paper.
-  const first = builtins.find((p) => p.method === "inkjet") ?? builtins[0];
-  if (!s.doc.preset && first) useStudio.setState({ doc: { ...useStudio.getState().doc, preset: first } });
+ *  built-in presets (the first is the document's preset until one is picked).
+ *  A rejected call is tried again (FACT_TRIES, backing off); after the last,
+ *  `facts` holds the error until a Retry (the panel's) or the core's next
+ *  ready asks again. One ask at a time: a second call joins the first.
+ *  WHY (Zach, 2026-10-20 night, "BUG: seems to be stuck loading?"): it ran
+ *  once, and one failed call left the preset null and the panel on "Loading…"
+ *  for good, with only a 4 s toast to say why. */
+export function loadCoreFacts(): Promise<void> {
+  asking ??= askFacts().finally(() => { asking = null; });
+  return asking;
+}
+
+async function askFacts(): Promise<void> {
+  useStudio.setState({ facts: { state: "asking" } });
+  let why = "no answer";
+  for (let i = 0; i < FACT_TRIES; i++) {
+    if (i) await new Promise((r) => setTimeout(r, FACT_BACKOFF_MS[i - 1] ?? FACT_BACKOFF_MS[FACT_BACKOFF_MS.length - 1]));
+    // a core that failed to load rejects every call: its own error says why
+    if (coreStatus().state === "error") { why = coreStatus().detail ?? "the core failed to load"; break; }
+    try {
+      const [info, builtins] = await Promise.all([core.info(), core.presets()]);
+      const s = useStudio.getState();
+      useStudio.setState({ info, builtins, facts: { state: "ok" } });
+      // WHY inkjet first: Zach moved to inkjet stickers on vinyl (2026-10-17, CF-13);
+      // 3D-printed markers stay a placeholder, so a new document starts on paper.
+      const first = builtins.find((p) => p.method === "inkjet") ?? builtins[0];
+      if (!s.doc.preset && first) useStudio.setState({ doc: { ...useStudio.getState().doc, preset: first } });
+      return;
+    } catch (e) {
+      why = e instanceof Error ? e.message : String(e);
+    }
+  }
+  useStudio.setState({ facts: { state: "error", error: why } });
 }

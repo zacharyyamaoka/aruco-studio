@@ -11,6 +11,7 @@ import { Button, FieldRow, Glyph, NumberField, SegmentedRow, Select, TextField }
 import { Copy, Download, Plus, Trash2, Upload } from "lucide-react";
 import type { Preset } from "../core/contract";
 import { downloadText } from "../io/files";
+import { CoreWait } from "../panel/Waiting";
 import { useStudio } from "../store";
 import { chipValues, filterPresets, infoRows, methodName, NO_FILTERS, PAGES, withField, type Filters, type InfoRow } from "./fields";
 import { blankPreset, exportJson, importJson, myPresets, presetNumbers, recentIds, saveMine } from "./local";
@@ -194,7 +195,7 @@ function PresetsLibrary() {
           <div className="pl-list" role="listbox" aria-label="Presets" data-testid="preset-list">
             {!list.length && (
               <div className="empty">{coll === "mine" && !mine.length ? "No presets of your own yet: New, or Duplicate a built-in."
-                : builtins.length ? "Nothing matches." : "Loading the core's presets…"}</div>
+                : builtins.length ? "Nothing matches." : <CoreWait needFacts testid="presets-wait" />}</div>
             )}
             {METHODS.map((method) => {
               const group = list.filter((p) => p.method === method);

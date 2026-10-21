@@ -1,0 +1,12 @@
+/* What the Studio waits for (Waiting.tsx): a line with its action */
+.wait-line { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; font-weight: 400; }
+.wait-line .kit-btn { flex: none; }
+.wait-core-error, .wait-facts-error, .wait-plan-error, .wait-error { color: var(--bad); }
+.wait-plan-slow, .wait-slow { color: var(--warn, var(--text)); }
+.wait-core-loading, .wait-facts-asking, .wait-planning { color: var(--muted); }
+.wait-spin { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid currentColor; border-right-color: transparent;
+  display: inline-block; margin-right: 6px; vertical-align: -1px; animation: spin 0.9s linear infinite; }
+.wait-block { padding: 10px 12px; }
+/* the top bar's chip on a core that failed: Reload beside its words */
+.chip-core .chip-reload { margin-left: 2px; padding: 0 6px; height: 18px; border-radius: 9px; border: 1px solid currentColor;
+  background: transparent; color: inherit; font: inherit; font-size: 11px; cursor: pointer; }

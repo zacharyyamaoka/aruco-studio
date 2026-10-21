@@ -40,7 +40,10 @@ async function boot(): Promise<WebApi> {
   // OpenCV load below ever asks for a package; the runtime, stdlib and lock
   // still come from indexURL (self-hosted), the lock's hashes check the wheels.
   py = await loadPyodide({ indexURL: url("pyodide/"), packageBaseUrl: `https://cdn.jsdelivr.net/pyodide/v${version}/full/` });
-  const res = await fetch(url("py/aruco_studio.zip"));
+  // WHY the file's name in a network failure: the fetch's own error ("Failed to fetch") does not say which download broke
+  const res = await fetch(url("py/aruco_studio.zip")).catch((e: unknown) => {
+    throw new Error(`could not download py/aruco_studio.zip (${e instanceof Error ? e.message : String(e)})`);
+  });
   if (!res.ok) throw new Error(`py/aruco_studio.zip: HTTP ${res.status}`);
   py.unpackArchive(await res.arrayBuffer(), "zip", { extractDir: LIB });
   py.runPython(`import sys\nif ${JSON.stringify(LIB)} not in sys.path:\n    sys.path.insert(0, ${JSON.stringify(LIB)})`);

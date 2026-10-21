@@ -165,6 +165,15 @@ function schedule(force = false) {
   }
 }
 
+/** Ask again for auto id and every feature's plan, failed or still out: the
+ *  panel's Retry (a plan that failed is otherwise asked again only when its
+ *  request changes; one that never answers, never). */
+export function replan(): void {
+  idSent = "";
+  useStudio.setState({ planErrors: {} });
+  schedule(true);
+}
+
 export function startPlanner(): () => void {
   const un1 = useStudio.subscribe((s, prev) => {
     if (s.doc !== prev.doc || s.panel.open !== prev.panel.open || s.panel.featureId !== prev.panel.featureId) schedule();
