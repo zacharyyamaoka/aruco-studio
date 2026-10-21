@@ -10,7 +10,7 @@ const { useStudio } = await import("./store");
 const { emptyDoc, parseDoc } = await import("./model/doc");
 const { rectShape } = await import("./sketch/model");
 const { idsReady, settledDoc, settledOutput } = await import("./app/output");
-const { idRequest } = await import("./model/doc");
+const { addFeature, idRequest, newFeature, rectProfile } = await import("./model/doc");
 
 const st = () => useStudio.getState();
 
@@ -81,5 +81,77 @@ describe("output from a settled revision (review finding #6)", () => {
     });
     expect(built).toEqual(["Start", "Moved"]);
     expect(out!.out).toBe("MOVED");
+  });
+});
+
+describe("Cancel takes back the panel's own steps, nothing else (review finding #7)", () => {
+  // a document with one marker (its rectangle a profile) and a fresh history
+  const withMarker = () => {
+    const d = emptyDoc("Start", [rectShape("p", 0, 0, 120, 80), rectShape("m", 10, 10, 40, 40)]);
+    st().loadDoc(addFeature(d, newFeature(rectProfile("m"), "f1")));
+  };
+  const ids = () => st().doc.shapes.map((s) => s.id);
+
+  it("add a rectangle, open the marker, undo the rectangle, Cancel: the rectangle stays gone and redo still has it", () => {
+    withMarker();
+    st().addShape(rectShape("r1", 50, 10, 70, 30));
+    st().editFeature("f1");
+    expect(st().panel.open).toBe(true);
+    st().undo();
+    expect(ids()).toEqual(["p", "m"]);
+    st().cancel();
+    expect(st().panel.open).toBe(false);
+    expect(ids()).toEqual(["p", "m"]);
+    expect(st().canRedo).toBe(true);
+    st().redo();
+    expect(ids()).toEqual(["p", "m", "r1"]);
+  });
+
+  it("an edit in the panel, then Cancel: the edit is taken back as one, the history as before the panel", () => {
+    withMarker();
+    st().addShape(rectShape("r1", 50, 10, 70, 30));
+    st().editFeature("f1");
+    st().setField("marker.first_id", 9);
+    st().setField("label.on", true);
+    st().cancel();
+    expect(st().doc.features[0].marker.first_id).toBe(0);
+    expect(st().doc.features[0].label.on).toBe(false);
+    expect(ids()).toEqual(["p", "m", "r1"]);
+    st().undo();
+    expect(ids()).toEqual(["p", "m"]);
+  });
+
+  it("a rename while the panel is open survives Cancel", () => {
+    withMarker();
+    st().editFeature("f1");
+    st().setField("marker.first_id", 9);
+    st().setName("Renamed");
+    st().cancel();
+    expect(st().doc.name).toBe("Renamed");
+    expect(st().doc.features[0].marker.first_id).toBe(0);
+  });
+
+  it("undo inside the panel's own steps, then Cancel: back to the document the panel opened on", () => {
+    withMarker();
+    st().editFeature("f1");
+    st().setField("marker.first_id", 9);
+    st().setField("label.on", true);
+    st().undo();
+    st().cancel();
+    expect(st().doc.features[0].marker.first_id).toBe(0);
+    expect(st().doc.features[0].label.on).toBe(false);
+    expect(st().canUndo).toBe(false);
+  });
+
+  it("a new marker (A on a rectangle), Cancel: it is gone, and so is its step", () => {
+    withMarker();
+    st().addShape(rectShape("r1", 50, 10, 70, 30));
+    st().select({ kind: "shape", id: "r1" });
+    void st().extrude();
+    expect(st().doc.features).toHaveLength(2);
+    st().cancel();
+    expect(st().doc.features).toHaveLength(1);
+    st().undo();
+    expect(ids()).toEqual(["p", "m"]);
   });
 });
