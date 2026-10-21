@@ -2,8 +2,11 @@
 // core planned, and turns pointer events into the store's actions. y up,
 // millimetres; pan with the middle button or Space-drag, zoom at the cursor,
 // F fits. A right-button drag is a selection box (a window left to right, a
-// crossing right to left); Shift+click adds or removes a shape; a drag on a
-// selected shape moves every selected one. D dimensions (./constraints.ts):
+// crossing right to left), and so is a left-button drag on empty canvas or
+// on a fill no marker owns (Figma's marquee); Shift+click (Ctrl, Cmd too)
+// adds or removes a shape, pressed on its edge, its fill or its marker; a
+// drag on a selected shape moves every selected one; several selected get
+// their bounds and an "N selected" chip. D dimensions (./constraints.ts):
 // pick an edge, a circle, or two references, drag (or click) to place, type
 // the value. Drawing a rectangle or a circle shows Fusion's value boxes on
 // the rubber band; a typed value is a driving dimension. Every feature's marker, outline, Joint Origin and
@@ -32,7 +35,7 @@ import { activeFeatureId, selectedFeatureId, useStudio } from "../store";
 import { DimEditor, Dims, layoutDims, type LaidDim } from "./Dims";
 import { diameterLocked, dimFromPicks, refusal, resizable, typedValue, type DimRef, type SketchDim } from "./constraints";
 import {
-  boxPick, circleFrom, hitTest, inShape, profileLoops, rectAt, rectOf, resizeShape, sameProfile, shapeLoop,
+  boxPick, circleFrom, hitTest, inShape, profileLoops, rectAt, rectOf, resizeShape, sameProfile, shapeLoop, shapeUnder, sketchBox,
   type Hit, type ProfileRef, type RectShape, type Shape,
 } from "./model";
 import { pointer } from "./pointer";
@@ -46,8 +49,8 @@ type Drag =
   | { kind: "label"; fid: string; from: Vec2; orig: Vec2; at: Vec2 }
   /** `clicked`: the first corner was a click: the band follows the pointer until the next click (Fusion) */
   | { kind: "draw"; tool: "rect" | "circle"; a: Vec2; b: Vec2; clicked: boolean }
-  /** the right-button selection box, in view px */
-  | { kind: "box"; a: Vec2; b: Vec2; add: boolean; moved: boolean }
+  /** the selection box, in view px (the right button, or the left on empty canvas); `click`: what a press that does not move does */
+  | { kind: "box"; a: Vec2; b: Vec2; add: boolean; moved: boolean; click?: () => void }
   /** D: pressed on a pick; a drag from it places the dimension */
   | { kind: "dim"; press: Vec2 }
   /** the turn arc of a rectangle profile: `orig` as it was, `a0` the pointer's angle about its centre at the press */
@@ -125,7 +128,19 @@ export function Viewport() {
   const plans = useStudio((s) => s.plans);
   const panel = useStudio((s) => s.panel);
   const [hover, setHover] = useState<Hit>(null);
-  const [drag, setDrag] = useState<Drag | null>(null);
+  const [drag, setDragState] = useState<Drag | null>(null);
+  // WHY a ref beside the state (Zach, 2026-10-20 night: "multi select by right
+  // click drag doesn't work"; scripts/real-input-check.mjs reproduced it under
+  // real X11 input): the handlers read the gesture from the last render, and a
+  // hand that releases right after its last move (a busy page, coalesced
+  // moves) got there first: the release saw the box unmoved and selected
+  // nothing; a rectangle ended at an older point. The handlers read this ref,
+  // which every change writes at once; the state only draws.
+  const dragRef = useRef<Drag | null>(null);
+  const setDrag = (next: Drag | null | ((d: Drag | null) => Drag | null)) => {
+    dragRef.current = typeof next === "function" ? next(dragRef.current) : next;
+    setDragState(dragRef.current);
+  };
   const [labelAt, setLabelAt] = useState<{ fid: string; at: Vec2 } | null>(null);
   /** the dimension being typed into, and its feature as it was when the editor opened (Esc puts it back) */
   const [dimEdit, setDimEdit] = useState<{ fid: string; field: string; start: Feature } | null>(null);
@@ -318,6 +333,21 @@ export function Viewport() {
     st.gesture(true);
     setDrag({ kind: "move", ids, from: p, base: st.doc.shapes, moved: false, click });
   };
+  /** Shift+click: the shape into the selection, or out of it. A selection
+   *  that is not shapes yet counts as its shape: a profile its outer one, a
+   *  feature (its marker, label or origin) its rectangle. */
+  const toggleIn = (id: string) => {
+    const st = useStudio.getState();
+    const s = st.sel;
+    if (!st.multi.length && s && s.kind !== "shape") {
+      const base = s.kind === "profile" ? s.ref.outer : s.kind === "sketch" ? undefined : featureRect(st.doc, getFeature(st.doc, s.id))?.id;
+      if (base) st.selectShapes([base]);
+    }
+    st.toggleShape(id);
+  };
+  /** A left press on empty canvas: a drag is a selection box, a click does `click`. */
+  const startBox = (e: React.PointerEvent, click: () => void) => setDrag({ kind: "box", a: local(e), b: local(e), add: false, moved: false, click });
+
   /** A press on a shape that is one of several selected: it drags them all, and only a click selects it alone. */
   const inGroup = (id: string | undefined) => {
     const m = useStudio.getState().multi;
@@ -326,6 +356,7 @@ export function Viewport() {
 
   const onPointerDown = (e: React.PointerEvent) => {
     const st = useStudio.getState();
+    const drag = dragRef.current;
     const target = e.target as Element;
     (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
     if (drag?.kind === "draw" && drag.clicked && e.button === 0) {
@@ -334,7 +365,7 @@ export function Viewport() {
       return;
     }
     if (e.button === 2 && !space.current) {
-      setDrag({ kind: "box", a: local(e), b: local(e), add: e.shiftKey, moved: false });
+      setDrag({ kind: "box", a: local(e), b: local(e), add: e.shiftKey || e.ctrlKey || e.metaKey, moved: false });
       return;
     }
     if (e.button === 1 || space.current) {
@@ -384,6 +415,19 @@ export function Viewport() {
       return;
     }
     const hit = hitTest(st.doc.shapes, p, EDGE_PX / z);
+    // WHY every part of a shape (Zach, 2026-10-20 night: "multi select ... by
+    // shift click doesn't work"): it took an edge or a marker only; a press
+    // inside a rectangle (its fill) selected the region instead
+    if ((e.shiftKey || e.ctrlKey || e.metaKey) && !st.panel.selector) {
+      const mk = target.closest("[data-marker]")?.getAttribute("data-marker");
+      const mf = mk ? getFeature(st.doc, mk) : null;
+      const sh = (mf ? featureRect(st.doc, mf) : null)
+        ?? (hit?.kind === "edge" ? st.doc.shapes.find((x) => x.id === hit.id) : undefined)
+        ?? shapeUnder(st.doc.shapes, p);
+      if (sh) toggleIn(sh.id);
+      else setDrag({ kind: "box", a: local(e), b: local(e), add: true, moved: false });
+      return;
+    }
     const selShape = selectedShape();
     const move = (sh: Shape, click?: () => void) => startMove(sh, p, click);
     // WHY WYSIWYG (Zach, 2026-10-18): "just clicking the marker on the screen is
@@ -395,7 +439,6 @@ export function Viewport() {
     const markerOf = markerId ? getFeature(st.doc, markerId) : null;
     if (markerId && markerOf) {
       const r = featureRect(st.doc, markerOf);
-      if (e.shiftKey && r) { st.toggleShape(r.id); return; }
       if (r && inGroup(r.id)) { move(r, () => st.inspect(markerId)); return; }
       st.inspect(markerId);
       if (r) move(r);
@@ -405,7 +448,6 @@ export function Viewport() {
       // the Profile row takes a region or a double-clicked rectangle, not an edge
       if (st.panel.selector) return;
       const s = st.doc.shapes.find((x) => x.id === hit.id)!;
-      if (e.shiftKey) { st.toggleShape(s.id); return; }
       const owner = featureOfRect(st.doc, s.id);
       const pickIt = () => {
         if (owner) st.inspect(owner.id);
@@ -433,11 +475,15 @@ export function Viewport() {
         if (r) move(r);
         return;
       }
-      if (st.panel.open) st.ok();
-      st.select({ kind: "profile", ref: hit.ref });
+      // a fill no marker owns (the plate's): a click selects it, a drag is a box (Figma's marquee on a frame)
+      const ref = hit.ref;
+      const pick = () => { const now = useStudio.getState(); if (now.panel.open) now.ok(); now.select({ kind: "profile", ref }); };
+      if (st.panel.selector) pick();
+      else startBox(e, pick);
       return;
     }
-    st.closePanel();
+    if (st.panel.selector) st.closePanel();
+    else startBox(e, () => useStudio.getState().closePanel());
   };
 
   /** The Profile row's pick, noted so a double-click that follows re-picks. */
@@ -456,7 +502,8 @@ export function Viewport() {
   const onDoubleClick = (e: React.MouseEvent) => {
     const st = useStudio.getState();
     const target = e.target as Element;
-    if (tool !== "select" || e.button !== 0) return;
+    // WHY not with Shift / Ctrl / Cmd: two quick Shift+clicks on one shape add it and take it out (a double-click would select its profile)
+    if (tool !== "select" || e.button !== 0 || e.shiftKey || e.ctrlKey || e.metaKey) return;
     if (target.closest("[data-dim-label],[data-sdim-label],[data-label],[data-turn],[data-handle],input")) return;
     const p = world(e);
     const onEdge = hitTest(st.doc.shapes, p, EDGE_PX / z)?.kind === "edge";
@@ -477,6 +524,7 @@ export function Viewport() {
 
   const onPointerMove = (e: React.PointerEvent) => {
     const st = useStudio.getState();
+    const drag = dragRef.current;
     pointer.at = world(e);
     if (tool === "dim") setCursorAt(world(e));
     if (!drag) {
@@ -543,6 +591,13 @@ export function Viewport() {
 
   const onPointerUp = (e: React.PointerEvent) => {
     const st = useStudio.getState();
+    // the gesture as it is now, and it ends where the pointer is released (not at the last move seen)
+    let drag = dragRef.current;
+    if (drag?.kind === "draw" && !drag.clicked) drag = { ...drag, b: world(e) };
+    if (drag?.kind === "box") {
+      const b = local(e);
+      drag = { ...drag, b, moved: drag.moved || Math.hypot(b[0] - drag.a[0], b[1] - drag.a[1]) > DRAG_PX };
+    }
     if (drag?.kind === "draw") {
       if (drag.clicked) return;
       // a press without a drag: the first corner (centre) was a click, the band follows the pointer (Fusion)
@@ -556,7 +611,7 @@ export function Viewport() {
         const [x0, y1] = toWorld(camera, w, h, [Math.min(drag.a[0], drag.b[0]), Math.min(drag.a[1], drag.b[1])]);
         const [x1, y0] = toWorld(camera, w, h, [Math.max(drag.a[0], drag.b[0]), Math.max(drag.a[1], drag.b[1])]);
         st.selectShapes(boxPick(st.doc.shapes, { x0, y0, x1, y1 }, drag.b[0] < drag.a[0]), drag.add);
-      }
+      } else drag.click?.();
       setDrag(null);
       return;
     }
@@ -843,6 +898,16 @@ export function Viewport() {
     handles.push(<rect key="e" data-handle="e" x={x - 4} y={y - 4} width={8} height={8} className="handle h-e" />);
   }
 
+  // several selected: their bounds (Figma's selection box) and the count under them
+  const multiShapes = multi.length > 1 ? shapes.filter((s) => multi.includes(s.id)) : [];
+  const mb = multiShapes.length > 1 ? sketchBox(multiShapes) : null;
+  const bounds = mb ? (() => {
+    const [ax, ay] = scr([mb.x0, mb.y1]), [bx, by] = scr([mb.x1, mb.y0]);
+    return { x: ax, y: ay, w: bx - ax, h: by - ay };
+  })() : null;
+  // WHY clamped: the chip stays on the canvas, above the dock, when the bounds run off it
+  const chipAt: Vec2 | null = bounds ? [Math.min(Math.max(bounds.x + bounds.w / 2, 60), w - 60), Math.min(Math.max(bounds.y + bounds.h + 8, 28), h - 104)] : null;
+
   const cursor = drag?.kind === "pan" ? "grabbing" : tool !== "select" ? "crosshair" : hover?.kind === "edge" ? "pointer" : "default";
 
   // the rotate manipulator's angle box: over the knob (else the rectangle's centre); typing sets the angle
@@ -921,6 +986,7 @@ export function Viewport() {
         {triads}
         {arc}
         {labels}
+        {bounds && <rect className="sel-bounds" data-testid="selection-bounds" x={bounds.x} y={bounds.y} width={bounds.w} height={bounds.h} />}
         <g className="handles">{handles}</g>
         {drag?.kind === "box" && drag.moved && (
           <rect x={Math.min(drag.a[0], drag.b[0])} y={Math.min(drag.a[1], drag.b[1])} width={Math.abs(drag.b[0] - drag.a[0])} height={Math.abs(drag.b[1] - drag.a[1])}
@@ -936,6 +1002,11 @@ export function Viewport() {
         <DimEditor key={`${dimFid}:${editDim.field}`} dim={editDim}
           onLive={(t) => applyDim(dimFid, editDim.field, t, true)}
           onCommit={(t) => commitDim(dimFid, editDim.field, t)} onCancel={() => revertDim(dimFid, dimEdit.start)} />
+      )}
+      {chipAt && (
+        <div className="sel-count" data-testid="selection-count" data-count={multiShapes.length} style={{ left: chipAt[0], top: chipAt[1] }}>
+          {multiShapes.length} selected
+        </div>
       )}
       {drawBoxes.length > 0 && <div data-testid="draw-values">{drawBoxes}</div>}
       {rot && rotShape && rotAt && (

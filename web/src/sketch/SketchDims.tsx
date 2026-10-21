@@ -119,7 +119,8 @@ export function SketchDims({ dims, selected, editing, preview, onSelect, onEdit 
         <path className="arw" data-tip="b" d={arrow(d.q, d.inside ? d.p : add(d.q, dir, 1))} />
         {editing !== id && (
           <g className="val" data-sdim-label={faint ? undefined : id} transform={`rotate(${d.angle} ${d.at[0]} ${d.at[1]})`}
-            onPointerDown={(e) => { e.stopPropagation(); onSelect(id); }}
+            // WHY the left button only: a right-drag (the selection box) may start on a label
+            onPointerDown={(e) => { if (e.button !== 0) return; e.stopPropagation(); onSelect(id); }}
             onDoubleClick={(e) => { e.stopPropagation(); onEdit(id); }}>
             <title>{`${d.text} mm, driving: double-click to change it, Del deletes it`}</title>
             <rect className="chip" x={d.at[0] - d.tw / 2} y={d.at[1] - TEXT_H / 2} width={d.tw} height={TEXT_H} rx={3} />

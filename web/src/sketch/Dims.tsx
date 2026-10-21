@@ -220,7 +220,8 @@ export function Dims({ fid, dims, editing, onEdit }: {
             <path className="arw" data-tip="b" d={arrow(d.q, d.inside ? d.p : add(d.q, dir, 1))} />
             {editing !== d.field && (
               <g className="val" data-dim-label={d.field} transform={`rotate(${d.angle} ${d.at[0]} ${d.at[1]})`}
-                onPointerDown={(e) => e.stopPropagation()}
+                // WHY the left button only: a right-drag (the selection box) may start on a label
+                onPointerDown={(e) => { if (e.button === 0) e.stopPropagation(); }}
                 onClick={() => onEdit(d.field)}
                 onDoubleClick={() => onEdit(d.field)}>
                 <title>{`${NAMES[d.field] ?? d.field}: ${d.text} mm, ${d.set ? "set" : "driven"}`

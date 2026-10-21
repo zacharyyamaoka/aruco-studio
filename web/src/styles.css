@@ -138,6 +138,10 @@ a.kit-ib { text-decoration: none; }
 .vp-svg .edge.hover { stroke-width: 3; }
 .vp-svg .edge.on { stroke: var(--pick); stroke-width: 2.4; stroke-dasharray: none; }
 .vp-svg .edge.draft { stroke-dasharray: 4 3; }
+/* several selected: their bounds and "N selected" under them (Figma's selection box and its label) */
+.vp-svg .sel-bounds { fill: none; stroke: var(--pick); stroke-width: 1; }
+.sel-count { position: absolute; transform: translateX(-50%); z-index: 4; pointer-events: none; white-space: nowrap;
+  background: var(--pick); color: #111418; font-size: 11px; font-weight: 600; line-height: 1; padding: 4px 7px; border-radius: 4px; box-shadow: var(--shadow-sm); }
 .vp-svg .draft-dim { fill: var(--accent); font-size: 11px; font-weight: 600; }
 .vp-svg .marker .outline { fill: var(--t-white); stroke: var(--shape-line); stroke-width: 1; stroke-linejoin: round; }
 .vp-svg .marker .outline.bad { stroke: var(--bad); stroke-width: 2.5; }
