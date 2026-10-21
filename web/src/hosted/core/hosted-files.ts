@@ -22,7 +22,7 @@ import {
   tabId,
 } from "./drafts.js";
 import { HostedFilesError } from "./errors.js";
-import { randomId, withExtension } from "./format.js";
+import { copyName, randomId, withExtension } from "./format.js";
 import { SignInFlow } from "./signin.js";
 import type {
   AgentLink,
@@ -67,6 +67,8 @@ const LIVE_INTERVAL_MS = 5_000;
 // beat lets the keystroke win, and the edit then lands as "both versions kept" (SPEC §7.3). Only a
 // head still newer after this long, with nothing typed meanwhile, is loaded.
 const LIVE_CONFIRM_MS = 1_500;
+// SPEC v2.11: the URL parameter that names the file a page opens with (Duplicate's new tab).
+const FILE_PARAM = "file";
 
 export const DISCARD = Symbol("discard");
 
@@ -1182,6 +1184,76 @@ export class HostedFiles {
       this.flushLocal();
       this.settledStatus();
       this.refreshMeQuietly();
+    });
+  }
+
+  // "Make a copy" in the editor follows Canva (SPEC v2.11): the copy is "Copy of <name>" and opens in a
+  // new tab at fileUrl(copy), whose openFromUrl() loads it; this tab keeps the original. Unsaved changes
+  // are saved first, so the copy has them. A blocked tab falls back to opening the copy here.
+  duplicateCurrent(): Promise<FileMeta | null> {
+    const file = this.current.file;
+    if (!file) return Promise.resolve(null);
+    // WHY open the tab before the request: a window opened after an await is a popup the
+    // browser may block; one opened inside the click is not.
+    const tab = window.open("", "_blank");
+    return this.enqueue(async () => {
+      try {
+        if (this.dirty && !file.locked && this.current.file?.id === file.id) await this.saveNow();
+        const copy = await this.files.duplicate(file.id, copyName(file.name));
+        this.refreshMeQuietly();
+        if (tab) {
+          tab.opener = null;
+          tab.location.href = this.fileUrl(copy.id);
+        } else await this.load(copy);
+        return copy;
+      } catch (err) {
+        tab?.close();
+        throw err;
+      }
+    });
+  }
+
+  // This page's address naming one file (`?file=<id>`, SPEC v2.11): where Duplicate opens its copy.
+  fileUrl(id: string): string {
+    const url = new URL(location.href);
+    url.searchParams.set(FILE_PARAM, id);
+    url.searchParams.delete("shf_checkout");
+    url.hash = "";
+    return url.toString();
+  }
+
+  // SPEC v2.11: opens the file the page's URL names (`?file=<id>`, as Duplicate's new tab has). Apps call it
+  // once at start-up; without the parameter it does nothing. The parameter comes off the address first, so a
+  // later reload or New does not reopen that file. Resolves to the opened file, or null.
+  async openFromUrl(): Promise<FileMeta | null> {
+    const url = new URL(location.href);
+    const id = url.searchParams.get(FILE_PARAM);
+    if (!id) return null;
+    url.searchParams.delete(FILE_PARAM);
+    history.replaceState(history.state, "", url.toString());
+    await this.ready;
+    if (!this.current.user) return null;
+    if (this.current.file?.id === id) return this.current.file; // its working copy came back already
+    try {
+      return await this.open(id);
+    } catch (err) {
+      this.report(err);
+      return null;
+    }
+  }
+
+  // Takes a file out of the trash; `open` also makes it the current file again — the Undo of "Move to
+  // trash" on the open file (SPEC v2.11), which puts the person back where they were.
+  restoreFromTrash(id: string, opts: { open?: boolean } = {}): Promise<FileMeta | null> {
+    return this.enqueue(async () => {
+      let meta = await this.files.restore(id);
+      this.patchFile(meta);
+      this.refreshMeQuietly();
+      if (!opts.open || this.current.file?.id === id) return meta;
+      if (!(await this.settleBeforeLeaving())) return meta;
+      meta = await this.files.get(id);
+      await this.load(meta);
+      return meta;
     });
   }
 

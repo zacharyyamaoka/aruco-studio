@@ -337,7 +337,8 @@ function ThisFileItems({ close, onRename }: { close: () => void; onRename: () =>
       <Item close={close} label="Rename" testid="shf-action-rename" onClick={onRename} />
       {state.user && (
         <>
-          <Item close={close} label="Duplicate" testid="shf-action-duplicate" disabled={!file} onClick={() => { if (file) void actions.duplicate(file); }} />
+          {/* Canva's Make a copy (SPEC v2.11): "Copy of <name>" opens in a new tab (opened inside this click, so it is not a blocked pop-up) */}
+          <Item close={close} label="Duplicate" testid="shf-action-duplicate" disabled={!file} onClick={() => { if (file) void actions.duplicateCurrent(); }} />
           <Item close={close} label="Version history" testid="shf-action-history" disabled={!file} onClick={() => actions.showHistory()} />
           <div className="dm-sep" />
           <Item close={close} label="Move to trash" testid="shf-action-trash" disabled={!file} onClick={() => { if (file) void actions.trash(file); }} />

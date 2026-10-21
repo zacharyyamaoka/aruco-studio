@@ -8,7 +8,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react"
 import { toast } from "sonner"
-import { DISCARD, HostedFilesError, type FileMeta, type HostedFiles, type SignInFlow, type State, withExtension } from "@/lib/hosted-files/core"
+import { copyName, DISCARD, HostedFilesError, type FileMeta, type HostedFiles, type SignInFlow, type State, withExtension } from "@/lib/hosted-files/core"
 
 // WHY derived from the class instead of importing the interface: the seam is exactly what
 // HostedFiles#ui accepts, whatever the core names it.
@@ -288,22 +288,35 @@ export function useHostedFilesActions() {
           const name = await prompt("Rename", file.name, "Rename")
           if (name && name !== file.name) await renameFile(file, name)
         }),
+      // From a file list, as Canva's Projects page does it (SPEC v2.11): "Copy of <name>" joins the list, nothing opens.
       duplicate: (file: FileMeta) =>
         run(async () => {
-          const copy = await hostedFiles.files.duplicate(file.id, `${file.name} (copy)`)
+          const copy = await hostedFiles.files.duplicate(file.id, copyName(file.name))
           await hostedFiles.me()
           toast(`Duplicated as “${copy.name}”`)
           return copy
         }),
+      // The open file's Duplicate, as Canva's editor does it (SPEC v2.11): the copy opens in a new tab.
+      duplicateCurrent: () =>
+        run(async () => {
+          const copy = await hostedFiles.duplicateCurrent()
+          if (!copy) return copy
+          toast(hostedFiles.state.file?.id === copy.id ? `Opened “${copy.name}”` : `Opened “${copy.name}” in a new tab`)
+          return copy
+        }),
       trash: (file: FileMeta) =>
         run(async () => {
-          if (file.id === hostedFiles.state.file?.id) await hostedFiles.trashCurrent()
-          else hostedFiles.patchFile(await hostedFiles.files.trash(file.id))
+          const current = file.id === hostedFiles.state.file?.id
+          if (current) {
+            await hostedFiles.trashCurrent()
+            if (hostedFiles.state.file?.id === file.id) return // the user cancelled leaving it
+          } else hostedFiles.patchFile(await hostedFiles.files.trash(file.id))
           await hostedFiles.me().catch(() => {})
           // WHY an Undo in the toast: delete is "move to trash" (SPEC §0); say so at the moment it happens.
+          // Undo on the open file also reopens it, so the person is back where they were (SPEC v2.11).
           toast(`Moved “${file.name}” to the trash`, {
             description: "Restorable for 30 days.",
-            action: { label: "Undo", onClick: () => void actions.restore(file) },
+            action: { label: "Undo", onClick: () => void (current ? actions.restoreAndOpen(file) : actions.restore(file)) },
           })
         }),
       restore: (file: FileMeta) =>
@@ -311,6 +324,7 @@ export function useHostedFilesActions() {
           hostedFiles.patchFile(await hostedFiles.files.restore(file.id))
           await hostedFiles.me().catch(() => {})
         }, `Restored “${file.name}”`),
+      restoreAndOpen: (file: FileMeta) => run(() => hostedFiles.restoreFromTrash(file.id, { open: true }), `Restored “${file.name}”`),
       download: (file: FileMeta, version?: number) =>
         run(() => hostedFiles.files.download(file.id, { version }), `Downloaded ${withExtension(file.name, ext())}`),
       downloadCurrent: () => run(() => hostedFiles.downloadCurrent()),
