@@ -137,7 +137,7 @@ ul { padding-left: 20px; } li { margin: 4px 0; }
 """
 
 
-def build(media: Path, out: Path, rev: str) -> None:
+def build(media: Path, out: Path, rev: str, gates: Path = None) -> None:
     with tempfile.TemporaryDirectory(prefix="printdims_base_") as tmp:
         before = facade_numbers(base_tree(rev, Path(tmp)))
     after = facade_numbers(ROOT)
@@ -222,6 +222,11 @@ reads 123.5 + 2 × 2.0 = 127.5 mm. Not verified: whether this is what was measur
 print tells the two apart: 100.0 mm means the file printed at 100 % and the extra is the marks (or the cut); more means the
 printer or its dialog scaled it.</figcaption></figure>
 """
+    if gates is not None and gates.exists():
+        # each gate's own summary line, as its tool printed it (the runs' logs, parsed by the caller)
+        items = "".join(f"<li><b>{html.escape(g['name'])}</b>: {html.escape(g['result'])}</li>"
+                        for g in json.loads(gates.read_text()))
+        body += f"<h2>Gates</h2><ul>{items}</ul>"
     out.write_text(f"<!doctype html><html lang=en><head><meta charset=utf-8>"
                    f"<meta name=viewport content='width=device-width, initial-scale=1'><title>Printdims report</title>"
                    f"<style>{CSS}</style></head><body><main>{body}</main></body></html>")
@@ -233,5 +238,6 @@ if __name__ == "__main__":
     ap.add_argument("--media", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--base", default="833ea6a")
+    ap.add_argument("--gates", type=Path, help="[{name, result}]: each gate's summary line")
     a = ap.parse_args()
-    build(a.media, a.out, a.base)
+    build(a.media, a.out, a.base, a.gates)
