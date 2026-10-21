@@ -7,11 +7,15 @@
 // changes nothing.
 // WHY (Zach, 2026-10-20): "we should be able to have lots of the markers on a
 // page and then re-id them". Typed ids always win (core/autoid.py rule 2).
+// With the panel in batch mode (several markers selected) it numbers only
+// those: the others are held at their ids, as typed (model/batch.ts
+// reIdItems), and the table lists the selection.
 import { useEffect, useState } from "react";
 import { Badge, Button, Dialog, FieldRow, Glyph, Messages, NumberField, SegmentedRow, Switch } from "@bam/ui";
 import type { IdAssignment, IdRequest, IdResult, Issue } from "../core/contract";
 import { core } from "../coreSource";
-import { featureNumber, idItems, idRange, isSet, type Feature } from "../model/doc";
+import { reIdItems, reIdResult } from "../model/batch";
+import { featureNumber, idRange, isSet, type Feature } from "../model/doc";
 import { WaitLine, useCallWait, useCoreWait } from "../panel/Waiting";
 import { useStudio } from "../store";
 import "./reid.css";
@@ -32,6 +36,9 @@ function typeText(f: Feature): string {
 export function ReIdDialog() {
   const open = useStudio((s) => s.modal === "reid");
   const doc = useStudio((s) => s.doc);
+  // the batch panel's selection: only those are numbered
+  const batch = useStudio((s) => (s.panel.open && s.panel.featureIds.length > 1 ? s.panel.featureIds : null));
+  const only = batch && batch.length ? batch : null;
   const [how, setHow] = useState<How>("sequential");
   const [start, setStart] = useState(0);
   // the preview on screen and the request it answers
@@ -40,7 +47,7 @@ export function ReIdDialog() {
   /** Retry's count: a new one asks again */
   const [tries, setTries] = useState(0);
   const close = () => useStudio.getState().openModal(null);
-  const items = open ? idItems(doc) : [];
+  const items = open ? reIdItems(doc, only) : [];
   const req: IdRequest = { items, mode: how, fresh: true, ...(how === "sequential" ? { start } : {}) };
   const key = JSON.stringify(req);
 
@@ -63,18 +70,19 @@ export function ReIdDialog() {
   const plain = (is: Issue[]) => is.map((i) => ({ field: i.field, level: i.level, text: i.text }));
   const byKey = (k: string) => plain((res?.warnings ?? []).filter((i) => i.key === k));
   const general = plain((res?.warnings ?? []).filter((i) => !i.key));
-  const moved = res ? doc.features.filter((f, i) => newRange(res.items[i]) !== idRange(f.marker)).length : 0;
+  const rows = doc.features.map((f, i) => ({ f, a: res?.items[i] })).filter(({ f }) => !only || only.includes(f.id));
+  const moved = res ? rows.filter(({ f, a }) => newRange(a) !== idRange(f.marker)).length : 0;
   const apply = () => {
     if (!res) return;
-    useStudio.getState().reId(res);
+    useStudio.getState().reId(reIdResult(doc, only, res));
     close();
   };
 
   return (
-    <Dialog open={open} onClose={close} title="ArUco Re-ID" icon="marker" testid="reid-dialog" width={640} className="reid-dialog"
+    <Dialog open={open} onClose={close} title={only ? `ArUco Re-ID · ${only.length} selected` : "ArUco Re-ID"} icon="marker" testid="reid-dialog" width={640} className="reid-dialog"
       footer={<>
         <span className="reid-sum muted" data-testid="reid-summary">
-          {res ? `${moved} of ${doc.features.length} marker${doc.features.length === 1 ? "" : "s"} change` : wait ? <WaitLine wait={wait} testid="reid-wait" /> : error ? "" : "Working it out…"}
+          {res ? `${moved} of ${rows.length} ${only ? "selected " : ""}marker${rows.length === 1 ? "" : "s"} change` : wait ? <WaitLine wait={wait} testid="reid-wait" /> : error ? "" : "Working it out…"}
         </span>
         <span className="grow" />
         <Button onClick={close} testid="reid-cancel">Cancel</Button>
@@ -102,8 +110,7 @@ export function ReIdDialog() {
       <table className="reid-table" data-testid="reid-table">
         <thead><tr><th>Marker</th><th>Type</th><th>Old ids</th><th>New ids</th></tr></thead>
         <tbody>
-          {doc.features.map((f, i) => {
-            const a = res?.items[i];
+          {rows.map(({ f, a }) => {
             const typed = isSet(f, "marker.first_id");
             const iss = byKey(f.key);
             const was = idRange(f.marker), now = res ? newRange(a) : "…";
