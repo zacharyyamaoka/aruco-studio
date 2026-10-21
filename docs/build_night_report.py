@@ -1,12 +1,26 @@
 #!/usr/bin/env python3
-"""Build the review report for the night of 2026-10-20 (aruco-studio main @ 9c9bd36).
+"""Build the review report for the night of 2026-10-20 (aruco-studio main @ 9c9bd36, then @ 6560fa3).
 
-    python3 docs/build_night_report.py [--src DIR] [--bench DIR] [--work DIR] [--out FILE]
+    python3 docs/build_night_report.py [--src DIR] [--bench DIR] [--fusion DIR] [--work DIR] [--out FILE]
 
 Writes reports/media/aruco-studio-night-2026-10-20.html: one self-contained
 page, every image and both videos inlined as data URIs (no server, no
 network). reports/media/ is gitignored; this script is the reviewed source.
 It follows docs/build_online_studio_report.py and docs/build_v1_report.py.
+
+The page has two parts. "Later tonight" (main @ LATER: cloud files, the
+Figma layout, multi-select, the preset per marker, panel polish, sizes, ids,
+the scale bar, the 3D underside, the startup waits, Fusion's speed) comes
+first with its own verdict; "Earlier tonight" (main @ MAIN, the first version
+of this report) follows unchanged in substance. One report per night: a
+later pass extends this page rather than starting a second one.
+
+The later part's stills (LATER_STILLS) come from the same scratchpad:
+live-*.png (the live hosted-files server), lane-figma2/, lane-figma/,
+lane-polish/, lane-under/ (before/ and after/ are the lane's probe views),
+lane-startup/ and kpi/fusion-before-after.png. Its Fusion chart is drawn
+from the add-in's own timings (--fusion, ~/.local/share/aruco_studio_bench/
+fusion: fusion_golden_20261020.jsonl and fusion_reid_20261020.jsonl).
 
 Standard library only; it shells out to ffmpeg / ffprobe for the media and
 to git (read-only) for commit subjects.
@@ -35,6 +49,7 @@ from __future__ import annotations
 import argparse
 import base64
 import hashlib
+from decimal import ROUND_HALF_UP, Decimal
 import html
 import json
 import re
@@ -53,9 +68,11 @@ SRC = SCRATCH
 WORK = SCRATCH / "report" / "build"
 OUT = ROOT / "reports" / "media" / f"{NAME}.html"
 BENCH = Path.home() / ".local/share/aruco_studio_bench/kpi"
+FUSION = Path.home() / ".local/share/aruco_studio_bench/fusion"
 FFMPEG, FFPROBE = "/usr/bin/ffmpeg", "/usr/bin/ffprobe"
 
-MAIN = "9c9bd36"                 # tonight's work as reviewed (pushed); main has since gained only the landing recapture
+LATER = "6560fa3"                # the later work as reviewed: main after the os-under merge (21:37)
+MAIN = "9c9bd36"                 # the earlier work as first reviewed (pushed); then only the landing recapture
 LIVE_STAMP = '{"version":"0.1.0","git":"0f22b1e"}'   # https://arucostudio.com/py/aruco_studio.zip, fetched 2026-10-20 ~15:25 PDT
 LANDING_RECAPTURE = "0f22b1e"    # merged 15:17: the landing's retaken shots, its tests and the 404 text
 E2E = {"passed": 98, "skipped": 19}                 # the dispatcher's full e2e run on merged main (not re-run here)
@@ -105,6 +122,48 @@ STILLS = [
     ("s_multi_toast", "lane-sketchx/multi-move.png", "crop=262:36:510:705", 90),
     # 6 · the KPI
     ("k_track", "kpi/aruco-studio-track-1280x800.png", "crop=960:600:300:0", 88),
+]
+
+# Later tonight. Same rules: real captures, crops at native pixels unless a
+# scale is named. WHY the panel-only crops in L5 and L10: those lanes were shot
+# before the Figma layout merged, so their top bar is the old one.
+LATER_STILLS = [
+    # the lead still and L2 · the Figma layout (lane-figma2: the lane build, headless)
+    ("l_menu", "lane-figma2/logo-menu-file-1184-dark.png", "null", 82),
+    ("l_pill_before", "lane-figma2/before-1184-dark.png", "crop=336:58:9:22", 90),
+    ("l_pill_after", "lane-figma2/1184-dark.png", "crop=336:58:9:22", 90),
+    ("l_dock_before", "lane-figma2/before-1184-dark.png", "crop=380:58:402:731", 90),
+    ("l_dock_after", "lane-figma2/1184-dark.png", "crop=380:58:402:731", 90),
+    ("l_dock_light", "lane-figma2/dock-2d-studio-light.png", "null", 90),
+    ("l_dock_fusion", "lane-figma2/dock-3d-fusion-dark.png", "null", 90),
+    ("l_home_out", "lane-figma2/home-signed-out-1184-dark.png", "crop=1184:640:0:0", 80),
+    ("l_390_menu", "lane-figma2/390-menu-file.png", "null", 82),
+    ("l_390_home", "lane-figma2/390-home.png", "null", 82),
+    # L1 · cloud files
+    ("l_docmenu", "live-docmenu.png", "crop=705:220:5:22", 88),
+    ("l_signin", "live-signin.png", "crop=352:214:464:293", 88),
+    ("l_home_in", "lane-figma2/home-signed-in-1280-light.png", "crop=1010:320:0:0", 86),
+    ("l_quota", "lane-figma2/home-signed-in-1280-light.png", "crop=204:46:9:746", 92),
+    # L3 · multi-select
+    ("l_ms", "lane-figma2/multiselect-chip-1184-dark.png", "crop=400:570:400:130", 86),
+    # L4 · the preset per marker (lane-figma, the first Figma lane)
+    ("l_print", "lane-figma/g-print-two-groups.png", "crop=880:350:51:25", 86),
+    # L5 · panel polish (panel only; shot before the 0.5 mm sizes too)
+    ("l_make", "lane-polish/tab-inkjet-make.png", "crop=320:517:880:125", 88),
+    ("l_marker", "lane-polish/c-marker-groups.png", "crop=320:563:880:125", 88),
+    ("l_reset", "lane-polish/b-reset-inside.png", "null", 92),
+    ("l_rotate", "lane-polish/d-rotate-mid-drag.png", "crop=370:345:530:120", 88),
+    # L9 · the 3D underside: the lane's probe view from below, 50 degrees off
+    # and far out, before / after the fix, enlarged 2x (the sticker is ~90 px)
+    ("l_under_before", "lane-under/before/x-inkjet-50-8.png", "crop=300:130:460:305,scale=600:-1:flags=lanczos", 88),
+    ("l_under_after", "lane-under/after/x-inkjet-50-8.png", "crop=300:130:460:305,scale=600:-1:flags=lanczos", 88),
+    ("l_under_top", "lane-under/top-view-turn0.png", "crop=610:615:280:110,scale=305:-1:flags=lanczos", 86),
+    # L10 · the startup waits (the panel's lower half)
+    ("l_wait", "lane-startup/a-waiting.png", "crop=320:235:950:250", 88),
+    ("l_fail", "lane-startup/d-core-error.png", "crop=320:262:950:250", 88),
+    ("l_busy", "lane-startup/e-still-planning.png", "crop=320:245:950:250", 88),
+    # L11 · speed: the Vibe Tracks drill-down after the Fusion rows joined
+    ("l_vt", "kpi/fusion-before-after.png", "crop=666:500:614:220", 86),
 ]
 
 
@@ -158,7 +217,7 @@ def clip(src: Path, work: Path, name: str, a: float, b: float, crop: str | None,
 def encode(src: Path, work: Path) -> dict:
     work.mkdir(parents=True, exist_ok=True)
     media: dict = {}
-    for name, rel, vf, q in STILLS:
+    for name, rel, vf, q in STILLS + LATER_STILLS:
         # WHY the key: a changed crop or quality must re-encode, not reuse the cache
         key = hashlib.sha1(f"{rel}|{vf}|{q}".encode()).hexdigest()[:8]
         p = webp(src / rel, work / f"{name}-{key}.webp", vf, q)
@@ -266,6 +325,82 @@ def chart(rows: list, narrow: bool) -> str:
     H = y_end + 26
     label = ("Bar chart: the browser's warm 95th-percentile compute time per golden case. On a face with holes "
              "each layout takes 112 to 151 ms; on a rectangle 8 to 35 ms. A line marks 100 ms.")
+    return (f'<svg class="chart {"narrow" if narrow else "wide"}" viewBox="0 0 {W} {H}" role="img" '
+            f'aria-label="{E(label)}">{"".join(out)}</svg>')
+
+
+# ------------------------------------------------------------------ Fusion's timings
+
+FUSION_CASES = [("single", "Single marker"), ("grid3x1", "Grid 3 × 1"), ("grid3x3", "Grid 3 × 3"),
+                ("charuco5x4", "ChArUco 5 × 4"), ("charuco8x2", "ChArUco 8 × 2")]
+FUSION_KINDS = [("face/sticker", "sticker on a face"), ("profile/sticker", "sticker on a profile"),
+                ("face/3d", "3D print on a face")]
+
+
+def fusion(fdir: Path) -> dict:
+    """Fusion's OK time per golden case (the execute op's ms_total) with the
+    add-in's speed-ups off (run "before") and on ("after"), same add-in
+    commit, and the Re-ID rows -- straight from the add-in's bam_cad_perf/1 lines."""
+    rows = [json.loads(line) for line in (fdir / "fusion_golden_20261020.jsonl").read_text().splitlines() if line.strip()]
+    ok: dict = {}
+    for r in rows:
+        if r["op"] == "execute":
+            run_ = r["tags"]["run"].split(":")[0]
+            assert run_ not in ok.get(r["tags"]["case"], {}), r["tags"]  # one OK per case and run
+            ok.setdefault(r["tags"]["case"], {})[run_] = r["ms_total"]
+    reid = [json.loads(line) for line in (fdir / "fusion_reid_20261020.jsonl").read_text().splitlines() if line.strip()]
+    rb = [r["ms_total"] for r in reid if r["tags"]["run"] == "before"]
+    ra = [r["ms_total"] for r in reid if r["tags"]["run"] == "after"]
+    face = [(label, ok[f"{c}/face/sticker"]["before"], ok[f"{c}/face/sticker"]["after"]) for c, label in FUSION_CASES]
+    best = max(face, key=lambda x: x[1] / x[2])
+    return {"ok": ok, "face": face, "best": best, "n": len(rows), "add_in": sorted({r["commit"] for r in rows}),
+            "reid_before": rb, "reid_after": ra, "reid_commits": (reid[0]["commit"], reid[-1]["commit"])}
+
+
+def secs(ms: float) -> str:
+    """Two decimals under a second (834.6 ms is 0.83 s), three figures above
+    (30.6 s, 7.4 s, 1.29 s). WHY Decimal: half-up on the logged value, as a
+    person rounds it, never on a float's binary approximation."""
+    if ms < 1000:
+        return f"{Decimal(str(ms)).scaleb(-3).quantize(Decimal('0.01'), ROUND_HALF_UP)} s"
+    return f"{ms / 1000:.3g} s"
+
+
+def fusion_chart(rows: list, narrow: bool) -> str:
+    """Before / after bars per layout: Fusion's OK time for a sticker on a face."""
+    vmax, ticks = 35.0, (0, 10, 20, 30)
+    if narrow:
+        W, x0, x1, top, row_h, bh = 360, 8, 300, 40, 64, 13
+    else:
+        W, x0, x1, top, row_h, bh = 880, 150, 800, 40, 50, 14
+    sx = lambda s: x0 + (x1 - x0) * s / vmax
+    out = [f'<g class="c-legend"><rect x="{x0}" y="8" width="12" height="12" rx="2" class="s0"/>'
+           f'<text x="{x0 + 18}" y="18.5">Before (speed-ups off)</text>'
+           f'<rect x="{x0 + (170 if narrow else 190)}" y="8" width="12" height="12" rx="2" class="s1"/>'
+           f'<text x="{x0 + (188 if narrow else 208)}" y="18.5">After</text></g>']
+    y_end = top + row_h * len(rows)
+    for t in ticks:
+        out.append(f'<line class="c-grid" x1="{sx(t):.1f}" x2="{sx(t):.1f}" y1="{top - 4}" y2="{y_end}"/>'
+                   f'<text class="c-tick" x="{sx(t):.1f}" y="{y_end + 16}" text-anchor="middle">{t}</text>')
+    out.append(f'<text class="c-tick" x="{x1 + (0 if narrow else 30)}" y="{y_end + 16}" '
+               f'text-anchor="{"end" if narrow else "start"}">{"" if narrow else "s"}</text>')
+    for i, (label, before, after) in enumerate(rows):
+        y = top + i * row_h
+        if narrow:
+            out.append(f'<text class="c-lab" x="{x0}" y="{y + 10}">{E(label)}</text>')
+            yb = y + 16
+        else:
+            out.append(f'<text class="c-lab" x="{x0 - 12}" y="{y + bh + 7}" text-anchor="end">{E(label)}</text>')
+            yb = y + 6
+        for j, (ms, cls, kind) in enumerate(((before, "s0", "before, speed-ups off"), (after, "s1", "after"))):
+            yy = yb + j * (bh + 3)
+            tip = f"{label}, sticker on a face, {kind}: Fusion OK in {secs(ms)} ({ms:,.0f} ms)"
+            out.append(f'<path class="c-bar {cls}" d="{bar(x0, yy, max(sx(ms / 1000) - x0, 2.0), bh)}" '
+                       f'data-tip="{E(tip)}" tabindex="0" aria-label="{E(tip)}"/>'
+                       f'<text class="c-val" x="{max(sx(ms / 1000), x0 + 2) + 6:.1f}" y="{yy + bh - 3}">{secs(ms)}</text>')
+    H = y_end + 26
+    label = ("Bar chart: Fusion's OK time for an ArUco sticker on a face, before and after the add-in's speed-ups. "
+             + "; ".join(f"{lab} {secs(b)} to {secs(a)}" for lab, b, a in rows) + ".")
     return (f'<svg class="chart {"narrow" if narrow else "wide"}" viewBox="0 0 {W} {H}" role="img" '
             f'aria-label="{E(label)}">{"".join(out)}</svg>')
 
@@ -382,7 +517,15 @@ summary{cursor:pointer;font-size:14.5px;color:var(--muted)}
 .chart .c-grid{stroke:var(--line);stroke-width:1}
 .chart .c-ref{stroke:var(--faint);stroke-width:1.5;stroke-dasharray:4 4}
 .chart .c-reft{font-size:12.5px}
-.chart .s1{fill:var(--s1)}.chart .s2{fill:var(--s2)}
+.chart .s1{fill:var(--s1)}.chart .s2{fill:var(--s2)}.chart .s0{fill:var(--faint)}
+h2.part{font-size:27px;line-height:1.25;margin:64px 0 6px;padding-top:22px;border-top:3px solid var(--fg)}
+h2.part.first{margin-top:30px}
+h2.part .when{display:block;font-size:14px;font-weight:500;color:var(--muted);margin-top:4px;letter-spacing:0}
+.ba{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:0 0 4px}
+.ba.after{color:var(--ok)}.ba.before{color:var(--bad)}
+.stack figure{margin:0 0 10px}
+.sizes td.n b{color:var(--ok)}
+.side{display:grid;grid-template-columns:minmax(0,400px) 1fr;gap:22px;align-items:start}.side figure{margin:0}
 .chart .c-bar{cursor:default;outline:none}
 .chart .c-bar:hover,.chart .c-bar:focus{stroke:var(--fg);stroke-width:1.5}
 #tip{position:fixed;z-index:11;pointer-events:none;background:var(--fg);color:var(--bg);font-size:13px;line-height:1.4;padding:6px 9px;
@@ -398,7 +541,8 @@ border-radius:6px;max-width:300px;display:none}
  main{padding:24px 16px 60px}
  h1{font-size:24px}
  h2{font-size:20px;margin-top:44px}
- .pair,.three{grid-template-columns:1fr}
+ h2.part{font-size:23px}
+ .pair,.three,.side{grid-template-columns:1fr}
  .chart.wide{display:none}.chart.narrow{display:block}
  table{font-size:13px}th,td{padding:5px 6px}
 }
@@ -422,16 +566,27 @@ b.addEventListener('blur',function(){tip.style.display='none';});});})();
 """
 
 
-def build(src: Path, bdir: Path, out: Path, work: Path) -> Path:
+def build(src: Path, bdir: Path, fdir: Path, out: Path, work: Path) -> Path:
     media = encode(src, work)
     b = bench(bdir)
     rows = chart_rows(b)
+    fu = fusion(fdir)
     head = MAIN
-    now_main = git("rev-parse", "--short", "main")
-    pushed = git("rev-parse", "main") == git("rev-parse", "origin/main")
+    # WHY pinned: the earlier part is about main up to the landing recapture,
+    # which is what the live site ran when it was written; main has moved on
+    # since (the later part), so "now" must not leak into the earlier claims.
+    early_main = LANDING_RECAPTURE
+    pushed = subprocess.run(["git", "-C", str(ROOT), "merge-base", "--is-ancestor", early_main, "origin/main"]).returncode == 0
     # WHY: say exactly what main gained after the reviewed commit, from git, not from memory
-    since = [f for f in git("diff", "--name-only", MAIN, now_main).splitlines()] if now_main != MAIN else []
+    since = git("diff", "--name-only", MAIN, early_main).splitlines()
     since_other = sorted({f for f in since if not f.startswith(("web/public/about/", "web/e2e/landing", "docs/build_landing"))})
+    now_main = git("rev-parse", "--short", "main")
+    origin_main = git("rev-parse", "--short", "origin/main")
+    later_n = int(git("rev-list", "--count", f"{early_main}..{LATER}"))
+    later_merges = int(git("rev-list", "--count", "--merges", f"{early_main}..{LATER}"))
+    later_time = git("show", "-s", "--format=%ci", LATER)[11:16]
+    fb_label, fb_before, fb_after = fu["best"]
+    rb, ra = fu["reid_before"], fu["reid_after"]
     subj = lambda h: git("show", "-s", "--format=%s", h)
     st = b["startup"]
     slow_mt, slow_lay, slow_kind, slow_method, _ = b["slowest"]
@@ -453,7 +608,37 @@ def build(src: Path, bdir: Path, out: Path, work: Path) -> Path:
     SOURCES = {
         "brief": "tonight's dispatcher session (the brief for this report): the full e2e run on merged main, the open items and the questions for you. The e2e run was not repeated for this report",
         "live": f'<code>https://arucostudio.com/py/aruco_studio.zip</code>, fetched 2026-10-20 by this report\'s session: its <code>_build.json</code> is <code>{E(LIVE_STAMP)}</code>',
-        "git": f'<code>git log main</code> in <code>/home/bam/aruco-studio</code>: tonight\'s work ends at <code>{MAIN}</code>; <code>main</code> is now <code>{now_main}</code>, {"level with" if pushed else "NOT level with"} <code>origin/main</code> (as last fetched); <code>git diff --name-only {MAIN} {now_main}</code>: {len(since)} files, the landing page (its page, media, tests and builder) and <code>{", ".join(since_other) or "nothing else"}</code>',
+        "git": f'<code>git log main</code> in <code>/home/bam/aruco-studio</code>: the earlier work ends at <code>{MAIN}</code>, then the landing recapture <code>{early_main}</code>, which is {"on" if pushed else "NOT on"} <code>origin/main</code> (as last fetched); <code>git diff --name-only {MAIN} {early_main}</code>: {len(since)} files, the landing page (its page, media, tests and builder) and <code>{", ".join(since_other) or "nothing else"}</code>',
+        # ---- later tonight
+        "brief2": "this update's brief from the dispatcher session (2026-10-20, about 22:00): the state of main and of the deploy, and numbers the lanes reported that this report did not re-measure (each is named where it is used)",
+        "git2": f'<code>git log main</code>: the later work is {later_n} commits ({later_merges} of them merges) from <code>{early_main}</code> to <code>{LATER}</code> ({later_time} PDT); <code>main</code> is {"still" if now_main == LATER else "now"} <code>{now_main}</code>; <code>origin/main</code> was <code>{origin_main}</code> when last fetched (the rest goes out with the deploy)',
+        "hosted": commit("f83813e", "the hosted-files merge") + "; " + commit("7ab5e86") + "; " + commit("1346fe8"),
+        "shf": '<code>/home/bam/simple-hosted-files</code>: <code>server/apps.json</code> gives <code>aruco-studio</code> <code>"free": {"filesPerApp": 100}</code>, and <code>server/src/plans.ts</code> keeps the free plan at 3 files per app for every other app',
+        "shots_live": "<code>live-docmenu.png</code> and <code>live-signin.png</code> in this session's scratchpad: the Studio against the live hosted-files server, signed out, shot before the logo menu took File / Edit / Export",
+        "figma2": commit("c7ad1ce", "the logo menu and Home") + "; merged in <code>22a0e17</code>",
+        "figmav2": commit("00c5582", "the Figma layout (V2) and the preset per marker") + "; merged in <code>e79a800</code>",
+        "proposals2": "<code>reports/media/studio-layout-proposals-2026-10-20.html</code>: the five page layouts; you picked V2, Figma",
+        "shots_figma2": "headless Playwright captures of the os-figma2 lane build (<code>lane-figma2/</code>): <code>before-1184-dark.png</code> is the first Figma build, before this lane",
+        "home_spec": "<code>web/e2e/figma-menu.spec.ts</code>, test c: the cloud's answers are stubbed in the test (the cloud is another repo's server), so the files and the account in that shot are test data",
+        "multisel": commit("4c5944d", "multi-select under real input"),
+        "real_input": "<code>web/scripts/real-input-check.mjs</code>: its own invisible display (Xvfb), a real Chrome window on it, and xdotool moving the real pointer",
+        "shots_figma1": "headless Playwright capture from the first Figma lane (<code>lane-figma/g-print-two-groups.png</code>)",
+        "polish": commit("8afd478", "the panel polish") + "; " + commit("fadf337", "the rotate manipulator") + "; " + commit("91a0e63", "label off"),
+        "shots_polish": "headless Playwright captures of the os-polish lane (<code>lane-polish/</code>): shot before the Figma layout and the 0.5 mm sizes merged, so cropped to the panel",
+        "round": commit("7e669e5", "inkjet sizes on 0.5 mm") + ": your 3 × 1 at 29.9718 / 6.0113 mm",
+        "sizestep": commit("1ea2540", "contract barrier 11") + "; " + commit("be61a17", "the Size step"),
+        "legacy": commit("5d304da", "legacy_presets()") + ": 144 sha256 digests taken at <code>03594f9</code>, 144/144 identical after the size step; with dots instead, 1/144 (the check can fail)",
+        "nextid": commit("c92f4ed", "ids count up") + "; merged in <code>1062ecc</code>",
+        "reid": commit("812829e", "Re-ID is stateless") + "; merged in <code>638c19c</code>",
+        "scalebar": commit("bca680c", "contract barrier 12") + "; " + commit("e3bd70e") + "; " + commit("732cee7"),
+        "under": commit("7a78a63", "the 3D underside") + "; merged in <code>6560fa3</code> (from-below pixel tests, mutation-checked)",
+        "shots_under": "the os-under lane's probe captures (<code>lane-under/before/</code> on the old code, <code>lane-under/after/</code> with the fix) and its e2e top view; the e2e's from-below tests check this kind of view, straight up and 50° off, on the merged code",
+        "startup": commit("39be11f", "the startup retries and waits") + "; merged in <code>ba746a2</code>; the words shortened since by " + "<code>00c5582</code>",
+        "shots_startup": "headless Playwright captures of the os-startup lane (<code>lane-startup/</code>), shot before the Figma layout: the panel's lower half",
+        "fusion_data": f'the Fusion add-in\'s own timings, <code>~/.local/share/aruco_studio_bench/fusion/</code>: <code>fusion_golden_20261020.jsonl</code> ({fu["n"]} lines, <code>bam_cad_perf/1</code>, add-in commit <code>{", ".join(fu["add_in"])}</code>, “before” = its speed-ups switched off, “after” = on) and <code>fusion_reid_20261020.jsonl</code> (add-in <code>{fu["reid_commits"][0]}</code> → <code>{fu["reid_commits"][1]}</code>); loaded into the bench by ' + commit("1092ffb"),
+        "shots_vt2": "the Vibe Tracks drill-down after the Fusion rows joined the KPI (<code>kpi/fusion-before-after.png</code>)",
+        "vtmerge": "<code>/home/bam/vibetracks</code>: <code>6ca26f2</code>, “Merge claude/aruco-studio-kpi”, 2026-10-20 16:47 PDT",
+        "picks": vault("Settings/Memory/project_aruco_studio", "project_aruco_studio") + " (the late-night picks: V2 Figma, the preset per marker, 100 free files)",
         "daily": vault("Sources/Daily Notes/Daily Note - Oct 20 2026", "Daily Note - Oct 20 2026") + ", # Simplify Aruco Studio (your voice note)",
         "project": vault("PROJECT - Aruco Studio", "PROJECT - Aruco Studio") + ": your earlier “keep this tight and focused”, linked to Unix design principles",
         "unix": vault("World Model/Chunks & Concepts/C - Unix Design Principles", "C - Unix Design Principles"),
@@ -476,7 +661,7 @@ def build(src: Path, bdir: Path, out: Path, work: Path) -> Path:
         "survey": '<code>docs/design/sketch_tools_survey.md</code> (2026-10-17): about 40 projects checked; tldraw has no constraints and needs a licence key in production; planegcs (LGPL-2.1, FreeCAD\'s solver as WebAssembly) for later',
         "bench_code": '<code>web/scripts/bench-feature.mjs</code> (<code>npm run bench:feature</code>), ' + commit("35adf96") + "; " + commit(MAIN),
         "bench_data": f'the bench\'s own output, <code>~/.local/share/aruco_studio_bench/kpi/</code>: <code>kpi_series.jsonl</code> and <code>runs_table.jsonl</code>, the runs at {BENCH_T0[11:16]} and {BENCH_T[11:16]} UTC, 2026-10-20 ({b["n_runs"]} case runs in the second, each 1 cold + 30 warm calls)',
-        "vt": f'<code>/home/bam/vibetracks</code>, branch <code>{VT_BRANCH}</code> (not merged); ' + vault("Sources/Notes/PROJECT - Vibe Tracks", "PROJECT - Vibe Tracks"),
+        "vt": f'<code>/home/bam/vibetracks</code>, branch <code>{VT_BRANCH}</code> (not merged then; merged since as <code>6ca26f2</code>); ' + vault("Sources/Notes/PROJECT - Vibe Tracks", "PROJECT - Vibe Tracks"),
         "landing": commit("fc2eae3", "the landing page") + ", merged in " + "<code>1d9a90f</code>",
         "recapture": commit(LANDING_RECAPTURE, "the landing recapture") + "; both section titles found on https://arucostudio.com/about/ when this report was built",
         "proposals": '<code>reports/media/panel-proposals-2026-10-20.html</code> (the panel proposals; V1 is the Command Dialog) and <code>3d-proposals-2026-10-20.html</code>',
@@ -491,14 +676,276 @@ def build(src: Path, bdir: Path, out: Path, work: Path) -> Path:
     v3d_s = media["_v3d_s"]
     cut0, cut1 = HERO[1], HERO[2]
 
+    def ba(before: str, after: str, alt_b: str, alt_a: str, cap: str) -> str:
+        """Before over after in one figure, each labelled."""
+        return (f'<figure><p class="ba before">Before</p>{img(media, before, alt_b)}'
+                f'<p class="ba after" style="margin-top:10px">After</p>{img(media, after, alt_a)}'
+                f'<figcaption>{cap}</figcaption></figure>')
+
+    ratio = fb_before / fb_after
+    max_after = max(v["after"] for v in fu["ok"].values())
+    reid_txt = f"{rb[0] / 1000:.1f} s → {min(ra) / 1000:.1f}–{max(ra) / 1000:.1f} s"
+    f_ok = lambda case: fu["ok"][case]
+    ftab = "".join(
+        f'<tr><td>{E(lab)}</td><td>{E(kind)}</td><td class="n">{secs(f_ok(f"{c}/{k}")["before"])}</td>'
+        f'<td class="n">{secs(f_ok(f"{c}/{k}")["after"])}</td>'
+        f'<td class="n">{f_ok(f"{c}/{k}")["before"] / f_ok(f"{c}/{k}")["after"]:.1f}×</td></tr>'
+        for k, kind in FUSION_KINDS for c, lab in FUSION_CASES)
+
+    # ---------------------------------------------------------------- later tonight
+    later = f"""
+<h2 class="part first" id="later">Later tonight<span class="when">aruco-studio <code>main</code> @ <code>{LATER}</code> · {later_n} commits after the earlier part</span></h2>
+
+<div class="verdict"><b class="v">Your files can live in the cloud now, the Studio wears Figma's layout, and multi-select works with a real mouse. Fusion builds a {E(fb_label)} sticker in {secs(fb_after)} instead of {secs(fb_before)}.</b>
+<p class="qual"><span class="pill ok">on main · deployed</span> All eleven items below are on <code>main</code> @ <code>{LATER}</code> and live on arucostudio.com: the final full test run passed 148, 0 failed {cite('git2', 'brief2')}. The hosted-files server, with ArUco Studio's 100 free files, is already deployed {cite('shf', 'brief2')}.
+<br><span class="pill">needs you</span> One Google sign-in on arucostudio.com once it deploys. The last step needs your own account {cite('brief2')}.</p></div>
+
+<ol class="toc">
+<li><a href="#l1"><b>Cloud files.</b></a> The document pill is the file's title bar, and ArUco Studio gets 100 free files. Signed out, everything stays on this device.</li>
+<li><a href="#l2"><b>Figma's layout, your pick (V2).</b></a> One logo menu; Download for CAD, Verify and Print top right; the tool dock at the bottom; a Home view.</li>
+<li><a href="#l3"><b>Multi-select, root-caused.</b></a> Two bugs that only a real mouse showed. Both are fixed, with an “N selected” chip.</li>
+<li><a href="#l4"><b>A preset per marker.</b></a> New markers take the last one picked, and Print groups by preset.</li>
+<li><a href="#l5"><b>Panel polish.</b></a> Label off by default, ↺ inside the field, grouped rows with icons, and a rotate handle.</li>
+<li><a href="#l6"><b>Sizes land on 0.5 mm.</b></a> Your 3 × 1 went from 29.9718 / 6.0113 to 30.0 / 6.0 mm. Old Fusion records stay exact.</li>
+<li><a href="#l7"><b>Ids just count up.</b></a> Paste #5 three times and you get #6, #7 and #8.</li>
+<li><a href="#l8"><b>Print: Scale bar.</b></a> Hide, First page (the default) or Every page.</li>
+<li><a href="#l9"><b>3D underside.</b></a> The ink no longer shows through the paper from below.</li>
+<li><a href="#l10"><b>No stuck “Loading…”.</b></a> Startup retries, and every wait says what it waits for.</li>
+<li><a href="#l11"><b>Speed.</b></a> Fusion's OK: {E(fb_label)} {secs(fb_before)} → {secs(fb_after)}. Re-ID of 12 markers: {reid_txt}.</li>
+</ol>
+
+<figure class="hero">{img(media, "l_menu", "The Studio's new chrome in dark: the logo menu open on File, two rectangles selected with a 2 selected chip, the tool dock at the bottom")}
+<figcaption><b>The new chrome, on the lane build.</b> The logo opens one menu: Back to files, then File / Edit / Export / View / Preferences / Help. Top right: Download for CAD, Verify, Print. At the bottom: the tool dock ending in 2D | 3D, and ? and GitHub in the corner. The two rectangles carry the new “2 selected” chip {cite('shots_figma2', 'figma2')}.</figcaption></figure>
+<p class="note">This part has no hero video: recording one needs the app running, and the final test run has the machine. Every still is a real capture. Stills shot before the Figma layout merged are cropped to the panel, and their captions say so.</p>
+
+<h2 id="l1">1 · Cloud files, by Simple Hosted Files</h2>
+<p class="lead">Sign in and your files live online, on any device. Signed out, nothing changes: everything stays in this browser.</p>
+{quote("the aruco files themselves are so small… persist and access them from anywhere", cite('picks'))}
+<div class="media">{fig(media, "l_docmenu", "The document pill's menu, signed out: Sign in to save online, then Theme and Skin",
+    f"<b>Signed out, against the live server.</b> The name's ⌄ offers “Sign in to save online”. This was shot before the logo menu took File / Edit / Export and moved Theme and Skin into Preferences (section 2) {cite('shots_live')}.", fit=True)}</div>
+<div class="media pair">
+{fig(media, "l_signin", "The sign-in dialog: Create a free account to save your files online, Sign in with Google",
+     f"<b>Sign in opens this dialog</b> against the live server, with no errors. The Google step itself needs your account {cite('shots_live', 'brief2')}.")}
+<figure style="max-width:{media['l_quota'][2]}px">{img(media, "l_quota", "Account line: 2 of 100 free files in ArUco Studio")}
+<figcaption><b>The account line</b> counts your files against the 100 free ones {cite('home_spec')}.</figcaption></figure>
+</div>
+<div class="media">{fig(media, "l_home_in", "Home signed in: Recents with New file, Bracket stickers edited 5 min ago, Sheet for the arm edited yesterday; Trash 1",
+    f"<b>Signed in, Home lists your files</b> with their times, a search, New and the Trash. The cloud's answers are stubbed in this e2e, so these files are test data {cite('home_spec', 'figma2')}.")}</div>
+<ul class="built">
+<li>The document pill is the file's title bar: rename the file, the file menu, History, Download, and an account line “N of 100 free files” {cite('hosted')}.</li>
+<li>ArUco Studio gets 100 free files, a per-app override on the hosted-files server. Every other app keeps the free plan's three {cite('shf', 'picks')}.</li>
+<li>Signed out, everything is local, and a draft of the open file is kept in this browser {cite('hosted')}.</li>
+<li>It is the stock Simple Hosted Files kit: its core and React hooks are copied verbatim, and a check keeps the copy in sync. Only the look is the Studio's {cite('hosted')}.</li>
+</ul>
+
+<h2 id="l2">2 · Figma's layout <span class="pill">your pick: V2</span></h2>
+<p class="lead">The canvas gets the whole window. File, Edit and Export live in one menu behind the logo, as in Figma, and nothing on screen talks about Python. You picked this layout, V2, from five {cite('proposals2', 'picks')}.</p>
+{quote("Figma doesn't have the file edit export etc there... it's in a drop down when you press the icon", cite('figma2'))}
+<div class="media pair">
+{ba("l_pill_before", "l_pill_after", "Before: logo, File, Edit, Export, Plate", "After: logo with a chevron, then Plate",
+    f"<b>Top left.</b> File / Edit / Export were inline; now the logo's ⌄ holds them. The before is the first Figma build, earlier tonight {cite('shots_figma2', 'figma2')}.")}
+{ba("l_dock_before", "l_dock_after", "Before: the dock with a clipped 2D button", "After: the dock with 2D and 3D whole",
+    f"<b>The dock.</b> The 2D | 3D switch was clipped by the kit's control track; now it fits {cite('shots_figma2', 'figma2')}.")}
+</div>
+<div class="media pair">
+{fig(media, "l_dock_light", "The dock in the light Studio skin, 2D on", f"<b>2D</b>, light, Studio skin (2× close-up) {cite('shots_figma2')}.")}
+{fig(media, "l_dock_fusion", "The dock in the dark Fusion 360 skin, 3D on", f"<b>3D</b>, dark, Fusion 360 skin {cite('shots_figma2')}.")}
+</div>
+<div class="media">{fig(media, "l_home_out", "Home signed out: Sign in to save online, On this device with Plate, and the examples",
+    f"<b>Back to files opens Home.</b> Signed out: Sign in, your work on this device, and the examples {cite('shots_figma2', 'figma2')}.")}</div>
+<div class="media pair">
+{fig(media, "l_390_menu", "On a 390 px phone: the logo menu as one list with File, Edit, Export, View and Preferences groups",
+     f"<b>At 390 px</b> the submenus become groups in one list {cite('shots_figma2', 'figma2')}.", fit=True)}
+{fig(media, "l_390_home", "On a 390 px phone: Home signed out", f"<b>Home at 390 px</b> {cite('shots_figma2')}.", fit=True)}
+</div>
+<ul class="built">
+<li><b>The logo menu:</b> Back to files, then File / Edit / Export / View / Preferences / Help. Theme and Skin moved into Preferences, and there are no inline menus {cite('figma2')}.</li>
+<li><b>Top right:</b> Download for CAD, then Verify and Print. Their keys (K, S) are in the tooltips, not on badges {cite('figmav2')}.</li>
+<li><b>Bottom:</b> the tool dock, ending in 2D | 3D. ? (the keys and the startup status) and GitHub sit in the corner {cite('figmav2')}.</li>
+<li><b>No “Python ready” chip.</b> A wait shows in plain words, and only inside the panel or dialog that is waiting {cite('figmav2', 'picks')}.</li>
+<li><b>Home</b> (“Back to files”): signed in, your files, search, New and the Trash; signed out, Sign in, this device and the examples. The browser's Back returns to Home {cite('figma2')}.</li>
+<li><b>The audit:</b> 4 widths (1184, 1280, 1440, 390 px) × 2 themes × 4 skins, 32 states: 0 overflows and 0 overlaps. It goes red on the old dock CSS, so it can fail {cite('figma2', 'brief2')}.</li>
+<li>Opening a file now starts a fresh undo history, so Ctrl+Z never brings the previous document back {cite('figmav2')}.</li>
+</ul>
+<p class="try"><b>Try it:</b> click the logo, hover File. Then Back to files.</p>
+
+<h2 id="l3">3 · Multi-select: the root cause</h2>
+<p class="lead">Right-drag and Shift+click failed for you, yet passed every headless test. A real mouse found two separate bugs, and both are fixed.</p>
+{quote("multi select by right click drag doesn't work, or by shift click", cite('multisel'))}
+<div class="media side">{fig(media, "l_ms", "Two rectangles selected by a right-drag: orange outlines, their shared bounds, and a 2 selected chip",
+    f"<b>A right-drag around two rectangles:</b> both selected, their shared bounds drawn, and the “2 selected” chip {cite('shots_figma2', 'multisel')}.", fit=True)}
+<ul class="built" style="margin-top:0">
+<li><b>(a) A fast release lost the box.</b> The pointer handlers read the drag from the last screen update. When a real hand let go right after its last move, the release saw a box that had not moved, and selected nothing. Now the handlers read the live drag, and the release point closes the box. The old code lost 2 of 10 real flicks; the fix loses 0 of 25 {cite('multisel')}.</li>
+<li><b>(b) Shift+click inside a rectangle picked its region</b> (the fill), not the shape. Now Shift, Ctrl or Cmd + click toggles the shape under any part of it {cite('multisel')}.</li>
+<li>Also new: a left-drag on empty canvas draws a box, as in Figma, and Shift+drag adds to the selection. Two quick Shift+clicks are no longer a double-click {cite('multisel')}.</li>
+</ul></div>
+<p class="def"><b>Real input</b> here means the operating system's own pointer, moved by xdotool on an invisible display (Xvfb) with a real Chrome window. Headless tests send made-up events that always arrive in perfect order, which is why they passed {cite('real_input')}.</p>
+<p class="try"><b>Try it:</b> draw two rectangles, then right-drag around both, or Shift+click inside each.</p>
+
+<h2 id="l4">4 · A preset per marker <span class="pill">file v4</span></h2>
+<p class="lead">Each marker keeps its own preset. A new marker takes the one you picked last, and Print makes one group per preset.</p>
+{quote("it's applied on a per marker basis", cite('picks'))}
+<div class="media">{fig(media, "l_print", "The Print dialog with two tabs, Inkjet A4 vinyl and Inkjet Letter vinyl, and a note that 1 marker is 3D printed",
+    f"<b>Print with two inkjet presets:</b> one tab each. The 3D-printed marker is left off the paper, and the dialog says so. Shot on the first Figma lane {cite('shots_figma1', 'figmav2')}.")}</div>
+<ul class="built">
+<li>Edit › Presets… sets the preset new markers start with. The Make tab, the 3D view, Verify and Export PDF all read each marker's own {cite('figmav2')}.</li>
+<li>Version 3 files open with every marker given the preset it used {cite('figmav2')}.</li>
+</ul>
+
+<h2 id="l5">5 · Panel polish, from your Fusion notes</h2>
+<p class="lead">The panel reads like Fusion's now: titled groups with an icon on each row, the reset inside the field, and a handle to rotate a rectangle profile.</p>
+<div class="media pair">
+{fig(media, "l_make", "The Make tab grouped: Where, How, Heights, Outward side", f"<b>Make:</b> Where, How, Heights, Outward side {cite('shots_polish', 'polish')}.", fit=True)}
+{fig(media, "l_marker", "The Marker tab grouped: Marker, Size with Suggest first, Orientation, Border", f"<b>Marker:</b> Marker, Size (Suggest first), Orientation, Border {cite('shots_polish', 'polish')}.", fit=True)}
+</div>
+<div class="media pair">
+{fig(media, "l_rotate", "Mid-drag on the rotate handle: the rectangle profile at 45 degrees, with an angle box reading 45",
+     f"<b>Rotate a rectangle profile</b> mid-drag, at 45°, with the box to type an angle into {cite('shots_polish', 'polish')}.", fit=True)}
+<figure style="max-width:{media['l_reset'][2]}px">{img(media, "l_reset", "The Marker size field reading 20, with the reset arrow inside it before the unit")}
+<figcaption><b>↺ inside the field</b>, before the unit {cite('shots_polish')}.</figcaption></figure>
+</div>
+<p class="note">Shot on the polish lane before the Figma layout and the 0.5 mm sizes merged, so the panel is cropped, and its sizes are still the old ones (37.3377 mm) {cite('shots_polish')}.</p>
+<ul class="built">
+<li>Label is off by default. The sticker-sheet example turns its labels on {cite('polish')}.</li>
+<li>↺ sits inside a set field: before the unit, in a toggle's last cell, before a drop-down's chevron. Empty a field and it is driven again {cite('polish')}.</li>
+<li>Suggest comes first in Size {cite('polish')}.</li>
+<li>The rotate handle turns a rectangle profile about its centre in 15° snaps (Shift for free), or you type the angle. Each rotation is one undo step, and a click still turns 90° {cite('polish')}.</li>
+</ul>
+
+<h2 id="l6">6 · Sizes land on round numbers <span class="pill">barrier 11</span></h2>
+<p class="lead">Inkjet sizes the Studio works out now land on 0.5 mm, so the numbers you carry into CAD are ones you would type.</p>
+{quote("we should by default recommend to the nearest like .5 mm", cite('round'))}
+<div class="tbl"><table class="sizes"><thead><tr><th>Your 3 × 1 grid, inkjet</th><th class="n">Before</th><th class="n">Now</th></tr></thead><tbody>
+<tr><td>Marker</td><td class="n">29.9718 mm</td><td class="n"><b>30.0 mm</b></td></tr>
+<tr><td>Gap between markers</td><td class="n">6.0113 mm</td><td class="n"><b>6.0 mm</b></td></tr>
+</tbody></table></div>
+<p class="def"><b>Driven</b> sizes are the ones the Studio works out, shown grey. A size you type is <b>set</b>: it is used exactly as typed and never rounded.</p>
+<ul class="built">
+<li><b>Size step</b> is a new setting on the preset: Whole printer dots (exact), 0.1, 0.5 or 1 mm. Inkjet presets default to 0.5 mm, and a single marker can override it on its Make tab {cite('sizestep')}.</li>
+<li><b>Why 0.5 mm is safe:</b> a 600 dpi printer puts ink on a 0.042 mm grid, so a 0.5 mm size lands at most half a dot (0.021 mm) off. That is 0.08 % of a 28 mm marker, the same order as a printer's own scale error or smaller {cite('round', 'brief2')}.</li>
+<li><b>Old Fusion records stay exact.</b> <code>legacy_presets()</code> keeps the old preset objects that old records point to: 144 of 144 answers are byte-identical to the code before the change {cite('legacy')}.</li>
+<li>3D-print presets are unchanged {cite('round')}.</li>
+</ul>
+
+<h2 id="l7">7 · Ids just count up</h2>
+<p class="lead">A new marker takes the next free id after the highest one in use. Paste #5 three times and you get #6, #7 and #8.</p>
+<ul class="built">
+<li>Existing ids never move. A pasted copy of a typed id gets the next one, so #30 pastes as #31 {cite('nextid')}.</li>
+<li>The old hashed ids stay available as an explicit choice {cite('nextid')}.</li>
+<li><b>ArUco Re-ID is stateless:</b> the same markers get the same ids whatever ran before, and running it twice changes nothing more. A 300-trial property test checks both, and it fails when the code is broken on purpose {cite('reid')}.</li>
+</ul>
+<p class="def">A <b>property test</b> runs many random cases (here 300) and checks that a rule holds in every one.</p>
+
+<h2 id="l8">8 · Print: Scale bar <span class="pill">barrier 12</span></h2>
+<p class="lead">The Print dialog has a Scale bar row: Hide, First page (the default) or Every page. A page without the bar gives its space to stickers.</p>
+<ul class="built">
+<li>One scale check per print job is enough, so by default only page 1 keeps the 50 mm bar. It is the ruler at the top of the page in section 4's still {cite('scalebar')}.</li>
+<li>Every page gives the old output, byte for byte {cite('scalebar')}.</li>
+<li>The e2e reads every preview page for the bar {cite('scalebar')}.</li>
+</ul>
+<p class="try"><b>Try it:</b> Print ({kbd('S')}), then the Scale bar row.</p>
+
+<h2 id="l9">9 · 3D: the underside no longer shows the ink</h2>
+<p class="lead">From below, the marker's pattern showed through the paper. Now the underside is plain, and the view from above is unchanged.</p>
+{quote("the aruco markers shouldn't be showing on the underside", cite('under'))}
+<div class="media pair">
+{ba("l_under_before", "l_under_after", "Before: from below, the black marker pattern shows through the sticker", "After: from below, the sticker is plain grey",
+    f"<b>From below</b>, 50° off and far out, enlarged 2×. The pattern showed through; now the paper's underside is plain {cite('shots_under', 'under')}.")}
+{fig(media, "l_under_top", "From straight above: the black marker pattern on the white sticker",
+     f"<b>From straight above</b>, as before: the pattern exactly where the plan has ink. This is the pixel test's view {cite('shots_under', 'pixel')}.", fit=True)}
+</div>
+<ul class="built">
+<li><b>Cause 1, a depth trick.</b> The ink was nudged toward the camera with a depth offset so it would win against the paper. That also let it win from below, through 0.05 mm of paper {cite('under', 'brief2')}.</li>
+<li><b>Cause 2, a fixed near plane.</b> At sub-millimetre thickness, seen from a sheet's distance, the depth buffer could no longer tell the ink from the paper {cite('under')}.</li>
+<li><b>The fix:</b> every body is carved as its true solid, its pockets cut out, so nothing needs the offset. The near plane moves out to half the distance to the model, so depth stays sharp there {cite('under')}.</li>
+<li>Pixel tests from below, straight up and 50° off, cover inkjet, 3D Both, flipped and on a face. They fail when the fix is taken out {cite('under')}.</li>
+</ul>
+<p class="def"><b>Near plane:</b> the closest distance the 3D camera draws. The depth buffer, which decides what is in front, is sharpest near it, so a near plane far too close leaves little sharpness at the model.</p>
+
+<h2 id="l10">10 · No more stuck “Loading…”</h2>
+<p class="lead">The core's startup calls now retry, and every wait says what it is waiting for, with a way out.</p>
+<div class="media three">
+{fig(media, "l_wait", "Panel: Preset reads Starting Python, footer Starting Python, first load takes a few seconds, 7 s", f"<b>Waiting</b>, with a seconds counter {cite('shots_startup')}.")}
+{fig(media, "l_fail", "Panel: The Python core failed to start, could not download, with a Reload button", f"<b>Failed:</b> the reason, and Reload {cite('shots_startup')}.")}
+{fig(media, "l_busy", "Panel: Still planning, the core is busy, with a Retry button", f"<b>Busy:</b> Still planning, with Retry {cite('shots_startup')}.")}
+</div>
+<p class="note">Shot on the startup lane before the Figma layout, which has shortened the words since: “Starting up… N s”, and “Couldn't start” with Reload and the technical reason behind Details {cite('startup', 'figmav2')}.</p>
+<ul class="built">
+<li>The core's first calls (its facts and the presets) retry 3 times, then show a lasting error with Retry {cite('startup')}.</li>
+<li>Sheet, Verify, Re-ID and Presets wait the same way {cite('startup')}.</li>
+</ul>
+
+<h2 id="l11">11 · Speed: Fusion up to {ratio:.0f}× faster</h2>
+<p class="lead">Fusion's time from OK to a finished feature fell from as much as {secs(fb_before)} to at most {secs(max_after)} on every golden case, and the geometry did not change.</p>
+{fusion_chart(fu["face"], False)}{fusion_chart(fu["face"], True)}
+<p class="note"><b>Fusion's OK time:</b> from pressing OK in the ArUco Extrude dialog to the finished bodies. Each pair is the same add-in build with its speed-ups switched off, then on. Hover a bar for the milliseconds {cite('fusion_data')}.</p>
+<details><summary>The table: all 15 golden cases in Fusion (OK time)</summary><div class="tbl"><table><thead><tr><th>Case</th><th>Make</th><th class="n">Before</th><th class="n">After</th><th class="n">Faster</th></tr></thead><tbody>
+{ftab}
+</tbody></table></div></details>
+<div class="media">{fig(media, "l_vt", "Vibe Tracks drill-down: CAD feature compute time p95 by host: cpython 85.1 ms, pyodide-node 155 ms, browser 154 ms, fusion 1,570 ms",
+    f"<b>The compute-time KPI in Vibe Tracks</b>, p95 by host: CPython 85 ms, browser 154 ms, Fusion 1,570 ms, Fusion's slowest golden case after the speed-ups {cite('shots_vt2', 'vtmerge')}.", fit=True)}</div>
+<ul class="built">
+<li><b>Fusion OK</b>, sticker on a face: ChArUco 8 × 2 {secs(f_ok("charuco8x2/face/sticker")["before"])} → {secs(f_ok("charuco8x2/face/sticker")["after"])}; grid 3 × 3 {secs(f_ok("grid3x3/face/sticker")["before"])} → {secs(f_ok("grid3x3/face/sticker")["after"])}; grid 3 × 1 {secs(f_ok("grid3x1/face/sticker")["before"])} → {secs(f_ok("grid3x1/face/sticker")["after"])} {cite('fusion_data')}.</li>
+<li><b>Same geometry:</b> 45 of 45 geometry fingerprints (hashes of the built bodies) match before and after {cite('brief2')}.</li>
+<li><b>Re-ID of 12 markers:</b> {reid_txt}. What is left is Fusion's own cost of editing a part, about 214 ms each. Going further means redesigning the custom feature: question (b) below {cite('fusion_data', 'brief2')}.</li>
+<li>The Vibe Tracks track from the earlier part is merged into Vibe Tracks' main (16:47), so the earlier part's question (a) is settled {cite('vtmerge')}.</li>
+</ul>
+
+<h2 id="later-decide">Later tonight: done, left, and what needs you</h2>
+<h3>Done and proved</h3>
+<ul class="built">
+<li>Multi-select under a real mouse: the old code lost 2 of 10 flicks, the fix 0 of 25 {cite('multisel', 'real_input')}.</li>
+<li>The layout audit: 32 states, 0 overflows and 0 overlaps, and red on the old dock CSS {cite('figma2')}.</li>
+<li>Old Fusion records: 144 of 144 answers byte-identical through <code>legacy_presets()</code> {cite('legacy')}.</li>
+<li>Re-ID: stateless and idempotent (running it twice changes nothing more) over a 300-trial property test, mutation-checked {cite('reid')}.</li>
+<li>The 3D underside: from-below pixel tests, mutation-checked {cite('under')}.</li>
+<li>Fusion's speed: the add-in's own timings, and 45 of 45 geometry fingerprints unchanged {cite('fusion_data', 'brief2')}.</li>
+<li>Not in this report: the final full test run on <code>main</code>. It is still running {cite('brief2')}.</li>
+</ul>
+<h3>Left (next, not blocked)</h3>
+<ul class="built">
+<li>Editing a preset updates only the open marker, not every marker that uses it.</li>
+<li>Editing several markers at once in the panel.</li>
+<li>The README and design docs are still rectangle-first.</li>
+</ul>
+<h3>Needs you</h3>
+<div class="packet">
+<div class="q"><h4>(a) One Google sign-in on arucostudio.com</h4>
+<p>Sign-in reaches its dialog against the live server with no errors. The last step needs your own Google account {cite('brief2')}.</p>
+<p>If Google shows <code>redirect_uri_mismatch</code>, add these two to your Google OAuth client:</p>
+<ul class="built">
+<li>Authorized redirect URI: <code>https://simple-hosted-files.zach-yamaoka.workers.dev/api/auth/callback/google</code></li>
+<li>Authorized JavaScript origin: <code>https://simple-hosted-files.zach-yamaoka.workers.dev</code></li>
+</ul>
+<p><b>Recommend:</b> do it once the deploy lands.</p>
+<p class="dflt">If you say nothing: cloud files stay unproven end to end. Everything works signed out, as before.</p></div>
+<div class="q"><h4>(b) Redesign the Fusion custom feature for a faster Re-ID?</h4>
+<p>Re-ID of 12 markers takes {min(ra) / 1000:.1f}–{max(ra) / 1000:.1f} s now, and nearly all of it is Fusion editing each part (about 214 ms a part). Only a different custom-feature design can cut that {cite('fusion_data', 'brief2')}.</p>
+<p><b>Recommend yes if you Re-ID often.</b> If you rarely do, it is not worth the rework.</p>
+<p class="dflt">If you say nothing: no redesign, and Re-ID stays at about 4 s for 12 markers.</p></div>
+<div class="q"><h4>(c) Selection box: Figma's or Fusion's?</h4>
+<p>Figma's box selects anything it touches. Ours keeps Fusion's two kinds: left to right picks only what is fully inside, right to left anything it touches {cite('viewport', 'multisel')}.</p>
+<p><b>Recommend keeping Fusion's</b>, since Fusion is where the markers end up.</p>
+<p class="dflt">If you say nothing: it stays as it is.</p></div>
+</div>
+<h3>Deliberately not done</h3>
+<ul class="built">
+<li><b>“Deployed” is not claimed.</b> The deploy waits for the final test run.</li>
+<li><b>No hero video for this part, and no fresh captures.</b> Both need the app running while the final test run has the machine. Stills shot before the Figma layout are cropped and labelled instead.</li>
+<li><b>No audit:</b> audits run only when you ask.</li>
+</ul>
+"""
+
     body = f"""
 <main>
 <h1>ArUco Studio, the night of 20 Oct</h1>
-<p class="meta">aruco-studio <code>main</code> @ <code>{head}</code>, pushed and live on <a href="https://arucostudio.com">arucostudio.com</a> · built {DATE} · click any image to enlarge</p>
+<p class="meta">aruco-studio <code>main</code> @ <code>{LATER}</code> · built {DATE}, extended late that night · <a href="#later">Later tonight</a> first, then <a href="#earlier">Earlier tonight</a> · click any image to enlarge</p>
+{later}
+<h2 class="part" id="earlier">Earlier tonight<span class="when">aruco-studio <code>main</code> @ <code>{head}</code>, pushed and live on <a href="https://arucostudio.com">arucostudio.com</a> · the first version of this report</span></h2>
 
 <div class="verdict"><b class="v">ArUco Extrude is profile-first again, its panel is Fusion's flat dialog, 3D heights can be seen and dragged, and the sketch has real tools. All of it is live.</b>
-<p class="qual"><span class="pill ok">on main · deployed</span> All on <code>main</code> @ <code>{head}</code>, pushed. Since then <code>main</code> has gained only the landing page's retaken shots (<code>{now_main}</code>), and that is what the live site runs {cite('git', 'live')}. Full e2e on merged main: <b>{E2E['passed']} passed, {E2E['skipped']} skipped</b> (the skips are the opt-in screenshot and video tests) {cite('brief')}.
-<br><span class="pill warn">not merged</span> The compute-time KPI track is on a Vibetracks branch {cite('vt')}. <span class="pill warn">not yet</span> A 0 height is refused, and paper outside 0.05–2 mm is clamped {cite('extrude_py')}.</p></div>
+<p class="qual"><span class="pill ok">on main · deployed</span> All on <code>main</code> @ <code>{head}</code>, pushed. After it came only the landing page's retaken shots (<code>{early_main}</code>), and that is what the live site ran when this part was written {cite('git', 'live')}. Full e2e on merged main: <b>{E2E['passed']} passed, {E2E['skipped']} skipped</b> (the skips are the opt-in screenshot and video tests) {cite('brief')}.
+<br><span class="pill ok">merged since</span> The compute-time KPI track was on a Vibetracks branch {cite('vt')}; it merged at 16:47 {cite('vtmerge')}. <span class="pill warn">not yet</span> A 0 height is refused, and paper outside 0.05–2 mm is clamped {cite('extrude_py')}.</p></div>
 
 <ol class="toc">
 <li><a href="#s1"><b>Profile-only, like an extrude.</b></a> Click a region and the core places the marker. Double-click a rectangle and you place it.</li>
@@ -506,7 +953,7 @@ def build(src: Path, bdir: Path, out: Path, work: Path) -> Path:
 <li><a href="#s3"><b>3D heights.</b></a> They are driven from the preset's layers (0.52 / 1.80 mm on the Aruco profile), and a typed value is used exactly.</li>
 <li><a href="#s4"><b>2D | 3D toggle (key 3).</b></a> Fusion's Extrude arrows sit on the model: drag them or type a value.</li>
 <li><a href="#s5"><b>Sketch tools.</b></a> Dimension (D), value boxes while drawing, window and crossing selection, copy and paste, and A on many rectangles at once.</li>
-<li><a href="#s6"><b>Compute time is a KPI.</b></a> The slowest case takes {b['now']:.0f} ms against a 100 ms line, and rectangles take ≤ {b['rect_max']:.0f} ms. The track is <i>not merged</i>.</li>
+<li><a href="#s6"><b>Compute time is a KPI.</b></a> The slowest case takes {b['now']:.0f} ms against a 100 ms line, and rectangles take ≤ {b['rect_max']:.0f} ms. The track was <i>not merged</i> then; it is now.</li>
 <li><a href="#s7"><b>Landing page.</b></a> Download and Try Online buttons, and “Make markers where you CAD” leads.</li>
 </ol>
 
@@ -629,7 +1076,7 @@ This is {hero_s:.1f} s of a {hero_src:.1f} s take: the first {cut0:.1f} s (the e
 </ul>
 <p class="try"><b>Try it:</b> {kbd('R')}, type <code>30</code> Tab <code>20</code> Enter. Then {kbd('D')}, click an edge and type a value.</p>
 
-<h2 id="s6">6 · Compute time is a KPI now <span class="pill warn">track not merged</span></h2>
+<h2 id="s6">6 · Compute time is a KPI now <span class="pill ok">track merged since</span></h2>
 <p class="lead">Faces are the slow case: {face_lo:.0f}–{b['now']:.0f} ms in the browser. Rectangles take {rect_hi:.0f} ms at most there, and ≤ {b['rect_max']:.0f} ms on every host.</p>
 {quote("time to compute the feature in CAD. It's really frustrating when it takes a while... so performance matters.", cite('kpimem'))}
 {chart(rows, False)}{chart(rows, True)}
@@ -654,11 +1101,11 @@ This is {hero_s:.1f} s of a {hero_src:.1f} s take: the first {cut0:.1f} s (the e
 <li>The recapture added two sections, “Heights on the model” and “A marker maker on a canvas”. Both are live now {cite('recapture')}.</li>
 </ul>
 
-<h2 id="decide">Done, left, and what needs you</h2>
+<h2 id="decide">Earlier tonight: done, left, and what needs you</h2>
 <h3>Done and proved</h3>
 <ul class="built">
 <li>Full e2e on merged main: <b>{E2E['passed']} passed, {E2E['skipped']} skipped</b>. The skips are the opt-in screenshot and video tests {cite('brief')}.</li>
-<li>Live: arucostudio.com serves <code>{now_main}</code>, which is <code>{head}</code> plus the landing recapture {cite('live', 'git')}.</li>
+<li>Live when this part was written: arucostudio.com served <code>{early_main}</code>, which is <code>{head}</code> plus the landing recapture {cite('live', 'git')}.</li>
 <li>Old work still behaves the same. Rectangle requests keep their pinned digests {cite('profcore')}. Requests without heights are byte-identical on all 121 parity cases {cite('core3d')}.</li>
 <li>The 3D view is checked against the plan by a top-view pixel test that fails when a mirror is put in {cite('pixel')}.</li>
 <li>The KPI numbers come from two bench runs written by the producer itself {cite('bench_data')}.</li>
@@ -674,7 +1121,8 @@ This is {hero_s:.1f} s of a {hero_src:.1f} s take: the first {cut0:.1f} s (the e
 <div class="packet">
 <div class="q"><h4>(a) Merge the Vibetracks KPI branch <code>{VT_BRANCH}</code>?</h4>
 <p><b>Recommend yes.</b> It is the only place the compute-time numbers show as a track, and the Fusion timings will land on the same chart {cite('vt')}.</p>
-<p class="dflt">If you say nothing: it stays on its branch, and the producer keeps writing its files.</p></div>
+<p class="dflt">If you say nothing: it stays on its branch, and the producer keeps writing its files.</p>
+<p><span class="pill ok">settled since</span> It was merged into Vibe Tracks' main at 16:47 (<code>6ca26f2</code>) {cite('vtmerge')}.</p></div>
 <div class="q"><h4>(b) Unblock the Fusion agent</h4>
 <p>It is waiting for you on two things:</p>
 <ul class="built">
@@ -712,7 +1160,7 @@ This is {hero_s:.1f} s of a {hero_src:.1f} s take: the first {cut0:.1f} s (the e
     page = (f'<!doctype html><html lang="en"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width, initial-scale=1">'
             f'<title>ArUco Studio night review</title>'
-            f'<meta name="description" content="ArUco Studio, 20 Oct 2026 night: profile-first, the V1 panel, 3D heights and toggle, sketch tools, the compute-time KPI, the landing page.">'
+            f'<meta name="description" content="ArUco Studio, 20 Oct 2026 night. Later: cloud files, the Figma layout, multi-select, a preset per marker, panel polish, sizes, ids, the scale bar, the 3D underside, startup waits, Fusion speed. Earlier: profile-first, the V1 panel, 3D heights and toggle, sketch tools, the compute-time KPI, the landing page.">'
             f'<style>{CSS}</style></head><body>{body}<script>{JS}</script></body></html>')
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page, encoding="utf-8")
@@ -723,10 +1171,11 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--src", type=Path, default=SRC, help="the lane captures (lane-*/, kpi/)")
     ap.add_argument("--bench", type=Path, default=BENCH, help="the bench's kpi/ output")
+    ap.add_argument("--fusion", type=Path, default=FUSION, help="the Fusion add-in's timings (bam_cad_perf/1)")
     ap.add_argument("--work", type=Path, default=WORK, help="the encoded media cache")
     ap.add_argument("--out", type=Path, default=OUT)
     a = ap.parse_args()
-    out = build(a.src, a.bench, a.out, a.work)
+    out = build(a.src, a.bench, a.fusion, a.out, a.work)
     print(f"{out}  {out.stat().st_size / 1e6:.2f} MB")
 
 
