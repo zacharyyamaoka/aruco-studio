@@ -374,11 +374,13 @@ export interface SheetGroup { key: string; preset: Preset; items: PlanRequest[] 
 
 /** Print's sheets: the inkjet features that plan, one group per preset (its
  *  page size can differ), in the order the presets first appear. A 3D-print
- *  feature is not printed on paper. Two presets are one group when every
+ *  feature is not printed on paper, nor one whose ids auto id refused
+ *  (`refused`: their keys, refusedKeys). Two presets are one group when every
  *  field is the same (the id alone is not enough: a modified copy shares it). */
-export function sheetGroups(doc: Doc): SheetGroup[] {
+export function sheetGroups(doc: Doc, refused: readonly string[] = []): SheetGroup[] {
   const groups = new Map<string, SheetGroup>();
   for (const f of doc.features) {
+    if (refused.includes(f.key)) continue;
     const req = planRequest(doc, f);
     if (!req || req.preset.method !== "inkjet") continue;
     const key = presetKey(req.preset);
@@ -396,8 +398,8 @@ export function presetKey(p: Preset): string {
 
 /** Print's sheet for one feature's preset (`featureId`'s, else the first
  *  group's): the items core.sheet lays out on that preset's page. */
-export function sheetItems(doc: Doc, featureId?: string | null): PlanRequest[] {
-  const groups = sheetGroups(doc);
+export function sheetItems(doc: Doc, featureId?: string | null, refused: readonly string[] = []): PlanRequest[] {
+  const groups = sheetGroups(doc, refused);
   const f = getFeature(doc, featureId);
   const own = f ? featurePreset(doc, f) : null;
   return (own && groups.find((g) => g.key === presetKey(own)))?.items ?? groups[0]?.items ?? [];
@@ -419,12 +421,15 @@ export function idRequest(doc: Doc): IdRequest {
 /** Auto id's answer into the document: each driven feature's first id is
  *  the one assigned (a typed one is left as typed), and the ledger is the
  *  core's (a removed feature's entry is gone from it). The same document
- *  when nothing changed. `res.items` is in the order of idItems(doc). */
+ *  when nothing changed. `res.items` is in the order of idItems(doc).
+ *  WHY a refused item (ids []) keeps its first id (review finding #5,
+ *  2026-10-21): its first_id is only the block the core wanted, already
+ *  someone else's; taken, a full dictionary printed a duplicate. */
 export function applyIds(doc: Doc, res: IdResult): Doc {
   let changed = false;
   const features = doc.features.map((f, i) => {
     const a = res.items[i];
-    if (!a || a.key !== f.key || isSet(f, "marker.first_id") || a.first_id === f.marker.first_id) return f;
+    if (!a || a.key !== f.key || !a.ids.length || isSet(f, "marker.first_id") || a.first_id === f.marker.first_id) return f;
     changed = true;
     return { ...f, marker: { ...f.marker, first_id: a.first_id } };
   });
@@ -434,6 +439,12 @@ export function applyIds(doc: Doc, res: IdResult): Doc {
 }
 
 const sortedLedger = (l: Record<string, number>) => Object.keys(l).sort().map((k) => [k, l[k]]);
+
+/** The keys auto id gave no ids (ids []: out of its dictionary, or the
+ *  dictionary is full; the answer's warnings say why): never printed or exported. */
+export function refusedKeys(res: IdResult): string[] {
+  return res.items.filter((a) => !a.ids.length).map((a) => a.key);
+}
 
 /** The feature (other than `id`) whose key is already `key`, if any: keys are unique. */
 export function keyOwner(doc: Doc, id: string, key: string): Feature | null {

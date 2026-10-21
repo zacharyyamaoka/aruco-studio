@@ -15,7 +15,7 @@ import { create } from "zustand";
 import type { CoreInfo, IdResult, Issue, LabelParams, MarkerPlan, Preset, Suggestion } from "./core/contract";
 import { core, coreStatus } from "./coreSource";
 import {
-  addFeature, addShape, applyIds, deleteShape, emptyDoc, featureOfProfile, featureOfRect, fillPresets, getFeature, keyOwner, newFeature, newId, nextTurn, pickSuggestion,
+  addFeature, addShape, applyIds, refusedKeys, deleteShape, emptyDoc, featureOfProfile, featureOfRect, fillPresets, getFeature, keyOwner, newFeature, newId, nextTurn, pickSuggestion,
   rectProfile, removeFeature, resetField, setField, setShape, updateFeature, validateDoc, withoutRect, type Doc, type Feature, type Holes,
 } from "./model/doc";
 import { applyBatch, resetBatch } from "./model/batch";
@@ -71,6 +71,8 @@ export interface Studio {
   planErrors: Record<string, string>;
   /** auto id's last warnings (core.assign_ids): each names its feature by Issue.key */
   idIssues: Issue[];
+  /** the keys auto id last refused ids (doc.ts refusedKeys): Print and Export leave them out */
+  idRefused: string[];
   /** for the feature the panel edits */
   suggestions: Suggestion[];
   info: CoreInfo | null;
@@ -317,6 +319,7 @@ export const useStudio = create<Studio>((set, get) => {
     plans: {},
     planErrors: {},
     idIssues: [],
+    idRefused: [],
     suggestions: [],
     info: null,
     builtins: [],
@@ -341,7 +344,7 @@ export const useStudio = create<Studio>((set, get) => {
       last = null;
       held = null;
       openAt = -1;
-      set({ doc: fillPresets({ ...doc, dims: doc.dims ?? [], default_preset: preset }, preset), ...only(null), panel: PANEL0, plans: {}, planErrors: {}, idIssues: [], suggestions: [], tool: "select", ...flags() });
+      set({ doc: fillPresets({ ...doc, dims: doc.dims ?? [], default_preset: preset }, preset), ...only(null), panel: PANEL0, plans: {}, planErrors: {}, idIssues: [], idRefused: [], suggestions: [], tool: "select", ...flags() });
       get().fit();
     },
     newDoc: (exampleId) => {
@@ -662,7 +665,8 @@ export const useStudio = create<Studio>((set, get) => {
       put({ doc: { ...ids.reduce((d, id) => updateFeature(d, id, (f) => ({ ...f, preset: p })), doc), default_preset: p } });
     },
     // the planner's next auto id call (with this ledger) keeps these ids
-    reId: (res) => put({ doc: applyIds(get().doc, res) }),
+    // its warnings and refusals too: a Re-ID that ran out of ids says so (review finding #5)
+    reId: (res) => put({ doc: applyIds(get().doc, res), idIssues: res.warnings, idRefused: refusedKeys(res) }),
     openModal: (modal) => set({ modal }),
     say: (note) => set({ note }),
 

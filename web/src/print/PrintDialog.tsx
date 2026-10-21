@@ -21,6 +21,7 @@ import { core } from "../coreSource";
 import { downloadBase64, downloadText, slug } from "../io/files";
 import { featurePreset, getFeature, presetKey, sheetGroups } from "../model/doc";
 import { CoreWait, WaitLine, useCallWait, useCoreWait } from "../panel/Waiting";
+import { idLines } from "../app/output";
 import { activeFeatureId, useStudio } from "../store";
 import "./sheet.css";
 
@@ -55,6 +56,8 @@ function Stat({ value, label, testid, raw }: { value: string; label: string; tes
 export function PrintDialog() {
   const open = useStudio((s) => s.modal === "print");
   const doc = useStudio((s) => s.doc);
+  const idIssues = useStudio((s) => s.idIssues);
+  const refused = useStudio((s) => s.idRefused);
   // the sheet on screen and the request it was laid out from
   const [laid, setLaid] = useState<{ key: string; sheet: Sheet } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +75,7 @@ export function PrintDialog() {
   const [tries, setTries] = useState(0);
   const stage = useRef<HTMLDivElement>(null);
   const [room, setRoom] = useState<[number, number]>([820, 600]);
-  const groups = open ? sheetGroups(doc) : [];
+  const groups = open ? sheetGroups(doc, refused) : [];
   const group = groups.find((g) => g.key === groupKey) ?? groups[0] ?? null;
   const items = group?.items ?? [];
   // the features without a preset yet (the core's presets have not arrived), and the 3D-printed ones
@@ -218,6 +221,7 @@ export function PrintDialog() {
               <Stat testid="sheet-cuts" raw={sheet?.cuts} value={sheet?.cuts !== undefined ? String(sheet.cuts) : "–"} label="straight cuts" />
               <Stat testid="sheet-fill" raw={sheet?.fill} value={sheet?.fill !== undefined ? `${Math.round(sheet.fill * 100)}%` : "–"} label="fill" />
             </div>
+            <Messages path="sheet.ids" issues={idLines(doc, idIssues, refused).map((i) => ({ field: i.field, level: i.level, text: i.text }))} />
             {sheet && <Messages path="sheet" issues={sheet.warnings.map((i) => ({ field: i.field, level: i.level, text: i.text }))} />}
             <div className="sheet-note muted">Print at 100 % (Scale: Default / Actual size): “Fit to page” changes the marker’s size. The grey lines are the cuts.</div>
             <div className="sheet-actions">

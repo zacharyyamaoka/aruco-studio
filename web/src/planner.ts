@@ -14,7 +14,7 @@
 // file all carry them.
 import type { IdRequest, PlanRequest } from "./core/contract";
 import { core, onCoreStatus, coreStatus } from "./coreSource";
-import { applyIds, getFeature, idRequest, planRequest } from "./model/doc";
+import { applyIds, getFeature, idRequest, planRequest, refusedKeys } from "./model/doc";
 import { useStudio } from "./store";
 
 const PLAN_MS = 30;
@@ -81,12 +81,12 @@ async function runAssign(req: IdRequest, key: string) {
     // WHY settled on the new ledger without a second call: with the ledger the
     // core just returned, the same items keep the same ids (core/autoid.py)
     idSettled = JSON.stringify(idRequest(doc));
-    useStudio.setState({ doc, idIssues: res.warnings });
+    useStudio.setState({ doc, idIssues: res.warnings, idRefused: refusedKeys(res) });
   } catch (e) {
     // no auto id (the mock core, or a refused request): the typed / default ids plan as they are
     if (key === JSON.stringify(idRequest(useStudio.getState().doc))) {
       idSettled = key;
-      useStudio.setState({ idIssues: [{ field: "marker.first_id", level: "warn", text: `Auto id failed: ${(e as Error).message}` }] });
+      useStudio.setState({ idIssues: [{ field: "marker.first_id", level: "warn", text: `Auto id failed: ${(e as Error).message}` }], idRefused: [] });
     }
   } finally {
     running -= 1;
@@ -104,8 +104,8 @@ function idsSettled(ready: boolean): boolean {
   if (!req.items.length) {
     // nothing to number: the core would answer an empty ledger
     idSettled = key;
-    if (Object.keys(s.doc.id_ledger).length || s.idIssues.length) {
-      useStudio.setState({ doc: { ...s.doc, id_ledger: {} }, idIssues: [] });
+    if (Object.keys(s.doc.id_ledger).length || s.idIssues.length || s.idRefused.length) {
+      useStudio.setState({ doc: { ...s.doc, id_ledger: {} }, idIssues: [], idRefused: [] });
       return false;
     }
     return true;

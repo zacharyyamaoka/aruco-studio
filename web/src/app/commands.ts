@@ -2,6 +2,7 @@
 import { core } from "../coreSource";
 import { downloadBase64, downloadText, pickFile, slug } from "../io/files";
 import { getFeature, parseDoc, planRequest, serialise, sheetItems } from "../model/doc";
+import { idLines } from "./output";
 import { activeFeatureId, useStudio } from "../store";
 import { leaveFile } from "../hosted/hosted";
 
@@ -31,8 +32,13 @@ export async function openDoc(): Promise<void> {
 
 /** Export › SVG: the marker in focus (the panel's, the selected one, else the last made). */
 export async function exportSvg(): Promise<void> {
-  const req = planRequest(st().doc, getFeature(st().doc, activeFeatureId(st())));
+  const f = getFeature(st().doc, activeFeatureId(st()));
+  const req = planRequest(st().doc, f);
   if (!req) { st().say("Nothing to export yet: make an ArUco Extrude (A) first."); return; }
+  if (f && st().idRefused.includes(f.key)) {
+    st().say(`Not exported: ${idLines(st().doc, st().idIssues, [f.key])[0].text}`);
+    return;
+  }
   try {
     downloadText(`${slug(st().doc.name)}-marker.svg`, await core.svg(req), "image/svg+xml");
   } catch (e) {
@@ -43,7 +49,9 @@ export async function exportSvg(): Promise<void> {
 /** Export › PDF: the page of the marker in focus's preset (its inkjet
  *  markers, as Print lays them out); the first preset's when it is 3D printed. */
 export async function exportPdf(): Promise<void> {
-  const items = sheetItems(st().doc, activeFeatureId(st()));
+  const refused = st().idRefused;
+  const items = sheetItems(st().doc, activeFeatureId(st()), refused);
+  if (!items.length && refused.length) { st().say(`Not exported: ${idLines(st().doc, st().idIssues, refused)[0].text}`); return; }
   if (!items.length) {
     st().say(st().doc.features.length ? "Nothing on paper: 3D-print markers aren't printed on a sheet." : "Nothing to export yet: make an ArUco Extrude (A) first.");
     return;
@@ -51,6 +59,7 @@ export async function exportPdf(): Promise<void> {
   try {
     const sheet = await core.sheet({ items, cut_lines: true });
     downloadBase64(`${slug(st().doc.name)}.pdf`, sheet.pdf_base64, "application/pdf");
+    if (refused.length) st().say(`PDF saved without ${refused.length} marker${refused.length === 1 ? "" : "s"}: ${idLines(st().doc, st().idIssues, refused)[0].text}`);
   } catch (e) {
     st().say(`PDF export failed: ${(e as Error).message}`);
   }

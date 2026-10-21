@@ -7,7 +7,7 @@ import v3Fixture from "../../e2e/fixtures/v3-a4.arucostudio-web.json?raw";
 import {
   DEFAULT_MARKER, addFeature, addShape, applyIds, deleteShape, emptyDoc, featureNumber, featurePreset, fillPresets, featureOfProfile, featureOfRect, featureRect, idCount, idItems,
   idRange, idRequest, isSet, keyOwner, newFeature, nextTurn, parseDoc, pickSuggestion, planRequest, rectProfile, referenceFace, removeFeature,
-  resetField, serialise, setField, setMarker, setType, sheetGroups, sheetItems, validateDoc } from "./doc";
+  resetField, serialise, setField, setMarker, setType, sheetGroups, sheetItems, validateDoc, refusedKeys } from "./doc";
 
 const preset: Preset = { id: "builtin:x", name: "X", method: "inkjet", builtin: true, page: "A4", page_mm: [210, 297] };
 
@@ -548,5 +548,39 @@ describe("version 2 trim modes keep both the placement and the cut (review findi
     const raw = JSON.parse(serialise(d));
     raw.shapes = raw.shapes.filter((x: { id: string }) => x.id !== "r2");
     expect(() => parseDoc(JSON.stringify(raw))).toThrow(/feature 2 \("f2"\): its placement names rect "r2"/);
+  });
+});
+
+describe("a refused id assignment (review finding #5)", () => {
+  // 51 singles in DICT_4X4_50: 50 get ids 0..49, the 51st is refused (ids []),
+  // its first_id only the block the core wanted (7, already f7's)
+  const n = 51;
+  const doc = () => {
+    let d = emptyDoc("Full", Array.from({ length: n }, (_, i) => rectShape(`r${i}`, i * 40, 0, i * 40 + 30, 30)), preset);
+    for (let i = 0; i < n; i++) d = addFeature(d, newFeature(rectProfile(`r${i}`), `f${i}`, preset));
+    return d;
+  };
+  const res = {
+    items: Array.from({ length: n }, (_, i) => (i < 50
+      ? { key: `f${i}`, first_id: i, ids: [i], driven: true }
+      : { key: `f${i}`, first_id: 7, ids: [], driven: true })),
+    ledger: Object.fromEntries(Array.from({ length: 50 }, (_, i) => [`f${i}`, i])),
+    warnings: [{ field: "marker.first_id", level: "error" as const, key: "f50", text: "DICT_4X4_50 is full (50 ids): no free id left" }],
+  };
+
+  it("applyIds never takes a refused item's fallback first id", () => {
+    const d = applyIds({ ...doc(), features: doc().features.map((f, i) => (i === 50 ? { ...f, marker: { ...f.marker, first_id: 0 } } : f)) }, res);
+    const printed = d.features.slice(0, 50).map((f) => f.marker.first_id);
+    expect(new Set(printed).size).toBe(50);
+    expect(d.features[50].marker.first_id).not.toBe(7);
+    expect(refusedKeys(res)).toEqual(["f50"]);
+  });
+
+  it("the sheet leaves the refused marker out: 50 stickers, 50 different ids", () => {
+    const d = applyIds(doc(), res);
+    const items = sheetGroups(d, refusedKeys(res)).flatMap((g) => g.items);
+    expect(items).toHaveLength(50);
+    expect(new Set(items.map((r) => r.marker.first_id)).size).toBe(50);
+    expect(sheetItems(d, "f50", refusedKeys(res))).toHaveLength(50);
   });
 });
