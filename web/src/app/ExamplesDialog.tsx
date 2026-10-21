@@ -4,6 +4,7 @@ import { loopD } from "../model/geom";
 import { EXAMPLES } from "../model/examples";
 import { shapeLoop, sketchBox } from "../sketch/model";
 import { useStudio } from "../store";
+import { leaveFile } from "../hosted/hosted";
 
 function Thumb({ id }: { id: string }) {
   const ex = EXAMPLES.find((e) => e.id === id)!;
@@ -27,7 +28,7 @@ export function ExamplesDialog() {
       <div className="ex-grid">
         {EXAMPLES.map((e) => (
           <button type="button" key={e.id} className="ex-card" data-example={e.id}
-            onClick={() => { useStudio.getState().newDoc(e.id); close(); }}>
+            onClick={() => { close(); void leaveFile().then((left) => { if (left) useStudio.getState().newDoc(e.id); }); }}>
             <Thumb id={e.id} />
             <span className="ex-name">{e.name}</span>
             <span className="ex-note">{e.note}</span>

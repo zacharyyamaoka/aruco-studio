@@ -3,8 +3,13 @@
 // 2026-10-20 night: "For the design let's please follow Figma!"): two corner
 // pills over the canvas and, in the bottom corner, ? and GitHub.
 // - Top left, the document pill: the logo (the landing page), File, Edit,
-//   Export, and the document's name with ⌄ (Theme and Skin; on a phone also
-//   File, Edit, Export, Download for CAD, GitHub and the keys).
+//   Export, then the title bar of Simple Hosted Files (the registry's
+//   hosted-files-title-bar, in the kit): the document's name, which is its
+//   cloud file's name (click to rename), a quiet status dot (it opens
+//   History), and ⌄: the cloud file's menu, the account, Theme and Skin (on
+//   a phone also File, Edit, Export, Download for CAD, GitHub and the keys).
+//   Signed out, ⌄ offers "Sign in to save online" and the Studio works as
+//   before; File keeps Open from this computer and the Download.
 // - Top right: Download for CAD, then Verify | Print (K, S: in the tooltips,
 //   no key badges).
 // - Bottom right: ? (the keys, and how the start went) and GitHub.
@@ -17,10 +22,14 @@
 // WHY no key badges on the corner buttons and GitHub at the bottom (Zach):
 // "No need for hot keys on those corner buttons. GitHub maybe better in the
 // bottom corner."
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Popover } from "@base-ui/react/popover";
 import { Button, Dialog, Glyph, Kbd, Menu, MenuItem, MenuSeparator, cn, useTheme } from "@bam/ui";
-import { CircleHelp, Moon, Sun } from "lucide-react";
+import { Check, CircleHelp, Moon, RotateCcw, Sun } from "lucide-react";
+import { relativeTime } from "../hosted/core";
+import { newDocument, renameDocument } from "../hosted/hosted";
+import { useFiles, useHostedFiles, useHostedFilesActions, useStatus } from "../hosted/react";
+import { UsageLine, initials, usePlan } from "../hosted/ui/HostedDialogs";
 import { useCoreStatus } from "../coreSource";
 import { WaitLine, failedDetail, reload, startingText, useTick } from "../panel/Waiting";
 import { useStudio } from "../store";
@@ -46,7 +55,7 @@ function GithubMark() {
 // 2026-10-18.html). The top bitmap and this stroke weight are checked not to
 // decode as any OpenCV dictionary, and the pass is narrow: re-check any
 // change to the bitmap, the height or the stroke.
-function BrandCube() {
+export function BrandCube() {
   return (
     <svg className="brand-cube" viewBox="0 0 64 64" width="20" height="20" aria-hidden="true">
       <path fill="#f1f3f6" stroke="#111418" strokeWidth="2.6" strokeLinejoin="round" d="M2 40.31L32 57.63L32 41.01L2 23.69z" />
@@ -90,11 +99,11 @@ function FileMenu() {
   const st = useStudio.getState;
   return (
     <Menu label="File" testid="menu-file">
-      <MenuItem icon="sketch" label="New" testid="cmd-new" onClick={() => st().newDoc()} />
+      <MenuItem icon="sketch" label="New" testid="cmd-new" onClick={newDocument} />
       <MenuItem icon="library" label="Examples…" testid="cmd-examples" onClick={() => st().openModal("examples")} />
-      <MenuItem label="Open…" testid="cmd-open" onClick={() => void openDoc()} />
+      <MenuItem label="Open from this computer…" testid="cmd-open" onClick={() => void openDoc()} />
       <MenuSeparator />
-      <MenuItem label="Save" hint=".arucostudio-web.json" testid="cmd-save" onClick={saveDoc} />
+      <MenuItem label="Download" hint=".arucostudio-web.json" testid="cmd-save" onClick={saveDoc} />
     </Menu>
   );
 }
@@ -173,9 +182,114 @@ function Preferences() {
   );
 }
 
-/** The document's name with ⌄ (Figma's file-name menu): Theme and Skin; on a
- *  phone also what the pills fold away. */
-function DocMenu({ onHelp }: { onHelp: () => void }) {
+/** The cloud file's part of ⌄ (the registry title bar's menu): Recent, the
+ *  file group, Autosave, the account with its plan and usage; signed out,
+ *  "Sign in to save online". */
+function CloudItems({ close, onRename }: { close: () => void; onRename: () => void }) {
+  const { state } = useHostedFiles();
+  const actions = useHostedFilesActions();
+  const plan = usePlan();
+  const { data: files } = useFiles();
+  const file = state.file;
+  const user = state.user;
+  if (!user) {
+    return (
+      <>
+        <Item close={close} label="Sign in to save online" testid="shf-signin" onClick={() => void actions.signIn()} />
+        <div className="dm-sep" />
+      </>
+    );
+  }
+  const recents = (files ?? []).filter((f) => f.id !== file?.id).slice(0, 3);
+  return (
+    <>
+      {recents.length > 0 && <div className="dm-h">Recent</div>}
+      {recents.map((f) => (
+        <Item key={f.id} close={close} label={f.name} hint={f.locked ? "View-only" : relativeTime(f.updatedAt)} testid="shf-recent" onClick={() => void actions.open(f.id)} />
+      ))}
+      <Item close={close} label="Open…" hint="your files online" testid="shf-action-files" onClick={actions.showFiles} />
+      <div className="dm-sep" />
+      <Item close={close} icon="sketch" label="New" testid="shf-action-new" onClick={() => void actions.newFile()} />
+      <Item close={close} label="Save" hint="Ctrl+S" testid="shf-action-save" disabled={!!file?.locked} onClick={() => void actions.save()} />
+      <Item close={close} label="Save as…" testid="shf-action-saveas" onClick={() => void actions.saveAs()} />
+      <Item close={close} label="Rename" testid="shf-action-rename" onClick={onRename} />
+      <Item close={close} label="Version history" testid="shf-action-history" disabled={!file} onClick={() => actions.showHistory()} />
+      <Item close={close} icon="download" label="Download" hint=".arucostudio-web.json" testid="shf-action-download" onClick={() => void actions.downloadCurrent()} />
+      <Item close={close} label="Move to trash" testid="shf-action-trash" disabled={!file} onClick={() => { if (file) void actions.trash(file); }} />
+      <Item close={close} label="Trash…" testid="shf-action-trashed" onClick={actions.showTrash} />
+      <div className="dm-sep" />
+      {/* a checkbox row: it stays open, and says its state (SPEC v2.4) */}
+      <button type="button" role="menuitemcheckbox" aria-checked={state.autosave} className="dm-item" data-testid="shf-autosave-toggle"
+        onClick={() => actions.setAutosave(!state.autosave)}>
+        <span className="ic">{state.autosave && <Check size={14} />}</span><span className="dm-label">Autosave</span>
+      </button>
+      <div className="dm-sep" />
+      <div className="shf-account" data-testid="shf-account">
+        <span className="shf-avatar" aria-hidden="true">{initials(user.name, user.email)}</span>
+        <span className="shf-who">{user.name && <b>{user.name}</b>}<span className="dm-hint">{user.email}</span></span>
+      </div>
+      <UsageLine />
+      {plan.canUpgrade && <Item close={close} label={`Upgrade — ${plan.price}`} testid="shf-action-upgrade" onClick={() => void actions.upgrade()} />}
+      <Item close={close} label="Export all files" hint=".zip" testid="shf-action-export" onClick={() => void actions.exportAll()} />
+      <Item close={close} label="Your account ↗" testid="shf-action-account" onClick={() => void actions.account()} />
+      <Item close={close} label="Sign out" testid="shf-action-signout" onClick={() => void actions.signOut()} />
+      <div className="dm-sep" />
+    </>
+  );
+}
+
+/** The name: the control (click, or ⌄ › Rename, to rename in place). One
+ *  name: the document's is its cloud file's (hosted/hosted.ts oneName). */
+function DocTitle({ editing, setEditing }: { editing: boolean; setEditing: (on: boolean) => void }) {
+  const name = useStudio((s) => s.doc.name);
+  if (editing) return <NameInput name={name} done={() => setEditing(false)} />;
+  return (
+    <button type="button" className="doc-name" data-testid="shf-filename" title="Rename" onClick={() => setEditing(true)}>
+      <span className="doc-text" data-testid="doc-name">{name}</span>
+    </button>
+  );
+}
+
+function NameInput({ name, done }: { name: string; done: () => void }) {
+  const [value, setValue] = useState(name);
+  const input = useRef<HTMLInputElement>(null);
+  const finished = useRef(false);
+  useEffect(() => { input.current?.select(); }, []);
+  const finish = (save: boolean) => {
+    if (finished.current) return;
+    finished.current = true;
+    done();
+    if (save) renameDocument(value);
+  };
+  return (
+    <input ref={input} autoFocus className="kit-text doc-name-input" data-testid="doc-name-input" aria-label="Document name" maxLength={200}
+      value={value} onChange={(e) => setValue(e.target.value)} onBlur={() => finish(true)}
+      onKeyDown={(e) => { if (e.key === "Enter") finish(true); else if (e.key === "Escape") finish(false); }} />
+  );
+}
+
+/** The save status, quiet: a dot (saved, saving, on this device, …) whose
+ *  words are its tooltip; it opens History. Nothing while signed out. */
+function StatusDot() {
+  const { hostedFiles, state } = useHostedFiles();
+  const status = useStatus();
+  const actions = useHostedFilesActions();
+  if (!state.user) return null;
+  const stale = !!hostedFiles.staleHead && !!state.message && state.status === "saved";
+  return (
+    <>
+      <button type="button" className={cn("shf-dot", `k-${status.kind}`)} data-testid="shf-status" data-kind={status.kind}
+        title={state.file ? `${status.detail} — Version history` : status.detail} disabled={!state.file} onClick={() => actions.showHistory()}>
+        <i /><span className="shf-sr">{status.label}</span>
+      </button>
+      {stale && <Button size="sm" className="shf-reload" testid="shf-reload" icon={<RotateCcw size={11} />} onClick={() => void actions.reload()}>Updated elsewhere — Reload</Button>}
+    </>
+  );
+}
+
+/** ⌄ (Figma's file-name menu): the cloud file and the account, then Theme
+ *  and Skin; on a phone also what the pills fold away. */
+function DocMenu({ onHelp, onRename }: { onHelp: () => void; onRename: () => void }) {
   const name = useStudio((s) => s.doc.name);
   const canUndo = useStudio((s) => s.canUndo);
   const canRedo = useStudio((s) => s.canRedo);
@@ -186,8 +300,7 @@ function DocMenu({ onHelp }: { onHelp: () => void }) {
   const st = useStudio.getState;
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger className="doc-name" data-testid="menu-doc" title="The document: Theme and Skin">
-        <span className="doc-text" data-testid="doc-name">{name}</span>
+      <Popover.Trigger className="doc-name doc-chev" data-testid="menu-doc" title="The document: file, account, Theme and Skin" aria-label="Document menu">
         <svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true" className="chev"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>
       </Popover.Trigger>
       <Popover.Portal>
@@ -197,10 +310,10 @@ function DocMenu({ onHelp }: { onHelp: () => void }) {
             {narrow && (
               <>
                 <div className="dm-h">File</div>
-                <Item close={close} icon="sketch" label="New" testid="cmd-new" onClick={() => st().newDoc()} />
+                <Item close={close} icon="sketch" label="New" testid="cmd-new" onClick={newDocument} />
                 <Item close={close} icon="library" label="Examples…" testid="cmd-examples" onClick={() => st().openModal("examples")} />
-                <Item close={close} label="Open…" testid="cmd-open" onClick={() => void openDoc()} />
-                <Item close={close} label="Save" hint=".arucostudio-web.json" testid="cmd-save" onClick={saveDoc} />
+                <Item close={close} label="Open from this computer…" testid="cmd-open" onClick={() => void openDoc()} />
+                <Item close={close} label="Download" hint=".arucostudio-web.json" testid="cmd-save" onClick={saveDoc} />
                 <div className="dm-h">Edit</div>
                 <Item close={close} label="Undo" testid="cmd-undo" disabled={!canUndo} onClick={() => st().undo()} />
                 <Item close={close} label="Redo" testid="cmd-redo" disabled={!canRedo} onClick={() => st().redo()} />
@@ -221,6 +334,7 @@ function DocMenu({ onHelp }: { onHelp: () => void }) {
                 <div className="dm-sep" />
               </>
             )}
+            <CloudItems close={close} onRename={onRename} />
             <Preferences />
           </Popover.Popup>
         </Popover.Positioner>
@@ -229,8 +343,10 @@ function DocMenu({ onHelp }: { onHelp: () => void }) {
   );
 }
 
-/** The top-left pill: the logo, File, Edit, Export, the document ⌄. */
+/** The top-left pill: the logo, File, Edit, Export, the title bar (the name,
+ *  the status dot, ⌄). */
 export function DocPill({ onHelp }: { onHelp: () => void }) {
+  const [editing, setEditing] = useState(false);
   return (
     <div className="pill doc-pill" data-testid="doc-pill">
       {/* the brand goes to the landing page (Zach, 2026-10-20); a real navigation, not a route */}
@@ -241,7 +357,11 @@ export function DocPill({ onHelp }: { onHelp: () => void }) {
         <ExportMenu />
       </span>
       <span className="pill-sep" />
-      <DocMenu onHelp={onHelp} />
+      <span className="doc-title">
+        <DocTitle editing={editing} setEditing={setEditing} />
+        <StatusDot />
+        <DocMenu onHelp={onHelp} onRename={() => setEditing(true)} />
+      </span>
     </div>
   );
 }

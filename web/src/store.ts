@@ -85,6 +85,9 @@ export interface Studio {
   /** a document opened (a file, an example, New): its history starts fresh */
   loadDoc: (doc: Doc) => void;
   newDoc: (exampleId?: string) => void;
+  /** the document's name, which is its cloud file's name (hosted/hosted.ts):
+   *  not an undo step, and undo / redo keep it */
+  setName: (name: string) => void;
   setTool: (t: Tool) => void;
   select: (s: Selection) => void;
   /** a drawn shape, with the driving dims its typed values made (one undo step) */
@@ -250,6 +253,10 @@ export const useStudio = create<Studio>((set, get) => {
     return out;
   };
 
+  /** A snapshot from the history with today's name: renaming is not a step,
+   *  so undo never renames the document (or its cloud file) back. */
+  const named = (doc: Doc | undefined) => doc && doc.name !== get().doc.name ? { ...doc, name: get().doc.name } : doc;
+
   /** the clipboard (in memory; the system's too when the page may write it) and the pastes made from it */
   let clip: Clip | null = null;
   let pastes = 0;
@@ -292,6 +299,7 @@ export const useStudio = create<Studio>((set, get) => {
     dimSel: null,
 
     setDoc: (doc, key) => put({ doc }, key),
+    setName: (name) => { if (name !== get().doc.name) set({ doc: { ...get().doc, name } }); },
     loadDoc: (doc) => {
       const preset = doc.default_preset ?? get().doc.default_preset;
       // WHY a fresh history (as Excalidraw and Figma do): Ctrl+Z after Open,
@@ -607,7 +615,7 @@ export const useStudio = create<Studio>((set, get) => {
     say: (note) => set({ note }),
 
     undo: () => {
-      const doc = past.pop();
+      const doc = named(past.pop());
       if (!doc) return;
       future.push(get().doc);
       last = null;
@@ -615,7 +623,7 @@ export const useStudio = create<Studio>((set, get) => {
       set({ doc, ...still(doc), ...flags() });
     },
     redo: () => {
-      const doc = future.pop();
+      const doc = named(future.pop());
       if (!doc) return;
       past.push(get().doc);
       last = null;
@@ -648,6 +656,12 @@ export function loadCoreFacts(): Promise<void> {
   return asking;
 }
 
+/** True while the store writes the presets the core filled in: not an edit,
+ *  so hosted/hosted.ts does not mark the document unsaved for it (else a
+ *  fresh page would ask "Save this first?" about an untouched example). */
+let filling = false;
+export const isFilling = (): boolean => filling;
+
 async function askFacts(): Promise<void> {
   useStudio.setState({ facts: { state: "asking" } });
   let why = "no answer";
@@ -664,7 +678,10 @@ async function askFacts(): Promise<void> {
       const doc = useStudio.getState().doc;
       const dflt = doc.default_preset ?? first;
       const next = fillPresets(dflt === doc.default_preset ? doc : { ...doc, default_preset: dflt }, dflt);
-      if (next !== doc) useStudio.setState({ doc: next });
+      if (next !== doc) {
+        filling = true;
+        try { useStudio.setState({ doc: next }); } finally { filling = false; }
+      }
       return;
     } catch (e) {
       why = e instanceof Error ? e.message : String(e);

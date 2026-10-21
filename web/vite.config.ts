@@ -13,7 +13,14 @@ const here = import.meta.dirname;
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
-    alias: [{ find: /^@bam\/ui/, replacement: path.resolve(here, "../studio/packages/bam-ui/src") }],
+    alias: [
+      { find: /^@bam\/ui/, replacement: path.resolve(here, "../studio/packages/bam-ui/src") },
+      // the Simple Hosted Files copies (src/hosted, scripts/sync-hosted-files.mjs)
+      // import as a shadcn app; these are the names they use
+      { find: /^@\/lib\/hosted-files\/(core|react)$/, replacement: path.resolve(here, "src/hosted/$1/index.ts") },
+      { find: /^@\/lib\/utils$/, replacement: path.resolve(here, "src/hosted/shims/utils.ts") },
+      { find: /^sonner$/, replacement: path.resolve(here, "src/hosted/shims/sonner.ts") },
+    ],
     // WHY: the kit's files live outside web/, so its imports must resolve to
     // web/node_modules, or React loads twice.
     dedupe: ["react", "react-dom", "@base-ui/react", "cmdk", "lucide-react"],
