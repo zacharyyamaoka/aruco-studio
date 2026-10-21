@@ -26,7 +26,7 @@ import { useLayoutEffect, type ReactNode } from "react";
 import { FieldRow, Glyph, Messages, NumberField, SegmentedRow, Select, Switch, Tabs, TextField, Button, type Issue as KitIssue, type Opt } from "@bam/ui";
 import { X } from "lucide-react";
 import type { ExtrudeParams, Issue, LabelParams, MarkerParams, Trim } from "../core/contract";
-import { DEFAULT_MARKER, DEFAULT_TRIM, featureNumber, featureRect, getFeature, idRange, isSet, referenceFace, typeCounts } from "../model/doc";
+import { DEFAULT_MARKER, DEFAULT_TRIM, featureNumber, featurePreset, featureRect, getFeature, idRange, isSet, referenceFace, typeCounts } from "../model/doc";
 import { boxOf, rectCorners, toScreen } from "../model/geom";
 import { presetNumbers, samePreset, myPresets } from "../presets/local";
 import { profileLoops } from "../sketch/model";
@@ -134,7 +134,9 @@ export function ExtrudePanel() {
   const plan = plans[f.id] ?? null;
   const planError = st.planErrors[f.id] ?? null;
   const refFace = referenceFace(doc, f);
-  const method = doc.preset?.method ?? "inkjet";
+  // this marker's own preset (Zach, 2026-10-20 night: "applied on a per marker basis")
+  const preset = featurePreset(doc, f);
+  const method = preset?.method ?? "inkjet";
   const rows = tabRows(m, l, method);
   const issues: Issue[] = plan && f.profile ? [...plan.warnings] : [];
   // auto id's issues for this feature (Issue.key): a collision, a full dictionary
@@ -142,8 +144,8 @@ export function ExtrudePanel() {
   const routed = routeIssues(issues, [...rows.make, ...rows.marker, ...rows.label]);
   const iss = (p: string) => kit(routed[p]);
   const bad = (p: string) => !!routed[p]?.some((i) => i.level === "error");
-  const library = [...builtins, ...myPresets()].find((p) => p.id === doc.preset?.id);
-  const modified = !!doc.preset && !!library && !samePreset(library, doc.preset);
+  const library = [...builtins, ...myPresets()].find((p) => p.id === preset?.id);
+  const modified = !!preset && !!library && !samePreset(library, preset);
   const dicts: Opt[] = (info?.dictionaries.map((d) => ({ value: d.name, label: d.name.replace("DICT_", ""), hint: `${d.capacity} ids` }))
     ?? FALLBACK_DICTS.map((d) => ({ value: d, label: d.replace("DICT_", "") })));
   const showPlan = plan && f.profile ? plan : null;
@@ -160,7 +162,7 @@ export function ExtrudePanel() {
   const height = (k: keyof ExtrudeParams & `${string}_mm`, fallback: number | null = null): number | null =>
     isSet(f, `extrude.${k}`) ? (f.extrude[k] as number) : ex ? ex[k] : fallback;
   const mode = isSet(f, "extrude.mode") && f.extrude.mode !== "auto" ? f.extrude.mode! : ex?.mode ?? (refFace ? "black" : "both");
-  const layer = doc.preset?.layer_mm || 0.1;
+  const layer = preset?.layer_mm || 0.1;
   // a rectangle profile (the custom placement) turns on the sketch; a face's box is the core's
   const rect = featureRect(doc, f);
   const outward = refFace ? (m.flip ? "into the face (flipped)" : "out of the face") : (m.flip ? "down (flipped)" : "up");
@@ -193,15 +195,15 @@ export function ExtrudePanel() {
       <Group title="How" />
       <FieldRow path="preset" label="Preset" issues={iss("preset")}>
         <button type="button" className="preset-pick" data-testid="panel-preset" onClick={() => st.openModal("presets")}
-          title="How it is made: open the presets">
+          title="How this marker is made: open the presets (the next new marker starts with it too)">
           <Glyph name={method === "print3d" ? "print3d" : "inkjet"} />
-          <span className="preset-name">{doc.preset ? doc.preset.name : <PresetWait />}{modified && <i className="modified"> (modified)</i>}</span>
+          <span className="preset-name">{preset ? preset.name : <PresetWait />}{modified && <i className="modified"> (modified)</i>}</span>
         </button>
         <button type="button" className="kit-ib" title="Presets…" aria-label="Presets" data-testid="panel-preset-more" onClick={() => st.openModal("presets")}>
           <Glyph name="dots" />
         </button>
       </FieldRow>
-      {doc.preset && <Note testid="preset-lines">{method === "print3d" ? "3D print" : "Inkjet"} · {presetNumbers(doc.preset)}</Note>}
+      {preset && <Note testid="preset-lines">{method === "print3d" ? "3D print" : "Inkjet"} · {presetNumbers(preset)}</Note>}
       <Rule />
       <FieldRow path="trim" label="Trim" icon="row-scissors" title="What the sticker is cut to: everything inside the cut is white" issues={iss("trim")}>
         <DrivenChoice {...drv("trim")} value={f.trim} driver={`${DEFAULT} (${DEFAULT_TRIM})`}>
@@ -230,8 +232,8 @@ export function ExtrudePanel() {
         </>
       ) : (
         <FieldRow path="extrude.paper_mm" label="Paper thickness" icon="row-arrow-up-from-line" issues={iss("extrude.paper_mm")} title="The paper / vinyl the sticker is printed on">
-          <DrivenField {...drv("extrude.paper_mm")} value={height("paper_mm", doc.preset?.thickness_mm ?? null)}
-            driver={`the preset's thickness${doc.preset?.thickness_mm != null ? ` (${doc.preset.thickness_mm} mm)` : ""}`}
+          <DrivenField {...drv("extrude.paper_mm")} value={height("paper_mm", preset?.thickness_mm ?? null)}
+            driver={`the preset's thickness${preset?.thickness_mm != null ? ` (${preset.thickness_mm} mm)` : ""}`}
             unit="mm" min={0} step={0.01} bad={bad("extrude.paper_mm")} />
         </FieldRow>
       )}

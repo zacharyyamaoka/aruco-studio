@@ -1,14 +1,19 @@
-// What the Studio is waiting for, said plainly: the core starting (with the
-// seconds once it takes a while), the core failed (its error, Reload), the
-// presets not answered (Retry), a plan that is slow or failed (Retry). The
-// panel's Preset row and footer, the top bar's chip and the dialogs that ask
-// the core (Sheet, Verify, the presets, Re-ID) all say it the same way.
+// What the Studio is waiting for, said plainly: starting up (with the seconds
+// once it takes a while), it couldn't start (Reload), the presets not loaded
+// (Retry), a plan that is slow or failed (Retry). Only what is actually
+// waiting says it -- the panel's Preset row and footer, and the dialogs that
+// ask the core (Sheet, Verify, the presets, Re-ID) -- and the help popover's
+// status line; the technical reason (Python, which file) is behind Details.
 // WHY (Zach, 2026-10-20 night, "BUG: seems to be stuck loading?"): "Loading…"
 // and "Planning…" read the same whether the core was starting, had failed or
 // was stuck, so a wait that would never end looked like one that would.
+// WHY user words and no chip (Zach, 2026-10-20 night): "for me that's back end
+// details, no need to show me that on the front end in a visible place ...
+// it shouldn't clutter the main viewer."
 import { useEffect, useState } from "react";
 import { Button } from "@bam/ui";
 import { coreElapsedMs, coreKind, useCoreStatus } from "../coreSource";
+import { featurePreset, getFeature } from "../model/doc";
 import { replan } from "../planner";
 import { loadCoreFacts, useStudio } from "../store";
 import "./waiting.css";
@@ -23,6 +28,8 @@ export interface Wait {
   /** a few words, for a row (the panel's Preset) */
   short: string;
   text: string;
+  /** the technical reason, behind a small Details disclosure */
+  detail?: string;
   action?: { label: "Retry" | "Reload"; run: () => void };
 }
 
@@ -46,11 +53,15 @@ export function useSince(on: boolean): number {
   return on && at !== null ? performance.now() - at : 0;
 }
 
-/** "Starting Python… (first load takes a few seconds) · 5 s". */
+/** "Starting up…", then "Starting up… 5 s". */
 export function startingText(): string {
   const s = Math.floor(coreElapsedMs() / 1000);
-  const what = coreKind === "mock" ? "the mock core" : "Python";
-  return `Starting ${what}… (first load takes a few seconds)${s >= SHOW_SECONDS ? ` · ${s} s` : ""}`;
+  return `Starting up…${s >= SHOW_SECONDS ? ` ${s} s` : ""}`;
+}
+
+/** The technical reason the core failed to start (the Details disclosure). */
+export function failedDetail(detail: string | undefined): string {
+  return `The ${coreKind === "mock" ? "mock" : "Python"} core failed to start: ${detail ?? "no reason given"}`;
 }
 
 /** What waits on the core: its start, then (`needFacts`: the caller has no
@@ -59,17 +70,16 @@ export function useCoreWait(needFacts: boolean): Wait | null {
   const core = useCoreStatus();
   const facts = useStudio((s) => s.facts);
   useTick(core.state === "loading");
-  if (core.state === "loading") {
-    return { kind: "core-loading", short: coreKind === "mock" ? "Starting the mock core…" : "Starting Python…", text: startingText() };
-  }
+  if (core.state === "loading") return { kind: "core-loading", short: "Starting up…", text: startingText() };
   if (core.state === "error") {
-    return { kind: "core-error", short: "Core failed to start", text: `The Python core failed to start: ${core.detail ?? "no reason given"}`, action: { label: "Reload", run: reload } };
+    return { kind: "core-error", short: "Couldn't start", text: "Couldn't start", detail: failedDetail(core.detail), action: { label: "Reload", run: reload } };
   }
   if (!needFacts || facts.state === "ok") return null;
   if (facts.state === "error") {
-    return { kind: "facts-error", short: "Presets did not load", text: `The core didn't answer: ${facts.error ?? "no reason given"}`, action: { label: "Retry", run: () => void loadCoreFacts() } };
+    return { kind: "facts-error", short: "Couldn't load the presets", text: "Couldn't load the presets",
+      detail: `The core didn't answer: ${facts.error ?? "no reason given"}`, action: { label: "Retry", run: () => void loadCoreFacts() } };
   }
-  return { kind: "facts-asking", short: "Asking the core…", text: "Asking the core for its presets and dictionaries…" };
+  return { kind: "facts-asking", short: "Loading the presets…", text: "Loading the presets…" };
 }
 
 /** A wait as a line: its text and its action. */
@@ -81,6 +91,12 @@ export function WaitLine({ wait, testid = "core-wait" }: { wait: Wait; testid?: 
         {wait.text}
       </span>
       {wait.action && <Button size="sm" onClick={wait.action.run} testid={`${testid}-action`}>{wait.action.label}</Button>}
+      {wait.detail && (
+        <details className="wait-details" data-testid={`${testid}-details`}>
+          <summary>Details</summary>
+          <span className="wait-detail" data-testid={`${testid}-detail`}>{wait.detail}</span>
+        </details>
+      )}
     </span>
   );
 }
@@ -91,7 +107,7 @@ export function CoreWait({ needFacts = false, testid = "core-wait" }: { needFact
   return wait ? <div className="wait-block"><WaitLine wait={wait} testid={testid} /></div> : null;
 }
 
-/** The panel's Preset row while the document has no preset. */
+/** The panel's Preset row while its marker has no preset yet. */
 export function PresetWait() {
   const wait = useCoreWait(true);
   return <span data-testid="preset-wait" data-wait={wait?.kind ?? "none"}>{wait?.short ?? "No preset: pick one"}</span>;
@@ -109,7 +125,7 @@ export function useCallWait(pending: boolean, error: string | null, doing: strin
 
 /** The panel's footer line: the instruction, the plan's summary, or what it waits for. */
 export function PlanLine({ profile, summary, error }: { profile: boolean; summary: string | null; error: string | null }) {
-  const hasPreset = useStudio((s) => !!s.doc.preset);
+  const hasPreset = useStudio((s) => !!featurePreset(s.doc, getFeature(s.doc, s.panel.featureId)));
   const wait = useCoreWait(!hasPreset);
   const planning = profile && !summary && !error && !wait;
   const since = useSince(planning);

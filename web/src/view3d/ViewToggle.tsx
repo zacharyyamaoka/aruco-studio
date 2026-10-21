@@ -1,6 +1,7 @@
-// The 2D | 3D toggle on the canvas (V3 "3D Toggle", Zach 2026-10-20 night: "as
-// we are always going to be in a 3D modelling like that, to me it's the most
-// natural"): a small segmented control at the stage's top-left; 3 toggles it.
+// The 2D | 3D toggle (V3 "3D Toggle", Zach 2026-10-20 night: "as we are always
+// going to be in a 3D modelling like that, to me it's the most natural"): a
+// small segmented control at the end of the dock (../app/Toolbar.tsx), where
+// Figma puts its Dev Mode switch (V2, picked 2026-10-20 night); 3 toggles it.
 // The view state is the store's (view3d), not the document's.
 import { SegmentedRow } from "@bam/ui";
 import { useStudio } from "../store";

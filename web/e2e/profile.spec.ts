@@ -198,7 +198,7 @@ test.describe(`profile-first (${CORE} core)`, () => {
     await idle(page);
     await expect.poll(async () => !!(await state(page)).plans.f1).toBe(true);
     const s = await state(page);
-    expect(s.doc.version).toBe(3);
+    expect(s.doc.version).toBe(4);
     const f1 = s.doc.features[0];
     expect(f1).not.toHaveProperty("rectId");
     expect(f1.profile).toEqual({ outer: "r1", holes: [] });
@@ -209,7 +209,7 @@ test.describe(`profile-first (${CORE} core)`, () => {
     const r1 = s.doc.shapes.find((x: any) => x.id === "r1");
     const legacy = {
       trim: "rectangle", rect: { cx: r1.cx, cy: r1.cy, w: r1.w, h: r1.h, angle_deg: r1.angle_deg },
-      marker: f1.marker, label: f1.label, preset: s.doc.preset, reference_face: false,
+      marker: f1.marker, label: f1.label, preset: f1.preset, reference_face: false,
     };
     const old = JSON.parse(JSON.stringify(await page.evaluate((req) => (window as any).__aruco.plan(req), legacy)));
     // as JSON (what a saved plan is): -0 and 0 are one number there

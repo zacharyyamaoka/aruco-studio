@@ -1,9 +1,14 @@
 // The document: one sketch (closed shapes, ../sketch/model.ts) and any number
-// of ArUco Extrude features, with the preset they are made by. Pure: the
+// of ArUco Extrude features, each with the preset it is made by. Pure: the
 // store (../store.ts) calls these; vitest covers them. Saved as
-// `.arucostudio-web.json` (format "arucostudio-web", version 3; a version 1
-// file, which held one feature, and a version 2 file, whose features filled
-// a rectangle, are migrated on open).
+// `.arucostudio-web.json` (format "arucostudio-web", version 4; a version 1
+// file, which held one feature, a version 2 file, whose features filled a
+// rectangle, and a version 3 file, whose one preset was the document's, are
+// migrated on open).
+//
+// WHY a preset per feature (Zach, 2026-10-20 night): "Preset shouldn't be on
+// the file because it's applied on a per marker basis!" The document keeps
+// only the preset a NEW marker starts with: the last one picked.
 //
 // WHY a feature references a PROFILE (Zach, 2026-10-20 evening: "if we just
 // have the idea of a profile, and you want a custom location, then you draw a
@@ -39,6 +44,9 @@ export interface Feature {
    *  its value). The Make tab's rows and the 3D view's drag arrows both write it
    *  through setField("extrude.<key>") / resetField. */
   extrude: ExtrudeParams;
+  /** how it is made (inkjet or 3D print, and the numbers); null only while
+   *  the core's presets have not arrived (loadCoreFacts fills it) */
+  preset: Preset | null;
   /** the fields typed by hand among those the contract has no driven
    *  encoding for ("marker.cols", "label.gap_mm", ...). The rest say it in
    *  their own value: see isSet(). */
@@ -47,7 +55,7 @@ export interface Feature {
 
 export interface Doc {
   format: "arucostudio-web";
-  version: 3;
+  version: 4;
   name: string;
   shapes: Shape[];
   /** the sketch's driving dimensions (D; ../sketch/constraints.ts): a file
@@ -56,10 +64,12 @@ export interface Doc {
   features: Feature[];
   /** auto id: key -> the first id already given out (IdRequest.ledger) */
   id_ledger: Record<string, number>;
-  preset: Preset | null;
+  /** the preset a new marker starts with: the last one picked (a version 3
+   *  file's one preset) */
+  default_preset: Preset | null;
 }
 
-export const DOC_VERSION = 3;
+export const DOC_VERSION = 4;
 
 export const TRIMS: readonly Trim[] = ["profile", "marker"];
 // WHY profile (Zach, 2026-10-20 evening): "there is no longer trim to rectangle.
@@ -87,14 +97,15 @@ export function rectProfile(rectId: string): ProfileRef {
   return { outer: rectId, holes: [] };
 }
 
-export function newFeature(profile: ProfileRef | null, id = newId("f")): Feature {
+export function newFeature(profile: ProfileRef | null, id = newId("f"), preset: Preset | null = null): Feature {
   return {
-    id, key: id, profile, holes: "avoid", trim: DEFAULT_TRIM, marker: { ...DEFAULT_MARKER }, label: { ...DEFAULT_LABEL, offset_mm: [0, 0] }, extrude: {}, set: [],
+    id, key: id, profile, holes: "avoid", trim: DEFAULT_TRIM, marker: { ...DEFAULT_MARKER }, label: { ...DEFAULT_LABEL, offset_mm: [0, 0] }, extrude: {},
+    preset, set: [],
   };
 }
 
-export function emptyDoc(name = "Untitled", shapes: Shape[] = [], preset: Preset | null = null): Doc {
-  return { format: "arucostudio-web", version: 3, name, shapes, dims: [], features: [], id_ledger: {}, preset };
+export function emptyDoc(name = "Untitled", shapes: Shape[] = [], defaultPreset: Preset | null = null): Doc {
+  return { format: "arucostudio-web", version: 4, name, shapes, dims: [], features: [], id_ledger: {}, default_preset: defaultPreset };
 }
 
 // ------------------------------------------------------------ shapes
@@ -310,14 +321,28 @@ export function idRange(m: MarkerParams, ids?: number[]): string {
 
 // ------------------------------------------------------------ the requests
 
+/** The preset a feature is made by: its own; the new-marker default for one
+ *  made before the core's presets arrived (a step back in the history). */
+export function featurePreset(doc: Doc, f: Feature | null | undefined): Preset | null {
+  return f?.preset ?? doc.default_preset;
+}
+
+/** Every feature without a preset given `p` (the core's presets arrived, or a
+ *  file or an example came without one); the same document when none lacks it. */
+export function fillPresets(doc: Doc, p: Preset | null): Doc {
+  if (!p || doc.features.every((f) => f.preset)) return doc;
+  return { ...doc, features: doc.features.map((f) => (f.preset ? f : { ...f, preset: p })) };
+}
+
 /** The feature's plan request: the profile's loops (the outer counter-
- *  clockwise, the holes clockwise) and what to do with its holes. No `rect`:
- *  the core places the marker and answers MarkerPlan.fit_rect. */
+ *  clockwise, the holes clockwise), what to do with its holes, and its own
+ *  preset. No `rect`: the core places the marker and answers MarkerPlan.fit_rect. */
 export function planRequest(doc: Doc, f: Feature | null): PlanRequest | null {
   const profile = f?.profile ? profileLoops(doc.shapes, f.profile) : null;
-  if (!f || !profile || !doc.preset) return null;
+  const preset = featurePreset(doc, f);
+  if (!f || !profile || !preset) return null;
   return {
-    trim: f.trim, profile, holes: f.holes, marker: f.marker, label: f.label, preset: doc.preset,
+    trim: f.trim, profile, holes: f.holes, marker: f.marker, label: f.label, preset,
     reference_face: referenceFace(doc, f),
     // always, even {}: the core answers MarkerPlan.extrude (the driven heights the
     // Make tab and the 3D view show grey) only when the request asks
@@ -325,9 +350,38 @@ export function planRequest(doc: Doc, f: Feature | null): PlanRequest | null {
   };
 }
 
-/** Print's sheet: one item per feature that plans, in the order made. */
-export function sheetItems(doc: Doc): PlanRequest[] {
-  return doc.features.map((f) => planRequest(doc, f)).filter((r): r is PlanRequest => !!r);
+/** One paper sheet: the inkjet features made by one preset, in the order made. */
+export interface SheetGroup { key: string; preset: Preset; items: PlanRequest[] }
+
+/** Print's sheets: the inkjet features that plan, one group per preset (its
+ *  page size can differ), in the order the presets first appear. A 3D-print
+ *  feature is not printed on paper. Two presets are one group when every
+ *  field is the same (the id alone is not enough: a modified copy shares it). */
+export function sheetGroups(doc: Doc): SheetGroup[] {
+  const groups = new Map<string, SheetGroup>();
+  for (const f of doc.features) {
+    const req = planRequest(doc, f);
+    if (!req || req.preset.method !== "inkjet") continue;
+    const key = presetKey(req.preset);
+    const g = groups.get(key) ?? { key, preset: req.preset, items: [] };
+    g.items.push(req);
+    groups.set(key, g);
+  }
+  return [...groups.values()];
+}
+
+/** A preset's identity for grouping: its fields, in key order. */
+export function presetKey(p: Preset): string {
+  return JSON.stringify(Object.keys(p).sort().map((k) => [k, (p as unknown as Record<string, unknown>)[k]]));
+}
+
+/** Print's sheet for one feature's preset (`featureId`'s, else the first
+ *  group's): the items core.sheet lays out on that preset's page. */
+export function sheetItems(doc: Doc, featureId?: string | null): PlanRequest[] {
+  const groups = sheetGroups(doc);
+  const f = getFeature(doc, featureId);
+  const own = f ? featurePreset(doc, f) : null;
+  return (own && groups.find((g) => g.key === presetKey(own)))?.items ?? groups[0]?.items ?? [];
 }
 
 /** Auto id's input (core.assign_ids): a typed first id is kept, a driven one is null. */
@@ -383,6 +437,8 @@ function readFeature(raw: Record<string, unknown>): Feature {
   } as Feature;
   if (typeof f.key !== "string" || !f.key) f.key = f.id;
   if (!Array.isArray(f.set)) f.set = [];
+  // a file from before version 4 has no preset per feature: parseDoc gives it the file's
+  if (!f.preset || typeof f.preset !== "object" || Array.isArray(f.preset)) f.preset = null;
   // before barrier 10 (2026-10-20 night) there were no heights: all driven
   if (!f.extrude || typeof f.extrude !== "object" || Array.isArray(f.extrude)) f.extrude = {};
   // version 2 (2026-10-18 .. 20): the marker filled the rectangle `rectId` (drawn,
@@ -421,12 +477,23 @@ export function migrateV2(d: Record<string, unknown>): Record<string, unknown> {
   return { ...d, version: 3 };
 }
 
+/** Version 3 had one preset, the document's: every feature is made by it,
+ *  and it is the one a new marker starts with. */
+export function migrateV3(d: Record<string, unknown>): Record<string, unknown> {
+  const { preset, ...rest } = d;
+  const p = preset && typeof preset === "object" ? preset : null;
+  const features = Array.isArray(d.features)
+    ? d.features.map((f) => (f && typeof f === "object" ? { ...(f as object), preset: p } : f)) : d.features;
+  return { ...rest, version: 4, features, default_preset: p };
+}
+
 /** Read a saved file; throws with a readable reason when it is not one. */
 export function parseDoc(text: string): Doc {
   let d = JSON.parse(text);
   if (!d || d.format !== "arucostudio-web") throw new Error("not an .arucostudio-web.json file");
   if (d.version === 1) d = migrateV1(d);
   if (d.version === 2) d = migrateV2(d);
+  if (d.version === 3) d = migrateV3(d);
   if (d.version !== DOC_VERSION) throw new Error(`file version ${d.version}: this Studio reads versions 1 to ${DOC_VERSION}`);
   const shapes: Shape[] = Array.isArray(d.shapes) ? d.shapes.filter((s: Shape) => s && ["rect", "circle", "poly"].includes(s.kind)) : [];
   const features: Feature[] = Array.isArray(d.features) ? d.features.filter((f: unknown) => f && typeof f === "object").map(readFeature) : [];
@@ -434,7 +501,8 @@ export function parseDoc(text: string): Doc {
   const ids = new Set(shapes.map((s) => s.id));
   const dims: SketchDim[] = Array.isArray(d.dims)
     ? d.dims.filter((x: SketchDim) => x && typeof x.id === "string" && dimShapes(x).every((id) => ids.has(id))) : [];
-  return {
-    format: "arucostudio-web", version: 3, name: String(d.name ?? "Untitled"), shapes, dims, features, id_ledger: ledger, preset: d.preset ?? null,
-  };
+  const defaultPreset: Preset | null = d.default_preset && typeof d.default_preset === "object" ? d.default_preset : null;
+  return fillPresets({
+    format: "arucostudio-web", version: 4, name: String(d.name ?? "Untitled"), shapes, dims, features, id_ledger: ledger, default_preset: defaultPreset,
+  }, defaultPreset);
 }

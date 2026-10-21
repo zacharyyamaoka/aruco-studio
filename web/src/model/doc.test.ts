@@ -3,10 +3,11 @@ import type { Preset, Suggestion } from "../core/contract";
 import { circleShape, rectShape } from "../sketch/model";
 import v1Fixture from "../../e2e/fixtures/v1-plate.arucostudio-web.json?raw";
 import v2Fixture from "../../e2e/fixtures/v2-rect.arucostudio-web.json?raw";
+import v3Fixture from "../../e2e/fixtures/v3-a4.arucostudio-web.json?raw";
 import {
-  DEFAULT_MARKER, addFeature, addShape, applyIds, deleteShape, emptyDoc, featureNumber, featureOfProfile, featureOfRect, featureRect, idCount, idItems,
+  DEFAULT_MARKER, addFeature, addShape, applyIds, deleteShape, emptyDoc, featureNumber, featurePreset, fillPresets, featureOfProfile, featureOfRect, featureRect, idCount, idItems,
   idRange, idRequest, isSet, keyOwner, newFeature, nextTurn, parseDoc, pickSuggestion, planRequest, rectProfile, referenceFace, removeFeature,
-  resetField, serialise, setField, setMarker, setType, sheetItems } from "./doc";
+  resetField, serialise, setField, setMarker, setType, sheetGroups, sheetItems } from "./doc";
 
 const preset: Preset = { id: "builtin:x", name: "X", method: "inkjet", builtin: true, page: "A4", page_mm: [210, 297] };
 
@@ -97,7 +98,7 @@ describe("driven vs set", () => {
 describe("the document", () => {
   const base = addShape(addShape(emptyDoc("t", [], preset), rectShape("r1", 0, 0, 40, 20)), rectShape("r2", 50, 0, 80, 30));
   const plate = {
-    ...emptyDoc("p", [rectShape("p", 0, 0, 120, 80), circleShape("h", 25, 55, 20), rectShape("r1", 40, 20, 80, 60)]), preset,
+    ...emptyDoc("p", [rectShape("p", 0, 0, 120, 80), circleShape("h", 25, 55, 20), rectShape("r1", 40, 20, 80, 60)]), default_preset: preset,
   };
 
   it("a feature has a stable id, and its key is the id", () => {
@@ -111,7 +112,7 @@ describe("the document", () => {
     expect(planRequest(base, null)).toBeNull();
     expect(planRequest(base, newFeature(null))).toBeNull();
     expect(planRequest(base, newFeature(rectProfile("gone")))).toBeNull();
-    expect(planRequest({ ...base, preset: null }, newFeature(rectProfile("r1")))).toBeNull();
+    expect(planRequest({ ...base, default_preset: null }, newFeature(rectProfile("r1")))).toBeNull();
   });
 
   it("the request carries the profile's loops, its holes and the trim, never a rect (the core places the marker)", () => {
@@ -186,17 +187,19 @@ describe("the document", () => {
     expect(planRequest(moved, f)!.profile!.loops[0][0]).toEqual([60, 20]);
   });
 
-  it("saves and reads back (version 3, with the ledger)", () => {
-    const d = { ...addFeature(base, setField(newFeature(rectProfile("r1")), "label.side", "above")), id_ledger: { k: 3 } };
+  it("saves and reads back (version 4, with the ledger and each feature's preset)", () => {
+    const d = { ...addFeature(base, setField(newFeature(rectProfile("r1"), undefined, preset), "label.side", "above")), id_ledger: { k: 3 } };
     const text = serialise(d);
-    expect(JSON.parse(text).version).toBe(3);
+    expect(JSON.parse(text).version).toBe(4);
+    expect(JSON.parse(text).features[0].preset).toEqual(preset);
+    expect(JSON.parse(text)).not.toHaveProperty("preset");
     expect(JSON.parse(text).features[0]).not.toHaveProperty("rectId");
     expect(parseDoc(text)).toEqual(d);
   });
 
   it("refuses a file that is not one, by name", () => {
     expect(() => parseDoc("{}")).toThrow(/arucostudio-web/);
-    expect(() => parseDoc(JSON.stringify({ format: "arucostudio-web", version: 4 }))).toThrow(/version 4/);
+    expect(() => parseDoc(JSON.stringify({ format: "arucostudio-web", version: 5 }))).toThrow(/version 5/);
   });
 
   it("fills missing fields from the defaults", () => {
@@ -210,7 +213,7 @@ describe("the document", () => {
 describe("version 2 files migrate: a feature's rectangle becomes its profile (2026-10-20 evening)", () => {
   it("rectId + trim rectangle opens as that rectangle on its own, trim profile (driven), and requests that rectangle", () => {
     const d = parseDoc(v2Fixture);
-    expect(d.version).toBe(3);
+    expect(d.version).toBe(4);
     expect(d.shapes.map((s) => s.id)).toEqual(["plate", "plate-h1", "plate-h2", "r1", "r2"]);
     const f1 = d.features[0];
     expect(f1).not.toHaveProperty("rectId");
@@ -244,7 +247,7 @@ describe("version 2 files migrate: a feature's rectangle becomes its profile (20
     expect(sheetItems(d)).toHaveLength(1);
   });
 
-  it("a migrated file saves as version 3 and reads back the same", () => {
+  it("a migrated file saves as version 4 and reads back the same", () => {
     const d = parseDoc(v2Fixture);
     expect(parseDoc(serialise(d))).toEqual(d);
   });
@@ -303,7 +306,7 @@ describe("auto id", () => {
 describe("version 1 files migrate", () => {
   it("the old one-feature fixture becomes one feature that plans", () => {
     const d = parseDoc(v1Fixture);
-    expect(d.version).toBe(3);
+    expect(d.version).toBe(4);
     expect(d.name).toBe("Old plate");
     expect(d.features).toHaveLength(1);
     expect(d.id_ledger).toEqual({});
@@ -342,7 +345,7 @@ describe("version 1 files migrate", () => {
 });
 
 describe("trim (2026-10-18; profile | marker since 2026-10-20 evening)", () => {
-  const plate = { ...emptyDoc("p", [rectShape("p", 0, 0, 120, 80), { kind: "circle", id: "h", cx: 25, cy: 55, r: 10 }, rectShape("r1", 40, 20, 80, 60)]), preset };
+  const plate = { ...emptyDoc("p", [rectShape("p", 0, 0, 120, 80), { kind: "circle", id: "h", cx: 25, cy: 55, r: 10 }, rectShape("r1", 40, 20, 80, 60)]), default_preset: preset };
 
   it("a new feature is cut to its profile, driven; set and reset like any row", () => {
     const f = newFeature(rectProfile("r1"));
@@ -406,5 +409,77 @@ describe("the heights (barrier 10, 2026-10-20 night): set only when typed, drive
   it("files from before barrier 10 open with every height driven", () => {
     const d = parseDoc(v2Fixture);
     for (const f of d.features) expect(f.extrude).toEqual({});
+  });
+});
+
+describe("a preset per feature (version 4, Zach 2026-10-20 night: \"applied on a per marker basis\")", () => {
+  const a4 = preset;
+  const letter: Preset = { id: "builtin:letter", name: "Letter", method: "inkjet", builtin: true, page: "Letter", page_mm: [215.9, 279.4] };
+  const print3d: Preset = { id: "builtin:default", name: "Default", method: "print3d", builtin: true, nozzle_mm: 0.6, line_mm: 0.675 };
+  const sheet = () => {
+    let d = emptyDoc("s", [rectShape("r1", 0, 0, 30, 30), rectShape("r2", 40, 0, 70, 30), rectShape("r3", 80, 0, 110, 30), rectShape("r4", 120, 0, 150, 30)], letter);
+    d = addFeature(d, newFeature(rectProfile("r1"), "f1", a4));
+    d = addFeature(d, newFeature(rectProfile("r2"), "f2", print3d));
+    d = addFeature(d, newFeature(rectProfile("r3"), "f3", letter));
+    return addFeature(d, newFeature(rectProfile("r4"), "f4", a4));
+  };
+
+  it("each feature plans with its own preset, not the document's default", () => {
+    const d = sheet();
+    expect(planRequest(d, d.features[0])!.preset).toEqual(a4);
+    expect(planRequest(d, d.features[1])!.preset).toEqual(print3d);
+    expect(planRequest(d, d.features[2])!.preset).toEqual(letter);
+  });
+
+  it("a feature without one (made before the core's presets arrived) plans with the default; fillPresets gives it the default", () => {
+    const d = addFeature(emptyDoc("w", [rectShape("r1", 0, 0, 30, 30)], letter), newFeature(rectProfile("r1"), "f1"));
+    expect(featurePreset(d, d.features[0])).toEqual(letter);
+    expect(planRequest(d, d.features[0])!.preset).toEqual(letter);
+    expect(fillPresets(d, letter).features[0].preset).toEqual(letter);
+    const full = fillPresets(d, letter);
+    expect(fillPresets(full, a4)).toBe(full);
+  });
+
+  it("Print: the inkjet features, one group per preset in first-seen order; 3D-print ones are not on paper", () => {
+    const groups = sheetGroups(sheet());
+    expect(groups.map((g) => g.preset.id)).toEqual(["builtin:x", "builtin:letter"]);
+    expect(groups.map((g) => g.items.length)).toEqual([2, 1]);
+    expect(groups.flatMap((g) => g.items).every((r) => r.preset.method === "inkjet")).toBe(true);
+    // a modified copy of a preset (same id, another margin) is its own group
+    const d = sheet();
+    const mod = { ...d, features: d.features.map((f) => (f.id === "f4" ? { ...f, preset: { ...a4, margin_mm: 3 } } : f)) };
+    expect(sheetGroups(mod).map((g) => g.items.length)).toEqual([1, 1, 1]);
+    // sheetItems: the group of the named feature's preset, else the first
+    expect(sheetItems(d, "f3").map((r) => r.preset.id)).toEqual(["builtin:letter"]);
+    expect(sheetItems(d, "f2")).toHaveLength(2);
+    expect(sheetItems(d)).toHaveLength(2);
+  });
+});
+
+describe("version 3 files migrate: the file's preset goes on every feature (fixture v3-a4)", () => {
+  it("every feature is made by the file's preset, which is also the default for a new marker", () => {
+    const old = JSON.parse(v3Fixture);
+    const d = parseDoc(v3Fixture);
+    expect(d.version).toBe(4);
+    expect(d).not.toHaveProperty("preset");
+    expect(d.default_preset).toEqual(old.preset);
+    expect(d.features.map((f) => f.preset)).toEqual([old.preset, old.preset]);
+    expect(d.features.map((f) => planRequest(d, f)!.preset.id)).toEqual(["builtin:inkjet-a4-vinyl", "builtin:inkjet-a4-vinyl"]);
+    expect(d.id_ledger).toEqual({ f1: 3, f2: 10 });
+    expect(d.features[1].marker).toMatchObject({ type: "grid", cols: 2, rows: 2, first_id: 10 });
+  });
+
+  it("a v3 file without a preset opens with none (the core's presets fill them later)", () => {
+    const old = JSON.parse(v3Fixture);
+    delete old.preset;
+    const d = parseDoc(JSON.stringify(old));
+    expect(d.default_preset).toBeNull();
+    expect(d.features.map((f) => f.preset)).toEqual([null, null]);
+  });
+
+  it("the migrated file saves as version 4 and reads back the same", () => {
+    const d = parseDoc(v3Fixture);
+    expect(JSON.parse(serialise(d)).version).toBe(4);
+    expect(parseDoc(serialise(d))).toEqual(d);
   });
 });

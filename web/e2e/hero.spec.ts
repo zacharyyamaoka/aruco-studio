@@ -123,7 +123,7 @@ test("hero · plate → face → A (panel beside) → Grid → type the marker s
   await page.waitForTimeout(BEAT * 1.5);
 
   // 6 · Sheet: Fewest cuts | Fewest sheets
-  await glideClick(page.getByTestId("tool-sheet"));
+  await glideClick(page.getByTestId("act-print"));
   await expect(page.locator('[data-testid="print-page"] svg')).toBeVisible({ timeout: 45_000 });
   await idle(page);
   mark("sheet");
@@ -143,7 +143,7 @@ test("hero · plate → face → A (panel beside) → Grid → type the marker s
   await page.waitForTimeout(BEAT / 2);
 
   // 7 · Verify: OpenCV reads the marker; drag Tilt by hand (the manual sweep)
-  await glideClick(page.getByTestId("tool-verify"));
+  await glideClick(page.getByTestId("act-verify"));
   await expect(page.getByTestId("verify-dialog")).toBeVisible();
   mark("verify_open");
   await expect(page.getByTestId("verify-image")).toBeVisible({ timeout: 90_000 });

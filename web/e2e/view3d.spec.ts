@@ -8,7 +8,7 @@
 // flow into that folder.
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, idle, labelOn, loadExample, openStudio, planOutline, state } from "./helpers";
+import { CORE, clickAt, coreReady, idle, labelOn, loadExample, openPresets, openStudio, planOutline, state } from "./helpers";
 
 const SHOTS = process.env.VIEW3D_SHOTS ?? "test-results/view3d";
 
@@ -23,10 +23,11 @@ async function arrow(page: Page, key: string): Promise<Arrow> {
   return (await v3(page))!.arrows.find((a) => a.key === key)!;
 }
 
-/** Choose the first built-in preset of a method in the presets modal. */
+/** Choose the first built-in preset of a method in the presets modal: the open
+ *  marker's (a preset is per marker since 2026-10-20 night), else the one a new
+ *  marker starts with. */
 async function preset(page: Page, chip: "3D print" | "Inkjet"): Promise<void> {
-  await page.getByTestId("preset-chip").click();
-  const modal = page.getByTestId("presets-modal");
+  const modal = await openPresets(page);
   await modal.locator('[data-coll="builtin"]').click();
   await modal.getByTestId("presets-nav").locator(`[data-chip="${chip}"]`).click();
   await modal.locator(".card[data-card]").first().click();
@@ -41,9 +42,18 @@ async function tile(page: Page, inkjet = false): Promise<string> {
   await coreReady(page);
   await loadExample(page, "custom-placement");
   await idle(page);
-  if (!inkjet) await preset(page, "3D print");
+  if (!inkjet) {
+    // the tile's own preset: its panel's Preset row, then OK
+    const o = await planOutline(page);
+    await clickAt(page, o.cx, o.cy);
+    await expect(page.getByTestId("extrude-panel")).toBeVisible();
+    await preset(page, "3D print");
+    await page.getByTestId("panel-ok").click();
+    await expect(page.getByTestId("extrude-panel")).toHaveCount(0);
+    await idle(page);
+  }
   const s = await state(page);
-  expect(s.doc.preset.method).toBe(inkjet ? "inkjet" : "print3d");
+  expect(s.feature.preset.method).toBe(inkjet ? "inkjet" : "print3d");
   expect(s.plan?.extrude, "the core answers MarkerPlan.extrude").toBeTruthy();
   return s.feature.id;
 }
@@ -68,6 +78,13 @@ async function dragArrow(page: Page, a: Arrow, dx: number, dy: number, steps = 1
   for (let i = 1; i <= steps; i++) { await page.mouse.move(g[0] + (dx * i) / steps, g[1] + (dy * i) / steps); await page.waitForTimeout(15); }
   await page.mouse.up();
   await idle(page);
+}
+
+/** Click a value box's input and let its focus settle: onFocus selects the
+ *  text in the next animation frame, which would swallow keys typed before it. */
+async function focusBox(page: Page, input: ReturnType<Page["locator"]>): Promise<void> {
+  await input.click();
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 }
 
 const layer = (plan: any, colour: string) => plan.layers.find((L: any) => L.op === "add" && L.colour === colour && L.part !== "label");
@@ -248,7 +265,7 @@ test.describe(`the 3D view (${CORE} core)`, () => {
     expect(layer(s.plan, "white").z[1]).toBeCloseTo(W0, 6);
 
     // type 2.4 in the box, Enter
-    await box.locator("input").click();
+    await focusBox(page, box.locator("input"));
     await page.keyboard.press("Control+a");
     await page.keyboard.type("2.4");
     await page.keyboard.press("Enter");
@@ -260,7 +277,7 @@ test.describe(`the 3D view (${CORE} core)`, () => {
     await expect(box.locator("input")).toHaveValue("2.40 mm");
     await expect(box).toHaveAttribute("data-driven", "false");
     // Esc cancels a typed value
-    await box.locator("input").click();
+    await focusBox(page, box.locator("input"));
     await page.keyboard.press("Control+a");
     await page.keyboard.type("9");
     await page.keyboard.press("Escape");
@@ -306,7 +323,7 @@ test.describe(`the 3D view (${CORE} core)`, () => {
     // typed, with the white set too: the black still hangs from the white's outer face
     const typeIn = async (key: string, v: string) => {
       const input = page.locator(`[data-testid="v3-box"][data-key="${key}"] input`);
-      await input.click();
+      await focusBox(page, input);
       await page.keyboard.press("Control+a");
       await page.keyboard.type(v);
       await page.keyboard.press("Enter");
@@ -330,7 +347,7 @@ test.describe(`the 3D view (${CORE} core)`, () => {
     const s = await state(page);
     const v = (await v3(page))!;
     expect(v.arrows.map((a) => a.key)).toEqual(["paper_mm"]);
-    expect(v.arrows[0]).toMatchObject({ field: "extrude.paper_mm", value: s.doc.preset.thickness_mm, driven: true, dir: 1 });
+    expect(v.arrows[0]).toMatchObject({ field: "extrude.paper_mm", value: s.feature.preset.thickness_mm, driven: true, dir: 1 });
     expect(v.arrows[0].base3d[2]).toBeCloseTo(layer(s.plan, "white").z[1], 6);
     await expect(page.locator('[data-testid="v3-box"]')).toHaveCount(1);
     await page.waitForTimeout(100);

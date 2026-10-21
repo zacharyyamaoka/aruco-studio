@@ -3,15 +3,17 @@
 // the drawn elements' boxes in pixels.
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import { clickAt, CORE, coreReady, dragWorld, fitRect, idle, loadExample, openStudio, overlaps, panelTab, planOutline, profileRect, state, toClient } from "./helpers";
+import { clickAt, CORE, coreReady, dragWorld, fitRect, idle, loadExample, openPresets, openStudio, overlaps, panelTab, planOutline, profileRect, state, toClient } from "./helpers";
 
 test.describe(`online Studio (${CORE} core)`, () => {
-  test("1 · the core chip reaches ready", async ({ page }) => {
+  test("1 · the core reaches ready: ?'s status line says so (no chip in the chrome since the Figma layout)", async ({ page }) => {
     await openStudio(page);
     // usable before: the sketch draws and picks while the core loads
     await expect(page.locator("[data-shape]").first()).toBeVisible();
-    await expect(page.getByTestId("core-chip")).toHaveAttribute("data-state", "ready", { timeout: 60_000 });
-    await expect(page.getByTestId("core-chip")).toContainText(CORE === "mock" ? "Mock core" : "Python ready");
+    await coreReady(page);
+    await page.getByTestId("help").click();
+    await expect(page.getByTestId("core-status")).toHaveAttribute("data-state", "ready");
+    await expect(page.getByTestId("core-status")).toHaveText(/^Ready in \d+\.\d s$/);
   });
 
   // 2026-10-20 evening (barrier 9): the profile is the input; the core places
@@ -110,12 +112,11 @@ test.describe(`online Studio (${CORE} core)`, () => {
     expect(Math.abs((px1.x + px1.width / 2) - (px0.x + px0.width / 2) - 20 * z)).toBeLessThanOrEqual(0.5 * z + 1);
   });
 
-  test("5 · the presets modal: pick the A4 inkjet preset, the chip follows", async ({ page }) => {
+  test("5 · the presets modal with no marker open: pick the A4 inkjet preset, a new marker starts with it", async ({ page }) => {
     await openStudio(page);
     await coreReady(page);
-    await page.getByTestId("preset-chip").click();
-    const modal = page.getByTestId("presets-modal");
-    await expect(modal).toBeVisible();
+    const modal = await openPresets(page);
+    await expect(page.getByTestId("presets-target")).toHaveAttribute("data-target", "new");
     await modal.locator('[data-coll="builtin"]').click();
     await modal.locator('[data-chip="Inkjet"]').click();
     await modal.locator('[data-chip="A4"]').click();
@@ -126,9 +127,15 @@ test.describe(`online Studio (${CORE} core)`, () => {
     await card.click();
     await page.getByTestId("presets-select").click();
     await expect(modal).toHaveCount(0);
-    await expect(page.getByTestId("preset-chip")).toContainText(name);
+    expect((await state(page)).doc.default_preset).toMatchObject({ method: "inkjet", page: "A4" });
+    // the next marker is made by it, and its Preset row says so
+    await clickAt(page, 60, 40);
+    await page.keyboard.press("a");
+    await idle(page);
+    await expect(page.getByTestId("panel-preset")).toContainText(name);
     const s = await state(page);
-    expect(s.doc.preset).toMatchObject({ method: "inkjet", page: "A4" });
+    expect(s.feature.preset).toMatchObject({ method: "inkjet", page: "A4" });
+    expect(s.plan.extrude.method).toBe("inkjet");
   });
 
   test("6 · Export SVG downloads a file whose root is sized in mm", async ({ page }) => {

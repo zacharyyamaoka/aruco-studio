@@ -15,7 +15,7 @@ import { create } from "zustand";
 import type { CoreInfo, IdResult, Issue, LabelParams, MarkerPlan, Preset, Suggestion } from "./core/contract";
 import { core, coreStatus } from "./coreSource";
 import {
-  addFeature, addShape, applyIds, deleteShape, emptyDoc, featureOfProfile, featureOfRect, getFeature, keyOwner, newFeature, newId, nextTurn, pickSuggestion,
+  addFeature, addShape, applyIds, deleteShape, emptyDoc, featureOfProfile, featureOfRect, fillPresets, getFeature, keyOwner, newFeature, newId, nextTurn, pickSuggestion,
   rectProfile, removeFeature, resetField, setField, setShape, updateFeature, type Doc, type Feature, type Holes,
 } from "./model/doc";
 import { boxOf, fitBox, rectCorners, type Camera } from "./model/geom";
@@ -82,6 +82,7 @@ export interface Studio {
   /** a new document state; edits sharing a `key` (one value, typed) within
    *  IDLE_MS of each other are one undo step */
   setDoc: (doc: Doc, key?: string) => void;
+  /** a document opened (a file, an example, New): its history starts fresh */
   loadDoc: (doc: Doc) => void;
   newDoc: (exampleId?: string) => void;
   setTool: (t: Tool) => void;
@@ -155,6 +156,8 @@ export interface Studio {
   /** a click on empty canvas: the panel closes (OK) and nothing is selected */
   closePanel: () => void;
 
+  /** the marker the panel is open on is made by `p` (one undo step), and a new
+   *  marker starts with it; with no panel open, only the latter */
   setPreset: (p: Preset) => void;
   /** Edit › ArUco Re-ID…: a core.assign_ids answer for idItems(doc)
    *  (sequential or fresh hash) into the document's ids and ledger, as one undo step */
@@ -290,14 +293,21 @@ export const useStudio = create<Studio>((set, get) => {
 
     setDoc: (doc, key) => put({ doc }, key),
     loadDoc: (doc) => {
-      const preset = doc.preset ?? get().doc.preset;
+      const preset = doc.default_preset ?? get().doc.default_preset;
+      // WHY a fresh history (as Excalidraw and Figma do): Ctrl+Z after Open,
+      // an example or New must not bring the previous document back -- an
+      // autosave would then write it into the file just opened
+      past.length = 0;
+      future = [];
+      last = null;
+      held = null;
       openAt = -1;
-      put({ doc: { ...doc, dims: doc.dims ?? [], preset }, ...only(null), panel: PANEL0, plans: {}, planErrors: {}, idIssues: [], suggestions: [], tool: "select" });
+      set({ doc: fillPresets({ ...doc, dims: doc.dims ?? [], default_preset: preset }, preset), ...only(null), panel: PANEL0, plans: {}, planErrors: {}, idIssues: [], suggestions: [], tool: "select", ...flags() });
       get().fit();
     },
     newDoc: (exampleId) => {
       const ex = exampleId ? example(exampleId) : undefined;
-      const doc = emptyDoc(ex?.name ?? "Untitled", ex ? structuredClone(ex.shapes) : [], get().doc.preset);
+      const doc = emptyDoc(ex?.name ?? "Untitled", ex ? structuredClone(ex.shapes) : [], get().doc.default_preset);
       get().loadDoc(ex?.features ? { ...doc, features: structuredClone(ex.features) } : doc);
     },
     setTool: (tool) => set({ tool }),
@@ -477,7 +487,7 @@ export const useStudio = create<Studio>((set, get) => {
       if (many.length > 1) {
         if (get().panel.open) get().ok();
         const { doc, panel, multi } = get();
-        const fresh = many.filter((r) => !featureOfRect(doc, r.id)).map((r) => newFeature(rectProfile(r.id)));
+        const fresh = many.filter((r) => !featureOfRect(doc, r.id)).map((r) => newFeature(rectProfile(r.id), undefined, doc.default_preset));
         if (!fresh.length) { set({ note: "Those rectangles already have ArUco Extrudes: click a marker to edit it." }); return; }
         openAt = past.length;
         put({
@@ -498,7 +508,8 @@ export const useStudio = create<Studio>((set, get) => {
       // the new feature and the rectangle (or profile) it takes are one step
       held = { stepped: false };
       try {
-        const f = newFeature(null);
+        // a new marker starts with the last preset picked
+        const f = newFeature(null, undefined, doc.default_preset);
         open(doc, f, true);
         const ref = sel?.kind === "profile" ? sel.ref
           : sel?.kind === "shape" && doc.shapes.find((s) => s.id === sel.id)?.kind === "rect" ? rectProfile(sel.id) : null;
@@ -587,7 +598,8 @@ export const useStudio = create<Studio>((set, get) => {
 
     setPreset: (p) => {
       touchRecent(p.id);
-      put({ doc: { ...get().doc, preset: p } });
+      const { doc, panel } = get();
+      put({ doc: { ...updateFeature(doc, panel.open ? panel.featureId : null, (f) => ({ ...f, preset: p })), default_preset: p } });
     },
     // the planner's next auto id call (hash, with this ledger) keeps these ids
     reId: (res) => put({ doc: applyIds(get().doc, res) }),
@@ -623,7 +635,8 @@ const FACT_BACKOFF_MS = [600, 1800];
 let asking: Promise<void> | null = null;
 
 /** Load what the core knows once it answers: the dictionaries and the
- *  built-in presets (the first is the document's preset until one is picked).
+ *  built-in presets (the first inkjet one is a new marker's until one is
+ *  picked, and every marker made before it arrived gets it).
  *  A rejected call is tried again (FACT_TRIES, backing off); after the last,
  *  `facts` holds the error until a Retry (the panel's) or the core's next
  *  ready asks again. One ask at a time: a second call joins the first.
@@ -644,12 +657,14 @@ async function askFacts(): Promise<void> {
     if (coreStatus().state === "error") { why = coreStatus().detail ?? "the core failed to load"; break; }
     try {
       const [info, builtins] = await Promise.all([core.info(), core.presets()]);
-      const s = useStudio.getState();
       useStudio.setState({ info, builtins, facts: { state: "ok" } });
       // WHY inkjet first: Zach moved to inkjet stickers on vinyl (2026-10-17, CF-13);
       // 3D-printed markers stay a placeholder, so a new document starts on paper.
-      const first = builtins.find((p) => p.method === "inkjet") ?? builtins[0];
-      if (!s.doc.preset && first) useStudio.setState({ doc: { ...useStudio.getState().doc, preset: first } });
+      const first = builtins.find((p) => p.method === "inkjet") ?? builtins[0] ?? null;
+      const doc = useStudio.getState().doc;
+      const dflt = doc.default_preset ?? first;
+      const next = fillPresets(dflt === doc.default_preset ? doc : { ...doc, default_preset: dflt }, dflt);
+      if (next !== doc) useStudio.setState({ doc: next });
       return;
     } catch (e) {
       why = e instanceof Error ? e.message : String(e);

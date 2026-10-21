@@ -1,16 +1,11 @@
 // The presets modal after Zach's 2026-10-18 review: filters in the left bar,
 // Info always on the right, a click shows a preset's Info, my presets are
-// edited in Info and kept in this browser, Select sets the document's preset.
-// On the real core: the built-ins are the core's, read through the cards.
-import { expect, test, type Locator, type Page } from "@playwright/test";
-import { coreReady, openStudio, state } from "./helpers";
-
-async function openPresets(page: Page): Promise<Locator> {
-  await page.getByTestId("preset-chip").click();
-  const modal = page.getByTestId("presets-modal");
-  await expect(modal).toBeVisible();
-  return modal;
-}
+// edited in Info and kept in this browser. Use sets the open marker's preset;
+// with no marker open (Edit › Presets…, as here) the one a new marker starts
+// with (a preset per marker since 2026-10-20 night). On the real core: the
+// built-ins are the core's, read through the cards.
+import { expect, test, type Locator } from "@playwright/test";
+import { coreReady, openPresets, openStudio, state } from "./helpers";
 
 const num = (info: Locator, path: string) => info.locator(`input[data-path="${path}"]`);
 
@@ -40,8 +35,8 @@ test.describe("the presets modal", () => {
       expect(b.y).toBeGreaterThan(search.y + search.height - 1);
       expect(b.y + b.height).toBeLessThan(colls.y + 1);
     }
-    // the current preset's Info is open from the start
-    const cur = (await state(page)).doc.preset;
+    // the current preset's Info is open from the start (no marker open: the new markers' one)
+    const cur = (await state(page)).doc.default_preset;
     await expect(side.getByTestId("preset-info")).toHaveAttribute("data-preset", cur.id);
   });
 
@@ -87,7 +82,8 @@ test.describe("the presets modal", () => {
       await expect(num(info, "preset.min_cell_mm")).toBeDisabled();
       await expect(info.getByTestId("preset-dup-edit")).toBeVisible();
     }
-    // Select uses the picked card: the document's preset has Info's numbers
+    // Use uses the picked card: with no marker open, a new marker starts with Info's numbers
+    await expect(page.getByTestId("presets-target")).toHaveAttribute("data-target", "new");
     const a4 = cards.filter({ hasText: "A4" }).first();
     await a4.click();
     const a4Id = (await a4.getAttribute("data-card"))!;
@@ -95,11 +91,11 @@ test.describe("the presets modal", () => {
     await page.getByTestId("presets-select").click();
     await expect(modal).toHaveCount(0);
     const s = await state(page);
-    expect(s.doc.preset.id).toBe(a4Id);
-    expect(s.doc.preset).toMatchObject({ page: "A4", margin_mm: margin, page_mm: [210, 297] });
+    expect(s.doc.default_preset.id).toBe(a4Id);
+    expect(s.doc.default_preset).toMatchObject({ page: "A4", margin_mm: margin, page_mm: [210, 297] });
   });
 
-  test("3 · Duplicate a built-in, type a margin in Info: it persists; Select puts the new name on the chip", async ({ page }) => {
+  test("3 · Duplicate a built-in, type a margin in Info: it persists; Use makes it the current one, by its new name", async ({ page }) => {
     let modal = await openPresets(page);
     await modal.locator('[data-coll="builtin"]').click();
     const a4 = modal.locator(".card[data-card]").filter({ hasText: "A4" }).first();
@@ -141,16 +137,19 @@ test.describe("the presets modal", () => {
     info = modal.getByTestId("preset-info");
     await expect(num(info, "preset.margin_mm")).toHaveValue(typed);
 
-    // rename it in Info, then Select: the top bar's chip shows the new name
+    // rename it in Info, then Use: it is the current preset (marked so), by its new name
     const newName = "My A4 vinyl, wide margin";
     await info.getByTestId("preset-name").fill(newName);
     await info.getByTestId("preset-name").press("Enter");
     await expect(modal.locator(`.card[data-card="${copyId}"] .name`)).toHaveText(newName);
     await page.getByTestId("presets-select").click();
     await expect(modal).toHaveCount(0);
-    await expect(page.getByTestId("preset-chip")).toContainText(newName);
     const s = await state(page);
-    expect(s.doc.preset).toMatchObject({ id: copyId, name: newName, margin_mm: Number(typed), page: "A4" });
+    expect(s.doc.default_preset).toMatchObject({ id: copyId, name: newName, margin_mm: Number(typed), page: "A4" });
+    modal = await openPresets(page);
+    await modal.locator('[data-coll="mine"]').click();
+    await expect(modal.locator(`.card[data-card="${copyId}"]`)).toHaveAttribute("data-mark", "current");
+    await expect(modal.locator(`.card[data-card="${copyId}"] .name`)).toHaveText(newName);
   });
 
   test("4 · the Method chip in the left bar filters the cards", async ({ page }) => {
