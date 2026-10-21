@@ -40,3 +40,13 @@
 .xpanel .xp-title-edit, .fpanel-minus, .fpanel-tail { display: none; }
 /* the Key (a driven text, ../ui/DrivenField.tsx) reads as text, not a number */
 .xpanel .drv-text input { font-variant-numeric: normal; }
+/* batch mode (./BatchPanel.tsx): a row it does not set reads "—" (why in its
+   tooltip); where the selected markers differ, "Mixed" in grey italics */
+.xpanel .batch-ctl { display: contents; }
+.xpanel .batch-ro { color: var(--muted); padding-left: 8px; cursor: help; }
+.xpanel .batch-mixed { flex: none; margin-left: 6px; font-size: 11px; font-style: italic; color: var(--muted); }
+.xpanel .batch-mixed-num input::placeholder, .xpanel .batch-mixed-text::placeholder { font-style: italic; color: var(--muted); opacity: 1; }
+.xpanel .batch-mixed-sel .kit-select-label[data-placeholder] { font-style: italic; }
+.xpanel .preset-name .batch-mixed { margin-left: 0; }
+.xpanel .row-ctl > .kit-btn.s-sm { margin-left: auto; }
+.xpanel .hint-line.batch-mixed-line { font-style: italic; color: var(--muted); }

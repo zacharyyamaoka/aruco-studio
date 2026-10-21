@@ -18,6 +18,7 @@ import {
   addFeature, addShape, applyIds, deleteShape, emptyDoc, featureOfProfile, featureOfRect, fillPresets, getFeature, keyOwner, newFeature, newId, nextTurn, pickSuggestion,
   rectProfile, removeFeature, resetField, setField, setShape, updateFeature, type Doc, type Feature, type Holes,
 } from "./model/doc";
+import { applyBatch, resetBatch } from "./model/batch";
 import { boxOf, fitBox, rectCorners, type Camera } from "./model/geom";
 import { touchRecent } from "./presets/local";
 import { example } from "./model/examples";
@@ -37,8 +38,11 @@ export interface Facts { state: "idle" | "asking" | "ok" | "error"; error?: stri
 
 export interface PanelState {
   open: boolean;
-  /** the feature the panel edits */
+  /** the feature the panel edits (in a batch: the first of them) */
   featureId: string | null;
+  /** a batch (2 or more: the panel's batch mode, ./model/batch.ts): the
+   *  features every row sets at once, in document order; empty for one */
+  featureIds: string[];
   tab: Tab;
   collapsed: boolean;
   /** the selection row waiting for a click on the sketch (Profile: the only one) */
@@ -144,6 +148,10 @@ export interface Studio {
    *  focus, panel open or not); one undo step per value, like typing */
   setFieldFor: (featureId: string, path: string, value: unknown) => void;
   resetFieldFor: (featureId: string, path: string) => void;
+  /** a batch row set on several features (model/batch.ts applyBatch), one undo step */
+  setFieldMany: (featureIds: string[], path: string, value: unknown) => void;
+  /** a batch row back to driven on several features, one undo step */
+  resetFieldMany: (featureIds: string[], path: string) => void;
   setView3d: (on: boolean) => void;
   setMarkerInfo: (on: boolean) => void;
   /** a label value that has no row (the drag's offset_mm); the panel's feature unless named */
@@ -164,8 +172,8 @@ export interface Studio {
   /** a click on empty canvas: the panel closes (OK) and nothing is selected */
   closePanel: () => void;
 
-  /** the marker the panel is open on is made by `p` (one undo step), and a new
-   *  marker starts with it; with no panel open, only the latter */
+  /** the marker the panel is open on (a batch: every one) is made by `p` (one
+   *  undo step), and a new marker starts with it; with no panel open, only the latter */
   setPreset: (p: Preset) => void;
   /** Edit › ArUco Re-ID…: a core.assign_ids answer for idItems(doc)
    *  (sequential or fresh hash) into the document's ids and ledger, as one undo step */
@@ -190,7 +198,7 @@ function readMarkerInfo(): boolean {
   try { return window.localStorage.getItem(MARKER_INFO_KEY) === "1"; } catch { return false; }
 }
 
-const PANEL0: PanelState = { open: false, featureId: null, tab: "marker", collapsed: false, selector: null, backup: null };
+const PANEL0: PanelState = { open: false, featureId: null, featureIds: [], tab: "marker", collapsed: false, selector: null, backup: null };
 
 /** What Ctrl+C holds: shapes, the features on them and the dims among them. */
 export interface Clip { format: "arucostudio-clip"; shapes: Shape[]; features: Feature[]; dims: SketchDim[] }
@@ -205,6 +213,11 @@ export function selectedFeatureId(doc: Doc, sel: Selection): string | null {
   if (sel?.kind === "shape") return featureOfRect(doc, sel.id)?.id ?? null;
   if (sel?.kind === "profile") return featureOfProfile(doc, sel.ref)?.id ?? null;
   return null;
+}
+
+/** The features a multi-selection names: those whose profile's outer shape is selected, in document order. */
+export function selectionFeatureIds(doc: Doc, multi: string[]): string[] {
+  return doc.features.filter((f) => f.profile && multi.includes(f.profile.outer)).map((f) => f.id);
 }
 
 /** The feature in focus: the one the panel edits, else the selected one,
@@ -253,6 +266,10 @@ export const useStudio = create<Studio>((set, get) => {
     const { sel, panel } = get();
     const out: Partial<Studio> = {};
     if (panel.open && !getFeature(doc, panel.featureId)) { out.panel = { ...PANEL0, tab: panel.tab, collapsed: panel.collapsed }; openAt = -1; }
+    else if (panel.featureIds.length) {
+      const ids = panel.featureIds.filter((id) => getFeature(doc, id));
+      if (ids.length !== panel.featureIds.length) out.panel = { ...panel, featureIds: ids.length > 1 ? ids : [] };
+    }
     const there = !sel || sel.kind === "sketch" ? true
       : sel.kind === "shape" ? doc.shapes.some((x) => x.id === sel.id)
       : sel.kind === "profile" ? !!profileLoops(doc.shapes, sel.ref)
@@ -505,20 +522,26 @@ export const useStudio = create<Studio>((set, get) => {
       // WHY (Zach, 2026-10-20 night: "an Aruco marker maker, however on a
       // canvas"): A on several selected rectangles makes one feature in each
       // (a rectangle profile, the defaults, its own auto id) as one step; the
-      // panel opens on the first, the rectangles stay selected
+      // rectangles stay selected
+      // WHY batch (Zach, 2026-10-21: "batch editing of multiple markers ... turn the
+      // triangle on on many of them"): A on a selection naming 2 or more features
+      // (theirs, or the ones just made) opens the panel on them all, in batch mode
       const many = get().multi.length > 1
         ? get().multi.map((id) => get().doc.shapes.find((s) => s.id === id)).filter((s): s is Shape => s?.kind === "rect") : [];
-      if (many.length > 1) {
+      const owned = get().multi.length > 1 ? selectionFeatureIds(get().doc, get().multi) : [];
+      if (many.length > 1 || owned.length > 1) {
         if (get().panel.open) get().ok();
         const { doc, panel, multi } = get();
         const fresh = many.filter((r) => !featureOfRect(doc, r.id)).map((r) => newFeature(rectProfile(r.id), undefined, doc.default_preset));
-        if (!fresh.length) { set({ note: "Those rectangles already have ArUco Extrudes: click a marker to edit it." }); return; }
+        const next = fresh.reduce(addFeature, doc);
+        // 2 or more: every rectangle has one now
+        const ids = selectionFeatureIds(next, multi);
         openAt = past.length;
         put({
-          doc: fresh.reduce(addFeature, doc),
-          panel: { ...PANEL0, open: true, featureId: fresh[0].id, backup: doc, tab: panel.tab, collapsed: panel.collapsed },
-          tool: "select", sel: { kind: "feature", id: fresh[0].id }, multi, dimSel: null,
-          note: `${fresh.length} ArUco Extrudes, one in each rectangle.`,
+          doc: next,
+          panel: { ...PANEL0, open: true, featureId: ids[0], featureIds: ids, backup: doc, tab: panel.tab, collapsed: panel.collapsed },
+          tool: "select", sel: { kind: "feature", id: ids[0] }, multi, dimSel: null,
+          ...(fresh.length ? { note: `${fresh.length} ArUco Extrude${fresh.length === 1 ? "" : "s"}, one in each rectangle.` } : {}),
         });
         return;
       }
@@ -563,6 +586,10 @@ export const useStudio = create<Studio>((set, get) => {
     resetField: (path) => edit((f) => resetField(f, path), `field:${get().panel.featureId}:${path}`),
     setFieldFor: (fid, path, value) => put({ doc: updateFeature(get().doc, fid, (f) => setField(f, path, value)) }, `field:${fid}:${path}`),
     resetFieldFor: (fid, path) => put({ doc: updateFeature(get().doc, fid, (f) => resetField(f, path)) }, `field:${fid}:${path}`),
+    setFieldMany: (fids, path, value) =>
+      put({ doc: fids.reduce((d, fid) => updateFeature(d, fid, (f) => applyBatch(f, path, value)), get().doc) }, `batch:${fids.join(",")}:${path}`),
+    resetFieldMany: (fids, path) =>
+      put({ doc: fids.reduce((d, fid) => updateFeature(d, fid, (f) => resetBatch(f, path)), get().doc) }, `batch:${fids.join(",")}:${path}`),
     setView3d: (view3d) => set({ view3d }),
     setMarkerInfo: (markerInfo) => {
       try { window.localStorage.setItem(MARKER_INFO_KEY, markerInfo ? "1" : "0"); } catch { /* storage blocked: kept for this visit only */ }
@@ -615,7 +642,7 @@ export const useStudio = create<Studio>((set, get) => {
 
     inspect: (id) => {
       const { panel } = get();
-      if (panel.open && panel.featureId === id) { set(only({ kind: "feature", id })); return; }
+      if (panel.open && panel.featureId === id && !panel.featureIds.length) { set(only({ kind: "feature", id })); return; }
       if (panel.open) get().ok();
       get().editFeature(id);
     },
@@ -627,7 +654,8 @@ export const useStudio = create<Studio>((set, get) => {
     setPreset: (p) => {
       touchRecent(p.id);
       const { doc, panel } = get();
-      put({ doc: { ...updateFeature(doc, panel.open ? panel.featureId : null, (f) => ({ ...f, preset: p })), default_preset: p } });
+      const ids = panel.open ? (panel.featureIds.length ? panel.featureIds : [panel.featureId]) : [];
+      put({ doc: { ...ids.reduce((d, id) => updateFeature(d, id, (f) => ({ ...f, preset: p })), doc), default_preset: p } });
     },
     // the planner's next auto id call (with this ledger) keeps these ids
     reId: (res) => put({ doc: applyIds(get().doc, res) }),

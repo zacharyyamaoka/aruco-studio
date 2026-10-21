@@ -41,56 +41,14 @@ import { DrivenChoice, DrivenField, DrivenText } from "../ui/DrivenField";
 import { FloatingPanel } from "../ui/FloatingPanel";
 import { TextArea } from "../ui/TextArea";
 import { routeIssues, tabLevel, tabRows } from "./issues";
+import { BatchPanel } from "./BatchPanel";
 import { SuggestSelect } from "./SuggestSelect";
 import { PlanLine, PresetWait } from "./Waiting";
+import {
+  CORNERS, FALLBACK_DICTS, Group, MODE_ICONS, MODES, Note, ORIGINS, PLACEHOLDERS, PLACES, SIDES, SURFACES, TRIM_ICONS, TRIM_OPTS, TURNS, TYPE_ICONS, TYPES,
+  deg360, kit,
+} from "./parts";
 import "./panel.css";
-
-const TYPES: Opt[] = [
-  { value: "single", label: "Single", hint: "Single marker" },
-  { value: "grid", label: "Grid", hint: "Grid of markers" },
-  { value: "charuco", label: "ChArUco", hint: "ChArUco board" },
-];
-const TURNS: Opt[] = [0, 90, 180, 270].map((t) => ({ value: t, label: `${t}°`, hint: `Turn ${t}°` }));
-const CORNERS: Opt[] = [
-  { value: "none", label: "None", hint: "No corner mark" },
-  { value: "triangle", label: "Triangle", hint: "A triangle in the quiet zone's top-left corner" },
-];
-const ORIGINS: Opt[] = [
-  { value: "corner", label: "Board corner", hint: "The Joint Origin at OpenCV's board corner" },
-  { value: "square", label: "Square", hint: "The Joint Origin at the centre of one board square" },
-];
-// WHY no Rectangle (Zach, 2026-10-20 evening): "If you want trim to rectangle
-// then just make your profile a rectangle and trim to profile!"
-const TRIM_OPTS: Opt[] = [
-  { value: "profile", label: "Profile", hint: "The sticker is the whole profile, its holes cut out" },
-  { value: "marker", label: "Marker", hint: "The sticker is the marker and its quiet zone" },
-];
-// WHY Black | White | Both with Auto as the driven value (contract barrier 10):
-// Auto is black only on a reference face (the body is the white), both in open space
-const MODES: Opt[] = [
-  { value: "black", label: "Black", hint: "Only the black is made: into the body under it" },
-  { value: "white", label: "White", hint: "Only the white is made: the pattern into a dark body" },
-  { value: "both", label: "Both", hint: "A white tile with the black inlaid" },
-];
-/** A segmented row's choices as icons: the Fusion skin draws Type, Trim and
- *  Extrude as icon buttons, as Fusion's own dialog does (the hint is the
- *  tooltip); the other skins keep the words. */
-const asIcons = (opts: Opt[], prefix = "") => opts.map((o) => ({ ...o, icon: `${prefix}${o.value}` }));
-const TYPE_ICONS = asIcons(TYPES), TRIM_ICONS = asIcons(TRIM_OPTS, "trim-"), MODE_ICONS = asIcons(MODES, "mode-");
-const PLACES: Opt[] = [
-  { value: "on_marker", label: "On marker", hint: "In the marker's border: the black row or the white quiet zone" },
-  { value: "outside", label: "Outside", hint: "In a band beside the marker" },
-];
-const SURFACES: Opt[] = [
-  { value: "black", label: "Black", hint: "Knocked out of the black border row" },
-  { value: "white", label: "White", hint: "Black text in the white quiet zone" },
-];
-const PLACEHOLDERS = "{id} {first} {last} {ids} {dict} {type}";
-const SIDES: Opt[] = ["below", "above", "left", "right"].map((s) => ({ value: s, label: s[0].toUpperCase() + s.slice(1) }));
-/** The core's issues in the kit's shape (an object literal per issue). */
-const kit = (xs: Issue[] | undefined): KitIssue[] => (xs ?? []).map((i) => ({ field: i.field, level: i.level, text: i.text }));
-
-const FALLBACK_DICTS = ["DICT_4X4_50", "DICT_4X4_100", "DICT_4X4_250", "DICT_5X5_50", "DICT_5X5_100", "DICT_6X6_50", "DICT_6X6_250"];
 
 function SelRow({ path, label, count, active, onActivate, onClear, issues, icon, rowIcon, testid, emptyText }: {
   path: string; label: string; count: number; active: boolean; onActivate: () => void; onClear: () => void;
@@ -112,17 +70,6 @@ function SelRow({ path, label, count, active, onActivate, onClear, issues, icon,
   );
 }
 
-/** A group's small title and thin rule, over its rows (Fusion's command dialog). */
-const Group = ({ title }: { title: string }) => (
-  <div className="xp-group" data-group-title={title} role="presentation"><span className="xp-group-title">{title}</span></div>
-);
-
-/** An angle into [0, 360). */
-const deg360 = (a: number) => +((((a % 360) + 360) % 360).toFixed(6));
-
-/** A grey line under a row: what the value means (no issue, never red). */
-const Note = ({ children, testid }: { children: ReactNode; testid?: string }) => <div className="hint-line" data-testid={testid}>{children}</div>;
-
 /** What drives a field while it is driven (the tooltip). */
 const DEFAULT = "default";
 
@@ -138,6 +85,8 @@ export function ExtrudePanel() {
     if (fresh) useStudio.getState().setTab("marker");
   }, [panel.featureId, fresh]);
   if (!panel.open || !f) return null;
+  // 2 or more features: the same skeleton, set on them all (./BatchPanel.tsx)
+  if (panel.featureIds.length > 1) return <BatchPanel />;
   const m = f.marker, l = f.label;
   const plan = plans[f.id] ?? null;
   const planError = st.planErrors[f.id] ?? null;
