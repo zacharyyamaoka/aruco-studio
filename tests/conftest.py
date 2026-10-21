@@ -29,6 +29,7 @@ def pytest_configure(config):
 
 def pytest_collection_modifyitems(session, config, items):
     """tools/check.py --trace: every test's ref(suite, section) markers -> a JSON file."""
+    config._fidelity_collected = any("test_port_fidelity" in it.nodeid for it in items)
     out = os.environ.get("ARUCO_TRACE_OUT")
     if not out:
         return
@@ -37,3 +38,12 @@ def pytest_collection_modifyitems(session, config, items):
             for it in items for m in it.iter_markers("ref")]
     with open(out, "w", encoding="utf-8") as f:
         json.dump(rows, f)
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    """A skipped port-fidelity check is not a pass: say so in the run's own
+    output, not only under -rs (tools/check.py repeats it in its group line)."""
+    import ref_path
+    note = ref_path.head_missing_note()
+    if note and getattr(config, "_fidelity_collected", False):
+        terminalreporter.write_line(f"WARNING: {note}", yellow=True, bold=True)

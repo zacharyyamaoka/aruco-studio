@@ -77,6 +77,16 @@ def _env():
     return env
 
 
+def _fidelity_note():
+    """'' or why tests/core/test_port_fidelity.py is skipped on this machine."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    try:
+        import ref_path
+        return ref_path.head_missing_note()
+    finally:
+        sys.path.pop(0)
+
+
 def run_pytest(name):
     t0 = time.time()
     with tempfile.TemporaryDirectory(prefix="aruco_check_xml_") as tmp:
@@ -105,6 +115,8 @@ def run_pytest(name):
     if counts["failures"] or counts["errors"]:
         words += f", {counts['failures'] + counts['errors']:,} failed"
     line = f"{name}: {words} in {dt:.0f} s"
+    if name == "core" and (note := _fidelity_note()):
+        line += f"\n  WARNING: {note}"
     if not ok:
         tail = "\n".join(p.stdout.strip().splitlines()[-25:])
         line += "\n" + tail

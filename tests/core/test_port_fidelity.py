@@ -4,7 +4,8 @@ For each core module, every top-level def / class / constant it shares with
 its REF file (at ref_path.REF_HEAD, the add-in the core was last brought
 up to: N-1, 2026-10-17) has the same source text, except the
 ones listed as ADAPTED (they took a Fusion object or the dialog's state, and
-their docstrings say what changed). Skipped when REF is not on this machine.
+their docstrings say what changed). Skipped when REF_HEAD is not on this
+machine, and said so (ref_path.head_missing_note; tools/check.py repeats it).
 """
 import ast
 import sys
@@ -17,7 +18,31 @@ CORE = ROOT / "aruco_studio" / "core"
 sys.path.insert(0, str(ROOT / "tools"))
 import ref_path  # noqa: E402
 
-pytestmark = pytest.mark.skipif(not (ref_path.REF / ".git").exists(), reason="REF is not here")
+needs_ref = pytest.mark.skipif(not ref_path.head_reachable(),
+                               reason=ref_path.head_missing_note())
+
+# Names that tonight's versioned rules and options changed in place (2026-10-20
+# night). name -> (why, the replay test that pins the OLD path). The old path
+# is what REF computes, so these still answer as REF did; the text differs.
+_CELLS = ("cells rule 2 (autosize.ROUND_RULE) and rule 3 (DOTS_RULE, SizeStep barrier 11): "
+          "the rule rides the cells tuple; no rule / rule 1 is REF's path to the bit")
+_CELLS_REPLAY = "tests/core/test_ref_cells_legacy.py"      # 511 sizings, 'cells' absent / marker 0.5
+_CELLS_REPLAY_WEB = "tests/web/test_web_legacy_presets.py"  # 144 plan+svg == 03594f9, cell_step_mm 0.042333
+_SCALE = ("SheetRequest.scale_bar (barrier 12): hide | first | every; "
+          "every / absent draws what REF drew, byte for byte")
+_SCALE_REPLAY = "tests/core/test_sheet_scalebar.py"         # every / absent == 65164e4 digests
+ADAPTED_NIGHT = {
+    "autosize": {
+        **{n: (_CELLS, _CELLS_REPLAY) for n in (
+            "_kw", "_layout", "_region_clamp", "_search_frame", "_typed", "candidates",
+            "candidates_on_loops", "clamp_to_fit", "default_layout", "face_default",
+            "fit_on_loops", "layout_for_size")},
+        "cells_of": (_CELLS + "; cell_step_mm 0.042333 reads as rule 1", _CELLS_REPLAY_WEB),
+    },
+    "markers": {n: (_SCALE, _SCALE_REPLAY) for n in ("sheet_check", "sheet_layout", "sidecar_files")},
+    "sheet": {n: (_SCALE, _SCALE_REPLAY) for n in (
+        "SheetLayout", "_page_content", "layout_sheet", "layout_summary")},
+}
 
 B = "CADExporter/bam_cad_core/"
 A = "ArucoMarkers/"
@@ -123,14 +148,28 @@ def defs(src):
 CASES = [(m, ref, skip) for m, refs in PORTS.items() for ref, skip in refs]
 
 
+@needs_ref
 @pytest.mark.parametrize("module,ref,adapted", CASES, ids=[f"{m}<-{Path(r).name}" for m, r, _ in CASES])
 def test_shared_names_are_refs_text(module, ref, adapted):
     mine = defs((CORE / f"{module}.py").read_text(encoding="utf-8"))
     theirs = defs(renamed(ref_path.show(ref, ref_path.REF_HEAD).decode("utf-8")))
-    shared = sorted((set(mine) & set(theirs)) - set(adapted))
+    adapted = set(adapted) | set(ADAPTED_NIGHT.get(module, {}))
+    shared = sorted((set(mine) & set(theirs)) - adapted)
     assert shared, f"{module} shares nothing with {ref}"
     differ = [n for n in shared if mine[n] != theirs[n]]
     assert not differ, f"{module} differs from {ref} in: {differ}"
+
+
+def test_every_night_adaptation_has_a_reason_and_a_replay():
+    """A name may differ from REF only for a stated rule/option, and the test
+    that pins the old path must exist and name the same rule's replay."""
+    for module, names in ADAPTED_NIGHT.items():
+        assert (CORE / f"{module}.py").exists(), module
+        mine = defs((CORE / f"{module}.py").read_text(encoding="utf-8"))
+        for name, (why, replay) in names.items():
+            assert name in mine, (module, name)
+            assert why.strip(), (module, name)
+            assert (ROOT / replay).is_file(), (module, name, replay)
 
 
 # print_beds' file I/O lives outside the core (audit C7): REF's text there
@@ -140,6 +179,7 @@ BEDS_IO_M8C = {"chain_profile", "filament_for", "write_project", "single_instanc
                "open_in_prusaslicer"}
 
 
+@needs_ref
 def test_beds_io_is_refs_text():
     """server/beds_io.py: each function is print_beds' own text, and the
     core's beds no longer holds any of them."""
@@ -155,6 +195,7 @@ def test_beds_io_is_refs_text():
     assert not (funcs & core), sorted(funcs & core)
 
 
+@needs_ref
 def test_whole_core_copies_keep_every_ref_name():
     """A copied bam_cad_core module keeps every one of REF's top-level names
     (markers.py: but instance_fiducials, the CAD Exporter's URDF bridge;
