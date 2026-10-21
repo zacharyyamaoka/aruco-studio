@@ -26,11 +26,19 @@ export interface View3DProbe {
   solids: Record<string, number>;
   /** face bodies drawn under face profiles (context) */
   faces: number;
+  /** how long the last rebuild of the solids (carved from the plans' layers) took, ms */
+  buildMs: number;
+  /** render one frame now and wait for the GPU: its time, ms (reached in-page as __aruco.view3d().frame) */
+  frame: () => number;
   /** a scene point (mm) as client pixels */
   project: (x: number, y: number, z: number) => Vec2;
   /** the camera straight down on the feature in focus, its outline filling the view;
    *  `marks` false hides the arrows, dimension lines and value boxes (a clean top view) */
   top: (marks?: boolean) => void;
+  /** the same framing from below, looking up at the feature's underside: straight
+   *  up, or `tilt` degrees off the normal from `far` mm away (reached in-page as
+   *  __aruco.view3d().bottom: the probe passes it through) */
+  bottom: (marks?: boolean, tilt?: number, far?: number) => void;
 }
 
 export const view3d: { probe: (() => View3DProbe) | null } = { probe: null };
