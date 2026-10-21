@@ -4,6 +4,8 @@
 export { DISCARD, HostedFiles, MSG_CONFLICT, MSG_EMPTY, MSG_OFFLINE, MSG_RESTORED, MSG_UPDATED } from "./hosted-files.js";
 export type { UiHost } from "./hosted-files.js";
 export { HostedFilesError } from "./errors.js";
+export { SignInFlow } from "./signin.js";
+export type { SignInDefaults, SignInDriver, SignInStep, SignInView } from "./signin.js";
 export type { FilesApi, SaveKind } from "./api.js";
 export { daysUntil, humanSize, relativeTime, withExtension } from "./format.js";
 export type {
@@ -14,6 +16,7 @@ export type {
   FileMeta,
   HostedFilesOptions,
   Me,
+  SignInMethods,
   State,
   Status,
   User,

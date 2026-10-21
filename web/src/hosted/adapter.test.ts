@@ -38,6 +38,24 @@ describe("the hosted files adapter", () => {
     expect(await options.getContent()).toBe(text);
   });
 
+  it("an opened file's name is the document's name", async () => {
+    const store = fakeStudio();
+    const { options } = studioAdapter(store);
+    const file = { name: "Forearm plate" } as Parameters<typeof options.setContent>[1];
+    await options.setContent(new Blob([serialise(emptyDoc("Plate"))]), file);
+    expect(store.getState().doc.name).toBe("Forearm plate");
+  });
+
+  it("the name a Save prompt answered is in the bytes, until a document is put in", async () => {
+    const store = fakeStudio();
+    const adapter = studioAdapter(store);
+    adapter.nameNext("Forearm plate");
+    expect(JSON.parse(String(await adapter.options.getContent())).name).toBe("Forearm plate");
+    expect(store.getState().doc.name).toBe("Plate");
+    await adapter.options.newDocument?.();
+    expect(JSON.parse(String(await adapter.options.getContent())).name).toBe("Untitled");
+  });
+
   it("setContent refuses what is not a Studio file, and leaves the document", async () => {
     const store = fakeStudio();
     const before = store.getState().doc;
@@ -72,6 +90,19 @@ describe("the hosted files adapter", () => {
     adapter.bind(core);
     await adapter.options.setContent(new Blob([serialise(emptyDoc("Opened"))]), null);
     await adapter.options.newDocument?.();
+    expect(core.dirty).toBe(0);
+    store.getState().edit();
+    expect(core.dirty).toBe(1);
+  });
+
+  it("a change the store makes of its own (quiet) is not an edit", () => {
+    const store = fakeStudio();
+    const core = fakeCore();
+    let filling = false;
+    studioAdapter(store, () => filling).bind(core);
+    filling = true;
+    store.getState().edit();
+    filling = false;
     expect(core.dirty).toBe(0);
     store.getState().edit();
     expect(core.dirty).toBe(1);

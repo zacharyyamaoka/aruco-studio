@@ -50,6 +50,9 @@ a.brand:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   color: var(--text); font: inherit; font-weight: 600; font-size: 13px; cursor: pointer; min-width: 0; }
 .doc-name:hover, .doc-name[data-popup-open] { background: var(--hover); }
 .doc-name .chev { flex: none; color: var(--muted); }
+/* the title bar (hosted/ui): the name, the status dot, ⌄ */
+.doc-title { display: inline-flex; align-items: center; min-width: 0; }
+.doc-chev { flex: none; padding: 0 7px; }
 .doc-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 220px; }
 .actions-pill { right: 12px; padding: 4px 8px; }
 .act-cad { display: inline-flex; align-self: stretch; align-items: center; }

@@ -1,10 +1,14 @@
-// Copies the Simple Hosted Files core (its client/src/core, the folder the
-// shadcn registry's hosted-files-core item is) into web/src/hosted/core,
-// verbatim, and stamps what it copied in web/src/hosted/core.source.json.
+// Copies the Simple Hosted Files SDK into web/src/hosted, verbatim, and stamps
+// what it copied in web/src/hosted/core.source.json:
+//   core   client/src/core                                  -> web/src/hosted/core   (the registry's hosted-files-core)
+//   react  web/registry/hosted-files-react/lib/hosted-files/react -> web/src/hosted/react  (hosted-files-react's hooks)
+// The copies import "@/lib/hosted-files/core", "@/lib/utils" and "sonner" as
+// a shadcn app would; vite.config.ts and tsconfig.app.json point those at
+// web/src/hosted (shims/ for the last two: the Studio's kit, no new package).
 //   node scripts/sync-hosted-files.mjs           copy (SHF_REPO moves the source, default /home/bam/simple-hosted-files)
-//   node scripts/sync-hosted-files.mjs --check   exit 1 when the copy no longer matches its stamp or the source
+//   node scripts/sync-hosted-files.mjs --check   exit 1 when a copy no longer matches its stamp or the source
 // WHY a copy, never an edit: one source, never forked (simple-hosted-files SPEC v2.5);
-// a fix to the core is made there and synced here.
+// a fix to the SDK is made there and synced here.
 import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -14,32 +18,44 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const web = path.resolve(here, "..");
 const repo = path.resolve(process.env.SHF_REPO || "/home/bam/simple-hosted-files");
-const src = path.join(repo, "client/src/core");
-const dest = path.join(web, "src/hosted/core");
+const PARTS = {
+  core: "client/src/core",
+  react: "web/registry/hosted-files-react/lib/hosted-files/react",
+};
 const stamp = path.join(web, "src/hosted/core.source.json");
 const check = process.argv.includes("--check");
 
 const sha = (file) => crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
-const list = (dir) => fs.readdirSync(dir).filter((n) => /\.ts$/.test(n) && !/\.(test|spec)\.ts$/.test(n)).sort();
+const list = (dir) => fs.readdirSync(dir).filter((n) => /\.tsx?$/.test(n) && !/\.(test|spec)\.tsx?$/.test(n)).sort();
 const hashes = (dir) => Object.fromEntries(list(dir).map((n) => [n, sha(path.join(dir, n))]));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const dest = (part) => path.join(web, "src/hosted", part);
+const src = (part) => path.join(repo, PARTS[part]);
 
 if (check) {
   const want = JSON.parse(fs.readFileSync(stamp, "utf8"));
   const problems = [];
-  if (!same(hashes(dest), want.files)) problems.push("web/src/hosted/core differs from core.source.json (edited here? fix it upstream, then sync)");
-  if (fs.existsSync(src) && !same(hashes(src), want.files)) problems.push(`${src} has moved on since ${want.commit}: run node scripts/sync-hosted-files.mjs`);
-  if (!fs.existsSync(src)) console.log(`(no ${src} here: checked the copy against its stamp only)`);
+  for (const part of Object.keys(PARTS)) {
+    const files = want.parts?.[part]?.files;
+    if (!files || !same(hashes(dest(part)), files)) problems.push(`web/src/hosted/${part} differs from core.source.json (edited here? fix it upstream, then sync)`);
+    if (!fs.existsSync(src(part))) console.log(`(no ${src(part)} here: checked the copy against its stamp only)`);
+    else if (!same(hashes(src(part)), files)) problems.push(`${src(part)} has moved on since ${want.commit}: run node scripts/sync-hosted-files.mjs`);
+  }
   for (const p of problems) console.error(p);
-  if (!problems.length) console.log(`hosted core in sync: ${Object.keys(want.files).length} files from ${want.commit}`);
+  if (!problems.length) console.log(`hosted SDK in sync: ${Object.keys(PARTS).map((p) => `${p} ${Object.keys(want.parts[p].files).length} files`).join(", ")} from ${want.commit}`);
   process.exit(problems.length ? 1 : 0);
 }
 
-const commit = execFileSync("git", ["-C", repo, "log", "-1", "--format=%h", "--", "client/src/core"], { encoding: "utf8" }).trim();
-const dirty = execFileSync("git", ["-C", repo, "status", "--porcelain", "--", "client/src/core"], { encoding: "utf8" }).trim();
-fs.rmSync(dest, { recursive: true, force: true });
-fs.mkdirSync(dest, { recursive: true });
-for (const n of list(src)) fs.copyFileSync(path.join(src, n), path.join(dest, n));
-const files = hashes(dest);
-fs.writeFileSync(stamp, JSON.stringify({ from: "simple-hosted-files/client/src/core", commit: dirty ? `${commit}+dirty` : commit, files }, null, 2) + "\n");
-console.log(`copied ${Object.keys(files).length} files from ${src} @ ${commit}${dirty ? " (with uncommitted changes)" : ""}`);
+const git = (...args) => execFileSync("git", ["-C", repo, ...args], { encoding: "utf8" }).trim();
+const paths = Object.values(PARTS);
+const commit = git("log", "-1", "--format=%h", "--", ...paths);
+const dirty = git("status", "--porcelain", "--", ...paths);
+const parts = {};
+for (const part of Object.keys(PARTS)) {
+  fs.rmSync(dest(part), { recursive: true, force: true });
+  fs.mkdirSync(dest(part), { recursive: true });
+  for (const n of list(src(part))) fs.copyFileSync(path.join(src(part), n), path.join(dest(part), n));
+  parts[part] = { from: `simple-hosted-files/${PARTS[part]}`, files: hashes(dest(part)) };
+}
+fs.writeFileSync(stamp, JSON.stringify({ commit: dirty ? `${commit}+dirty` : commit, parts }, null, 2) + "\n");
+console.log(`copied ${Object.entries(parts).map(([p, v]) => `${p} ${Object.keys(v.files).length} files`).join(", ")} from ${repo} @ ${commit}${dirty ? " (with uncommitted changes)" : ""}`);

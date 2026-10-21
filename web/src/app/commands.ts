@@ -3,19 +3,25 @@ import { core } from "../coreSource";
 import { downloadBase64, downloadText, pickFile, slug } from "../io/files";
 import { getFeature, parseDoc, planRequest, serialise, sheetItems } from "../model/doc";
 import { activeFeatureId, useStudio } from "../store";
+import { leaveFile } from "../hosted/hosted";
 
 const st = () => useStudio.getState();
 
+/** Download .arucostudio-web.json: the document as a file on this computer
+ *  (signed in or not; the cloud's Save is in the document menu). */
 export function saveDoc(): void {
   const { doc } = st();
   downloadText(`${slug(doc.name)}.arucostudio-web.json`, serialise(doc), "application/json");
 }
 
+/** Open from this computer: a file picked from disk becomes an unsaved
+ *  document (a cloud file open is left first, its changes saved). */
 export async function openDoc(): Promise<void> {
   const f = await pickFile(".json,application/json");
   if (!f) return;
   try {
     const doc = parseDoc(f.text);
+    if (!(await leaveFile())) return;
     st().loadDoc(doc);
     st().say(`Opened ${f.name}`);
   } catch (e) {

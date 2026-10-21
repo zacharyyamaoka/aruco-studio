@@ -25,6 +25,18 @@
       "vite/client"
     ],
     "paths": {
+      "@/lib/hosted-files/core": [
+        "./src/hosted/core/index.ts"
+      ],
+      "@/lib/hosted-files/react": [
+        "./src/hosted/react/index.ts"
+      ],
+      "@/lib/utils": [
+        "./src/hosted/shims/utils.ts"
+      ],
+      "sonner": [
+        "./src/hosted/shims/sonner.ts"
+      ],
       "@bam/ui": [
         "../studio/packages/bam-ui/src/index.ts"
       ],

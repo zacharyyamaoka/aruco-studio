@@ -12,7 +12,8 @@ import { ExamplesDialog } from "./app/ExamplesDialog";
 import { openPrint, openVerify } from "./app/commands";
 import { ReIdDialog } from "./app/ReIdDialog";
 import { Toolbar } from "./app/Toolbar";
-import { ActionsPill, DocPill, HelpCorner } from "./app/TopBar";
+import { ActionsPill, BrandCube, DocPill, HelpCorner } from "./app/TopBar";
+import { HostedDialogs, HostedProvider, HostedToast } from "./hosted/ui/HostedDialogs";
 import { onCoreStatus, coreStatus } from "./coreSource";
 import { ExtrudePanel } from "./panel/ExtrudePanel";
 import { startPlanner } from "./planner";
@@ -121,24 +122,29 @@ export function App() {
 
   return (
     <TooltipProvider>
-      <div className="app" data-testid="app">
-        <main className="stage">
-          {/* WHY hidden, not unmounted: back in 2D the sketch keeps its camera */}
-          <div className="vp-2d" style={{ display: view3d ? "none" : "contents" }}><Viewport /></div>
-          {view3d && <View3D />}
-          <DocPill onHelp={() => setHelp(true)} />
-          <ActionsPill />
-          <Toolbar />
-          <HelpCorner help={help} setHelp={setHelp} />
-          <ExtrudePanel />
-          {note && <div className="toast" role="status" data-testid="note">{note}</div>}
-        </main>
-      </div>
-      <PresetsModal />
-      <PrintDialog />
-      <VerifyDialog />
-      <ExamplesDialog />
-      <ReIdDialog />
+      {/* Simple Hosted Files: the title bar in the document pill, its dialogs below */}
+      <HostedProvider icon={<BrandCube />}>
+        <div className="app" data-testid="app">
+          <main className="stage">
+            {/* WHY hidden, not unmounted: back in 2D the sketch keeps its camera */}
+            <div className="vp-2d" style={{ display: view3d ? "none" : "contents" }}><Viewport /></div>
+            {view3d && <View3D />}
+            <DocPill onHelp={() => setHelp(true)} />
+            <ActionsPill />
+            <Toolbar />
+            <HelpCorner help={help} setHelp={setHelp} />
+            <ExtrudePanel />
+            {note && <div className="toast" role="status" data-testid="note">{note}</div>}
+            <HostedToast />
+          </main>
+        </div>
+        <HostedDialogs icon={<BrandCube />} />
+        <PresetsModal />
+        <PrintDialog />
+        <VerifyDialog />
+        <ExamplesDialog />
+        <ReIdDialog />
+      </HostedProvider>
     </TooltipProvider>
   );
 }

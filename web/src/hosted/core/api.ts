@@ -7,6 +7,8 @@ export interface RequestOptions {
   body?: BodyInit | object | null;
   headers?: Record<string, string>;
   keepalive?: boolean;
+  // WHY: the sign-in calls carry no bearer, and their 401 (a wrong code) is not a lost session.
+  anonymous?: boolean;
 }
 
 export type SaveKind = "manual" | "auto";
@@ -29,7 +31,7 @@ export class Api {
   async request(method: string, path: string, opts: RequestOptions = {}): Promise<Response> {
     const headers: Record<string, string> = { ...opts.headers };
     const token = this.getToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
+    if (token && !opts.anonymous) headers.Authorization = `Bearer ${token}`;
     let body: BodyInit | undefined;
     if (opts.body instanceof Blob || typeof opts.body === "string" || opts.body instanceof ArrayBuffer || ArrayBuffer.isView(opts.body)) {
       body = opts.body as BodyInit;
@@ -50,7 +52,7 @@ export class Api {
     } catch {}
     const { code, message, ...details } = payload.error ?? {};
     const error = new HostedFilesError(code ?? (res.status >= 500 ? "server_error" : "bad_request"), message ?? `HTTP ${res.status}`, res.status, details);
-    if (res.status === 401) this.onUnauthorized();
+    if (res.status === 401 && !opts.anonymous) this.onUnauthorized();
     throw error;
   }
 

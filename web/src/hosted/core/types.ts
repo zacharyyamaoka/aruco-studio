@@ -78,8 +78,23 @@ export interface HostedFilesOptions {
   // choice, kept in localStorage, overrides it.
   autosave?: boolean | AutosaveOptions;
   signInMode?: "popup" | "redirect";
+  // The sign-in dialog's header (SPEC v2.7). Default: the server's name for the app and the
+  // Simple Hosted Files mark at <server>/brand/logo.svg. `appIcon` is an image URL.
+  appName?: string;
+  appIcon?: string;
   shortcuts?: boolean;
   warnOnUnsavedClose?: boolean;
+}
+
+// GET /v1/session/methods?app=<id> (SPEC v2.7): what the sign-in dialog may offer.
+export interface SignInMethods {
+  serviceName: string;
+  google: boolean;
+  email: boolean;
+  termsUrl: string;
+  privacyUrl: string;
+  logoUrl: string;
+  appName?: string;
 }
 
 export type EventName = "signin" | "signout" | "open" | "save" | "conflict" | "limit" | "error";

@@ -23,7 +23,8 @@ import {
 } from "./drafts.js";
 import { HostedFilesError } from "./errors.js";
 import { randomId, withExtension } from "./format.js";
-import type { Draft, EventName, FileMeta, HostedFilesOptions, Me, State, Status, User } from "./types.js";
+import { SignInFlow } from "./signin.js";
+import type { Draft, EventName, FileMeta, HostedFilesOptions, Me, SignInMethods, State, Status, User } from "./types.js";
 
 export const MSG_OFFLINE = "Not saved online yet — kept on this device";
 export const MSG_CONFLICT = "Changed somewhere else — both versions are in History";
@@ -44,14 +45,16 @@ const KEEPALIVE_MAX_BYTES = 60 * 1024;
 
 export const DISCARD = Symbol("discard");
 
-// What the drop-in bar provides. Without a mounted bar the SDK falls back to window.prompt.
+// What the drop-in bar provides. Without a mounted bar the SDK falls back to window.prompt,
+// and sign-in to the hosted /connect pop-up.
 export interface UiHost {
   promptName(opts: { title: string; value: string; okLabel?: string; discard?: boolean }): Promise<string | null | typeof DISCARD>;
   showLimit(variant: "files" | "locked"): void;
   closeLimit(): void;
   showOpen(): void;
   showHistory(): void;
-  showSignInWaiting(cancel: () => void): () => void;
+  // SPEC v2.7: shows the sign-in dialog for `flow`; the returned function hides it.
+  showSignIn(flow: SignInFlow): () => void;
 }
 
 type Listener = (state: State) => void;
@@ -89,6 +92,9 @@ export class HostedFiles {
   private autosaveTiming: { idleMs: number; maxIntervalMs: number };
   private leaving = false;
   private _initialized = false;
+  private signingIn: Promise<User> | null = null;
+  private flow: SignInFlow | null = null;
+  private methods: Promise<SignInMethods> | null = null;
   staleHead: FileMeta | null = null;
 
   constructor(options: HostedFilesOptions) {
@@ -138,6 +144,28 @@ export class HostedFiles {
 
   get accountUrl(): string {
     return this.current.me?.accountUrl ?? `${this.server}/account/`;
+  }
+
+  // "Your account ↗" (SPEC v2.7): the account page signed in as this user, through a one-time
+  // hand-off token in the fragment (never sent to a server log), adopted by the page itself.
+  async openAccount(): Promise<void> {
+    // WHY open the tab before the request: a window opened after an await is a popup the
+    // browser may block; one opened inside the click is not.
+    const tab = window.open("", "_blank");
+    let url = this.accountUrl;
+    try {
+      const { token } = await this.api.json<{ token: string }>("POST", "/v1/session/handoff", { body: {} });
+      const target = new URL(url);
+      target.hash = `shf_ott=${encodeURIComponent(token)}`;
+      url = target.toString();
+    } catch (err) {
+      // The plain account page still works: it asks the user to sign in there.
+      console.warn("Simple Hosted Files: account hand-off failed; opening the account page signed out", err);
+    }
+    if (tab) {
+      tab.opener = null;
+      tab.location.href = url;
+    } else window.open(url, "_blank", "noopener");
   }
 
   get hasUnsavedChanges(): boolean {
@@ -250,6 +278,8 @@ export class HostedFiles {
     const wasSignedOut = !this.current.user;
     this.set({ user: me.user, me, plan: me.plan });
     if (wasSignedOut) this.settledStatus();
+    // Signed in some other way meanwhile (another tab): an open dialog has nothing left to do.
+    if (wasSignedOut) this.flow?.succeed(me.user);
     return me;
   }
 
@@ -259,31 +289,88 @@ export class HostedFiles {
 
   // ---- auth (SPEC §4) ----------------------------------------------------------------
 
+  // SPEC v2.7: the host UI's in-app dialog (Google pop-up, or an email code without leaving the
+  // app). Resolves once signed in; rejects with `cancelled` when the dialog is closed.
   async signIn(): Promise<User> {
     if (this.current.user) return this.current.user;
+    if (!this.ui) return this.connectSignIn().done;
+    this.signingIn ??= this.dialogSignIn().finally(() => {
+      this.signingIn = null;
+      this.flow = null;
+    });
+    return this.signingIn;
+  }
+
+  private dialogSignIn(): Promise<User> {
+    const ui = this.ui!;
+    return new Promise<User>((resolve, reject) => {
+      let hide: (() => void) | null = null;
+      const flow = new SignInFlow(
+        {
+          methods: () => this.signInMethods(),
+          startEmail: async (email) => {
+            await this.api.json("POST", "/v1/session/email/start", { body: { email }, anonymous: true });
+          },
+          verifyEmail: async (email, code) => {
+            const { token } = await this.api.json<{ token: string; user: User }>("POST", "/v1/session/email/verify", { body: { email, code }, anonymous: true });
+            return this.adoptBearer(token);
+          },
+          google: () => this.connectSignIn("google"),
+        },
+        { server: this.server, appId: this.app, appName: this.opts.appName, appIcon: this.opts.appIcon },
+        (user) => {
+          hide?.();
+          resolve(user);
+        },
+        (err) => {
+          hide?.();
+          reject(err);
+        },
+      );
+      this.flow = flow;
+      hide = ui.showSignIn(flow);
+      if (flow.done) hide();
+    });
+  }
+
+  // WHY cached per page: the dialog may open several times; a failed load is asked again.
+  private signInMethods(): Promise<SignInMethods> {
+    this.methods ??= this.api
+      .json<SignInMethods>("GET", `/v1/session/methods?app=${encodeURIComponent(this.app)}`, { anonymous: true })
+      .catch((err) => {
+        this.methods = null;
+        throw err;
+      });
+    return this.methods;
+  }
+
+  // The hosted /connect page in a pop-up: the Google path of the dialog (`provider`), and all of
+  // sign-in when no UI is mounted. `close` abandons it (rejects `popup_closed`).
+  private connectSignIn(provider?: "google"): { done: Promise<User>; close: () => void } {
     const state = randomId();
-    const connect = `${this.server}/connect?app=${encodeURIComponent(this.app)}&origin=${encodeURIComponent(location.origin)}&state=${state}`;
-    if (this.opts.signInMode === "redirect") return this.redirectSignIn(connect, state);
+    const connect = `${this.server}/connect?app=${encodeURIComponent(this.app)}&origin=${encodeURIComponent(location.origin)}&state=${state}${provider ? `&provider=${provider}` : ""}`;
+    const leave = () => ({ done: this.redirectSignIn(connect, state), close: () => {} });
+    if (this.opts.signInMode === "redirect") return leave();
     const width = 440;
     const height = 640;
     const left = Math.max(0, window.screenX + (window.outerWidth - width) / 2);
     const top = Math.max(0, window.screenY + (window.outerHeight - height) / 3);
     const popup = window.open(`${connect}&mode=popup`, "shf-signin", `popup,width=${width},height=${height},left=${left},top=${top}`);
     // WHY the redirect fallback: a blocked popup must not leave the user unable to sign in.
-    if (!popup) return this.redirectSignIn(connect, state);
+    if (!popup) return leave();
 
     const serverOrigin = new URL(this.server).origin;
-    return new Promise<User>((resolve, reject) => {
-      let done = false;
+    let close = () => {};
+    const done = new Promise<User>((resolve, reject) => {
+      let finished = false;
       let closedSince = 0;
       const cleanup = () => {
-        done = true;
+        finished = true;
         window.removeEventListener("message", onMessage);
         clearInterval(watch);
-        closeOverlay?.();
       };
       const fail = (err: HostedFilesError) => {
-        if (done) return;
+        if (finished) return;
         cleanup();
         try {
           popup.close();
@@ -309,8 +396,9 @@ export class HostedFiles {
         if (Date.now() - closedSince > 1_500) fail(new HostedFilesError("popup_closed", "The sign-in window was closed"));
       }, 300);
       window.addEventListener("message", onMessage);
-      const closeOverlay = this.ui?.showSignInWaiting(() => fail(new HostedFilesError("popup_closed", "Sign-in cancelled")));
+      close = () => fail(new HostedFilesError("popup_closed", "Sign-in cancelled"));
     });
+    return { done, close };
   }
 
   private get stashMarker(): string {
@@ -458,6 +546,11 @@ export class HostedFiles {
 
   private async exchange(oneTimeToken: string): Promise<User> {
     const { token } = await this.api.json<{ token: string; user: User }>("POST", "/v1/session/exchange", { body: { token: oneTimeToken } });
+    return this.adoptBearer(token);
+  }
+
+  // A per-app bearer from /exchange or /email/verify: kept, then the session starts.
+  private async adoptBearer(token: string): Promise<User> {
     localStorage.setItem(this.tokenKey, token);
     const me = await this.loadMe();
     this.emit("signin", me.user);
