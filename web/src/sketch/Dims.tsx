@@ -10,9 +10,14 @@
 // offset is left out: "it's not something we need precision positioning of".
 //
 // WHY only what you set (Zach, 2026-10-18): "do not display measurements here
-// that you cannot control". The outer size and the rectangle's W and H are
-// left out (W × H stays in ShapeDims' box); a feature shows only the sizes
-// its type takes (CONTROLS).
+// that you cannot control". The rectangle's W and H are left out (W × H stays
+// in ShapeDims' box); a feature shows the sizes its type takes (CONTROLS).
+//
+// WHY the outer W × H after all, read-only (Zach, 2026-10-21, from Fusion: "I
+// want to see the marker and spacing dimensions here and the outer
+// dimensions as driven"; docs/design/panel_skeleton.md, "On the model /
+// canvas"): the core's two "outer" dims (the outline's top and left edges)
+// are drawn grey, in the driven style, and take no click: nothing types them.
 //
 // WHY screen-space rings: the core stands each dimension offset_mm outside
 // the box it placed the marker in (MarkerPlan.fit_rect: "the rectangle"
@@ -42,11 +47,14 @@ const CONTROLS: Record<string, string[]> = {
   charuco: ["marker.checker_mm", "marker.marker_mm"],
 };
 
+/** The dims every type draws read-only: the outline's width and height. */
+const READ_ONLY = ["outer"];
+
 /** Which dims stay when they would overlap: the first wins. */
-const PRIORITY = ["marker.marker_mm", "marker.checker_mm", "marker.separation_mm"];
+const PRIORITY = ["marker.marker_mm", "marker.checker_mm", "marker.separation_mm", "outer"];
 
 const NAMES: Record<string, string> = {
-  "marker.marker_mm": "Marker", "marker.checker_mm": "Checker", "marker.separation_mm": "Separation",
+  "marker.marker_mm": "Marker", "marker.checker_mm": "Checker", "marker.separation_mm": "Separation", outer: "Outer",
 };
 
 export const fmtDim = (v: number) => String(+v.toFixed(2));
@@ -70,6 +78,8 @@ export interface LaidDim {
   text: string;
   /** set (typed) vs driven */
   set: boolean;
+  /** read-only (the outer size): driven always, no click types it */
+  fixed: boolean;
   bad: boolean;
   /** the measured points on the geometry, and the arrow tips (screen px) */
   a: Vec2; b: Vec2; p: Vec2; q: Vec2;
@@ -97,7 +107,7 @@ type Side = "top" | "bottom" | "left" | "right";
 /** Lay out the plan's dims for one feature in screen px (scr: sketch -> screen),
  *  standing outside `rect`: the box the core placed the marker in. */
 export function layoutDims(f: Feature, rect: Rect, plan: MarkerPlan, scr: (p: Vec2) => Vec2, z: number): LaidDim[] {
-  const fields = CONTROLS[f.marker.type] ?? [];
+  const fields = [...(CONTROLS[f.marker.type] ?? []), ...READ_ONLY];
   const dims = (plan.dims ?? []).filter((d) => fields.includes(d.field) && Math.hypot(d.b[0] - d.a[0], d.b[1] - d.a[1]) > 1e-6);
   // each dim's side of the rectangle (its offset normal in the rectangle's frame) and how far its geometry is inside that edge
   const placed = dims.map((d, i) => {
@@ -127,7 +137,8 @@ function laidOne(f: Feature, d: Dimension, i: number, nw: Vec2, off: number, scr
   const p = add(A, n, off), q = add(B, n, off);
   const dir = unit(sub(q, p));
   const span = Math.hypot(q[0] - p[0], q[1] - p[1]);
-  const set = isSet(f, d.field);
+  const fixed = READ_ONLY.includes(d.field);
+  const set = !fixed && isSet(f, d.field);
   const text = fmtDim((set ? typed(f, d.field) : null) ?? d.value_mm);
   const tw = textWidth(text, set) + 10;
   const inside = span >= 2 * ARROW + 4;
@@ -140,7 +151,7 @@ function laidOne(f: Feature, d: Dimension, i: number, nw: Vec2, off: number, scr
   if (angle < -90) angle += 180;
   const bad = set && errors.has(d.field);
   return {
-    key: `${d.field}:${i}`, field: d.field, value: d.value_mm, text, set, bad,
+    key: `${d.field}:${i}`, field: d.field, value: d.value_mm, text, set, fixed, bad,
     a: A, b: B, p, q, inside, fits, at, angle, tw,
   };
 }
@@ -183,6 +194,7 @@ export const DIM_CSS = `
 .cad-dim.bad text { fill: var(--bad); font-weight: 600; }
 .cad-dim .val { cursor: text; }
 .cad-dim .val:hover .chip { stroke: var(--accent); stroke-width: 1; }
+.cad-dim.fixed .val, .cad-dim.fixed .val * { pointer-events: none; cursor: default; }
 `;
 
 /** An arrowhead, its tip first (the e2e reads the tip as the path's first point). */
@@ -210,15 +222,22 @@ export function Dims({ fid, dims, editing, onEdit }: {
         // arrows inside point out to the tips; outside they point in, on short leaders
         const l0 = d.inside ? d.p : add(d.p, dir, -(ARROW + 6));
         const l1 = d.fits ? d.q : add(d.at, dir, -d.tw / 2);
-        const cls = ["cad-dim", d.set ? "set" : "driven", d.bad && "bad"].filter(Boolean).join(" ");
+        const cls = ["cad-dim", d.set ? "set" : "driven", d.fixed && "fixed", d.bad && "bad"].filter(Boolean).join(" ");
         return (
-          <g key={d.key} className={cls} data-dim={d.field} data-value={d.value} data-set={d.set ? "1" : "0"}>
+          <g key={d.key} className={cls} data-dim={d.field} data-value={d.value} data-set={d.set ? "1" : "0"} data-driven-only={d.fixed ? "1" : undefined}>
             <line className="ext" x1={e0[0]} y1={e0[1]} x2={e1[0]} y2={e1[1]} />
             <line className="ext" x1={f0[0]} y1={f0[1]} x2={f1[0]} y2={f1[1]} />
             <line className="dl" x1={l0[0]} y1={l0[1]} x2={l1[0]} y2={l1[1]} />
             <path className="arw" data-tip="a" d={arrow(d.p, d.inside ? d.q : add(d.p, dir, -1))} />
             <path className="arw" data-tip="b" d={arrow(d.q, d.inside ? d.p : add(d.q, dir, 1))} />
-            {editing !== d.field && (
+            {d.fixed && (
+              <g className="val" data-dim-label={d.field} transform={`rotate(${d.angle} ${d.at[0]} ${d.at[1]})`}>
+                <title>{`${NAMES[d.field] ?? d.field}: ${d.text} mm, driven (the marker's size and the quiet zone set it)`}</title>
+                <rect className="chip" x={d.at[0] - d.tw / 2} y={d.at[1] - TEXT_H / 2} width={d.tw} height={TEXT_H} rx={3} />
+                <text x={d.at[0]} y={d.at[1]} textAnchor="middle" dominantBaseline="central">{d.text}</text>
+              </g>
+            )}
+            {!d.fixed && editing !== d.field && (
               <g className="val" data-dim-label={d.field} transform={`rotate(${d.angle} ${d.at[0]} ${d.at[1]})`}
                 // WHY the left button only: a right-drag (the selection box) may start on a label
                 onPointerDown={(e) => { if (e.button === 0) e.stopPropagation(); }}

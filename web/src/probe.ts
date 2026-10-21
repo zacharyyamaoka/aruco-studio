@@ -9,6 +9,7 @@ import { plannerBusy } from "./planner";
 import { getFeature } from "./model/doc";
 import { activeFeatureId, useStudio } from "./store";
 import { view3d, type View3DProbe } from "./view3d/probe3d";
+import { exampleMarksKnown } from "./app/thumbs";
 
 export interface Probe {
   kind: "real" | "mock";
@@ -39,6 +40,8 @@ function snapshot() {
     canUndo: s.canUndo, canRedo: s.canRedo, view3d: s.view3d,
     // the sketch lane (2026-10-20 night): every selected shape, the selected sketch dim
     selection: s.multi, dimSel: s.dimSel,
+    // the canvas3 lane (2026-10-21): View › Marker info, and how many markers each example's thumbnail knows
+    markerInfo: s.markerInfo, thumbs: exampleMarksKnown(),
   };
 }
 

@@ -56,6 +56,10 @@ export interface Studio {
   /** the canvas shows the 3D model (barrier 10b; the 2D | 3D toggle, V3) -- a view
    *  state, not in the document or its history */
   view3d: boolean;
+  /** View › Marker info: a grey "#1 · 4X4_50 · 44.0 mm" under every marker
+   *  (the spaced sheet's caption) -- a view overlay, never printed, not in the
+   *  document; remembered per browser */
+  markerInfo: boolean;
   panel: PanelState;
   modal: Modal;
   /** each feature's last plan, by feature id (kept drawn while the next computes) */
@@ -141,6 +145,7 @@ export interface Studio {
   setFieldFor: (featureId: string, path: string, value: unknown) => void;
   resetFieldFor: (featureId: string, path: string) => void;
   setView3d: (on: boolean) => void;
+  setMarkerInfo: (on: boolean) => void;
   /** a label value that has no row (the drag's offset_mm); the panel's feature unless named */
   setLabel: <K extends keyof LabelParams>(key: K, value: LabelParams[K], featureId?: string) => void;
   /** the panel feature's stable key (auto id hashes it); empty = its id again.
@@ -178,6 +183,12 @@ export interface Studio {
 const HISTORY = 200;
 /** Edits to one value this close together are one step (ms). */
 const IDLE_MS = 500;
+
+/** Where View › Marker info is remembered (this browser only). */
+const MARKER_INFO_KEY = "arucoStudio.markerInfo";
+function readMarkerInfo(): boolean {
+  try { return window.localStorage.getItem(MARKER_INFO_KEY) === "1"; } catch { return false; }
+}
 
 const PANEL0: PanelState = { open: false, featureId: null, tab: "marker", collapsed: false, selector: null, backup: null };
 
@@ -283,6 +294,7 @@ export const useStudio = create<Studio>((set, get) => {
     camera: { cx: 60, cy: 40, zoom: 4 },
     view: { w: 800, h: 600 },
     view3d: false,
+    markerInfo: readMarkerInfo(),
     panel: PANEL0,
     modal: null,
     plans: {},
@@ -552,6 +564,10 @@ export const useStudio = create<Studio>((set, get) => {
     setFieldFor: (fid, path, value) => put({ doc: updateFeature(get().doc, fid, (f) => setField(f, path, value)) }, `field:${fid}:${path}`),
     resetFieldFor: (fid, path) => put({ doc: updateFeature(get().doc, fid, (f) => resetField(f, path)) }, `field:${fid}:${path}`),
     setView3d: (view3d) => set({ view3d }),
+    setMarkerInfo: (markerInfo) => {
+      try { window.localStorage.setItem(MARKER_INFO_KEY, markerInfo ? "1" : "0"); } catch { /* storage blocked: kept for this visit only */ }
+      set({ markerInfo });
+    },
     setLabel: (key, value, featureId) => {
       const fid = featureId ?? get().panel.featureId;
       put({ doc: updateFeature(get().doc, fid, (f) => ({ ...f, label: { ...f.label, [key]: value } })) }, `label:${fid}:${key}`);

@@ -12,8 +12,11 @@
 // the rubber band; a typed value is a driving dimension. Every feature's marker, outline, Joint Origin and
 // label are drawn as its plan() returned them: no marker geometry is made
 // here. The sticker's white is the plan's cut_shape (the trim: the profile
-// with its holes, or the quiet zone), under the marker. The turn arc belongs
-// to the feature in focus: a click turns the marker 90°; on a rectangle
+// with its holes, or the quiet zone), under the marker. A label is drawn in
+// the colour it prints in, selected or not. View › Marker info puts the
+// sheet's caption under every marker (a view overlay, never printed). The
+// turn arc belongs to the feature in focus (the panel's, else the selected
+// one; none when nothing is): a click turns the marker 90°; on a rectangle
 // profile it is also Fusion's rotate manipulator -- a drag turns the
 // rectangle about its centre (15° steps, Shift free) and the marker follows,
 // its angle in a value box you can type into (one undo step per rotation).
@@ -31,7 +34,7 @@ import {
   boxOf, fromLocal, handlePoint, HANDLES, loopD, niceStep, rectCorners, rectFromCorners, toLocal, toScreen, toWorld, zoomAt,
   type Handle,
 } from "../model/geom";
-import { activeFeatureId, selectedFeatureId, useStudio } from "../store";
+import { selectedFeatureId, useStudio } from "../store";
 import { DimEditor, Dims, layoutDims, type LaidDim } from "./Dims";
 import { diameterLocked, dimFromPicks, refusal, resizable, typedValue, type DimRef, type SketchDim } from "./constraints";
 import {
@@ -94,6 +97,27 @@ const OUTLINE = { fill: "transparent" };
  *  trim, the mock) its cut, else the marker's outline as before. */
 const cutShape = (p: MarkerPlan): Polygon => p.cut_shape ?? { outer: p.cut ?? p.outer, holes: [] };
 
+/** What a label prints in: knocked out of the black border row (the paper's
+ *  white), else black ink (on the quiet zone, or outside the marker).
+ *  WHY (Zach, 2026-10-21): "can label be white if they are not selected?
+ *  right now they are always like this selected blue" -- a label is drawn as
+ *  it prints; the selection shows by its own outline, never by recolouring it
+ *  (docs/design/panel_skeleton.md, "On the model / canvas"). */
+export function labelInk(f: Feature): "white" | "black" {
+  return (f.label.place ?? "on_marker") === "on_marker" && (f.label.surface ?? "black") === "black" ? "white" : "black";
+}
+const INK = { white: "var(--t-white)", black: "var(--t-black)" };
+
+/** The spaced sheet's caption under a sticker (web_api.sheet's, with no label:
+ *  "#1 · 4X4_50 · 44.0 mm"): the ids, the dictionary without DICT_, the marker
+ *  size as the core's _mm writes it (two decimals, a trailing 0 dropped). */
+export function markerInfoText(f: Feature, plan: MarkerPlan): string {
+  const ids = plan.ids;
+  const idw = ids.length === 1 ? `#${ids[0]}` : `#${ids[0]}-${ids[ids.length - 1]}`;
+  const mm = plan.marker_mm.toFixed(2);
+  return `${idw} · ${f.marker.dictionary.replace("DICT_", "")} · ${mm.endsWith("0") ? mm.slice(0, -1) : mm} mm`;
+}
+
 /** The box the core placed a feature's marker in: the plan's fit_rect, else
  *  (a core from before barrier 9) the rectangle profile, else the outline's box. */
 function placeBox(doc: Doc, f: Feature, plan: MarkerPlan): Rect {
@@ -127,6 +151,7 @@ export function Viewport() {
   const tool = useStudio((s) => s.tool);
   const plans = useStudio((s) => s.plans);
   const panel = useStudio((s) => s.panel);
+  const markerInfo = useStudio((s) => s.markerInfo);
   const [hover, setHover] = useState<Hit>(null);
   const [drag, setDragState] = useState<Drag | null>(null);
   // WHY a ref beside the state (Zach, 2026-10-20 night: "multi select by right
@@ -678,14 +703,17 @@ export function Viewport() {
   const selId = selShape?.id ?? null;
   const selIds = new Set([...multi, ...(selId ? [selId] : [])]);
   // every feature that has a profile and a plan, with the box its marker was
-  // placed in; the one in focus gets the turn arc
+  // placed in
   const drawn = doc.features
     .filter((f) => !!f.profile && !!plans[f.id])
     .map((f) => ({ f, plan: plans[f.id], rect: placeBox(doc, f, plans[f.id]) }));
-  const activeId = activeFeatureId({ doc, sel, panel });
   const featureRects = new Set(doc.features.map((f) => featureRect(doc, f)?.id));
 
-  // the selected feature's dimensions (the panel's feature, or the one the selection names)
+  // the feature in focus: the panel's feature, or the one the selection names
+  // (none when nothing is selected). It gets the dimensions and the turn arc.
+  // WHY not the store's activeFeatureId (Zach, 2026-10-21: "when nothing is
+  // selected it shouldn't display the rotation dragger"): that falls back to
+  // the last marker made, for Export.
   const dimFid = panel.open ? panel.featureId : selectedFeatureId(doc, sel);
   const dimOf = drawn.find((d) => d.f.id === dimFid);
   const laid: LaidDim[] = dimOf ? layoutDims(dimOf.f, dimOf.rect, dimOf.plan, scr, z) : [];
@@ -747,7 +775,7 @@ export function Viewport() {
     const ow = plan.outer_mm[0], oh = plan.outer_mm[1];
     const turned = f.marker.turn === 90 || f.marker.turn === 270;
     const [dw, dh] = turned ? [oh, ow] : [ow, oh];
-    if (f.id === activeId) {
+    if (f.id === dimFid) {
       // the turn arc: over the top of the marker, a handle in its middle
       const mc = fromLocal(fRect, [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2]);
       const rr = Math.min(b.x1 - b.x0, b.y1 - b.y0) * 0.42;
@@ -794,23 +822,34 @@ export function Viewport() {
     if (pl && pl.text) {
       const at0 = scr(pl.at);
       const at = scr(labelAt?.fid === f.id ? labelAt.at : pl.at);
-      const cls = `label${sel?.kind === "text" && sel.id === f.id ? " on" : ""}`;
+      const on = sel?.kind === "text" && sel.id === f.id;
+      const ink = labelInk(f);
+      // WHY no "on" class: the stylesheet's .label colours it the accent and
+      // .label.on strokes it the selection's (not this lane's to change); the
+      // fill is inline, the ink it prints in, selected or not
+      const cls = "label";
       // WHY inline pointer-events: the stylesheet lets only [data-label] itself take a press; here that is the group
-      const hit = { pointerEvents: "auto" as const };
+      const hit = { pointerEvents: "auto" as const, fill: INK[ink], stroke: "none" };
+      // a selected label: its band's outline, in the selection's colour (Fusion's text box)
+      const band = on && pl.box?.length ? (
+        <path d={sl(pl.box)} data-label-sel="1" transform={`translate(${at[0] - at0[0]} ${at[1] - at0[1]})`}
+          style={{ fill: "none", stroke: "var(--pick)", strokeWidth: 1.2, strokeDasharray: "4 3", pointerEvents: "none" }} />
+      ) : null;
       if (pl.font === "pixel" && pl.polygons?.length) {
         labels.push(
-          <g key={f.id} className={cls} data-label="1" data-feature={f.id} data-testid="label-text" data-font="pixel"
+          <g key={f.id} className={cls} data-label="1" data-feature={f.id} data-testid="label-text" data-font="pixel" data-ink={ink} data-on={on ? "1" : undefined}
             transform={`translate(${at[0] - at0[0]} ${at[1] - at0[1]})`}>
             <path d={pl.polygons.map((p) => sl(p.outer) + p.holes.map(sl).join("")).join("")} fillRule="evenodd" data-label-ink="1" style={hit} />
           </g>,
         );
+        if (band) labels.push(<g key={`${f.id}-sel`}>{band}</g>);
       } else {
         const lines = pl.lines?.length ? pl.lines : pl.text.split("\n");
         const cap = pl.height_mm * z;
         const pitch = (1 + LINE_GAP) * cap;
         const fs = Math.max(6, cap / 0.7);
         labels.push(
-          <g key={f.id} className={cls} data-label="1" data-feature={f.id} data-testid="label-text" data-font="sans"
+          <g key={f.id} className={cls} data-label="1" data-feature={f.id} data-testid="label-text" data-font="sans" data-ink={ink} data-on={on ? "1" : undefined}
             transform={pl.angle_deg ? `rotate(${-pl.angle_deg} ${at[0]} ${at[1]})` : undefined}>
             {lines.map((t, k) => (
               // line k's cap centre is (n - 1) / 2 - k pitches above the block's centre; its baseline half a cap below that
@@ -819,7 +858,27 @@ export function Viewport() {
             ))}
           </g>,
         );
+        if (band) labels.push(<g key={`${f.id}-sel`}>{band}</g>);
       }
+    }
+  }
+
+  // View › Marker info: the sheet's caption, small and grey, centred under
+  // each marker's outline (as it stands on screen, turned or not)
+  // WHY (Zach, 2026-10-21): "give me the option to add a lable under neatht
+  // he aruco markers ... look just like this one that appears if it has the
+  // spaced layout ... a different label to the actual label"
+  const infos: ReactElement[] = [];
+  if (markerInfo) {
+    for (const { f, plan } of drawn) {
+      const pts = plan.outer.map(scr);
+      if (!pts.length) continue;
+      const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+      const cx = (Math.min(...xs) + Math.max(...xs)) / 2, y = Math.max(...ys) + 12;
+      infos.push(
+        <text key={f.id} x={cx} y={y} textAnchor="middle" data-testid="marker-info" data-feature={f.id}
+          style={{ fill: "var(--muted)", font: "400 10px var(--font)", pointerEvents: "none" }}>{markerInfoText(f, plan)}</text>,
+      );
     }
   }
 
@@ -986,6 +1045,7 @@ export function Viewport() {
         {triads}
         {arc}
         {labels}
+        {infos.length > 0 && <g className="marker-infos" data-testid="marker-infos">{infos}</g>}
         {bounds && <rect className="sel-bounds" data-testid="selection-bounds" x={bounds.x} y={bounds.y} width={bounds.w} height={bounds.h} />}
         <g className="handles">{handles}</g>
         {drag?.kind === "box" && drag.moved && (

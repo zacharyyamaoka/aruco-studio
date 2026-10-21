@@ -135,6 +135,15 @@ function Pick({ on, label, testid, onClick, disabled, title }: { on: boolean; la
   );
 }
 
+/** An on / off row: a check when it is on. */
+function Toggle({ on, label, testid, onClick }: { on: boolean; label: ReactNode; testid: string; onClick: () => void }) {
+  return (
+    <M.Item className="kit-menu-item" data-testid={testid} aria-checked={on} role="menuitemcheckbox" onClick={onClick}>
+      <span className="ic">{on && <Check size={14} />}</span><span className="kit-menu-label">{label}</span>
+    </M.Item>
+  );
+}
+
 /** The main menu (Figma UI3's: the logo with ⌄, top left): Back to files, then
  *  File, Edit, Export, View, Preferences and Help, each a submenu.
  *  WHY no inline File / Edit / Export (Zach, 2026-10-20 night): "Figma doesn't
@@ -146,6 +155,7 @@ function MainMenu({ onHelp }: { onHelp: () => void }) {
   const canRedo = useStudio((s) => s.canRedo);
   const markers = useStudio((s) => s.doc.features.length);
   const view3d = useStudio((s) => s.view3d);
+  const markerInfo = useStudio((s) => s.markerInfo);
   const { state } = useHostedFiles();
   const actions = useHostedFilesActions();
   const [theme, setTheme] = useTheme();
@@ -191,6 +201,10 @@ function MainMenu({ onHelp }: { onHelp: () => void }) {
             <Sub label="View" testid="menu-view" inline={inline}>
               <Pick on={!view3d} label={<>2D <span className="hint">the sketch</span></>} testid="cmd-view-2d" onClick={() => st().setView3d(false)} />
               <Pick on={view3d} label={<>3D <span className="hint">the model</span></>} testid="cmd-view-3d" onClick={() => st().setView3d(true)} />
+              <MenuSeparator />
+              {/* WHY (Zach, 2026-10-21): "give me the option to add a lable under neatht he aruco markers ... You can put it here in the view tab" */}
+              <Toggle on={markerInfo} label={<>Marker info <span className="hint">id · dictionary · size</span></>} testid="cmd-marker-info"
+                onClick={() => st().setMarkerInfo(!markerInfo)} />
               <MenuSeparator />
               <MenuItem icon="fit" label="Fit" hint="F" testid="cmd-fit" onClick={() => st().fit()} />
             </Sub>
