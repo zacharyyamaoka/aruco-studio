@@ -245,6 +245,13 @@ function fusionProfile(v) {
   return s.includes("face") ? "face" : /rect|sketch|profile/.test(s) ? "rectangle" : s || null;
 }
 
+// WHY: the add-in's own words for the make (meta.make, tags.case's third segment) onto the golden cases' method facet
+const FUSION_METHODS = { sticker: "inkjet", "3d": "print3d" };
+const fusionMethod = (row) => {
+  const v = String(row.meta?.make ?? String(row.tags?.case ?? "").split("/")[2] ?? "").toLowerCase();
+  return FUSION_METHODS[v] ?? (v || null);
+};
+
 /** Lines of perf.jsonl not read before: {ts, op, node_kind, marker_type, cells, bodies, ms_core, ms_fusion, ms_total, substeps}. */
 function readFusion(files, seenFile) {
   const seen = new Set(fs.existsSync(seenFile) ? JSON.parse(fs.readFileSync(seenFile, "utf8")).lines : []);
@@ -287,7 +294,7 @@ function gitSha() {
 }
 
 function catalog() {
-  const facets = ["feature", "host", "phase", "marker_type", "cells", "layout", "profile_kind", "method", "call", "part"];
+  const facets = ["feature", "host", "phase", "marker_type", "cells", "layout", "profile_kind", "method", "call", "part", "step"];
   return {
     schema: "vt-kpi-catalog/1", unit_of_iteration: "run",
     title: "CAD feature compute time (ArUco Studio)",
@@ -385,46 +392,65 @@ function emit(a, t, stamp, git, measured, fusionRows, lastSha) {
     point("feature_compute_ms", null, null, 0, [], { lane: "none" }, "not_measured");
   }
 
-  // Fusion: the add-in's lines, grouped by op x marker x cells x profile; core and Fusion halves as a part facet
+  // Fusion: the add-in's lines, grouped by tags.run (a before and an after of one add-in commit are two points, not
+  // one), then op x marker x cells x profile x method x step; core and Fusion halves as a part facet
   if (fusionRows.length) {
-    const fstamp = fusionRows.map((x) => x.ts).filter(Boolean).sort().pop() ?? t;
-    const groups = {};
+    const iso = (sec) => new Date(sec * 1000).toISOString().replace(/\.\d+Z$/, "Z");
+    const byRun = new Map();
     for (const row of fusionRows) {
-      const f = { feature: FEATURE, host: "fusion", phase: row.op ?? null, marker_type: fusionType(row.marker_type),
-        cells: row.cells ?? null, profile_kind: fusionProfile(row.node_kind) };
-      const key = JSON.stringify(f);
-      (groups[key] = groups[key] || { f, rows: [] }).rows.push(row);
+      const tag = row.tags?.run ?? null;
+      if (!byRun.has(tag)) byRun.set(tag, []);
+      byRun.get(tag).push(row);
     }
-    // WHY no aruco-studio sha on Fusion points: the add-in's code is whatever ran on Windows, not this checkout
-    const fsha = fusionRows.map((x) => x.code_sha ?? x.sha ?? null).filter(Boolean).pop() ?? null;
-    const fsource = (ids) => ({ code_sha: fsha, bench_version: BENCH_VERSION, run_ids: ids });
-    const halves = { total: [], core: [], fusion: [] };
-    for (const { f, rows } of Object.values(groups)) {
-      const run_id = `${stamp}-fusion-${[f.phase, f.marker_type, f.cells, f.profile_kind].join("-")}`.replace(/[^\w.-]+/g, "_");
-      items[run_id] = rows.map((row, i) => ({ item_id: `${run_id}#${i + 1}`, t: row.ts ?? null, latency_ms: row.ms_total ?? null,
-        ms_core: row.ms_core ?? null, ms_fusion: row.ms_fusion ?? null, bodies: row.bodies ?? null,
-        facets: { phase: f.phase, node_kind: row.node_kind ?? null, marker_type: row.marker_type ?? null }, substeps: row.substeps ?? null, line: row._line }));
-      const sum = (k) => r3(rows.reduce((x, row) => x + (typeof row[k] === "number" ? row[k] : 0), 0));
-      runs.push({ schema: "vt-run/1", run_id, t: fstamp, facets: { ...f, lane: "fusion" },
-        metrics: { calls: rows.length, ms_total_sum: sum("ms_total"), ms_core_sum: sum("ms_core"), ms_fusion_sum: sum("ms_fusion"), bodies_sum: sum("bodies") },
-        items: { path: `items/${run_id}.jsonl`, schema: "aruco-fusion-perf/1", n: rows.length } });
-      for (const [part, field] of Object.entries(FUSION_PARTS)) {
-        const xs = rows.map((row) => row[field]).filter((v) => typeof v === "number");
-        if (!xs.length) continue;
-        halves[part].push({ v: p95(xs), n: xs.length, run_id });
-        points.push({ schema: "vt-kpi-point/1", kpi: "feature_compute_ms", t: fstamp, value: r3(p95(xs)), n: xs.length, status: "measured",
-          slice: { ...f, part }, labels: labels("fusion"), source: fsource([run_id]) });
-        points.push({ schema: "vt-kpi-point/1", kpi: "feature_compute_ms_p50", t: fstamp, value: r3(median(xs)), n: xs.length, status: "measured",
-          slice: { ...f, part }, labels: labels("fusion"), source: fsource([run_id]) });
+    for (const [tag, runRows] of byRun) {
+      // each run's own latest ts, in the stamp format of the other points
+      const secs = runRows.map((x) => x.ts).filter((v) => typeof v === "number");
+      const fstamp = secs.length ? iso(Math.max(...secs)) : t;
+      // WHY the commit is not the whole sha: before and after ran the SAME add-in commit, perf switches off / on
+      const commit = runRows.map((x) => x.commit).filter(Boolean).pop() ?? null;
+      const perf = tag?.startsWith("before") ? "perf_off" : tag?.startsWith("after") ? "perf_on" : null;
+      // WHY no aruco-studio sha on Fusion points: the add-in's code is whatever ran on Windows, not this checkout
+      const fsha = tag && perf && commit ? `${commit}-${perf}` : runRows.map((x) => x.code_sha ?? x.sha ?? null).filter(Boolean).pop() ?? null;
+      const fsource = (ids) => ({ code_sha: fsha, bench_version: BENCH_VERSION, run_ids: ids });
+      const groups = {};
+      for (const row of runRows) {
+        const caseParts = String(row.tags?.case ?? "").split("/");
+        const method = fusionMethod(row), step = row.tags?.step ?? null;
+        const f = { feature: FEATURE, host: "fusion", phase: row.op ?? null, marker_type: fusionType(row.marker_type),
+          cells: row.cells ?? null, profile_kind: fusionProfile(caseParts[1] || row.node_kind),
+          ...(method ? { method } : {}), ...(step ? { step } : {}) };
+        const key = JSON.stringify(f);
+        (groups[key] = groups[key] || { f, rows: [] }).rows.push(row);
       }
-    }
-    // the slow half, visible: each part's slowest group, and the host's slowest total
-    for (const [part, list] of Object.entries(halves)) {
-      const w = maxBy(list, (x) => x.v);
-      if (!w) continue;
-      const slice = part === "total" ? { host: "fusion" } : { part };
-      points.push({ schema: "vt-kpi-point/1", kpi: "feature_compute_ms", t: fstamp, value: r3(w.v), n: w.n, status: "measured",
-        slice, labels: labels("fusion", { slowest: w.run_id }), source: fsource(list.map((x) => x.run_id)) });
+      const halves = { total: [], core: [], fusion: [] };
+      for (const { f, rows } of Object.values(groups)) {
+        const run_id = `${stamp}-fusion-${[tag, f.phase, f.marker_type, f.cells, f.profile_kind, f.method, f.step].filter((x) => x != null).join("-")}`.replace(/[^\w.-]+/g, "_");
+        items[run_id] = rows.map((row, i) => ({ item_id: `${run_id}#${i + 1}`, t: row.ts ?? null, latency_ms: row.ms_total ?? null,
+          ms_core: row.ms_core ?? null, ms_fusion: row.ms_fusion ?? null, bodies: row.bodies ?? null,
+          facets: { phase: f.phase, node_kind: row.node_kind ?? null, marker_type: row.marker_type ?? null,
+            ...(tag ? { run: tag } : {}), ...(f.step ? { step: f.step } : {}) }, substeps: row.substeps ?? null, line: row._line }));
+        const sum = (k) => r3(rows.reduce((x, row) => x + (typeof row[k] === "number" ? row[k] : 0), 0));
+        runs.push({ schema: "vt-run/1", run_id, t: fstamp, facets: { ...f, lane: "fusion" },
+          metrics: { calls: rows.length, ms_total_sum: sum("ms_total"), ms_core_sum: sum("ms_core"), ms_fusion_sum: sum("ms_fusion"), bodies_sum: sum("bodies") },
+          items: { path: `items/${run_id}.jsonl`, schema: "aruco-fusion-perf/1", n: rows.length } });
+        for (const [part, field] of Object.entries(FUSION_PARTS)) {
+          const xs = rows.map((row) => row[field]).filter((v) => typeof v === "number");
+          if (!xs.length) continue;
+          halves[part].push({ v: p95(xs), n: xs.length, run_id });
+          points.push({ schema: "vt-kpi-point/1", kpi: "feature_compute_ms", t: fstamp, value: r3(p95(xs)), n: xs.length, status: "measured",
+            slice: { ...f, part }, labels: labels("fusion"), source: fsource([run_id]) });
+          points.push({ schema: "vt-kpi-point/1", kpi: "feature_compute_ms_p50", t: fstamp, value: r3(median(xs)), n: xs.length, status: "measured",
+            slice: { ...f, part }, labels: labels("fusion"), source: fsource([run_id]) });
+        }
+      }
+      // the slow half, visible: each part's slowest group, and the host's slowest total
+      for (const [part, list] of Object.entries(halves)) {
+        const w = maxBy(list, (x) => x.v);
+        if (!w) continue;
+        const slice = part === "total" ? { host: "fusion" } : { part };
+        points.push({ schema: "vt-kpi-point/1", kpi: "feature_compute_ms", t: fstamp, value: r3(w.v), n: w.n, status: "measured",
+          slice, labels: labels("fusion", { slowest: w.run_id }), source: fsource(list.map((x) => x.run_id)) });
+      }
     }
   } else {
     point("feature_compute_ms", null, { host: "fusion" }, 0, [], labels("fusion"), "not_measured");
