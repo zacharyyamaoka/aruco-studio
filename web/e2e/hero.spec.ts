@@ -106,6 +106,10 @@ test("hero · plate → face → A (panel beside) → Grid → type the marker s
   // 5 · the Label tab: two lines, then X offset
   await glideClick(page.locator('[role=tab][data-tab="label"]'));
   await page.waitForTimeout(BEAT / 2);
+  // the label is off by default (2026-10-20 night): turn it on first
+  if (!(await state(page)).feature.label.on) await glideClick(page.locator('[data-testid="extrude-panel"] [data-path="label.on"]'));
+  await expect.poll(async () => (await state(page)).feature.label.on).toBe(true);
+  await idle(page);
   const text = page.locator('textarea[data-path="label.text"]');
   await glideClick(text);
   await text.press("Control+a");
@@ -126,7 +130,7 @@ test("hero · plate → face → A (panel beside) → Grid → type the marker s
 
   // 6 · Sheet: Fewest cuts | Fewest sheets
   await glideClick(page.getByTestId("act-print"));
-  await expect(page.locator('[data-testid="print-page"] svg')).toBeVisible({ timeout: 45_000 });
+  await expect(page.locator('[data-testid="print-page"] svg').first()).toBeVisible({ timeout: 45_000 });
   await idle(page);
   mark("sheet");
   await page.waitForTimeout(BEAT);
