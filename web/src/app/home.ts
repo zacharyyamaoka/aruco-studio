@@ -5,6 +5,7 @@
 // WHY history.state, not a #hash: the hosted sign-in returns its token in the
 // hash (hosted/core shf_token) and rewrites it.
 import { useSyncExternalStore } from "react";
+import { saveDocMarks } from "./thumbs";
 
 const KEY = "arucoView";
 const listeners = new Set<() => void>();
@@ -22,6 +23,8 @@ if (typeof window !== "undefined") window.addEventListener("popstate", () => set
 /** Back to files: Home, a new history entry. */
 export function openHome(): void {
   if (home) return;
+  // the editor's markers, for its card (a page opened straight on Home draws them before the core is up)
+  saveDocMarks();
   history.pushState({ ...(history.state ?? {}), [KEY]: "home" }, "");
   set(true);
 }

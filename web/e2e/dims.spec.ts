@@ -50,9 +50,9 @@ const CONTROLS = {
   charuco: ["marker.checker_mm", "marker.marker_mm"],
 } as const;
 
-/** Every drawn dimension, in drawing order, measured in client px. */
-async function drawn(page: Page): Promise<DrawnDim[]> {
-  return page.evaluate(() => [...document.querySelectorAll('[data-testid="dims"] [data-dim]')].map((g) => {
+/** Every drawn dimension you can type into (`all`: the read-only outer W × H too, canvas3), in drawing order, measured in client px. */
+async function drawn(page: Page, all = false): Promise<DrawnDim[]> {
+  return page.evaluate((all) => [...document.querySelectorAll(`[data-testid="dims"] [data-dim]${all ? "" : ":not([data-driven-only])"}`)].map((g) => {
     const tip = (k: string): [number, number] => {
       const p = g.querySelector(`[data-tip="${k}"]`) as SVGPathElement;
       const pt = p.getPointAtLength(0), m = p.getScreenCTM()!;
@@ -66,7 +66,7 @@ async function drawn(page: Page): Promise<DrawnDim[]> {
       label: lab ? { x: lab.x, y: lab.y, w: lab.width, h: lab.height } : null,
       fill: text ? getComputedStyle(text).fill : null, stroke: getComputedStyle(g.querySelector("line.dl")!).stroke,
     };
-  }));
+  }), all);
 }
 
 /** A theme token resolved to the colour the browser paints. */
@@ -236,7 +236,7 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
     await gridFeature(page);
     let s = await state(page);
     const before = { marker: s.plan.marker_mm, outerW: s.plan.outer_mm[0] };
-    for (const f of ["rect.w", "rect.h", "outer"]) await expect(page.locator(`[data-dim="${f}"]`)).toHaveCount(0);
+    for (const f of ["rect.w", "rect.h"]) await expect(page.locator(`[data-dim="${f}"]`)).toHaveCount(0);
 
     // the W × H box is gone (2026-10-20 night): W is a sketch dim, D on the bottom edge dragged down to place it
     await page.keyboard.press("d");
@@ -251,7 +251,7 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
     expect(r).toMatchObject({ w: 40, h: 60, cx: 0, cy: 0 });
     expect(s.plan.marker_mm).toBeLessThan(before.marker);
     expect(s.plan.outer_mm[0]).toBeLessThan(before.outerW);
-    // the marker dim follows; still no W, H or outer on the canvas
+    // the marker dim follows; still no W or H on the canvas (the outer is read-only, canvas3.spec.ts)
     const m = await dimOf(page, "marker.marker_mm");
     expect(m.value).toBeCloseTo(s.plan.marker_mm, 4);
     expect(Math.abs(tipLength(m) / s.camera.zoom - m.value)).toBeLessThan(0.3);
@@ -274,8 +274,8 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
     expect(Math.abs(markerPx - 40), `marker ${markerPx} px`).toBeLessThan(1.5);
     expect(black.width).toBeLessThan(2 * 40 + 40);       // two markers and their gap
 
-    const dims = await drawn(page);
-    expect(dims.map((d) => d.field).sort()).toEqual([...CONTROLS.grid].sort());
+    const dims = await drawn(page, true);
+    expect(dims.filter((d) => d.field !== "outer").map((d) => d.field).sort()).toEqual([...CONTROLS.grid].sort());
     const rect = (await page.locator(`[data-shape="${s.feature.profile.outer}"]`).boundingBox())!;
     const rbox = { x: rect.x, y: rect.y, w: rect.width, h: rect.height };
     for (const d of dims) {
@@ -291,23 +291,23 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
   });
 
   for (const type of ["single", "grid", "charuco"] as const) {
-    test(`g · a selected ${type}: exactly ${CONTROLS[type].length} dim(s), ${CONTROLS[type].join(" + ")}; no outer, W or H`, async ({ page }) => {
+    test(`g · a selected ${type}: exactly ${CONTROLS[type].length} dim(s) to type, ${CONTROLS[type].join(" + ")}; no W or H (the outer: read-only)`, async ({ page }) => {
       await typedFeature(page, type);
       const s = await state(page);
       const dims = await drawn(page);
       expect(dims.map((d) => d.field).sort()).toEqual([...CONTROLS[type]].sort());
-      expect(await page.locator('[data-testid="dims"] [data-dim]').count()).toBe(CONTROLS[type].length);
+      expect(await page.locator('[data-testid="dims"] [data-dim]:not([data-driven-only])').count()).toBe(CONTROLS[type].length);
       // each is the plan's measure of that field, as long as its value
       for (const d of dims) {
         const p = (s.plan.dims as { field: string; value_mm: number }[]).find((x) => x.field === d.field)!;
         expect(d.value).toBe(p.value_mm);
         expect(Math.abs(tipLength(d) / s.camera.zoom - d.value), d.field).toBeLessThan(0.3);
       }
-      // nothing shows the outer size or the rectangle's W or H
+      // nothing you type shows the outer size or the rectangle's W or H
       const rect = s.doc.shapes.find((x: any) => x.id === s.feature.profile.outer);
       const hidden = new Set([s.plan.outer_mm[0], s.plan.outer_mm[1], rect.w, rect.h].map((v: number) => String(+v.toFixed(2))));
       expect(dims.filter((d) => hidden.has(d.text!)).map((d) => d.field), "no dim value is the outer size or W / H").toEqual([]);
-      const titles = await page.locator('[data-testid="dims"] title').allTextContents();
+      const titles = await page.locator('[data-testid="dims"] [data-dim]:not([data-driven-only]) title').allTextContents();
       expect(titles.some((t) => /outer|rectangle/i.test(t))).toBe(false);
       await page.screenshot({ path: path.join(SHOTS, `dims-${type}.png`) });
     });

@@ -16,7 +16,8 @@ import { daysUntil, relativeTime, type FileMeta } from "../core";
 import { matches, useFiles, useHostedFiles, useHostedFilesActions } from "../react";
 import { UsageLine, initials, usePlan } from "./HostedDialogs";
 import { EXAMPLES } from "../../model/examples";
-import { ShapesThumb, openExample } from "../../app/ExamplesDialog";
+import { ExampleThumb, ShapesThumb, openExample } from "../../app/ExamplesDialog";
+import { useDocMarks } from "../../app/thumbs";
 import { BrandCube } from "../../app/TopBar";
 import { leaveHome, useHome } from "../../app/home";
 import { useStudio } from "../../store";
@@ -43,7 +44,7 @@ function Card({ testid, id, pic, name, meta, onOpen, current, children }: {
 /** The document in the editor, drawn (the open cloud file's card, or the local draft's). */
 function DocPic() {
   const shapes = useStudio((s) => s.doc.shapes);
-  return <ShapesThumb shapes={shapes} />;
+  return <ShapesThumb shapes={shapes} marks={useDocMarks()} />;
 }
 
 function FileCard({ file, current }: { file: FileMeta; current: boolean }) {
@@ -118,12 +119,14 @@ function SignedOut() {
       </div>
       <h1 className="home-h1">On this device</h1>
       <div className="home-grid" role="list">
+        {/* WHY first (Zach, 2026-10-21): "There should be an option to add new files here easily on that home page" */}
+        <NewTile />
         <Card testid="home-draft" name={name} pic={<DocPic />} meta="Your work here, kept in this browser" onOpen={leaveHome} current />
       </div>
       <h1 className="home-h1">Examples</h1>
       <div className="home-grid" role="list" data-testid="home-examples">
         {EXAMPLES.map((e) => (
-          <Card key={e.id} testid="home-example" id={e.id} name={e.name} meta={e.note} pic={<ShapesThumb shapes={e.shapes} />}
+          <Card key={e.id} testid="home-example" id={e.id} name={e.name} meta={e.note} pic={<ExampleThumb id={e.id} />}
             onOpen={() => { void openExample(e.id).then(leaveHome); }} />
         ))}
       </div>
@@ -159,6 +162,7 @@ export function HostedHome() {
             value={query} onChange={(e) => setQuery(e.target.value)} />
         )}
         <span className="home-grow" />
+        <Button size="sm" icon={<Plus size={12} />} testid="home-new-top" title="A new, empty document" onClick={() => { void actions.newFile().then(leaveHome); }}>New</Button>
         {user ? (
           <span className="home-account" data-testid="home-account" title={user.email}>
             <span className="shf-avatar" aria-hidden="true">{initials(user.name, user.email)}</span>
