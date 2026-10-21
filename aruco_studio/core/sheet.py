@@ -169,7 +169,7 @@ class SheetSettings:
     cut_marks: bool = True
     labels: bool = True
     ruler: bool = True
-    # Which pages carry the ruler AND keep its band (layout_stickers only):
+    # Which pages carry the ruler AND keep its band (layout_sheet, layout_stickers):
     # "every" (this core's own default: byte for byte what it always drew),
     # "first" (page 1 only: one print scale for a whole job, the band of the
     # other pages goes to stickers) or "hide". Zach, 2026-10-20 night: "Hide,
@@ -227,6 +227,10 @@ class SheetLayout:
     rejected: List[RejectedItem]
     ruler: Optional[dict]          # {"mm_bar": (x,y,w,h), "in_bar": (x,y,w,h), "top": y}
     warnings: List[str]
+    # scale_bar "first": the sticker area's height on pages 2+ (the ruler's
+    # band is theirs); 0: every page has printable_mm's
+    rest_h_mm: float = 0.0
+    scale_bar: str = "every"        # the pages that draw `ruler`: every | first
 
     @property
     def page_count(self) -> int:
@@ -467,6 +471,9 @@ def layout_sheet(items: List[PrintItem], settings: Optional[SheetSettings] = Non
     with room, else opens a shelf on the first page with height left, else a
     new page. Deterministic for a given input."""
     settings = settings or SheetSettings()
+    if settings.scale_bar not in SCALE_BARS:
+        raise ValueError("scale_bar is one of %s (got %r)" % (", ".join(SCALE_BARS),
+                                                              settings.scale_bar))
     page_w, page_h = page_size_mm(settings)
     m = float(settings.margin_mm)
     gap = float(settings.gap_mm)
@@ -478,7 +485,7 @@ def layout_sheet(items: List[PrintItem], settings: Optional[SheetSettings] = Non
     footer_top = page_h - m - FOOTER_H_MM
     ruler = None
     area_bottom = footer_top - BAND_GAP_MM
-    if settings.ruler:
+    if settings.ruler and settings.scale_bar != "hide":
         if area_w + _EPS >= RULER_W_MM:
             top = footer_top - RULER_H_MM
             ruler = {"top": top,
@@ -493,6 +500,8 @@ def layout_sheet(items: List[PrintItem], settings: Optional[SheetSettings] = Non
     if area_w <= 0 or area_h <= 0:
         raise ValueError("margins and ruler leave no printable area on a "
                          "%.1f x %.1f mm page" % (page_w, page_h))
+    rest_h = _rest_h(settings, ruler, area_h)       # pages 2+ (scale_bar "first")
+    first_bar = rest_h > area_h
 
     prepared: List[_Prepared] = []
     rejected: List[RejectedItem] = []
@@ -511,6 +520,7 @@ def layout_sheet(items: List[PrintItem], settings: Optional[SheetSettings] = Non
 
     prepared.sort(key=lambda p: (-p.sticker_h, -p.sticker_w, -p.cell_h, p.index))
     x1, y1 = x0 + area_w, y0 + area_h
+    y1_rest = y0 + rest_h                    # pages 2+
     shelves: List[List[float]] = []          # [page, y, h, next_x]
     next_shelf_y: List[float] = []           # per page
     pages: List[List[PlacedItem]] = []
@@ -523,7 +533,7 @@ def layout_sheet(items: List[PrintItem], settings: Optional[SheetSettings] = Non
                 break
         if spot is None:
             for page_index, y in enumerate(next_shelf_y):
-                if y + p.cell_h <= y1 + _EPS:
+                if y + p.cell_h <= (y1 if page_index == 0 else y1_rest) + _EPS:
                     spot = (page_index, x0, y)
                     break
             if spot is None:
@@ -548,7 +558,9 @@ def layout_sheet(items: List[PrintItem], settings: Optional[SheetSettings] = Non
         page.sort(key=lambda q: (q.y_mm, q.x_mm))
     return SheetLayout(settings=settings, page_mm=(page_w, page_h),
                        printable_mm=(x0, y0, area_w, area_h), pages=pages,
-                       rejected=rejected, ruler=ruler, warnings=warnings)
+                       rejected=rejected, ruler=ruler, warnings=warnings,
+                       rest_h_mm=rest_h if first_bar else 0.0,
+                       scale_bar="first" if first_bar else "every")
 
 
 def fit_pages(item: PrintItem, settings: Optional[SheetSettings] = None,
@@ -590,7 +602,12 @@ def layout_summary(layout: SheetLayout) -> dict:
     """JSON-able account of a layout, for reports. page_number is 1-based."""
     s = layout.settings
     x, y, w, h = layout.printable_mm
+    extra = {}
+    if layout.scale_bar != "every":
+        extra["scale_bar"] = layout.scale_bar
+        extra["rest_h_mm"] = _r(layout.rest_h_mm)     # pages 2+ (the ruler is on page 1 only)
     return {
+        **extra,
         "page": s.page if s.custom_page_mm is None else "custom",
         "page_mm": [_r(layout.page_mm[0]), _r(layout.page_mm[1])],
         "landscape": bool(s.landscape),
@@ -873,7 +890,7 @@ def _page_content(layout: SheetLayout, page_index: int, page_total: int,
                 baseline = (by + LABEL_GAP_MM + k * line_mm
                             + 0.9 * p.label_font_pt / MM_TO_PT)
                 pg.text(bx + bw / 2.0, baseline, line, p.label_font_pt, "center")
-    if layout.ruler is not None:
+    if layout.ruler is not None and (layout.scale_bar != "first" or page_index == 0):
         _draw_ruler(pg, layout.ruler)
     m = float(s.margin_mm)
     base = page_h - m - 1.0

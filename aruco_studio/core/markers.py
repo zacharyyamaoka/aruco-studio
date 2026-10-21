@@ -1358,30 +1358,35 @@ def print_items(res: Resolution, *, include_hidden: bool = False,
 def sheet_layout(res: Resolution, *, design_name: str = "Design", page: str = "letter",
                  landscape: bool = False, margin_mm: float = 10.0,
                  only: Optional[Iterable[str]] = None,
-                 cad_ink: Optional[Dict[str, dict]] = None):
+                 cad_ink: Optional[Dict[str, dict]] = None, scale_bar: str = "every"):
     """The PDF sheet's layout (print_sheet.layout_sheet) of the visible tags
     -- of `only` (instance names) when given -- exactly as sidecar_files
-    writes it."""
+    writes it. `scale_bar` (SheetSettings.scale_bar): the pages that draw the
+    100 mm / 4 in bar and keep its band: "every" (as always), "first" or
+    "hide"."""
     from . import sheet as print_sheet
     # margin_mm: nothing is drawn closer than this to the paper edge -- the
     # printer's unprintable border (Zach: "a lot of printers cut off the edges")
     settings = print_sheet.SheetSettings(page=page, landscape=landscape,
                                          margin_mm=max(0.0, float(margin_mm)),
-                                         title=f"{design_name} — ArUco tags")
+                                         title=f"{design_name} — ArUco tags",
+                                         scale_bar=scale_bar)
     return print_sheet.layout_sheet(print_items(res, only=only, cad_ink=cad_ink), settings)
 
 
 def sheet_check(res: Resolution, *, page: str = "letter", landscape: bool = False,
                 margin_mm: float = 10.0, only: Optional[Iterable[str]] = None,
-                cad_ink: Optional[Dict[str, dict]] = None, pages=None) -> dict:
+                cad_ink: Optional[Dict[str, dict]] = None, pages=None,
+                scale_bar: str = "every") -> dict:
     """What the PDF type puts on paper, before anything is written (ArUco
     Export's info line and OK): {"placed", "boards" (ChArUco placed),
     "pages", "printable_mm" (w, h), "rejected": [{"key", "layout",
     "size_mm" (the sticker, w x h), "reason", "fits": [(page, landscape)]}],
-    "warnings"}. `pages`: where to look for a page a rejected one fits."""
+    "warnings"}. `pages`: where to look for a page a rejected one fits.
+    `scale_bar`: as sheet_layout's."""
     from . import sheet as print_sheet
     layout = sheet_layout(res, page=page, landscape=landscape, margin_mm=margin_mm,
-                          only=only, cad_ink=cad_ink)
+                          only=only, cad_ink=cad_ink, scale_bar=scale_bar)
     rejected = []
     for r in layout.rejected:
         try:
@@ -1435,7 +1440,8 @@ def sidecar_files(res: Resolution, *, design_name: str = "Design",
                   page: str = "letter", landscape: bool = False,
                   exported_at: str = "", margin_mm: float = 10.0,
                   only: Optional[Iterable[str]] = None,
-                  cad_ink: Optional[Dict[str, dict]] = None) -> Dict[str, bytes]:
+                  cad_ink: Optional[Dict[str, dict]] = None,
+                  scale_bar: str = "every") -> Dict[str, bytes]:
     """Everything the export writes beside the URDF, as {relpath: bytes}.
 
     Zach: "in the side car we also want to keep the image as well, with that
@@ -1453,7 +1459,8 @@ def sidecar_files(res: Resolution, *, design_name: str = "Design",
     `only` (instance names): the sheet prints those (ArUco Export's ticks /
     "ChArUco boards only"); markers.json and the images still cover every
     visible tag. `cad_ink`: each ChArUco board's own label / corner mark
-    (print_items).
+    (print_items). `scale_bar`: which pages of the sheet draw the 100 mm /
+    4 in bar ("every", "first", "hide"; see sheet_layout).
     """
     from . import dictionary as aruco_dict, sheet as print_sheet  # lazy: tables + PDF only on export
     out: Dict[str, bytes] = {}
@@ -1487,7 +1494,8 @@ def sidecar_files(res: Resolution, *, design_name: str = "Design",
     for row, inst in zip(doc["instances"], res.instances):
         row["image"] = None if inst.hidden else f"images/{_image_stem(inst.spec)}.png"
     layout = sheet_layout(res, design_name=design_name, page=page, landscape=landscape,
-                          margin_mm=margin_mm, only=only, cad_ink=cad_ink)
+                          margin_mm=margin_mm, only=only, cad_ink=cad_ink,
+                          scale_bar=scale_bar)
     doc["print_sheet"] = print_sheet.layout_summary(layout)
     if only is not None:
         doc["print_sheet"]["only"] = sorted(set(only))
