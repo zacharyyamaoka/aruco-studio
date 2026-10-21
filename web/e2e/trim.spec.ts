@@ -9,7 +9,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, dragWorld, idle, labelOn, loadExample, openStudio, panelTab, state, toClient } from "./helpers";
+import { CORE, clickAt, coreReady, dragWorld, idle, labelOn, loadExample, openStudio, panelTab, state, toClient, openMenu } from "./helpers";
 
 const SHOTS = process.env.TRIM_SHOTS ?? "test-results/trim";
 type Box = { x0: number; y0: number; x1: number; y1: number };
@@ -61,7 +61,7 @@ const boxOf = (pts: number[][]): Box => ({
 
 /** Export › SVG of the feature in focus: the white path's box (the file's mm, y down). */
 async function exportedWhite(page: Page): Promise<{ box: Box; loops: number }> {
-  await page.getByTestId("menu-export").click();
+  await openMenu(page, "export");
   const [dl] = await Promise.all([page.waitForEvent("download"), page.getByTestId("cmd-svg").click()]);
   const text = readFileSync((await dl.path())!, "utf8");
   const d = /<path data-layer="white"[^>]* d="([^"]*)"/.exec(text);
@@ -167,7 +167,7 @@ test.describe(`trim (${CORE} core)`, () => {
   test("a rectangle sticker: a drawn rectangle's feature is cut to the rectangle by Trim Profile (the default)", async ({ page }) => {
     await openStudio(page);
     await coreReady(page);
-    await page.getByTestId("menu-file").click();
+    await openMenu(page, "file");
     await page.getByTestId("cmd-new").click();
     await page.keyboard.press("r");
     await dragWorld(page, [-20, -15], [20, 15]);

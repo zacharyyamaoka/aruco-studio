@@ -37,14 +37,25 @@ body { font: var(--font-size)/1.35 var(--font); background: var(--bg); color: va
   border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-sm); min-width: 0; }
 .pill-sep { flex: none; width: 1px; align-self: stretch; margin: 8px 2px; background: var(--line-soft); }
 .doc-pill { left: 12px; padding: 4px 12px 4px 6px; max-width: calc(100% - 24px); }
-.pill-menus { display: inline-flex; align-items: center; gap: 2px; }
-.doc-pill .kit-menu-trigger { height: 32px; padding: 0 8px; }
-.brand { display: inline-flex; align-items: center; justify-content: center; height: 40px; padding: 0 8px; flex: none; }
+/* the main menu's button: the logo with ⌄ (Figma UI3's, top left) */
+.logo-btn { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 40px; padding: 0 8px 0 9px; border: 0; border-radius: 8px;
+  background: none; color: var(--text); cursor: pointer; }
+.logo-btn .chev { flex: none; color: var(--muted); }
+.logo-btn:hover, .logo-btn[data-popup-open] { background: var(--hover); }
+.logo-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .brand-cube { flex: none; }
-/* the brand is a link to the landing page: no link colour or underline in any skin */
-a.brand, a.brand:visited { color: inherit; text-decoration: none; border-radius: 8px; }
-a.brand:hover { background: var(--hover); }
-a.brand:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* its menu and submenus (Back to files, File ›, Edit ›, …) */
+.mm-popup { min-width: 230px; max-height: calc(100vh - 24px); overflow-y: auto; }
+.mm-popup .kit-menu-item { height: 28px; }
+.mm-sub[data-popup-open] { background: var(--accent-soft); }
+.mm-chev { flex: none; margin-left: 16px; color: var(--muted); }
+.mm-h { display: flex; align-items: center; gap: 6px; padding: 6px 8px 2px; color: var(--muted); font-size: 10.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.05em; }
+.mm-h .kit-glyph { width: 12px; height: 12px; }
+.mm-group + .mm-group { border-top: 1px solid var(--line-soft); margin-top: 4px; padding-top: 2px; }
+.kit-menu-item .ic { width: 16px; flex: none; display: inline-flex; align-items: center; }
+.kit-menu-item .ic .brand-cube { width: 16px; height: 16px; }
+a.kit-menu-item, a.kit-menu-item:visited { color: inherit; text-decoration: none; }
 /* the document's name with ⌄ (Figma's file-name menu) */
 .doc-name { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 6px; border: 0; border-radius: var(--radius-sm); background: none;
   color: var(--text); font: inherit; font-weight: 600; font-size: 13px; cursor: pointer; min-width: 0; }
@@ -65,7 +76,7 @@ a.brand:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   background: var(--panel); border: 1px solid var(--line); color: var(--text); box-shadow: var(--shadow-sm); cursor: pointer; text-decoration: none; }
 .corner-btn:hover, .corner-btn[data-popup-open] { background: var(--hover); }
 a.corner-btn, a.corner-btn:visited { color: var(--text); }
-/* the ⌄ menu: Theme and Skin (V2's Preferences); on a phone, what the pills folded away */
+/* the ⌄ menu: the cloud file and the account; on a phone, Download for CAD too */
 .dm-popup { min-width: 290px; max-width: calc(100vw - 16px); max-height: calc(100vh - 100px); overflow: auto; }
 .dm-head { padding: 4px 8px 6px; border-bottom: 1px solid var(--line-soft); margin-bottom: 4px; }
 .dm-h { padding: 6px 8px 2px; color: var(--muted); font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -127,6 +138,10 @@ a.kit-ib { text-decoration: none; }
 .vp-svg .edge.hover { stroke-width: 3; }
 .vp-svg .edge.on { stroke: var(--pick); stroke-width: 2.4; stroke-dasharray: none; }
 .vp-svg .edge.draft { stroke-dasharray: 4 3; }
+/* several selected: their bounds and "N selected" under them (Figma's selection box and its label) */
+.vp-svg .sel-bounds { fill: none; stroke: var(--pick); stroke-width: 1; }
+.sel-count { position: absolute; transform: translateX(-50%); z-index: 4; pointer-events: none; white-space: nowrap;
+  background: var(--pick); color: #111418; font-size: 11px; font-weight: 600; line-height: 1; padding: 4px 7px; border-radius: 4px; box-shadow: var(--shadow-sm); }
 .vp-svg .draft-dim { fill: var(--accent); font-size: 11px; font-weight: 600; }
 .vp-svg .marker .outline { fill: var(--t-white); stroke: var(--shape-line); stroke-width: 1; stroke-linejoin: round; }
 .vp-svg .marker .outline.bad { stroke: var(--bad); stroke-width: 2.5; }
@@ -305,7 +320,7 @@ a.kit-ib { text-decoration: none; }
      rest is in the ⌄ menu (app/TopBar.tsx), ? and GitHub too */
   .pill { height: 48px; }
   .doc-pill { left: 8px; padding: 4px 8px 4px 4px; max-width: calc(100% - 120px); }
-  .pill-menus, .doc-pill .pill-sep, .act-cad, .corner { display: none; }
+  .act-cad, .corner { display: none; }
   .actions-pill { right: 8px; padding: 4px 6px; }
   .act-btn.kit-btn { width: 36px; height: 36px; padding: 0; }
   .act-text { display: none; }

@@ -12,6 +12,12 @@
   color: var(--muted); cursor: pointer; font: inherit; }
 .v3-reset:hover { background: var(--hover); color: var(--text); }
 /* the 2D | 3D toggle: the dock's end (V2 Figma: its Dev Mode switch's spot) */
-.v3-toggle { display: inline-flex; flex: none; border-radius: var(--radius-sm); }
-.v3-toggle .kit-seg { background: var(--panel); border-color: transparent; }
-.v3-toggle .kit-seg-btn.words { min-width: 34px; height: 30px; font-weight: 600; }
+/* WHY a track of its own height (Zach, 2026-10-20 night: "the 2D and 3D are
+   clipping"): the kit's segment is --ctl high and clips what it holds, and the
+   30 px buttons in it lost their bottom; now the track holds them, inset 2 px,
+   as Figma's Dev Mode switch holds its knob */
+.v3-toggle { display: inline-flex; flex: none; border-radius: 8px; }
+.v3-toggle .kit-seg { height: 32px; padding: 2px; gap: 2px; border: 0; border-radius: 8px; overflow: visible;
+  background: color-mix(in srgb, var(--text) 8%, transparent); }
+.v3-toggle .kit-seg-btn.words { min-width: 34px; height: 28px; padding: 0 8px; border: 0; border-radius: 6px; font-weight: 600; color: var(--muted); background: none; }
+.v3-toggle .kit-seg-btn.words.on { background: var(--panel); color: var(--text); box-shadow: 0 0 0 1px var(--line), var(--shadow-sm); }

@@ -66,6 +66,13 @@ export function inShape(s: Shape, p: Vec2): boolean {
   return inLoop(s.pts, p);
 }
 
+/** The innermost shape whose inside p is in (the smallest), or undefined:
+ *  what a Shift+click on a fill adds. */
+export function shapeUnder(shapes: Shape[], p: Vec2): Shape | undefined {
+  const area = (s: Shape) => Math.abs(loopArea(shapeLoop(s)));
+  return shapes.filter((s) => inShape(s, p)).reduce<Shape | undefined>((a, s) => (!a || area(s) < area(a) ? s : a), undefined);
+}
+
 /** b lies inside a (every point of b's boundary is in a, and b is smaller). */
 export function contains(a: Shape, b: Shape): boolean {
   if (a.id === b.id) return false;

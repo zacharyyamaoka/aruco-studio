@@ -5,7 +5,7 @@
 // 390 × 844) go to LAYOUT_SHOTS (default test-results/layout).
 import path from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, dragWorld, idle, openPresets, openStudio, panelTab, pickSkin, state, toClient, toggleTheme } from "./helpers";
+import { CORE, clickAt, coreReady, dragWorld, idle, openPresets, openStudio, panelTab, pickSkin, state, toClient, toggleTheme, openMenu } from "./helpers";
 
 const SHOTS = process.env.LAYOUT_SHOTS ?? "test-results/layout";
 const FIXTURE_V3 = path.join(import.meta.dirname, "fixtures", "v3-a4.arucostudio-web.json");
@@ -13,7 +13,7 @@ const GITHUB = "https://github.com/zacharyyamaoka/aruco-studio";
 const ZIP = "**/py/aruco_studio.zip";
 /** the chrome's own boxes, and the controls in them */
 const CHROME = ["doc-pill", "actions-pill", "toolbar", "corner"];
-const CONTROLS = ["brand", "menu-file", "menu-edit", "menu-export", "menu-doc", "menu-cad", "act-verify", "act-print",
+const CONTROLS = ["menu-main", "menu-doc", "menu-cad", "act-verify", "act-print",
   "tool-select", "tool-rect", "tool-circle", "tool-dim", "tool-extrude", "tool-fit", "view-toggle", "help", "github"];
 
 type R = { x: number; y: number; w: number; h: number };
@@ -82,7 +82,7 @@ const ok = async (page: Page) => {
 
 /** File › Open the v3 fixture (two markers on the A4 inkjet preset). */
 async function openV3(page: Page): Promise<void> {
-  await page.getByTestId("menu-file").click();
+  await openMenu(page, "file");
   const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByTestId("cmd-open").click()]);
   await chooser.setFiles(FIXTURE_V3);
   await expect(page.getByTestId("note")).toContainText("Opened v3-a4");
@@ -180,27 +180,34 @@ test.describe(`the Figma layout (${CORE} core)`, () => {
     await expect(pop).toHaveCount(0);
   });
 
-  test("d · the document pill: the logo, File / Edit / Export, the name with ⌄ -- and no preset", async ({ page }) => {
+  test("d · the document pill: the logo (the main menu), the name with ⌄ -- and no preset", async ({ page }) => {
     await openStudio(page);
     await coreReady(page);
     const pill = page.getByTestId("doc-pill");
     const s = await state(page);
     const text = await pill.innerText();
-    expect(text.replace(/\s+/g, " ").trim()).toBe(`File Edit Export ${s.doc.name}`);
+    expect(text.replace(/\s+/g, " ").trim()).toBe(s.doc.name);
     expect(text).not.toContain(s.doc.default_preset.name);
     expect(text).not.toMatch(/inkjet|vinyl|letter|a4|preset|print3d|3d print/i);
     await expect(pill.locator("[data-testid=preset-chip], .chip-preset")).toHaveCount(0);
-    await expect(page.getByTestId("brand")).toHaveAttribute("href", /\/about\/$/);
+    await expect((await openMenu(page, "help")).getByTestId("brand")).toHaveAttribute("href", /\/about\/$/);
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("main-menu")).toHaveCount(0);
     // the top-left corner, under the rulers
     const r = await box(pill);
     expect(r.x).toBeLessThanOrEqual(16);
     expect(r.y).toBeGreaterThanOrEqual(18);
     expect(r.y).toBeLessThan(40);
-    // ⌄: Theme and Skin, no preset there either
+    // Theme and Skin are Preferences ›; ⌄ is the file's, no preset there either
+    const prefs = await openMenu(page, "prefs");
+    await expect(prefs.getByTestId("theme-dark")).toBeVisible();
+    await expect(prefs.getByTestId("skin-fusion")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
     await page.getByTestId("menu-doc").click();
     const menu = page.getByTestId("doc-menu");
-    await expect(menu.getByTestId("theme-dark")).toBeVisible();
-    await expect(menu.getByTestId("skin-fusion")).toBeVisible();
+    await expect(menu.getByTestId("theme-dark")).toHaveCount(0);
     expect(await menu.innerText()).not.toMatch(/preset|inkjet|vinyl/i);
     await page.getByTestId("menu-doc").click();
     await expect(menu).toHaveCount(0);
@@ -210,7 +217,7 @@ test.describe(`the Figma layout (${CORE} core)`, () => {
     test.skip(CORE === "mock", "the method comes from the real core's MarkerPlan.extrude");
     await openStudio(page);
     await coreReady(page);
-    await page.getByTestId("menu-file").click();
+    await openMenu(page, "file");
     await page.getByTestId("cmd-new").click();
     const ink = (await state(page)).doc.default_preset;
     expect(ink.method).toBe("inkjet");
@@ -344,17 +351,24 @@ test.describe(`the Figma layout (${CORE} core)`, () => {
     const panel = await box(page.getByTestId("extrude-panel")), dock = await box(page.getByTestId("toolbar"));
     expect(dock.y + dock.h).toBeLessThanOrEqual(panel.y);
     await shot(page, "h-390-panel");
-    // what folded away is in the ⌄ menu: File … GitHub, the keys
+    // what folded away: Download for CAD in ⌄; the rest is the main menu's, as on a desk
     await page.getByTestId("menu-doc").click();
     const menu = page.getByTestId("doc-menu");
-    for (const id of ["cmd-examples", "cmd-reid", "cmd-presets", "cmd-print", "cad-fusion", "github-menu", "help-menu", "theme-dark", "skin-studio"]) {
-      await expect(menu.getByTestId(id), id).toBeVisible();
-    }
-    await expect(menu.getByTestId("github-menu")).toHaveAttribute("href", GITHUB);
+    await expect(menu.getByTestId("cad-fusion")).toBeVisible();
     const m = await box(menu);
     expect(m.x + m.w).toBeLessThanOrEqual(390);
     await shot(page, "h-390-menu");
-    await menu.getByTestId("help-menu").click();
+    await page.getByTestId("menu-doc").click();
+    await expect(menu).toHaveCount(0);
+    for (const [sub, ids] of [["file", ["cmd-examples"]], ["edit", ["cmd-reid", "cmd-presets"]], ["export", ["cmd-print"]], ["prefs", ["theme-dark", "skin-studio"]], ["help", ["github-menu", "help-menu"]]] as const) {
+      const popup = await openMenu(page, sub);
+      for (const id of ids) await expect(popup.getByTestId(id), id).toBeVisible();
+      const r = await box(popup);
+      expect(r.x + r.w, `${sub} on screen`).toBeLessThanOrEqual(390);
+      expect(r.x, `${sub} on screen`).toBeGreaterThanOrEqual(0);
+    }
+    await expect(page.getByTestId("github-menu")).toHaveAttribute("href", GITHUB);
+    await page.getByTestId("help-menu").click();
     await expect(page.getByTestId("help-dialog")).toBeVisible();
     await expect(page.getByTestId("core-status")).toHaveText(/^Ready in/);
   });
@@ -387,7 +401,7 @@ test.describe(`the Figma layout (${CORE} core)`, () => {
   test("j · a marker at the very top opens its panel below the top pills, and a drag can't push it under them", async ({ page }) => {
     await openStudio(page);
     await coreReady(page);
-    await page.getByTestId("menu-file").click();
+    await openMenu(page, "file");
     await page.getByTestId("cmd-new").click();
     // the world y at client y 40 (just under the window's top edge): two samples of the linear map
     const [, ya] = await toClient(page, 0, 0), [, yb] = await toClient(page, 0, 10);

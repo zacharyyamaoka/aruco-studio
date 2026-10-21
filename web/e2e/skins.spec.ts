@@ -1,23 +1,25 @@
-// Skins (web/src/skins/): the document ⌄ menu's Skin row switches Studio, Unstyled,
+// Skins (web/src/skins/): the main menu's Preferences › Skin switches Studio, Unstyled,
 // Fusion 360 and Onshape. A skin changes the panel's look (its computed
 // background, accent and font), is remembered across a reload, pins the theme
 // of a one-theme CAD program, and never moves the layout beyond its own row
 // height. Numbers come from getComputedStyle and getBoundingClientRect.
 // SKINS_SHOTS=<dir> also writes a 1280x800 shot of the plate in every skin.
 import { expect, test, type Page } from "@playwright/test";
-import { clickAt, coreReady, idle, inDocMenu, loadExample, openStudio, pickSkin, toggleTheme } from "./helpers";
+import { clickAt, coreReady, idle, loadExample, openMenu, openStudio, pickSkin, toggleTheme } from "./helpers";
 
 type SkinId = "studio" | "unstyled" | "fusion" | "onshape";
 const SKINS: SkinId[] = ["studio", "unstyled", "fusion", "onshape"];
 
-/** The ⌄ menu's Theme buttons: enabled (both themes) or greyed out (a one-theme skin). */
+/** Preferences › Theme: enabled (both themes) or greyed out (a one-theme skin). */
 async function themeEnabled(page: Page, on: boolean): Promise<void> {
-  await inDocMenu(page, async (m) => {
-    for (const t of ["theme-light", "theme-dark"]) {
-      if (on) await expect(m.getByTestId(t)).toBeEnabled();
-      else await expect(m.getByTestId(t)).toBeDisabled();
-    }
-  });
+  const m = await openMenu(page, "prefs");
+  for (const t of ["theme-light", "theme-dark"]) {
+    if (on) await expect(m.getByTestId(t)).not.toHaveAttribute("data-disabled");
+    else await expect(m.getByTestId(t)).toHaveAttribute("data-disabled", "");
+  }
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("main-menu")).toHaveCount(0);
 }
 
 /** The plate with the ArUco Extrude panel open on its face (the profile). */
@@ -63,8 +65,10 @@ test.describe("skins", () => {
   test("1 · every switch changes the panel's background, accent and font; the layout keeps its boxes", async ({ page }) => {
     await platePanel(page);
     await expect(page.locator("html")).toHaveAttribute("data-skin", "studio");
-    // the brand is a link to the landing page
-    expect(await page.getByTestId("brand").getAttribute("href")).toMatch(/\/about\/$/);
+    // the landing page is Help › About ArUco Studio
+    expect(await (await openMenu(page, "help")).getByTestId("brand").getAttribute("href")).toMatch(/\/about\/$/);
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
     const looks = new Map<SkinId, Look>([["studio", await look(page)]]);
     // the order makes every switch a real change: Studio and Onshape are both white panels
     for (const id of ["fusion", "onshape", "unstyled", "studio"] as SkinId[]) {
@@ -74,9 +78,9 @@ test.describe("skins", () => {
       expect(after.bg, `${id}: background`).not.toBe(before.bg);
       expect(after.accent, `${id}: accent`).not.toBe(before.accent);
       expect(after.font, `${id}: font`).not.toBe(before.font);
-      // the brand link: the document pill's own text colour, no underline
+      // the logo (the main menu's button): the document pill's own text colour, no underline
       const brand = await page.evaluate(() => {
-        const a = document.querySelector("[data-testid=brand]")!, bar = document.querySelector("[data-testid=doc-pill]")!;
+        const a = document.querySelector("[data-testid=menu-main]")!, bar = document.querySelector("[data-testid=doc-pill]")!;
         return { deco: getComputedStyle(a).textDecorationLine, color: getComputedStyle(a).color, bar: getComputedStyle(bar).color };
       });
       expect(brand.deco, `${id}: brand underline`).toBe("none");

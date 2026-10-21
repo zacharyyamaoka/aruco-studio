@@ -5,7 +5,7 @@
 // from the probe's document and plans, and the labels drawn on the canvas.
 // REID_SHOTS=<dir> also saves 1280 × 800 screenshots of before, the dialog and after.
 import { expect, test, type Page } from "@playwright/test";
-import { clickAt, CORE, coreReady, idle, loadExample, openStudio, panelTab, state } from "./helpers";
+import { clickAt, CORE, coreReady, idle, loadExample, openStudio, panelTab, state, openMenu } from "./helpers";
 
 const SHOTS = process.env.REID_SHOTS;
 
@@ -35,7 +35,7 @@ function sequential(ns: number[], start = 0): number[][] {
 }
 
 async function openReId(page: Page): Promise<void> {
-  await page.getByTestId("menu-edit").click();
+  await openMenu(page, "edit");
   await page.getByTestId("cmd-reid").click();
   await expect(page.getByTestId("reid-dialog")).toBeVisible();
   await expect(page.getByTestId("reid-apply")).toBeEnabled();
@@ -98,7 +98,7 @@ test.describe(`Re-ID (${CORE} core)`, () => {
     expect(undone.doc.features.map((f: any) => undone.plans[f.id].ids)).toEqual(before.doc.features.map((f: any) => before.plans[f.id].ids));
     expect(undone.canRedo).toBe(true);
     // and Edit › Redo is the same step forward
-    await page.getByTestId("menu-edit").click();
+    await openMenu(page, "edit");
     await page.getByTestId("cmd-redo").click();
     await idle(page);
     expect(firsts(await state(page))).toEqual(want.map((ids) => ids[0]));

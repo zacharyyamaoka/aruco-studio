@@ -101,8 +101,8 @@ test.describe("Simple Hosted Files", () => {
     await expect(menu.getByTestId("shf-account")).toContainText(email);
     await expect(menu.getByTestId("shf-usage")).toHaveText(/^\d+ of \d+ free files in /);
     await expect(menu.getByTestId("shf-autosave-toggle")).toHaveAttribute("aria-checked", "true");
-    // Theme and Skin stay, below the file's part
-    await expect(menu.getByTestId("theme-dark")).toBeVisible();
+    // Theme and Skin are the main menu's (Preferences ›), not the file's
+    await expect(menu.getByTestId("theme-dark")).toHaveCount(0);
     await expect(page.getByTestId("doc-name")).toHaveText("Plate");
   });
 

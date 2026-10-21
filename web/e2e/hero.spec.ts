@@ -51,8 +51,10 @@ test("hero · plate → face → A (panel beside) → Grid → type the marker s
   mark("core_ready");
   await page.waitForTimeout(BEAT / 2);
 
-  // 1 · Examples › Plate
-  await glideClick(page.getByTestId("menu-file"));
+  // 1 · the main menu › File › Examples › Plate
+  await glideClick(page.getByTestId("menu-main"));
+  await page.waitForTimeout(BEAT / 3);
+  await glide(...(await centre(page.getByTestId("menu-file"))));
   await page.waitForTimeout(BEAT / 2);
   await glideClick(page.getByTestId("cmd-examples"));
   await page.waitForTimeout(BEAT / 2);

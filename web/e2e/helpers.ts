@@ -32,7 +32,7 @@ export async function openPresets(page: Page): Promise<Locator> {
     if (!(await page.getByTestId("panel-preset").count())) await panelTab(page, "make");
     await page.getByTestId("panel-preset").click();
   } else {
-    await page.getByTestId("menu-edit").click();
+    await openMenu(page, "edit");
     await page.getByTestId("cmd-presets").click();
   }
   const modal = page.getByTestId("presets-modal");
@@ -40,7 +40,26 @@ export async function openPresets(page: Page): Promise<Locator> {
   return modal;
 }
 
-/** Open the document's ⌄ menu (Theme, Skin; on a phone also File … GitHub), run `fn`, close it. */
+/** The main menu (the logo with ⌄, top left, Figma UI3's): open it, then its
+ *  `sub` submenu (File, Edit, Export, View, Preferences, Help), the pointer
+ *  moved onto it as a hand moves it. WHY the mouse, not locator.hover(): the
+ *  open submenu marks its parent inert for Playwright's actionability check,
+ *  while a real pointer moves from one submenu to the next. */
+export async function openMenu(page: Page, sub: "file" | "edit" | "export" | "view" | "prefs" | "help"): Promise<Locator> {
+  if (!(await page.getByTestId("main-menu").isVisible())) await page.getByTestId("menu-main").click();
+  await expect(page.getByTestId("main-menu")).toBeVisible();
+  // on a phone the submenus are groups in the menu itself: no trigger to move onto
+  const trigger = page.getByTestId(`menu-${sub}`);
+  if (await trigger.count()) {
+    const r = (await trigger.boundingBox())!;
+    await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2, { steps: 3 });
+  }
+  const popup = page.getByTestId(`menu-${sub}-popup`);
+  await expect(popup).toBeVisible();
+  return popup;
+}
+
+/** Open the document's ⌄ menu (the cloud file and the account; on a phone also Download for CAD), run `fn`, close it. */
 export async function inDocMenu(page: Page, fn: (menu: Locator) => Promise<void>): Promise<void> {
   const menu = page.getByTestId("doc-menu");
   if (!(await menu.count())) await page.getByTestId("menu-doc").click();
@@ -50,16 +69,20 @@ export async function inDocMenu(page: Page, fn: (menu: Locator) => Promise<void>
   await expect(menu).toHaveCount(0);
 }
 
-/** The ⌄ menu's Theme: the other one (it was a toggle in the old top bar). */
+/** Preferences › Theme: the other one (it was a toggle in the old top bar). */
 export async function toggleTheme(page: Page): Promise<void> {
   const dark = (await page.locator("html").getAttribute("data-theme")) === "dark";
-  await inDocMenu(page, (m) => m.getByTestId(dark ? "theme-light" : "theme-dark").click());
+  await openMenu(page, "prefs");
+  await page.getByTestId(dark ? "theme-light" : "theme-dark").click();
+  await expect(page.getByTestId("main-menu")).toHaveCount(0);
   await expect(page.locator("html")).toHaveAttribute("data-theme", dark ? "light" : "dark");
 }
 
-/** The ⌄ menu's Skin. */
+/** Preferences › Skin. */
 export async function pickSkin(page: Page, id: "studio" | "unstyled" | "fusion" | "onshape"): Promise<void> {
-  await inDocMenu(page, (m) => m.getByTestId(`skin-${id}`).click());
+  await openMenu(page, "prefs");
+  await page.getByTestId(`skin-${id}`).click();
+  await expect(page.getByTestId("main-menu")).toHaveCount(0);
   await expect(page.locator("html")).toHaveAttribute("data-skin", id);
 }
 
@@ -72,7 +95,7 @@ export async function state(page: Page): Promise<any> {
 }
 
 export async function loadExample(page: Page, id: string): Promise<void> {
-  await page.getByTestId("menu-file").click();
+  await openMenu(page, "file");
   await page.getByTestId("cmd-examples").click();
   await page.locator(`[data-example="${id}"]`).click();
   await expect(page.getByTestId("examples-dialog")).toHaveCount(0);

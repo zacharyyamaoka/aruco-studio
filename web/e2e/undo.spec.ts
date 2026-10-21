@@ -3,12 +3,12 @@
 // Each check measures the probe's numbers: the document, the plan the core
 // drew, and the history's canUndo / canRedo.
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, coreReady, dragWorld, idle, loadExample, openStudio, panelTab, planOutline, state } from "./helpers";
+import { CORE, coreReady, dragWorld, idle, loadExample, openStudio, panelTab, planOutline, state, openMenu } from "./helpers";
 
 async function blank(page: Page): Promise<void> {
   await openStudio(page);
   await coreReady(page);
-  await page.getByTestId("menu-file").click();
+  await openMenu(page, "file");
   await page.getByTestId("cmd-new").click();
 }
 
@@ -225,15 +225,17 @@ test.describe(`undo / redo (${CORE} core)`, () => {
     expect(s.doc, "Ctrl+Z does not bring the first document back").toEqual(second);
     expect(s.canUndo).toBe(false);
     // the menu's Undo is greyed out too
-    await page.getByTestId("menu-edit").click();
+    await openMenu(page, "edit");
     await expect(page.getByTestId("cmd-undo")).toHaveAttribute("data-disabled", "");
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("cmd-undo")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("main-menu")).toHaveCount(0);
     // New: the same
     await page.keyboard.press("r");
     await dragWorld(page, [5, 5], [20, 20]);
     expect((await state(page)).canUndo).toBe(true);
-    await page.getByTestId("menu-file").click();
+    await openMenu(page, "file");
     await page.getByTestId("cmd-new").click();
     s = await state(page);
     expect(s.canUndo).toBe(false);

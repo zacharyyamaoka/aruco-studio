@@ -7,7 +7,7 @@
 // go to E2E_SHOTS (default test-results/shots).
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, dragWorld, idle, labelOn, openPresets, openStudio, panelTab, state, toClient, toggleTheme } from "./helpers";
+import { CORE, clickAt, coreReady, dragWorld, idle, labelOn, openPresets, openStudio, panelTab, state, toClient, toggleTheme, openMenu } from "./helpers";
 
 const SHOTS = process.env.E2E_SHOTS ?? "test-results/shots";
 
@@ -20,7 +20,7 @@ interface DrawnDim {
 async function blank(page: Page): Promise<void> {
   await openStudio(page);
   await coreReady(page);
-  await page.getByTestId("menu-file").click();
+  await openMenu(page, "file");
   await page.getByTestId("cmd-new").click();
 }
 
@@ -360,7 +360,7 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
       shapes: [{ kind: "rect", id: "r1", cx: 0, cy: 0, w: 60, h: 60, angle_deg: 0 }],
       features: [{ id: "f1", key: "f1", profile: { outer: "r1", holes: [] }, holes: "avoid", marker: { type: "single" }, label: { on: true, text: "PLATE\n#{ids}" }, set: [] }],
     };
-    await page.getByTestId("menu-file").click();
+    await openMenu(page, "file");
     const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByTestId("cmd-open").click()]);
     await chooser.setFiles({ name: "two-lines.arucostudio-web.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(doc)) });
     await idle(page);
