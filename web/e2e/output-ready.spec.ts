@@ -1,8 +1,9 @@
-// Review finding #6 (2026-10-21): output is made only of a document whose ids
-// auto id has settled. The core's replies are held back with the test-only
-// window.__arucoFault (web/src/coreSource.ts) to open the window where it
-// went wrong: a copy of #7 exported as #7. On the real core (auto id is the
-// real core's).
+// Review findings #6 and #8 (2026-10-21): output is made only of a document
+// whose ids auto id has settled, and Print / Download only of the sheet the
+// controls ask for now. The core's replies are held back with the test-only
+// window.__arucoFault (web/src/coreSource.ts) to open the window where both
+// went wrong: a copy of #7 exported as #7, a sheet laid out under the old
+// controls still printable. On the real core (auto id is the real core's).
 import { expect, test, type Page } from "@playwright/test";
 import { CORE, coreReady, dragWorld, idle, openMenu, openStudio, panelTab, state, toClient } from "./helpers";
 
@@ -79,5 +80,21 @@ test.describe("output waits for settled ids and the current sheet", () => {
       await page.waitForTimeout(50);
     }
     expect(seenOn, "Print comes on once the ids are in").toBe(true);
+  });
+
+  test("#8 · a layout change with the sheet slow: the old sheet is not printable under the new controls", async ({ page }) => {
+    await blank(page);
+    await marker7(page);
+    await page.keyboard.press("p");
+    await expect(page.getByTestId("print-go")).toBeEnabled({ timeout: 30_000 });
+    const before = (await page.getByTestId("sheet-side").getAttribute("data-request"))!;
+    expect(JSON.parse(before).mode).toBe("spaced");
+    await page.evaluate(() => { (window as any).__arucoFault = { delay: { sheet: 2500 } }; });
+    await page.getByTestId("sheet-mode").locator('[data-value="tight"]').click();
+    for (const b of ["print-go", "print-pdf", "print-svg"]) await expect(page.getByTestId(b), b).toBeDisabled();
+    // the old sheet stays on screen, marked busy, until the new one lands
+    await expect(page.locator(".sheet-body")).toHaveAttribute("data-busy", "1");
+    await expect(page.getByTestId("print-go")).toBeEnabled({ timeout: 30_000 });
+    expect(JSON.parse((await page.getByTestId("sheet-side").getAttribute("data-request"))!).mode).toBe("tight");
   });
 });

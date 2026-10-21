@@ -58,8 +58,9 @@ export function PrintDialog() {
   const doc = useStudio((s) => s.doc);
   const idIssues = useStudio((s) => s.idIssues);
   const refused = useStudio((s) => s.idRefused);
-  // WHY (review finding #6, 2026-10-21): a sheet laid out before auto id
-  // answered printed a copy's borrowed id
+  // WHY (review findings #6, #8, 2026-10-21): a sheet laid out before auto id
+  // answered printed a copy's borrowed id, and the last sheet stayed printable
+  // while the next was worked out under the new controls
   const ready = useStudio(idsReady);
   // the sheet on screen and the request it was laid out from
   const [laid, setLaid] = useState<{ key: string; sheet: Sheet } | null>(null);
@@ -71,7 +72,8 @@ export function PrintDialog() {
   // WHY first (Zach, 2026-10-20 night): a printer's scale is the same for a whole job, and a bar on every page costs sticker area
   const [scaleBar, setScaleBar] = useState<ScaleBarOption>("first");
   const [shown, setShown] = useState(0);
-  const [printing, setPrinting] = useState(false);
+  /** the exact sheet Print is printing (captured at the click) */
+  const [printing, setPrinting] = useState<Sheet | null>(null);
   /** the group on screen (its preset's key); the marker in focus's when it opens */
   const [groupKey, setGroupKey] = useState<string | null>(null);
   /** Retry's count: a new one lays the sheet out again */
@@ -123,9 +125,9 @@ export function PrintDialog() {
   }, [open]);
 
   const sheet = laid?.sheet ?? null;
-  /** the sheet on screen was laid out from settled ids: only then can it be printed or saved */
-  const current = !!sheet && ready;
-  const busy = !!laid && (laid.key !== key || !ready) && !error;
+  /** the sheet on screen is the one the controls and the settled ids ask for: only then can it be printed or saved */
+  const current = !!sheet && laid?.key === key && ready && !error;
+  const busy = !!laid && !current && !error;
   const coreWait = useCoreWait(open && unset > 0);
   const callWait = useCallWait(open && !coreWait && !!items.length && (laid?.key !== key || !ready), items.length ? error : null,
     ready ? "laying out the page" : "numbering the markers", () => setTries((n) => n + 1));
@@ -142,16 +144,16 @@ export function PrintDialog() {
   const many = (sheet?.svg.length ?? 0) > 1;
 
   const doPrint = () => {
-    if (!current) return;
-    setPrinting(true);
+    if (!current || !sheet) return;
+    setPrinting(sheet);
     // the print-only page mounts first, then the browser's dialog opens
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const hook = (window as unknown as { __aruco?: { printHook?: (() => void) | null } }).__aruco?.printHook;
       if (hook) hook(); else window.print();
-      setPrinting(false);
+      setPrinting(null);
     }));
   };
-  const printed = sheet;
+  const printed = printing ?? sheet;
 
   return (
     <>
