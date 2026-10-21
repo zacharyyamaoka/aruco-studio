@@ -9,7 +9,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, dragWorld, idle, loadExample, openStudio, panelTab, state } from "./helpers";
+import { CORE, clickAt, coreReady, dragWorld, idle, labelOn, loadExample, openStudio, panelTab, state } from "./helpers";
 
 const SHOTS = process.env.V1_SHOTS ?? "test-results/v1";
 
@@ -129,7 +129,7 @@ test.describe(`V1 click-to-inspect (${CORE} core)`, () => {
     expect(s.plan.cols * s.plan.rows).toBeGreaterThan(1);
     expect(s.plan.summary).toMatch(/^Grid/);
     expect(s.plan.ids.length).toBe(s.plan.cols * s.plan.rows);
-    await page.locator('[role=tab][data-tab="label"]').click();
+    await labelOn(page);   // off by default since 2026-10-20 night
     for (const [v, t] of [["below", "Below"], ["above", "Above"], ["left", "Left"], ["right", "Right"]]) await expect(seg("label.side", v)).toHaveText(t);
     // the corner mark is a row of Label since V1 Command Dialog (2026-10-20 night)
     await expect(seg("marker.corner_mark", "triangle")).toHaveText("Triangle");
@@ -138,7 +138,7 @@ test.describe(`V1 click-to-inspect (${CORE} core)`, () => {
   test("c · Label: two lines, typed X offset moves it 3 mm, no offset readout on the canvas", async ({ page }) => {
     const fid = await plateFeature(page);
     await clickMarker(page, fid);
-    await page.locator('[role=tab][data-tab="label"]').click();
+    await labelOn(page);   // off by default since 2026-10-20 night
     for (const p of ["label.on", "label.text", "label.place", "label.surface", "label.side", "label.offset_mm", "label.height_mm"]) {
       await expect(page.locator(`[data-row="${p}"]`), p).toHaveCount(1);
     }

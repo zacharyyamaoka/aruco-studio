@@ -313,8 +313,9 @@ describe("version 1 files migrate", () => {
     expect(f.key).toBe(f.id);
     expect(f.profile).toEqual({ outer: "r1", holes: [] });
     expect(f.marker).toMatchObject({ type: "grid", dictionary: "DICT_5X5_100", first_id: 4, cols: 2, rows: 2, auto: true });
-    // what differs from its driven value was typed: set; the rest is driven
-    expect([...f.set].sort()).toEqual(["label.gap_mm", "marker.dictionary", "marker.first_id", "marker.type"]);
+    // what differs from its driven value was typed: set; the rest is driven (its label
+    // is on, the default off since 2026-10-20 night: the old file keeps it, set)
+    expect([...f.set].sort()).toEqual(["label.gap_mm", "label.on", "marker.dictionary", "marker.first_id", "marker.type"]);
     expect(isSet(f, "marker.cols")).toBe(false);
     expect(isSet(f, "marker.marker_mm")).toBe(false);
     const req = planRequest(d, f)!;

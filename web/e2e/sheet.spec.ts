@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, coreReady, dragWorld, idle, openStudio, state } from "./helpers";
+import { CORE, coreReady, dragWorld, idle, labelOn, openStudio, state } from "./helpers";
 
 const SHOTS = process.env.E2E_SHOTS ?? "test-results/shots";
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
@@ -31,13 +31,15 @@ async function blank(page: Page): Promise<void> {
   await page.getByTestId("cmd-new").click();
 }
 
-/** R, drag a rectangle, A, OK: one more feature. */
+/** R, drag a rectangle, A, the label on, OK: one more feature. (The label is
+ *  off by default since 2026-10-20 night; these sizes were set with it on.) */
 async function feature(page: Page, a: [number, number], b: [number, number]): Promise<void> {
   await page.keyboard.press("r");
   await dragWorld(page, a, b);
   expect((await state(page)).sel?.kind, `the rectangle from ${a} to ${b}`).toBe("shape");
   await page.keyboard.press("a");
   await expect(page.getByTestId("extrude-panel")).toBeVisible();
+  await labelOn(page);
   await idle(page);
   await page.getByTestId("panel-ok").click();
   await idle(page);

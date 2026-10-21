@@ -73,7 +73,7 @@ export const DEFAULT_MARKER: MarkerParams = {
 };
 
 export const DEFAULT_LABEL: LabelParams = {
-  on: true, text: "#{ids}", height_mm: 0, side: "below", gap_mm: 2, offset_mm: [0, 0],
+  on: false, text: "#{ids}", height_mm: 0, side: "below", gap_mm: 2, offset_mm: [0, 0],
 };
 
 let seq = 0;

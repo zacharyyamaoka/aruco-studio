@@ -110,3 +110,13 @@ export async function panelTab(page: Page, tab: "make" | "marker" | "label"): Pr
   await t.click();
   await expect(page.locator(`[data-testid="extrude-panel"] [data-tab-body="${tab}"]`)).toBeVisible();
 }
+
+/** Turn the label of the feature in the panel on: the Label tab's On switch
+ *  (a new feature's label is off since 2026-10-20 night: Zach, "Label by
+ *  default should be off"). Leaves the panel on the Label tab. */
+export async function labelOn(page: Page): Promise<void> {
+  await panelTab(page, "label");
+  if (!(await state(page)).feature.label.on) await page.locator('[data-testid="extrude-panel"] [data-path="label.on"]').click();
+  await expect.poll(async () => (await state(page)).feature.label.on).toBe(true);
+  await idle(page);
+}

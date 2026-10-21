@@ -8,7 +8,7 @@
 // colours. Screenshots (1280 × 800) go to PANEL_SHOTS (default test-results/panel).
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, dragWorld, idle, loadExample, openStudio, state } from "./helpers";
+import { CORE, clickAt, coreReady, dragWorld, idle, labelOn, loadExample, openStudio, state } from "./helpers";
 
 const SHOTS = process.env.PANEL_SHOTS ?? "test-results/panel";
 
@@ -258,6 +258,8 @@ test.describe(`the panel, V1 Command Dialog (${CORE} core)`, () => {
     expect(tabsTop - headBottom).toBeLessThanOrEqual(1);
     for (const t of ["make", "marker", "label"]) {
       await tab(page, t);
+      // the label's rows too (it is off by default since 2026-10-20 night)
+      if (t === "label") await labelOn(page);
       await expect(panel.locator(`[data-tab-body="${t}"]`)).toBeVisible();
       // (a dropdown's trigger has aria-expanded too: it is a choice, not a fold)
       await expect(panel.locator("details, summary, [aria-expanded]:not(.kit-select-trigger)"), `${t}: a disclosure`).toHaveCount(0);

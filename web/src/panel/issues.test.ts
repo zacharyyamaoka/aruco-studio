@@ -4,7 +4,9 @@ import { DEFAULT_LABEL, DEFAULT_MARKER } from "../model/doc";
 import { routeIssues, shownRows, tabLevel, tabRows, worstLevel } from "./issues";
 
 const I = (field: string, level: Issue["level"] = "error"): Issue => ({ field, level, text: field });
-const OUTSIDE = { ...DEFAULT_LABEL, place: "outside" as const };
+// the label is off by default (2026-10-20 night): the label rows' cases turn it on
+const ON = { ...DEFAULT_LABEL, on: true };
+const OUTSIDE = { ...ON, place: "outside" as const };
 
 describe("per-row issues", () => {
   it("an issue goes under its own row", () => {
@@ -53,7 +55,7 @@ describe("per-row issues", () => {
     expect(r["label.on"]).toHaveLength(2);
   });
   it("Gap is a row outside the marker, Surface on it; the hidden one's issue goes to Place", () => {
-    const on = shownRows(DEFAULT_MARKER, DEFAULT_LABEL, "inkjet"), out = shownRows(DEFAULT_MARKER, OUTSIDE, "inkjet");
+    const on = shownRows(DEFAULT_MARKER, ON, "inkjet"), out = shownRows(DEFAULT_MARKER, OUTSIDE, "inkjet");
     expect(on).toContain("label.surface");
     expect(on).not.toContain("label.gap_mm");
     expect(out).toContain("label.gap_mm");

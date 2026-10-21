@@ -18,7 +18,9 @@ type Kind = "single" | "grid" | "charuco";
 /** One marker on the sheet: its rectangle profile (centre, size, mm) and its type. */
 function sticker(n: number, kind: Kind, cx: number, cy: number, w: number, h: number): [Shape, Feature] {
   const rect = rectShape(`sheet-r${n}`, cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2);
-  const f = newFeature(rectProfile(rect.id), `sheet-f${n}`);
+  // WHY the label on here (it is off by default, Zach 2026-10-20 night): a sheet
+  // to Re-ID is read by its printed ids
+  const f = setField(newFeature(rectProfile(rect.id), `sheet-f${n}`), "label.on", true);
   return [rect, kind === "single" ? f : setField(f, "marker.type", kind)];
 }
 

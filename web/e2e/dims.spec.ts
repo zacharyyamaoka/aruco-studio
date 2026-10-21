@@ -7,7 +7,7 @@
 // go to E2E_SHOTS (default test-results/shots).
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, coreReady, dragWorld, idle, openStudio, panelTab, state, toClient } from "./helpers";
+import { CORE, coreReady, dragWorld, idle, labelOn, openStudio, panelTab, state, toClient } from "./helpers";
 
 const SHOTS = process.env.E2E_SHOTS ?? "test-results/shots";
 
@@ -107,6 +107,8 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
 
   test("a · a selected grid: marker and separation only, each as long as its value; b · no label offset", async ({ page }) => {
     const fid = await gridFeature(page);
+    await labelOn(page);
+    await panelTab(page, "marker");
     // move the label off its preset spot, so the core returns a label.offset_mm dimension
     const lb = (await page.getByTestId("label-text").boundingBox())!;
     await page.mouse.move(lb.x + lb.width / 2, lb.y + lb.height / 2);
@@ -313,7 +315,7 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
 
   test("h · the label follows as you type, a character at a time, without leaving the field; Esc reverts", async ({ page }) => {
     const fid = await typedFeature(page, "single");
-    await panelTab(page, "label");
+    await labelOn(page);
     const text = page.locator('textarea[data-path="label.text"]');
     const before = (await state(page)).plans[fid].label.lines as string[];
     const lines = page.locator(`[data-testid="label-text"][data-feature="${fid}"] [data-label-line]`);
