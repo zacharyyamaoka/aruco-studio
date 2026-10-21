@@ -2,12 +2,16 @@
 // Fusion's and SolidWorks' driven dimensions, Figma's Hug, Blender's driven
 // fields). Driven: the ACTUAL value -- the core's, a rule's or the default --
 // in muted grey, its driver in the tooltip; it follows its driver. Set: the
-// typed value in normal text with a ↺ that returns it to driven; it never
-// changes on its own, and goes red when the core flags it (`bad`).
+// typed value in normal text with a ↺ inside the field, at its right end, that
+// returns it to driven; it never changes on its own, and goes red when the
+// core flags it (`bad`).
 //
 // WHY (Zach, 2026-10-18): "instead of showing like auto, just show the actual
 // value but make it kinda like grey outed that indicates that its like being
 // driven as supposed to having been set". No Auto switch: typing sets.
+// WHY the ↺ inside the field (Zach, 2026-10-20 night): "Perhaps can you put a
+// reset icon within the input field on the right side? Also if you completely
+// delete what is inside a field, it can also just return to driven."
 //
 // Keys: a valid value sets as you type (~120 ms after the last keystroke, as
 // the label's text does); Enter commits (an edited value is set, even when it
@@ -19,16 +23,19 @@
 // ArrowUp / ArrowDown step (Shift: ten); a drag on the unit scrubs. The kit
 // (studio/packages/bam-ui) is not edited: this uses its classes and tokens.
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { RotateCcw } from "lucide-react";
 import { cn, fmtNumber } from "@bam/ui";
+import "./driven.css";
 
 const LIVE_MS = 120;
 
-/** The ↺ beside a set value. Its space is kept while driven, so rows line up. */
-function ResetButton({ path, driven, driver, onReset }: { path: string; driven: boolean; driver: string; onReset: () => void }) {
+/** The ↺ inside a set value's field, at its right end; a driven value has none. */
+function ResetIcon({ path, driver, onReset }: { path: string; driver: string; onReset: () => void }) {
   return (
-    <button type="button" className="kit-ib drv-reset" data-reset={path} title={`Back to driven: ${driver}`}
-      aria-label={`Reset ${path} to driven`} aria-hidden={driven} tabIndex={driven ? -1 : 0}
-      style={driven ? { visibility: "hidden" } : undefined} onClick={onReset}>↺</button>
+    <button type="button" className="drv-reset" data-reset={path} title={`Back to driven: ${driver}`}
+      aria-label={`Reset ${path} to driven`} onClick={onReset}>
+      <RotateCcw size={11} strokeWidth={2.2} aria-hidden="true" />
+    </button>
   );
 }
 
@@ -132,6 +139,7 @@ export function DrivenField({ path, value, driven, driver, onSet, onReset, unit,
             if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); stepBy((e.key === "ArrowUp" ? 1 : -1) * (e.shiftKey ? 10 : 1)); }
             e.stopPropagation();
           }} />
+        {!driven && <ResetIcon path={path} driver={driver} onReset={onReset} />}
         {unit && (
           <span className="unit" title={`drag to change in ${s} ${unit} steps`}
             onPointerDown={(e) => {
@@ -151,14 +159,14 @@ export function DrivenField({ path, value, driven, driver, onSet, onReset, unit,
             }}>{unit}</span>
         )}
       </span>
-      <ResetButton path={path} driven={driven} driver={driver} onReset={onReset} />
     </>
   );
 }
 
 /** A choice (segmented row, select, switch) that is driven or set: the
  *  control is muted while driven. Picking the lit option of a driven choice
- *  sets it (the kit's segmented row ignores a click on its lit option). */
+ *  sets it (the kit's segmented row ignores a click on its lit option). A set
+ *  choice's ↺ sits inside the control's box (./driven.css), at its right end. */
 export function DrivenChoice({ path, value, driven, driver, onSet, onReset, children }: {
   path: string; value: string | number | boolean; driven: boolean; driver: string;
   onSet: (v: string | number | boolean) => void; onReset: () => void; children: ReactNode;
@@ -170,9 +178,11 @@ export function DrivenChoice({ path, value, driven, driver, onSet, onReset, chil
           const b = (e.target as Element).closest?.(".kit-seg-btn[data-value]");
           if (driven && b && b.getAttribute("data-value") === String(value)) onSet(value);
         }}>
-        {children}
+        <span className="drv-box">
+          {children}
+          {!driven && <ResetIcon path={path} driver={driver} onReset={onReset} />}
+        </span>
       </span>
-      <ResetButton path={path} driven={driven} driver={driver} onReset={onReset} />
     </>
   );
 }
