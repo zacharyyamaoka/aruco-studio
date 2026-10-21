@@ -17,7 +17,10 @@ let adapter: StudioAdapter | null = null;
 export function hostedFiles(): HostedFiles {
   if (hosted) return hosted;
   adapter = studioAdapter(useStudio, isFilling);
-  // autosave is the SDK's default (on: existing, unlocked files only).
+  // autosave is the app's policy, "all" (simple-hosted-files server/apps.json,
+  // SPEC v2.10): signed in, a new document's first edit creates its file, so
+  // nobody has to press Save (Zach, 2026-10-21: "having to manually press
+  // ctrl S is so old school!"); File › Autosave turns it off per user.
   // WHY no unsaved-changes prompt on leaving: signed out the Studio works as
   // it did before (no prompt), and every change is kept in the local draft,
   // which the next load brings back (SPEC v2.4).

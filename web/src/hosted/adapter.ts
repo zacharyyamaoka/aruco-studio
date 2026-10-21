@@ -14,7 +14,7 @@ import type { Studio } from "../store";
 /** What the adapter needs of useStudio: its state and its changes. */
 export type StudioStore = Pick<StoreApi<Pick<Studio, "doc" | "loadDoc" | "newDoc">>, "getState" | "subscribe">;
 
-export type StudioContent = Pick<HostedFilesOptions, "getContent" | "setContent" | "newDocument" | "contentType" | "untitledName">;
+export type StudioContent = Pick<HostedFilesOptions, "getContent" | "setContent" | "newDocument" | "contentType" | "untitledName" | "documentName">;
 
 export interface StudioAdapter {
   /** spread into new HostedFiles({ server, app, ...options }) */
@@ -58,6 +58,9 @@ export function studioAdapter(store: StudioStore, quiet: () => boolean = () => f
         apply(() => store.getState().loadDoc(file ? { ...doc, name: file.name } : doc));
       },
       newDocument: () => { naming = null; apply(() => store.getState().newDoc()); },
+      // the file autosave creates for an untitled document (apps.json
+      // "autosave": "all") takes the document's name, as Save's prompt offers it
+      documentName: () => naming ?? store.getState().doc.name,
     },
     // by the document's identity: a Doc is never mutated (store.ts), and the
     // selection, camera, panel and the core's answers live beside it

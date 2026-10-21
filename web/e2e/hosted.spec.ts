@@ -7,7 +7,7 @@
 // page's own bearer.
 import fs from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
-import { dragWorld, idle, openMenu, state } from "./helpers";
+import { clickAt, dragWorld, idle, openMenu, state } from "./helpers";
 
 const HOSTED = process.env.E2E_HOSTED_SERVER ?? "";
 test.skip(!HOSTED, "needs a local Simple Hosted Files: E2E_HOSTED_SERVER=http://localhost:<port>");
@@ -241,6 +241,68 @@ test.describe("Simple Hosted Files", () => {
     expect(await (await api(page, `/v1/files/${id}/content?version=2`)).text()).toBe(fileText(ours));
     expect(await (await api(page, `/v1/files/${id}/content?version=3`)).text()).toBe(fileText(theirs));
     await other.close();
+  });
+
+  test("h · autosave is the default (apps.json \"all\"): New, a rectangle and A, and the file is in Open with no Save pressed; Ctrl+S is a checkpoint; Autosave off creates nothing", async ({ page }) => {
+    await open(page);
+    await signIn(page, newEmail());
+    const files = async () => (await (await api(page, "/v1/files?app=aruco-studio")).json()).files as { id: string; name: string }[];
+    await (await openMenu(page, "file")).getByTestId("cmd-new").click();
+    await expect(page.getByTestId("doc-name")).toHaveText("Untitled");
+    // a blank New is not an edit: nothing is created
+    await page.waitForTimeout(3_000);
+    expect(await files()).toEqual([]);
+    // a rectangle, its face, A: the ArUco Extrude
+    await page.keyboard.press("r");
+    await dragWorld(page, [-30, -20], [30, 20]);
+    await page.keyboard.press("Escape");
+    await clickAt(page, 0, 0);
+    await expect.poll(async () => (await state(page)).sel?.kind).toBe("profile");
+    await page.keyboard.press("a");
+    await idle(page);
+    await expect.poll(async () => (await state(page)).doc.features.length).toBe(1);
+    await saved(page);
+    await expect.poll(async () => (await files()).map((f) => f.name)).toEqual(["Untitled"]);
+    const [{ id }] = await files();
+    await expect.poll(async () => (await api(page, `/v1/files/${id}/content`)).text()).toBe(fileText((await state(page)).doc));
+    // Open… lists it
+    await (await openMenu(page, "file")).getByTestId("shf-action-files").click();
+    const dialog = page.getByTestId("shf-files-dialog");
+    await expect(dialog.getByTestId("shf-file-row")).toHaveCount(1);
+    await expect(dialog.getByTestId("shf-file-row")).toHaveAttribute("data-file-id", id);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    // the name's ⌄: saved, though nobody saved
+    const menu = await docMenu(page);
+    await expect(menu.getByTestId("shf-menu-status")).toHaveText("Saved · just now");
+    await page.screenshot({ path: test.info().outputPath("name-menu-autosaved.png") });
+    await page.keyboard.press("Escape");
+    // Ctrl+S still saves now: a manual version, the checkpoint thinning never removes
+    await page.keyboard.press("r");
+    await dragWorld(page, [40, -10], [55, 10]);
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Control+s");
+    await saved(page);
+    const versions = async () => (await (await api(page, `/v1/files/${id}/versions`)).json()).versions as { version: number; kind: string }[];
+    await expect.poll(async () => (await versions())[0]?.kind).toBe("manual");
+    const kept = (await versions()).length;
+
+    // Autosave off (the user's choice, File ›): a new document's edit creates nothing
+    const toggle = (await openMenu(page, "file")).getByTestId("shf-autosave-toggle");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
+    await (await openMenu(page, "file")).getByTestId("cmd-new").click();
+    await expect(page.getByTestId("doc-name")).toHaveText("Untitled");
+    await page.keyboard.press("r");
+    await dragWorld(page, [-30, -20], [30, 20]);
+    await page.keyboard.press("Escape");
+    await expect.poll(async () => (await state(page)).doc.shapes.length).toBe(1);
+    await page.waitForTimeout(4_000);
+    expect((await files()).map((f) => f.id)).toEqual([id]);
+    expect((await versions()).length).toBe(kept);
+    await expect(page.getByTestId("shf-status")).not.toHaveAttribute("data-kind", "saved");
   });
 
   test("g · ⌄ is this file: its status line, Duplicate makes a copy on the server, Move to trash puts it in File › Trash…", async ({ page }) => {
