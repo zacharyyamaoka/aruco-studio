@@ -79,6 +79,13 @@ multiple of the line width". Every function takes `cells` -- a tag's
               27.2 mm: cells 3.40 mm = 5 x 0.68 mm").
     min_m     a module under it is noted ("cell minimum: ..."), never refused.
 
+Rule 2 (ROUND_RULE, 2026-10-20 night; "rule": 2 in the setting, rule 1 /
+absent read exactly as before): "marker" cells whose grid gap is on the
+step too -- the gap rule's max(gap_ratio L, L / n) to the NEAREST step,
+up when nearest is under one module (L / n); a typed gap as typed. Zach,
+on an inkjet 3 x 1 at 29.97 / 6.0113 mm: "we should by default recommend
+to the nearest like .5 mm". "cell" cells under rule 2 are rule 1's.
+
 Standard library only (this module is loaded inside Fusion).
 """
 from __future__ import annotations
@@ -187,6 +194,8 @@ def _mmx(x_m: float) -> str:
 # -------------------------------------------------------------------- cells
 
 CELL_RULE = 1                 # what a tag's "cells" setting means today
+ROUND_RULE = 2                # rule 2: a "marker" grid's gap on the step too (module docstring)
+CELL_RULES = (CELL_RULE, ROUND_RULE)
 CELL_OF = ("cell", "marker")
 MIN_STEP_M = 1e-5             # a multiple under 0.01 mm is not one
 MAX_STEP_M = 0.02
@@ -197,20 +206,26 @@ def cells_of(cells):
     rule (the marker and the checker in 0.5 mm steps, a typed size as typed:
     every tag made before 2026-10-14). A dict as the settings store it (mm):
     {"rule": 1, "of": "cell" | "marker", "mm": 0.68, "min_mm": 2.0}; a tuple
-    (of, step_m, min_m) passes through. Anything unreadable is None."""
+    (of, step_m, min_m) passes through. Anything unreadable is None. Rule 2
+    (ROUND_RULE) -> (of, step_m, min_m, 2); any other rule reads as rule 1."""
     if cells is None:
         return None
-    if isinstance(cells, tuple) and len(cells) == 3:
-        of, step, mn = cells
+    rule = CELL_RULE
+    if isinstance(cells, tuple) and len(cells) in (3, 4):
+        of, step, mn = cells[:3]
+        rule = cells[3] if len(cells) == 4 else CELL_RULE
     elif isinstance(cells, dict) and cells:
         of = cells.get("of")
         step = _num(cells.get("mm")) / 1000.0
         mn = _num(cells.get("min_mm")) / 1000.0
+        rule = cells.get("rule", CELL_RULE)
     else:
         return None
     step, mn = _num(step), max(0.0, _num(mn))
     if of not in CELL_OF or not (MIN_STEP_M <= step <= MAX_STEP_M):
         return None
+    if rule == ROUND_RULE and not isinstance(rule, bool):
+        return (of, float(step), float(mn), ROUND_RULE)
     return (of, float(step), float(mn))
 
 
@@ -240,6 +255,9 @@ class _Grid:
         self.m = c[1] if c is not None else STEP_M
         self.min_m = c[2] if c is not None else 0.0
         self.Ls = n * self.m if self.cell else self.m
+        # rule 2: a "marker" grid's gap on the step (gap); every other grid
+        # takes the gap exactly as before
+        self.round_gap = c is not None and len(c) == 4 and not self.cell
         # Sizes are kept to 0.1 um (_r7). A step that is not a whole number
         # of 0.1 um (a sticker printer's dot, 25.4 / 600 mm) puts k Ls and
         # j m up to 0.05 um off the grid, more than _K_EPS / EPS_M allow:
@@ -352,8 +370,14 @@ class _Grid:
         return self.cap(S, L)
 
     def gap(self, L: float, gap_ratio: float) -> float:
-        """A grid's gap: max(gap_ratio L, L / n); cell: rounded UP to whole m."""
+        """A grid's gap: max(gap_ratio L, L / n); cell: rounded UP to whole m;
+        rule 2 "marker": to the NEAREST m, UP when that is under a module."""
         s = max(gap_ratio * L, L / self.n)
+        if self.round_gap:
+            j = int(math.floor(s / self.m + 0.5 + self.ke_m))
+            if j * self.m < L / self.n - EPS_M:
+                j = int(math.ceil(L / self.n / self.m - self.ke_m))
+            return _r7(j * self.m)
         if not self.cell:
             return _r7(s)
         return _r7(math.ceil(s / self.m - self.ke_m) * self.m)
@@ -1050,7 +1074,11 @@ def fill_count(kind: str, w_m: float, h_m: float, cols: int, rows: int, *,
             top = min((W - (c - 1) * sep) / (c + 2.0 * q / n), (H - (r - 1) * sep) / (r + 2.0 * q / n))
         else:
             g = kw["gap_ratio"]
-            top = min(W / _grid_factor(c, n, q, g), H / _grid_factor(r, n, q, g))
+            # rule 2: a gap rounded to the nearest step is up to half a step
+            # under the rule's, so the largest L can be above the rule's top
+            h = G.m / 2.0 if G.round_gap else 0.0
+            top = min((W + (c - 1) * h) / _grid_factor(c, n, q, g),
+                      (H + (r - 1) * h) / _grid_factor(r, n, q, g))
         L, S = (G.L_down(top) if top > 0 else 0.0), 0.0
     while L > 0 and L >= G.L_min - 1e-12:
         lay = _layout(kind, W, H, L, S, force=(c, r), final=False, **kw)
