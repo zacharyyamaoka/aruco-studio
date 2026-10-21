@@ -1,9 +1,9 @@
 // The commands the top bar, the toolbar and the keys share.
 import { core } from "../coreSource";
 import { downloadBase64, downloadText, pickFile, slug } from "../io/files";
-import { getFeature, parseDoc, planRequest, serialise, sheetItems } from "../model/doc";
+import { getFeature, parseDoc, planRequest, serialise, sheetItems, withFeatures, type Doc } from "../model/doc";
 import { idLines, idsReady, settledOutput } from "./output";
-import { activeFeatureId, useStudio } from "../store";
+import { activeFeatureId, selectedMarkerIds, useStudio } from "../store";
 import { leaveFile } from "../hosted/hosted";
 
 const st = () => useStudio.getState();
@@ -62,20 +62,24 @@ export async function exportSvg(): Promise<void> {
 
 /** Export › PDF: the page of the marker in focus's preset (its inkjet
  *  markers, as Print lays them out); the first preset's when it is 3D printed.
- *  From a revision whose ids are settled; a refused marker is left out. */
+ *  From a revision whose ids are settled; a refused marker is left out.
+ *  Several markers selected: only those, as Print opens on them (printSelection). */
 export async function exportPdf(): Promise<void> {
   const fid = activeFeatureId(st());
-  if (!sheetItems(st().doc, fid).length) {
+  const only = printSelection();
+  const pick = (doc: Doc) => (only ? withFeatures(doc, only) : doc);
+  if (!sheetItems(pick(st().doc), fid).length) {
     st().say(st().doc.features.length ? "Nothing on paper: 3D-print markers aren't printed on a sheet." : "Nothing to export yet: make an ArUco Extrude (A) first.");
     return;
   }
   const waited = waitNote("PDF export");
   try {
     const got = await settledOutput((doc) => {
-      const items = sheetItems(doc, fid, st().idRefused);
+      const items = sheetItems(pick(doc), fid, st().idRefused);
       return items.length ? { items, cut_lines: true } : null;
     }, (req) => core.sheet(req));
-    const refused = st().idRefused;
+    // the refused markers among the ones exported
+    const refused = st().idRefused.filter((k) => pick(st().doc).features.some((f) => f.key === k));
     if (!got) { st().say(`Not exported: ${idLines(st().doc, st().idIssues, refused)[0]?.text ?? "nothing on paper"}`); return; }
     downloadBase64(`${slug(got.doc.name)}.pdf`, got.out.pdf_base64, "application/pdf");
     if (refused.length) st().say(`PDF saved without ${refused.length} marker${refused.length === 1 ? "" : "s"}: ${idLines(st().doc, st().idIssues, refused)[0].text}`);
@@ -83,6 +87,18 @@ export async function exportPdf(): Promise<void> {
   } catch (e) {
     st().say(`PDF export failed: ${(e as Error).message}`);
   }
+}
+
+/** The markers Print and Export › PDF start from: the selected ones when the
+ *  selection names 2+ (a right-drag box, Shift+click), else null (all).
+ *  WHY 2+ (Zach, 2026-10-21: "if I only want to print a subset of markers I
+ *  will right-click-drag select them and maybe shift-click a couple more"):
+ *  the marker just made stays selected after OK, and is not a subset choice;
+ *  the batch panel and Re-ID read a selection the same way. */
+export function printSelection(): string[] | null {
+  const { doc, sel, multi } = st();
+  const only = selectedMarkerIds(doc, sel, multi);
+  return only.length > 1 ? only : null;
 }
 
 /** Verify (the simulated camera bench): its dialog is web/src/verify's. */

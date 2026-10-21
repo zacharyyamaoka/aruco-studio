@@ -52,14 +52,18 @@ async function settled(page: Page): Promise<Record<string, unknown>> {
   return JSON.parse((await page.getByTestId("sheet-side").getAttribute("data-request"))!);
 }
 
-/** What the page on screen carries: the bar's caption and the 4 in label as SVG text (the core's), and the screen's 50 mm bar. */
-async function bar(page: Page): Promise<{ page: number; core: boolean; inch: boolean; screen: boolean }> {
-  const stage = page.getByTestId("print-page");
+/** What page `i` (1-based) in the scroll carries: the bar's caption and the 4 in label as SVG text (the core's), and the screen's 50 mm bar over it. */
+async function bar(page: Page, i: number): Promise<{ page: number; core: boolean; inch: boolean; screen: boolean }> {
+  const box = page.getByTestId("sheet-page").nth(i - 1);
+  const stage = box.getByTestId("print-page");
+  // a page is drawn as it nears the view
+  await stage.scrollIntoViewIfNeeded();
+  await expect(stage.locator("svg")).toBeVisible();
   return {
     page: Number(await stage.getAttribute("data-page")),
     core: (await stage.locator("svg text", { hasText: "must measure 100 mm" }).count()) > 0,
     inch: (await stage.locator("svg text", { hasText: /^4 in$/ }).count()) > 0,
-    screen: (await page.getByTestId("scale-bar").count()) > 0,
+    screen: (await box.getByTestId("scale-bar").count()) > 0,
   };
 }
 
@@ -76,7 +80,7 @@ test.describe(`the Scale bar row (${CORE} core)`, () => {
     expect((await state(page)).doc.features).toHaveLength(8);
     await page.getByTestId("act-print").click();
     await expect(page.getByTestId("print-dialog")).toBeVisible();
-    await expect(page.locator('[data-testid="print-page"] svg')).toBeVisible({ timeout: 45_000 });
+    await expect(page.locator('[data-testid="print-page"] svg').first()).toBeVisible({ timeout: 45_000 });
     const gap = page.locator('[data-testid="sheet-gap"] input');
     await gap.fill(String(GAP));
     await gap.press("Enter");
@@ -96,11 +100,11 @@ test.describe(`the Scale bar row (${CORE} core)`, () => {
       const pages = Number(await page.getByTestId("sheet-pages").getAttribute("data-value"));
       expect(pages, `${option}: the core's page count`).toBe(corePages(request));
       expect(pages, `${option}: a multi-page sheet`).toBeGreaterThan(1);
-      await expect(page.getByTestId("sheet-page-tab")).toHaveCount(pages);
+      await expect(page.getByTestId("sheet-page")).toHaveCount(pages);
+      // the screen's bars: one over each page that carries the core's
+      await expect(page.getByTestId("scale-bar")).toHaveCount(option === "hide" ? 0 : option === "first" ? 1 : pages);
       for (let i = 1; i <= pages; i++) {
-        await page.getByTestId("sheet-page-tab").nth(i - 1).click();
-        await expect(page.getByTestId("print-page")).toHaveAttribute("data-page", String(i));
-        const got = await bar(page);
+        const got = await bar(page, i);
         const on = want[option](i);
         expect(got, `${option}: page ${i} of ${pages}`).toEqual({ page: i, core: on, inch: on, screen: on });
       }
@@ -108,7 +112,7 @@ test.describe(`the Scale bar row (${CORE} core)`, () => {
       await expect(page.getByText(NOTE)).toHaveCount(option === "hide" ? 1 : 0);
     }
 
-    // back to Every page: the page tabs and the request follow
+    // back to Every page: the request follows
     await row.locator('[data-value="every"]').click();
     expect((await settled(page)).scale_bar).toBe("every");
   });

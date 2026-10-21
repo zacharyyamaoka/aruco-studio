@@ -284,6 +284,10 @@ a.kit-ib { text-decoration: none; }
 .ex-card:hover { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 .ex-thumb { width: 100%; height: 84px; background: var(--canvas); border-radius: 5px; color: var(--muted); }
 .ex-fill { fill: var(--shape-fill-body); stroke: var(--accent); stroke-width: 0.8; }
+/* an empty document: the sketch's grid and origin (the canvas's own tokens), 1 px at any size */
+.ex-empty .ex-grid { fill: none; stroke: var(--grid); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.ex-empty .ex-grid.major { stroke: var(--grid-major); }
+.ex-empty .ex-axis { fill: none; stroke: var(--grid-axis); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .ex-name { font-weight: 600; }
 .ex-note { color: var(--muted); font-size: 11px; }
 

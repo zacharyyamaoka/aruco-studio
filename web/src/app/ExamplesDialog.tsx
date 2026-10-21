@@ -11,11 +11,26 @@ import { useExampleMarks, type Mark } from "./thumbs";
 const MARK_WHITE = { fill: "var(--t-white, #fff)", stroke: "none" };
 const MARK_BLACK = { fill: "var(--t-black, #111)", stroke: "none" };
 
+/** An empty document: the sketch's own grid and its origin, faint -- a calm
+ *  empty canvas (Zach, 2026-10-21: an empty file's card is not the file icon). */
+function EmptyCanvas() {
+  const lines: string[] = [], major: string[] = [];
+  for (let x = 10; x < 160; x += 10) if (x !== 80) (x % 40 === 0 ? major : lines).push(`M${x} 0V100`);
+  for (let y = 10; y < 100; y += 10) if (y !== 50) (y % 40 === 10 ? major : lines).push(`M0 ${y}H160`);
+  return (
+    <svg viewBox="0 0 160 100" preserveAspectRatio="xMidYMid slice" className="ex-thumb ex-empty" data-thumb="empty" aria-label="Empty">
+      <path d={lines.join("")} className="ex-grid" />
+      <path d={major.join("")} className="ex-grid major" />
+      <path d="M80 0V100M0 50H160" className="ex-axis" />
+    </svg>
+  );
+}
+
 /** Shapes as a small picture, y up (the examples' cards, Home's cards), and
  *  the markers on them when known (./thumbs.ts): each outline white, its black over it. */
 export function ShapesThumb({ shapes, marks = [] }: { shapes: Shape[]; marks?: Mark[] }) {
   const b = sketchBox(shapes);
-  if (!b) return <svg viewBox="0 0 10 10" className="ex-thumb"><path d="M1 1h8v8H1z" fill="none" stroke="currentColor" strokeDasharray="1 1" strokeWidth=".2" /></svg>;
+  if (!b) return <EmptyCanvas />;
   const pad = 4;
   return (
     <svg className="ex-thumb" viewBox={`${b.x0 - pad} ${-b.y1 - pad} ${b.x1 - b.x0 + 2 * pad} ${b.y1 - b.y0 + 2 * pad}`}>

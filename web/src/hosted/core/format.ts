@@ -36,6 +36,11 @@ export function withExtension(name: string, extension: string | undefined): stri
   return name + extension;
 }
 
+// Canva names a copy "Copy of <name>" (SPEC v2.11). The server's names stop at 200 characters.
+export function copyName(name: string): string {
+  return `Copy of ${name.slice(0, 192)}`;
+}
+
 export function randomId(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");

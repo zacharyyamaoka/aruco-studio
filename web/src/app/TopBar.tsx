@@ -33,6 +33,7 @@ import { Menu as M } from "@base-ui/react/menu";
 import { Popover } from "@base-ui/react/popover";
 import { Button, Dialog, Glyph, Kbd, Menu, MenuItem, MenuSeparator, cn, useTheme } from "@bam/ui";
 import { Check, ChevronRight, CircleHelp, Moon, RotateCcw, Sun } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import { newDocument, renameDocument } from "../hosted/hosted";
 import { useHostedFiles, useHostedFilesActions, useHostedFilesUi, useStatus } from "../hosted/react";
 import { UsageLine, initials, usePlan } from "../hosted/ui/HostedDialogs";
@@ -41,6 +42,7 @@ import { WaitLine, failedDetail, reload, startingText, useTick } from "../panel/
 import { useStudio } from "../store";
 import { SKINS, useSkin } from "../skins/skins";
 import { exportPdf, exportSvg, openDoc, openPrint, openVerify, saveDoc } from "./commands";
+import { ZoomItems } from "../zoom/ZoomItems";
 import { openHome } from "./home";
 
 export const GITHUB = "https://github.com/zacharyyamaoka/aruco-studio";
@@ -205,6 +207,10 @@ function AccountItems({ onHelp }: { onHelp: () => void }) {
       <M.LinkItem className="kit-menu-item" href={GITHUB} target="_blank" rel="noreferrer" data-testid="github-menu">
         <span className="ic mm-gh"><GithubMark /></span><span className="kit-menu-label">GitHub</span><span className="hint">the source</span>
       </M.LinkItem>
+      {/* the guides (Zach, 2026-10-21): where labels are safe, and why the Studio works as it does; a real navigation */}
+      <M.LinkItem className="kit-menu-item" href="/guides/" data-testid="guides-menu">
+        <span className="ic"><BookOpen size={14} /></span><span className="kit-menu-label">Guides</span><span className="hint">how and why</span>
+      </M.LinkItem>
       {/* the landing page (Zach, 2026-10-20); a real navigation, not a route */}
       <M.LinkItem className="kit-menu-item" href="/about/" data-testid="brand">
         <span className="ic"><BrandCube /></span><span className="kit-menu-label">About ArUco Studio</span>
@@ -283,6 +289,8 @@ function MainMenu({ onHelp }: { onHelp: () => void }) {
                 onClick={() => st().setMarkerInfo(!markerInfo)} />
               <MenuSeparator />
               <MenuItem icon="fit" label="Fit" hint="F" testid="cmd-fit" onClick={() => st().fit()} />
+              {/* Zoom to selection, Actual size, Zoom 100 %, Calibrate… (the canvas's right-click menu has them too) */}
+              <ZoomItems prefix="cmd" fit={false} />
             </Sub>
             <Sub label="Preferences" testid="menu-prefs" inline={inline}>
               <div className="mm-h">{theme === "dark" ? <Moon size={12} /> : <Sun size={12} />}Theme</div>
@@ -332,7 +340,8 @@ function ThisFileItems({ close, onRename }: { close: () => void; onRename: () =>
       <Item close={close} label="Rename" testid="shf-action-rename" onClick={onRename} />
       {state.user && (
         <>
-          <Item close={close} label="Duplicate" testid="shf-action-duplicate" disabled={!file} onClick={() => { if (file) void actions.duplicate(file); }} />
+          {/* Canva's Make a copy (SPEC v2.11): "Copy of <name>" opens in a new tab (opened inside this click, so it is not a blocked pop-up) */}
+          <Item close={close} label="Duplicate" testid="shf-action-duplicate" disabled={!file} onClick={() => { if (file) void actions.duplicateCurrent(); }} />
           <Item close={close} label="Version history" testid="shf-action-history" disabled={!file} onClick={() => actions.showHistory()} />
           <div className="dm-sep" />
           <Item close={close} label="Move to trash" testid="shf-action-trash" disabled={!file} onClick={() => { if (file) void actions.trash(file); }} />
@@ -457,8 +466,10 @@ export function ActionsPill() {
 /** The keys App.tsx binds. */
 const KEYS: [string, string][] = [
   ["V", "Select"], ["R", "Rectangle"], ["C", "Circle"], ["D", "Dimension"], ["A", "ArUco Extrude"], ["F", "Fit"], ["3", "2D | 3D"],
+  ["Shift+1", "Zoom to fit"], ["Shift+2", "Zoom to selection"], ["Shift+0", "Actual size"],
   ["S", "Print (P too)"], ["K", "Verify"],
   ["Ctrl+Z", "Undo"], ["Ctrl+Shift+Z", "Redo (Ctrl+Y too)"], ["Ctrl+C", "Copy"], ["Ctrl+X", "Cut"], ["Ctrl+V", "Paste at the pointer"],
+  ["Ctrl+D", "Duplicate"], ["Right-click", "The menu (a right-drag selects)"],
   ["← ↑ → ↓", "Nudge 1 mm (Shift: 10 mm)"], ["Del", "Delete"], ["Esc", "Back to Select; close the panel"],
 ];
 

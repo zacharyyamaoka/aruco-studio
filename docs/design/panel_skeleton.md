@@ -28,7 +28,7 @@ Grey = driven (computed or from the preset), with ↺ inside the field once set.
 Nothing is an "Auto" checkbox: a driven value is shown grey, typing sets it.
 
 ### 1 Marker
-1. **Profile** — the selection (a closed region, or a rectangle's outer edges)
+1. **Profile** — the selection (a closed region, or a rectangle's outer edges); Fusion adds a Holes pick
 2. **Preset** — how it is made (icon: inkjet printer vs 3D printer)
 3. **Type** — Single | Grid | ChArUco (icons)
 4. **Dictionary**
@@ -40,6 +40,10 @@ Nothing is an "Auto" checkbox: a driven value is shown grey, typing sets it.
 10. **Quiet zone**
 11. **Key** — driven (grey) until typed
 (Fusion may fold 10–11 under "Details".)
+12. — divider — **Operation** — Fusion only, the LAST row of Marker, where Fusion's own Extrude puts it
+    (Zach 2026-10-21: "I have muscle memory expecting it to be there"): New Body | New Component
+    (default), with Fusion's own icons (local add-in only, never published). The tag builds in the
+    ACTIVE component, root included, like Fusion's Extrude. The online Studio has no components.
 
 ### 2 Label
 1. **On** — off by default

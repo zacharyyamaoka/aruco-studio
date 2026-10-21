@@ -132,6 +132,12 @@ export interface Studio {
   /** Ctrl+V: what was copied, centred at `at` (a sketch point), else 10 mm on
    *  from the last paste; new ids and keys, one undo step */
   paste: (at: Vec2 | null) => void;
+  /** something was copied: Paste has something to put down */
+  canPaste: () => boolean;
+  /** Ctrl+D (Figma's Duplicate): what Ctrl+C would take, put down beside it
+   *  (its width + 10 mm to the right) as Paste puts it down: new ids and keys,
+   *  selected, one undo step. The clipboard is not touched. */
+  duplicate: () => void;
   setCamera: (c: Camera) => void;
   setView: (w: number, h: number) => void;
   fit: () => void;
@@ -226,6 +232,13 @@ export function selectionFeatureIds(doc: Doc, multi: string[]): string[] {
   return doc.features.filter((f) => f.profile && multi.includes(f.profile.outer)).map((f) => f.id);
 }
 
+/** The markers the selection names (Print's "Selected"): the multi-selection's
+ *  and the primary selection's, in document order. */
+export function selectedMarkerIds(doc: Doc, sel: Selection, multi: string[]): string[] {
+  const own = selectedFeatureId(doc, sel);
+  return doc.features.filter((f) => f.id === own || (f.profile && multi.includes(f.profile.outer))).map((f) => f.id);
+}
+
 /** The feature in focus: the one the panel edits, else the selected one,
  *  else the last made (Export SVG, the outer dimension and the turn arc). */
 export function activeFeatureId(s: Pick<Studio, "doc" | "sel" | "panel">): string | null {
@@ -298,6 +311,37 @@ export const useStudio = create<Studio>((set, get) => {
   /** the clipboard (in memory; the system's too when the page may write it) and the pastes made from it */
   let clip: Clip | null = null;
   let pastes = 0;
+  /** What Ctrl+C takes: the shapes `ids`, the features whose profile they all are, the dims among them. */
+  const clipOf = (doc: Doc, ids: string[]): Clip => structuredClone({
+    format: "arucostudio-clip",
+    shapes: doc.shapes.filter((s) => ids.includes(s.id)),
+    features: doc.features.filter((f) => f.profile && [f.profile.outer, ...f.profile.holes].every((id) => ids.includes(id))),
+    dims: dimsAmong(doc.dims, ids),
+  });
+  /** A clip put down (dx, dy) mm from where it was copied: new ids and keys, selected, one undo step. */
+  const place = (c: Clip, dx: number, dy: number) => {
+    const { doc } = get();
+    const map: Record<string, string> = {};
+    const shapes = c.shapes.map((s) => {
+      map[s.id] = newId(s.kind === "rect" ? "r" : s.kind === "circle" ? "c" : "p");
+      return { ...moveShape(structuredClone(s), dx, dy), id: map[s.id] };
+    });
+    // new ids and keys: auto id hands each pasted feature new marker ids; every setting is kept
+    // WHY a typed first id is driven in the copy (Zach, 2026-10-20 night: "simplest if they
+    // simply increment"): kept typed, the copy would print the same id as its original;
+    // driven, it takes the next id after the highest in use (core autoid rule 3')
+    const features = c.features.map((f) => {
+      const id = newId("f");
+      const g = { ...structuredClone(f), id, key: id, set: f.set.filter((p) => p !== "marker.first_id"),
+        profile: { outer: map[f.profile!.outer], holes: f.profile!.holes.map((h) => map[h]) } };
+      // a legacy placement rectangle comes along when it was copied (doc.ts Feature.rect)
+      return f.rect && map[f.rect] ? { ...g, rect: map[f.rect] } : withoutRect(g);
+    });
+    const dims = c.dims.map((d) => renameDim(d, newId("d"), map));
+    const allDims = [...doc.dims, ...dims];
+    const next = { ...doc, shapes: solve([...doc.shapes, ...shapes], allDims), features: [...doc.features, ...features], dims: allDims };
+    put({ doc: next, multi: shapes.map((s) => s.id), sel: { kind: "shape", id: shapes[0].id }, dimSel: null, tool: "select" });
+  };
 
   /** Edit the feature the panel edits (`key`: see setDoc). */
   const edit = (fn: (f: Feature) => Feature, key = "") => put({ doc: updateFeature(get().doc, get().panel.featureId, fn) }, key);
@@ -450,13 +494,11 @@ export const useStudio = create<Studio>((set, get) => {
       return ref ? [ref.outer, ...ref.holes].filter((id) => doc.shapes.some((s) => s.id === id)) : [];
     },
     copy: () => {
-      const { doc } = get();
       const ids = get().selectedShapeIds();
       if (!ids.length) return;
-      const shapes = doc.shapes.filter((s) => ids.includes(s.id));
-      const features = doc.features.filter((f) => f.profile && [f.profile.outer, ...f.profile.holes].every((id) => ids.includes(id)));
-      clip = structuredClone({ format: "arucostudio-clip", shapes, features, dims: dimsAmong(doc.dims, ids) });
+      clip = clipOf(get().doc, ids);
       pastes = 0;
+      const { shapes, features } = clip;
       // the system clipboard too, when the page may write it (the paste reads the copy in memory)
       try { void navigator.clipboard?.writeText(JSON.stringify(clip)).catch(() => {}); } catch { /* not allowed: memory only */ }
       set({ note: `Copied ${shapes.length} shape${shapes.length === 1 ? "" : "s"}${features.length ? ` and ${features.length} ArUco Extrude${features.length === 1 ? "" : "s"}` : ""}.` });
@@ -474,31 +516,22 @@ export const useStudio = create<Studio>((set, get) => {
     paste: (at) => {
       if (!clip || !clip.shapes.length) return;
       if (get().panel.open) get().ok();
-      const { doc } = get();
       const b = sketchBox(clip.shapes)!;
       pastes += 1;
       // at the cursor (the copy's middle there), else 10 mm on (right, down) per paste
       const [dx, dy] = at ? [at[0] - (b.x0 + b.x1) / 2, at[1] - (b.y0 + b.y1) / 2] : [10 * pastes, -10 * pastes];
-      const map: Record<string, string> = {};
-      const shapes = clip.shapes.map((s) => {
-        map[s.id] = newId(s.kind === "rect" ? "r" : s.kind === "circle" ? "c" : "p");
-        return { ...moveShape(structuredClone(s), dx, dy), id: map[s.id] };
-      });
-      // new ids and keys: auto id hands each pasted feature new marker ids; every setting is kept
-      // WHY a typed first id is driven in the copy (Zach, 2026-10-20 night: "simplest if they
-      // simply increment"): kept typed, the copy would print the same id as its original;
-      // driven, it takes the next id after the highest in use (core autoid rule 3')
-      const features = clip.features.map((f) => {
-        const id = newId("f");
-        const g = { ...structuredClone(f), id, key: id, set: f.set.filter((p) => p !== "marker.first_id"),
-          profile: { outer: map[f.profile!.outer], holes: f.profile!.holes.map((h) => map[h]) } };
-        // a legacy placement rectangle comes along when it was copied (doc.ts Feature.rect)
-        return f.rect && map[f.rect] ? { ...g, rect: map[f.rect] } : withoutRect(g);
-      });
-      const dims = clip.dims.map((d) => renameDim(d, newId("d"), map));
-      const allDims = [...doc.dims, ...dims];
-      const next = { ...doc, shapes: solve([...doc.shapes, ...shapes], allDims), features: [...doc.features, ...features], dims: allDims };
-      put({ doc: next, multi: shapes.map((s) => s.id), sel: { kind: "shape", id: shapes[0].id }, dimSel: null, tool: "select" });
+      place(clip, dx, dy);
+    },
+    canPaste: () => !!clip?.shapes.length,
+    duplicate: () => {
+      const ids = get().selectedShapeIds();
+      if (!ids.length) return;
+      if (get().panel.open) get().ok();
+      const c = clipOf(get().doc, ids);
+      const b = sketchBox(c.shapes)!;
+      // WHY beside it (Figma duplicates a frame beside the original): on top of
+      // it the copy would hide the original, and their markers would overlap
+      place(c, b.x1 - b.x0 + 10, 0);
     },
     setCamera: (camera) => set({ camera }),
     setView: (w, h) => set({ view: { w, h } }),
