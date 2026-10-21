@@ -28,7 +28,7 @@ Grey = driven (computed or from the preset), with ↺ inside the field once set.
 Nothing is an "Auto" checkbox: a driven value is shown grey, typing sets it.
 
 ### 1 Marker
-1. **Profile** — the selection (a closed region, or a rectangle's outer edges)
+1. **Profile** — the selection (a closed region, or a rectangle's outer edges); Fusion adds a Holes pick
 2. **Preset** — how it is made (icon: inkjet printer vs 3D printer)
 3. **Type** — Single | Grid | ChArUco (icons)
 4. **Dictionary**
@@ -54,6 +54,8 @@ Nothing is an "Auto" checkbox: a driven value is shown grey, typing sets it.
 3. **Heights** — inkjet: Paper thickness · 3D print: Extrude (Black | White | Both),
    White height, Black height (from the white's outer face)
 4. **Flip** (outward side)
+5. **Operation** — Fusion only: New Component (default) | New Body; the tag builds in the ACTIVE
+   component, root included, like Fusion's Extrude (Zach 2026-10-21). The online Studio has no components.
 
 ### Footer (every tab)
 The one-line summary ("Single DICT_4X4_50 #3 · 44.0 mm · outer 58.7 × 58.7 mm") and OK / Cancel.

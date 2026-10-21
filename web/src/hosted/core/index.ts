@@ -7,7 +7,7 @@ export { HostedFilesError } from "./errors.js";
 export { SignInFlow } from "./signin.js";
 export type { SignInDefaults, SignInDriver, SignInStep, SignInView } from "./signin.js";
 export type { FilesApi, SaveKind } from "./api.js";
-export { daysUntil, humanSize, relativeTime, withExtension } from "./format.js";
+export { copyName, daysUntil, humanSize, relativeTime, withExtension } from "./format.js";
 export type {
   AccountAgentLink,
   AgentLink,

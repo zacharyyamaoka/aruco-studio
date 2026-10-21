@@ -120,6 +120,9 @@
   border: 1px solid var(--line); border-radius: 8px; background: var(--canvas); color: var(--muted); }
 .home-pic.current { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
 .home-pic .ex-thumb { width: 82%; height: 82%; }
+/* a cloud file's picture (FilePic): the whole card, the drawing in it as the open file's */
+.home-thumb { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.home-pic .ex-thumb.ex-empty { width: 100%; height: 100%; border-radius: 0; }
 .home-card-text { display: grid; gap: 2px; min-width: 0; padding: 0 2px; }
 .home-name { font-weight: 600; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--muted); font-size: 11px; min-width: 0; }

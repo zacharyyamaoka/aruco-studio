@@ -20,6 +20,7 @@
 import type { IdRequest, PlanRequest } from "./core/contract";
 import { core, onCoreStatus, coreStatus } from "./coreSource";
 import { applyIds, getFeature, idRequest, planRequest, refusedKeys } from "./model/doc";
+import { notePlan } from "./app/thumbs";
 import { useStudio } from "./store";
 
 const PLAN_MS = 30;
@@ -64,12 +65,15 @@ async function runPlan(id: string, req: PlanRequest, key: string) {
   inflight.set(id, mine);
   try {
     const plan = await core.plan(req);
+    // every answer is a picture's too (app/thumbs.ts): the file this document saves draws on Home without asking again
+    notePlan(req, plan);
     if (planKeys.get(id) === key) {
       const { planErrors } = useStudio.getState();
       const { [id]: _e, ...rest } = planErrors;
       useStudio.setState({ plans: { ...useStudio.getState().plans, [id]: plan }, planErrors: rest });
     }
   } catch (e) {
+    notePlan(req, null);
     if (planKeys.get(id) === key) useStudio.setState({ planErrors: { ...useStudio.getState().planErrors, [id]: (e as Error).message } });
   } finally {
     running -= 1;
