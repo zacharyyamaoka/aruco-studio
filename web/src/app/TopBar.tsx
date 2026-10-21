@@ -33,6 +33,7 @@ import { Menu as M } from "@base-ui/react/menu";
 import { Popover } from "@base-ui/react/popover";
 import { Button, Dialog, Glyph, Kbd, Menu, MenuItem, MenuSeparator, cn, useTheme } from "@bam/ui";
 import { Check, ChevronRight, CircleHelp, Moon, RotateCcw, Sun } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import { newDocument, renameDocument } from "../hosted/hosted";
 import { useHostedFiles, useHostedFilesActions, useHostedFilesUi, useStatus } from "../hosted/react";
 import { UsageLine, initials, usePlan } from "../hosted/ui/HostedDialogs";
@@ -204,6 +205,10 @@ function AccountItems({ onHelp }: { onHelp: () => void }) {
       <MenuItem label="Keyboard shortcuts" hint="?" testid="help-menu" onClick={onHelp} />
       <M.LinkItem className="kit-menu-item" href={GITHUB} target="_blank" rel="noreferrer" data-testid="github-menu">
         <span className="ic mm-gh"><GithubMark /></span><span className="kit-menu-label">GitHub</span><span className="hint">the source</span>
+      </M.LinkItem>
+      {/* the guides (Zach, 2026-10-21): where labels are safe, and why the Studio works as it does; a real navigation */}
+      <M.LinkItem className="kit-menu-item" href="/guides/" data-testid="guides-menu">
+        <span className="ic"><BookOpen size={14} /></span><span className="kit-menu-label">Guides</span><span className="hint">how and why</span>
       </M.LinkItem>
       {/* the landing page (Zach, 2026-10-20); a real navigation, not a route */}
       <M.LinkItem className="kit-menu-item" href="/about/" data-testid="brand">

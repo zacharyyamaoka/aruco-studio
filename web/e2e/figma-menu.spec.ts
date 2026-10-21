@@ -20,7 +20,7 @@ const SUBMENUS: [string, string, string[]][] = [
   ["export", "Export", ["cmd-print", "cmd-svg", "cmd-pdf"]],
   ["view", "View", ["cmd-view-2d", "cmd-view-3d", "cmd-fit"]],
   ["prefs", "Preferences", ["theme-light", "theme-dark", "skin-studio", "skin-unstyled", "skin-fusion", "skin-onshape"]],
-  ["account", "Help and account", ["help-menu", "github-menu", "brand", "shf-action-signin"]],
+  ["account", "Help and account", ["help-menu", "github-menu", "guides-menu", "brand", "shf-action-signin"]],
 ];
 
 /** The chrome: its boxes, and every control in them. */
@@ -360,7 +360,7 @@ test.describe("Figma UI3 chrome", () => {
     expect(twice([...doc, ...main]), "signed out: in two places").toEqual([]);
     expect(ids(doc, "⌄")).toEqual(["shf-action-rename"]);
     expect(ids(main, "file")).toEqual(["cmd-new", "cmd-open", "cmd-save", "cmd-examples"]);
-    expect(ids(main, "account")).toEqual(["help-menu", "github-menu", "brand", "shf-action-signin"]);
+    expect(ids(main, "account")).toEqual(["help-menu", "github-menu", "guides-menu", "brand", "shf-action-signin"]);
     await page.getByTestId("menu-doc").click();
     await expect(page.getByTestId("shf-menu-status")).toHaveText("Not saved online");
     await page.getByTestId("menu-doc").click();
@@ -388,7 +388,7 @@ test.describe("Figma UI3 chrome", () => {
       "shf-action-export", "shf-action-trash-view", "cmd-examples", "shf-autosave-toggle"]);
     expect(main.filter((r) => r.menu === "file").map((r) => r.label)).toEqual(["New", "Open…", "Open from this computer…", "Save", "Save as…", "Download",
       "Export all files", "Trash…", "Examples…", "Autosave"]);
-    expect(ids(main, "account")).toEqual(["help-menu", "github-menu", "brand", "shf-action-account", "shf-action-signout"]);
+    expect(ids(main, "account")).toEqual(["help-menu", "github-menu", "guides-menu", "brand", "shf-action-account", "shf-action-signout"]);
     expect(main.find((r) => r.menu === "main" && r.id === "menu-account")?.label).toBe("Help and account");
     // the status line, then this file's items; a new document is not saved online yet: Duplicate, History and Trash wait for it
     await signed.getByTestId("menu-doc").click();
