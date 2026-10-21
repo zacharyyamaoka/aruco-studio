@@ -6,12 +6,12 @@
 // pasted becomes driven in the copy (web/src/store.ts paste) and takes the
 // next id, 30 -> 31. Ids come from the probe's plans, never DOM presence.
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, coreReady, dragWorld, idle, openStudio, panelTab, state, toClient } from "./helpers";
+import { CORE, coreReady, dragWorld, idle, openStudio, panelTab, state, toClient, openMenu } from "./helpers";
 
 async function blank(page: Page): Promise<void> {
   await openStudio(page);
   await coreReady(page);
-  await page.getByTestId("menu-file").click();
+  await openMenu(page, "file");
   await page.getByTestId("cmd-new").click();
 }
 

@@ -9,7 +9,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, coreReady, dragWorld, idle, labelOn, openStudio, state } from "./helpers";
+import { CORE, coreReady, dragWorld, idle, labelOn, openStudio, state, openMenu } from "./helpers";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const PY = [path.join(ROOT, ".venv", "bin", "python"), path.join(ROOT, ".venv", "Scripts", "python.exe")].find((p) => fs.existsSync(p));
@@ -70,7 +70,7 @@ test.describe(`the Scale bar row (${CORE} core)`, () => {
     test.setTimeout(240_000);
     await openStudio(page);
     await coreReady(page);
-    await page.getByTestId("menu-file").click();
+    await openMenu(page, "file");
     await page.getByTestId("cmd-new").click();
     for (const [a, b] of RECTS) await feature(page, a, b);
     expect((await state(page)).doc.features).toHaveLength(8);

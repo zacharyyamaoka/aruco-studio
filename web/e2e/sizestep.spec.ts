@@ -7,7 +7,7 @@
 // markers made by that preset. Numbers from the probe's plan, the colour from
 // getComputedStyle.
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, coreReady, dragWorld, idle, openPresets, openStudio, panelTab, state } from "./helpers";
+import { CORE, coreReady, dragWorld, idle, openPresets, openStudio, panelTab, state, openMenu } from "./helpers";
 
 const DOT = 25.4 / 600;
 const N = 6;                                       // DICT_4X4_50: cells per marker side
@@ -15,7 +15,7 @@ const N = 6;                                       // DICT_4X4_50: cells per mar
 async function blankMarker(page: Page): Promise<void> {
   await openStudio(page);
   await coreReady(page);
-  await page.getByTestId("menu-file").click();
+  await openMenu(page, "file");
   await page.getByTestId("cmd-new").click();
   await page.keyboard.press("r");
   await dragWorld(page, [-20, -20], [20, 20]);
