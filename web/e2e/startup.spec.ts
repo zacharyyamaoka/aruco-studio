@@ -155,7 +155,11 @@ test.describe(`startup waits (${CORE} core)`, () => {
     await page.unroute(ZIP);
     await page.getByTestId("plan-wait-action").click();
     await coreReady(page);
-    await faceAndA(page);
+    // WHY either: Simple Hosted Files keeps a local draft of every change
+    // (within 500 ms), so Reload may bring back the marker made while the
+    // core was down; whether the draft landed first is timing. Restored or
+    // fresh, the core must now plan a marker.
+    if ((await state(page)).doc.features.length === 0) await faceAndA(page);
     await recovered(page);
   });
 
