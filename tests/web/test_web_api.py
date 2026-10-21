@@ -15,6 +15,7 @@ import pytest
 
 from aruco_studio import __version__
 from aruco_studio import web_api as W
+from aruco_studio.core import autosize as A
 from aruco_studio.core import dictionary as D
 from aruco_studio.core import make as MK
 from aruco_studio.core import presets as P
@@ -29,6 +30,10 @@ def preset(name="Inkjet · Letter vinyl", **kw):
 
 INK = preset()
 INK_NO_SNAP = preset(cell_step_mm=0.0)          # typed sizes exactly as typed
+# the inkjet built-ins before cells rule 2 (2026-10-20 night): whole 600 dpi
+# dots. The tests of the dot grid itself, and the byte-for-byte pins taken
+# under it, use this one
+INK_DOTS = preset(cell_step_mm=0.042333)
 
 
 def req(marker=None, rect=None, label=None, pre=None, face=False):
@@ -84,7 +89,13 @@ def test_presets_map_back_onto_the_core():
         kind = "sticker" if flat["method"] == "inkjet" else "print3d"
         assert W.make_of(flat, []) == MK.new_make(kind, core["profile"])
         want = P.cell_setting(core)
-        if want["of"] == "marker":
+        if kind == "sticker":
+            # cells rule 2: the marker in 0.5 mm steps, the grid's gap too;
+            # the core preset's minimum cell kept (web_api._round_marker)
+            assert flat["cell_step_mm"] == 0.0 and flat["min_cell_mm"] == want["min_mm"]
+            assert W.cells_of(flat) == {"rule": A.ROUND_RULE, "of": "marker", "mm": 0.5,
+                                        "min_mm": want["min_mm"]}
+        elif want["of"] == "marker":
             assert W.cells_of(flat) == want
         else:
             assert W.cells_of(flat) == dict(want, mm=round(flat["cell_step_mm"], 6))
@@ -306,7 +317,7 @@ def test_inscribe_keeps_off_the_holes():
 def test_suggestions_carry_reasons():
     for t, rect in (("single", {"w": 30.0, "h": 30.0}), ("grid", {"w": 60.0, "h": 40.0}),
                     ("charuco", {"w": 80.0, "h": 60.0})):
-        got = W.suggest(req({"type": t, "cols": 2, "rows": 2}, rect=rect))
+        got = W.suggest(req({"type": t, "cols": 2, "rows": 2}, rect=rect, pre=INK_DOTS))
         assert got, t
         assert all(s["label"] and s["reason"] for s in got)
         assert set(got[0]["params"]) == {"cols", "rows", "marker_mm", "checker_mm", "separation_mm"}

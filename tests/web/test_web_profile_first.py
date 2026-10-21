@@ -263,8 +263,12 @@ def test_verify_from_a_profile():
 
 def parity_cases():
     """web/scripts/parity.mjs's own cases (the rect-only facade, at main
-    5164a79), built as that script builds them."""
+    5164a79), built as that script builds them -- the inkjet presets with
+    the whole 600 dpi dots they had then (cells rule 2, 2026-10-20 night,
+    made them the marker in 0.5 mm steps: tests/web/test_web_round.py), so
+    every pin below still says "byte for byte as before"."""
     d3, letter, a4 = json.loads(W.call("presets", "{}"))["result"]
+    letter, a4 = dict(letter, cell_step_mm=0.042333), dict(a4, cell_step_mm=0.042333)
 
     def marker(**m):
         return dict({"type": "single", "dictionary": "DICT_4X4_50", "first_id": 0, "auto": True,
@@ -323,7 +327,9 @@ def parity_cases():
 # sha256 of each case's call() JSON at main 5164a79 (before barrier 9's
 # profile-first core), a plan's fit_rect left out: the one field it adds
 TODAYS = {
-    "presets": "dd7c0cf29534e61a5aa1f26c082b7d9b875ddf88254679680400e7734209496d",
+    # cells rule 2 (2026-10-20 night): the inkjet built-ins cell_step_mm 0.042333 -> 0, nothing
+    # else (dd7c0cf2... with that one field set back: tests/web/test_web_round.py)
+    "presets": "b29c4b30f8699fbc7d0b8b1d6ec60e63a94962e9a8ecc6a268e0c739e0e45e0c",
     "plan single auto": "22474e1daf30a3d03568720eb4fad64ba84254a8d8b9f8705e44c51e111e8c80",
     "plan overflow": "50c34ea6027f933690d200b86ef779fa003152541738de278219a55ffb1d8767",
     "plan grid 3x2 auto": "a6835d762498caa24db802a56cd79386370a48b87207a98a3c21b624fa28f4a9",

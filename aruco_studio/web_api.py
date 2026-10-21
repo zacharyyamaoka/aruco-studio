@@ -23,7 +23,7 @@ Fusion composes a Joint Origin: core.geometry.jo_compose).
 | `marker.turn`, `quiet_modules`, `corner_mark` | `settings.turn` (+ `origin_v` 2), `settings.quiet_modules`, `settings.corner_mark` |
 | `preset` (method inkjet) | `settings.make` = core.make.new_make("sticker", profile): rule 2, its page, margins and paper thickness |
 | `preset` (method print3d) | `settings.make` = new_make("print3d") |
-| `preset.cell_step_mm`, `min_cell_mm` | `settings.cells` {"of": "cell", "mm": step} (0 = no snap: {"of": "marker", "mm": 0.5}, the legacy step) |
+| `preset.cell_step_mm`, `min_cell_mm` | `settings.cells` {"of": "cell", "mm": step} (0 = no snap: {"of": "marker", "mm": 0.5}, the legacy step; an inkjet's is rule 2, autosize.ROUND_RULE: its driven grid gap on 0.5 mm too) |
 | `reference_face` | the target is a "profile" with a body else "free": it picks the starting outward side (Auto's Black only), and `marker.flip` still turns it over (barrier 10) |
 | `extrude` (barrier 10, 2026-10-20 night) -> `MarkerPlan.extrude` | web_extrude: `mode` -> `settings.mode`, `white_mm` / `black_mm` -> `numbers.*_offset` / `*_height` (the black from the white's outer face), `paper_mm` -> the sticker's stock; unset = driven (core.presets.driven_heights, the preset's thickness). `MarkerPlan.extrude` only when the request has one, so every plan without stays as it was |
 | `label` on, `place` "outside" (2026-10-18) | core.rect_fill.fill: a band inside the rectangle on `label.side`; the marker is planned in the box it leaves (the target), centred there; "sans" text for an inkjet preset, the pixel font's ink for 3D. `height_mm` 0: one module of the marker drawn (the search in _outside) |
@@ -109,9 +109,25 @@ def _slug(name: str) -> str:
 
 def _builtins():
     """The core's presets the web offers: Default (3D) and the rule-2 vinyl
-    inkjet printers. The rule-1 stickers (core.presets.LEGACY_STICKERS) are
-    kept for old files only, and a flat Preset cannot say which rule."""
-    return [_P.default_preset(), _P.vinyl_preset("letter"), _P.vinyl_preset("a4")]
+    inkjet printers, their marker in 0.5 mm steps (_round_marker). The
+    rule-1 stickers (core.presets.LEGACY_STICKERS) are kept for old files
+    only, and a flat Preset cannot say which rule."""
+    return [_P.default_preset(), _round_marker(_P.vinyl_preset("letter")),
+            _round_marker(_P.vinyl_preset("a4"))]
+
+
+def _round_marker(p: dict) -> dict:
+    """A vinyl preset whose cells are the marker in 0.5 mm steps (a flat
+    `cell_step_mm` 0: cells_of's rule 2 for an inkjet), its minimum cell kept.
+    WHY (Zach, 2026-10-20 night, on a 3 x 1 at 29.97 / 6.0113 mm: "we should
+    by default recommend to the nearest like .5 mm or so? (in inkjet
+    printing)"): whole 600 dpi dots gave driven sizes no one would type; a
+    printer rounds any size to its dots by half a dot (0.02 mm) anyway, said
+    on the Marker row (dots_note). The core's vinyl_preset (the desktop
+    Studio's new tags) keeps its dots."""
+    p["cells"] = {"of": "marker", "step": "mm", "mm": 0.5,
+                  "min_mm": p["cells"]["min_mm"], "min_lines": 0}
+    return p
 
 
 def flat_preset(p: dict, builtin: bool = True) -> dict:
@@ -171,12 +187,28 @@ def make_of(preset: dict, issues: list, paper_mm=None) -> dict:
 def cells_of(preset: dict) -> dict:
     """`settings.cells` for a flat preset: cells a whole number of
     `cell_step_mm` (the line, the dot), or the marker in the legacy 0.5 mm
-    steps when it is 0; `min_cell_mm` the minimum either way."""
+    steps when it is 0; `min_cell_mm` the minimum either way. An inkjet's 0
+    is rule 2 (autosize.ROUND_RULE): its driven grid gap on 0.5 mm as well;
+    a 3D preset's stays rule 1, byte for byte."""
     step = float(preset.get("cell_step_mm") or 0.0)
     mn = float(preset.get("min_cell_mm") or 0.0)
     if step > 0:
         return {"rule": _A.CELL_RULE, "of": "cell", "mm": round(step, 6), "min_mm": round(mn, 6)}
-    return {"rule": _A.CELL_RULE, "of": "marker", "mm": 0.5, "min_mm": round(mn, 6)}
+    rule = _A.ROUND_RULE if preset.get("method") == "inkjet" else _A.CELL_RULE
+    return {"rule": rule, "of": "marker", "mm": 0.5, "min_mm": round(mn, 6)}
+
+
+def dots_note(preset: dict, cells: dict, marker_mm: float, modules: int):
+    """Rule 2's line on the Marker row: what the printer's dots do to the
+    0.5 mm marker ("29.5 mm → cell 4.92 mm (116.1 dots); the printer rounds
+    by ≤ 0.02 mm"), or None (not an inkjet's rule 2, or no dpi)."""
+    dpi = float(preset.get("dpi") or 0.0)
+    if cells.get("rule") != _A.ROUND_RULE or preset.get("method") != "inkjet" or dpi <= 0:
+        return None
+    dot = 25.4 / dpi
+    cell = marker_mm / modules
+    return (f"{_mm(marker_mm)} mm → cell {cell:.2f} mm ({cell / dot:.1f} dots); "
+            f"the printer rounds by ≤ {dot / 2.0:.2f} mm")
 
 
 # ------------------------------------------------------------------ the request
@@ -1129,6 +1161,7 @@ def plan(req: dict) -> dict:
     label = placed_label(req, kind, mk["dictionary"], list(d["ids"]), fl)
     modules = _D.dictionary_info(mk["dictionary"])["modules"]
     marker_mm = mk["marker_length_m"] * 1000.0
+    issues = _dots_on_marker(req, issues, marker_mm, modules)
     origin = [_r(v) for v in _mul(M, origin_square(m, d, d["frames"]["opencv"], issues))]
     ids = list(d["ids"])
     rect = req["rect"]
@@ -1171,6 +1204,26 @@ def plan(req: dict) -> dict:
         # WHY only when asked: a request without `extrude` (every caller
         # before barrier 10) gets the plan it got, byte for byte
         out["extrude"] = _EX.report(ex, d, flip)
+    return out
+
+
+def _dots_on_marker(req: dict, issues: list, marker_mm: float, modules: int) -> list:
+    """Rule 2: the core's cells line ("marker in 0.5 mm steps · cell 4.92
+    mm", on the preset) becomes dots_note on the Marker row, in its place."""
+    pre = req.get("preset") or {}
+    dn = dots_note(pre, cells_of(pre), marker_mm, modules)
+    if dn is None:
+        return issues
+    out, said = [], False
+    for i in issues:
+        if i["field"] == "preset" and i["level"] == "info" and i["text"].startswith("marker in "):
+            if not said:
+                out.append({"field": "marker.marker_mm", "level": "info", "text": dn})
+                said = True
+            continue
+        out.append(i)
+    if not said:
+        out.append({"field": "marker.marker_mm", "level": "info", "text": dn})
     return out
 
 

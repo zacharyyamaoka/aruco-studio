@@ -23,6 +23,7 @@ def preset(name):
 
 INK = preset("Inkjet · Letter vinyl")
 P3D = preset("Default")
+INK_DOTS = dict(INK, cell_step_mm=0.042333)     # the inkjet built-ins before cells rule 2
 
 
 def req(marker=None, rect=None, label=None, pre=None, face=False):
@@ -221,11 +222,13 @@ def test_label_off_plans_are_todays():
     contract barrier 4's CAD fields (tests/web/test_web_cad.py), barrier
     5's cut_shape (tests/web/test_web_trim.py), and barrier 9's fit_rect (the
     request's rect: tests/web/test_web_profile_first.py)."""
+    # the inkjet cases under the dots they were pinned with (cells rule 2 is
+    # tests/web/test_web_round.py's)
     cases = {"45d745cfb9e6f365165f5c0bd683e49ca3e92ce73c36bc70e1ecd36fba350684":
-             req({}, {"w": 20, "h": 20}),
+             req({}, {"w": 20, "h": 20}, pre=INK_DOTS),
              "ac8aa1c5edb27b8ab778aa1bfdd6da0f94c885ae28ff885f19e8cae6b0ce6ce7":
              req({"type": "grid", "cols": 3, "rows": 2, "turn": 90, "flip": True},
-                 {"cx": 15, "cy": -8, "angle_deg": 30, "w": 60, "h": 40}),
+                 {"cx": 15, "cy": -8, "angle_deg": 30, "w": 60, "h": 40}, pre=INK_DOTS),
              "7adcc5ce7f65c97b70dbd82367dabcd59a353ed661bfb771217b7ee537d81bc9":
              req({"type": "charuco", "cols": 5, "rows": 4}, {"w": 80, "h": 60}, pre=P3D)}
     for sha, r in cases.items():
@@ -406,7 +409,7 @@ def test_turning_the_rectangle_turns_the_dims_and_the_label():
 
 def test_sticker_parts_are_the_rectangle_with_its_label_inside():
     r = req({"type": "grid", "cols": 2, "rows": 2, "turn": 90}, {"w": 40.0, "h": 60.0, "angle_deg": 20.0},
-            {"on": True, "text": "#{ids}\nlid", "side": "below"})
+            {"on": True, "text": "#{ids}\nlid", "side": "below"}, pre=INK_DOTS)
     sp = W.sticker_parts(r)
     assert sp["cut"]["outer"] == [[-20.0, -30.0], [20.0, -30.0], [20.0, 30.0], [-20.0, 30.0]]
     assert sp["font"] == "sans" and sp["label_ink"] == []
