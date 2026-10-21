@@ -151,6 +151,8 @@ test("hero · plate → face → A (panel beside) → Grid → type the marker s
   // 7 · Verify: OpenCV reads the marker; drag Tilt by hand (the manual sweep)
   await glideClick(page.getByTestId("act-verify"));
   await expect(page.getByTestId("verify-dialog")).toBeVisible();
+  // Verify opens on its range strip since 2026-10-21 (lane verifyrange): the bench is the next segment
+  await glideClick(page.locator('[data-testid="verify-view"] [data-value="bench"]'));
   mark("verify_open");
   await expect(page.getByTestId("verify-image")).toBeVisible({ timeout: 90_000 });
   await expect(page.locator('.vf-frame[data-busy="0"]')).toHaveCount(1, { timeout: 60_000 });

@@ -178,7 +178,9 @@ test.describe(`Verify (${CORE} core)`, () => {
     const shown = page.locator('[data-testid="verify-ids"] [data-id]');
     await expect(shown).toHaveCount(ids.length + (await page.locator('[data-testid="verify-ids"] [data-state="wrong"]').count()));
     const missing = page.locator('[data-testid="verify-ids"] [data-state="missing"]');
-    expect(await missing.count()).toBeGreaterThanOrEqual(1);
+    // WHY a poll (the full e2e, 2026-10-21): settled() can see the frame idle before the
+    // knob's 30 ms debounce has sent the occluded view; the page then showed all four missing
+    await expect.poll(() => missing.count(), { timeout: 60_000 }).toBeGreaterThanOrEqual(1);
     const [colour, bad] = await missing.first().evaluate((e) => [getComputedStyle(e).color, getComputedStyle(e).getPropertyValue("--bad")]);
     const probe = await page.evaluate((c) => { const d = document.createElement("i"); d.style.color = c; document.body.appendChild(d); const v = getComputedStyle(d).color; d.remove(); return v; }, bad.trim());
     expect(colour).toBe(probe);
