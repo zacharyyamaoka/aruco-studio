@@ -28,28 +28,73 @@ body { font: var(--font-size)/1.35 var(--font); background: var(--bg); color: va
 .spin { animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.app { display: grid; grid-template-rows: 40px minmax(0, 1fr); height: 100vh; height: 100dvh; width: 100%; overflow: hidden; }
+.app { height: 100vh; height: 100dvh; width: 100%; overflow: hidden; display: flex; flex-direction: column; }
+.app > .stage { flex: 1; }
 
-/* ------------------------------------------------------------ the top bar */
-.topbar { display: flex; align-items: center; gap: 4px; padding: 0 8px; background: var(--panel); border-bottom: 1px solid var(--line); min-width: 0; }
-.topbar .brand { display: inline-flex; align-items: center; gap: 6px; margin-right: 6px; white-space: nowrap; font-size: 13px; }
+/* ------------------------------------------------------------ the chrome: Figma's corner pills (V2, app/TopBar.tsx) */
+/* under the rulers (18 px), as V2 draws them; the canvas runs under every pill */
+.pill { position: absolute; top: 26px; z-index: 10; display: flex; align-items: center; gap: 6px; height: 52px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-sm); min-width: 0; }
+.pill-sep { flex: none; width: 1px; align-self: stretch; margin: 8px 2px; background: var(--line-soft); }
+.doc-pill { left: 12px; padding: 4px 12px 4px 6px; max-width: calc(100% - 24px); }
+.pill-menus { display: inline-flex; align-items: center; gap: 2px; }
+.doc-pill .kit-menu-trigger { height: 32px; padding: 0 8px; }
+.brand { display: inline-flex; align-items: center; justify-content: center; height: 40px; padding: 0 8px; flex: none; }
 .brand-cube { flex: none; }
 /* the brand is a link to the landing page: no link colour or underline in any skin */
-a.brand, a.brand:visited { color: inherit; text-decoration: none; border-radius: var(--radius-sm); }
-a.brand:hover { color: var(--accent); }
-a.brand:focus-visible { color: var(--accent); outline: 2px solid var(--accent); outline-offset: 2px; }
-.topbar .doc-name { color: var(--muted); margin-left: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.chip-preset, .chip-core { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 12px;
-  border: 1px solid var(--line); background: var(--field); color: var(--text); font: inherit; white-space: nowrap; min-width: 0; }
-.chip-preset { cursor: pointer; max-width: 240px; }
-.chip-preset:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
-.chip-text { overflow: hidden; text-overflow: ellipsis; }
-.chip-core { color: var(--muted); }
-.chip-core .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); display: inline-block; }
-.chip-core.st-ready { color: var(--ok); }
-.chip-core.st-ready .dot { background: var(--ok); }
-.chip-core.st-error { color: var(--bad); }
-.chip-core.st-error .dot { background: var(--bad); }
+a.brand, a.brand:visited { color: inherit; text-decoration: none; border-radius: 8px; }
+a.brand:hover { background: var(--hover); }
+a.brand:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* the document's name with ⌄ (Figma's file-name menu) */
+.doc-name { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 6px; border: 0; border-radius: var(--radius-sm); background: none;
+  color: var(--text); font: inherit; font-weight: 600; font-size: 13px; cursor: pointer; min-width: 0; }
+.doc-name:hover, .doc-name[data-popup-open] { background: var(--hover); }
+.doc-name .chev { flex: none; color: var(--muted); }
+.doc-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 220px; }
+.actions-pill { right: 12px; padding: 4px 8px; }
+.act-cad { display: inline-flex; align-self: stretch; align-items: center; }
+.actions-pill .kit-menu-trigger { height: 34px; border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); color: var(--accent); font-weight: 600; }
+.actions-pill .kit-menu-trigger .kit-glyph { --accent: currentColor; }
+.act-btn.kit-btn { height: 34px; padding: 0 12px; gap: 7px; font-weight: 600; border-radius: 8px; }
+/* the bottom corner: ? and GitHub, round */
+.corner { position: absolute; right: 12px; bottom: 14px; z-index: 10; display: flex; align-items: center; gap: 8px; }
+.corner-btn { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; padding: 0; border-radius: 50%;
+  background: var(--panel); border: 1px solid var(--line); color: var(--text); box-shadow: var(--shadow-sm); cursor: pointer; text-decoration: none; }
+.corner-btn:hover, .corner-btn[data-popup-open] { background: var(--hover); }
+a.corner-btn, a.corner-btn:visited { color: var(--text); }
+/* the ⌄ menu: Theme and Skin (V2's Preferences); on a phone, what the pills folded away */
+.dm-popup { min-width: 290px; max-width: calc(100vw - 16px); max-height: calc(100vh - 100px); overflow: auto; }
+.dm-head { padding: 4px 8px 6px; border-bottom: 1px solid var(--line-soft); margin-bottom: 4px; }
+.dm-h { padding: 6px 8px 2px; color: var(--muted); font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.dm-sep { height: 1px; background: var(--line-soft); margin: 4px 2px; }
+.dm-item { display: flex; align-items: center; gap: 8px; width: 100%; height: 28px; padding: 0 8px; border: 0; border-radius: var(--radius-sm); background: none;
+  color: var(--text); font: inherit; text-align: left; cursor: pointer; text-decoration: none; }
+.dm-item:hover:not(:disabled) { background: var(--accent-soft); }
+.dm-item:disabled { opacity: 0.45; cursor: default; }
+.dm-item .ic { width: 16px; flex: none; display: inline-flex; }
+.dm-label { flex: 1; white-space: nowrap; }
+.dm-hint { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.dm-prefs { padding: 4px 4px 2px; }
+.dm-row { display: grid; grid-template-columns: 64px 1fr; align-items: start; gap: 8px; padding: 4px; }
+.dm-row-label { display: inline-flex; align-items: center; gap: 6px; height: 26px; }
+.dm-sws { display: flex; flex-wrap: wrap; gap: 4px; }
+.dm-sw { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 13px; background: var(--field);
+  color: var(--text); font: inherit; cursor: pointer; white-space: nowrap; }
+.dm-sw:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.dm-sw.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.dm-sw:disabled { opacity: 0.45; cursor: default; }
+/* ?: the keys, and the status line at its foot */
+.help-popup { min-width: 300px; max-height: calc(100vh - 100px); overflow: auto; }
+.help-body { padding: 4px 6px; }
+.help-title { font-weight: 600; padding: 2px 2px 6px; }
+.help-keys { margin: 0; display: grid; gap: 3px; }
+.help-key { display: grid; grid-template-columns: 112px 1fr; align-items: center; gap: 8px; }
+.help-key dt { display: flex; }
+.help-key dd { margin: 0; color: var(--text); }
+.help-status { display: flex; align-items: center; gap: 6px; margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 11px; }
+.help-status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); display: inline-block; flex: none; }
+.help-status.st-ready .dot { background: var(--ok); }
+.help-status[data-state="error"] { color: var(--bad); }
 a.kit-ib { text-decoration: none; }
 /* the kit's fields and popups, on the app's tokens (Studio: the kit's own values) */
 .kit-num, .kit-text, .kit-select-trigger, .kit-seg { border-color: var(--field-line); }
@@ -114,19 +159,20 @@ a.kit-ib { text-decoration: none; }
   color: var(--text); padding: 4px 10px; border-radius: 12px; box-shadow: var(--shadow-sm); pointer-events: none; white-space: nowrap; max-width: calc(100% - 24px);
   overflow: hidden; text-overflow: ellipsis; }
 
-/* the toolbar: a floating strip at the viewport's bottom centre (Zach, 2026-10-18:
-   "The off center tool bar should be center at top or bottom") */
-.toolbar { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; align-items: center; gap: 2px; padding: 3px; background: var(--panel);
-  border: 1px solid var(--line); border-radius: 9px; box-shadow: var(--shadow-sm); }
-.toolbar .tb-sep { width: 1px; height: 22px; background: var(--line-soft); margin: 0 2px; }
-/* a tool: its icon, its name, its key (words, not icons only: Zach, 2026-10-18) */
-.tb-tool { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 8px; border: 1px solid transparent; border-radius: 7px;
-  background: none; color: var(--text); font: inherit; white-space: nowrap; cursor: pointer; }
+/* the dock: Figma's bottom toolbar (V2), at the viewport's bottom centre (Zach, 2026-10-18:
+   "The off center tool bar should be center at top or bottom"); it scrolls sideways
+   rather than run off a narrow screen */
+.toolbar { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; align-items: center; gap: 3px; padding: 5px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-sm);
+  max-width: calc(100% - 16px); overflow-x: auto; scrollbar-width: none; }
+.toolbar .tb-sep { flex: none; width: 1px; height: 26px; background: var(--line-soft); margin: 0 4px; }
+/* a tool: its icon; its name and key in the tooltip (V2) */
+.tb-tool { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border: 1px solid transparent; border-radius: 9px;
+  background: none; color: var(--text); font: inherit; cursor: pointer; }
+.tb-tool .kit-glyph { width: 18px; height: 18px; }
 .tb-tool:hover { background: var(--hover); }
 .tb-tool.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 .tb-tool.on .kit-glyph { --accent: currentColor; }
-.tb-key { font: 600 9px/1 var(--mono); color: var(--muted); padding: 2px 3px; border: 1px solid var(--line-soft); border-radius: 3px; background: var(--panel-2); }
-.tb-tool.on .tb-key { color: var(--accent-text); background: rgba(0, 0, 0, 0.22); border-color: rgba(255, 255, 255, 0.35); }
 
 /* the selected shape's size */
 .dims-box { position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: var(--panel);
@@ -135,7 +181,7 @@ a.kit-ib { text-decoration: none; }
 .dims-box .dims-name { color: var(--muted); }
 .dims-x, .times { color: var(--muted); }
 
-.toast { position: absolute; left: 50%; bottom: 62px; transform: translateX(-50%); background: var(--text); color: var(--panel); padding: 6px 12px;
+.toast { position: absolute; left: 50%; bottom: 78px; transform: translateX(-50%); background: var(--text); color: var(--panel); padding: 6px 12px;
   border-radius: 6px; box-shadow: var(--shadow); max-width: calc(100% - 24px); }
 
 /* ------------------------------------------------------------ the floating panel */
@@ -245,30 +291,32 @@ a.kit-ib { text-decoration: none; }
   .print-sheet svg { display: block; width: 100%; height: 100%; }
 }
 
-/* a mid-width screen: the toolbar keeps its words, drops its keys, then its words (it must not run into the size box) */
-@media (max-width: 1180px) { .tb-key { display: none; } }
-@media (max-width: 980px) { .tb-tool .tb-name { display: none; } }
+/* a mid-width screen: the top-right pill keeps Verify | Print's words, folds Download for CAD to its icon */
+@media (max-width: 900px) {
+  .actions-pill .kit-menu-trigger > span { display: none; }
+}
 
 /* ------------------------------------------------------------ narrow screens: the panel docks to the bottom */
 @media (max-width: 640px) {
-  .topbar { gap: 2px; padding: 0 4px; }
-  .topbar .brand b, .topbar .doc-name { display: none; }
-  .topbar .kit-menu-trigger { padding: 0 5px; }
-  .chip-preset { max-width: 110px; }
-  .chip-core .chip-text { display: none; }
+  /* V2 at 390: the logo and the name top left, Verify | Print as icons top right; the
+     rest is in the ⌄ menu (app/TopBar.tsx), ? and GitHub too */
+  .pill { height: 48px; }
+  .doc-pill { left: 8px; padding: 4px 8px 4px 4px; max-width: calc(100% - 120px); }
+  .pill-menus, .doc-pill .pill-sep, .act-cad, .corner { display: none; }
+  .actions-pill { right: 8px; padding: 4px 6px; }
+  .act-btn.kit-btn { width: 36px; height: 36px; padding: 0; }
+  .act-text { display: none; }
+  .doc-text { max-width: 140px; }
   /* about 45 % of the screen: the canvas fits the marker above it (Viewport) */
   .fpanel { position: fixed; left: 0 !important; right: 0 !important; top: auto !important; bottom: 0; width: auto !important; max-height: 45vh;
     border-radius: 10px 10px 0 0; }
   .fpanel-head { cursor: default; }
   /* above the docked panel (45 vh open, its 31 px head collapsed) */
-  .toolbar { bottom: 8px; }
+  .toolbar { bottom: 8px; padding: 4px; }
+  .tb-tool { width: 36px; height: 36px; }
   .stage:has(.fpanel) .toolbar { bottom: calc(var(--head-h) + 1px + 8px); }
   .stage:has(.fpanel:not(.collapsed)) .toolbar { bottom: calc(45vh + 8px); }
   .stage:has(.fpanel) .toast { bottom: calc(45vh + 60px); }
-  .toolbar .kit-tool { width: 32px; height: 32px; }
-  .tb-tool { padding: 0 7px; }
-  .tb-tool .tb-name, .tb-tool .tb-key { display: none; }
-  [data-testid="menu-cad"] > span, [data-testid="menu-skin"] > span { display: none; }
   .dims-box { left: 6px; bottom: 6px; }
   .vp-hint { top: 24px; }
 }

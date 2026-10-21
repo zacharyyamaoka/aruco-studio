@@ -11,7 +11,7 @@
 .v3-reset { height: 22px; min-width: 20px; padding: 0 3px; border: 0; border-radius: var(--radius-sm); background: transparent;
   color: var(--muted); cursor: pointer; font: inherit; }
 .v3-reset:hover { background: var(--hover); color: var(--text); }
-/* the 2D | 3D toggle: the stage's top-left, under the ruler */
-.v3-toggle { position: absolute; left: 10px; top: 26px; z-index: 6; box-shadow: var(--shadow); border-radius: var(--radius-sm); }
-.v3-toggle .kit-seg { background: var(--panel); }
-.v3-toggle .kit-seg-btn.words { min-width: 34px; font-weight: 600; }
+/* the 2D | 3D toggle: the dock's end (V2 Figma: its Dev Mode switch's spot) */
+.v3-toggle { display: inline-flex; flex: none; border-radius: var(--radius-sm); }
+.v3-toggle .kit-seg { background: var(--panel); border-color: transparent; }
+.v3-toggle .kit-seg-btn.words { min-width: 34px; height: 30px; font-weight: 600; }

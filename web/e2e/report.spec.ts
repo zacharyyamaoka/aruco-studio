@@ -15,7 +15,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { coreReady, clickAt, dragWorld, fitRect, idle, loadExample, openStudio, panelTab, state } from "./helpers";
+import { coreReady, clickAt, dragWorld, fitRect, idle, loadExample, openPresets, openStudio, panelTab, state, toggleTheme } from "./helpers";
 
 const DIR = process.env.REPORT_SHOTS_DIR ?? "";
 const facts: Record<string, unknown> = {};
@@ -149,9 +149,7 @@ async function dims(page: Page) {
 }
 
 async function choosePreset(page: Page, name: RegExp): Promise<string> {
-  await page.getByTestId("preset-chip").click();
-  const modal = page.getByTestId("presets-modal");
-  await expect(modal).toBeVisible();
+  const modal = await openPresets(page);
   await modal.locator('[data-coll="builtin"]').click();
   const card = modal.locator(".card[data-card]").filter({ has: page.locator(".name", { hasText: name }) }).first();
   await card.click();
@@ -184,8 +182,8 @@ test("1 · click-to-inspect: the panel opens beside the clicked marker; toolbar 
   await shot(page, "01-inspect");
   await closeUp(page.getByTestId("extrude-panel"), "01b-panel");
   await closeUp(page.getByTestId("toolbar"), "01c-toolbar");
-  await unionClip(page, "01d-topbar-left", [page.getByTestId("topbar").locator("> *").first()], 6);
-  await closeUp(page.getByTestId("topbar"), "01e-topbar");
+  await unionClip(page, "01d-topbar-left", [page.getByTestId("doc-pill")], 6);
+  await unionClip(page, "01e-topbar", [page.getByTestId("doc-pill"), page.getByTestId("actions-pill")], 6);
 });
 
 test("2 · driven vs set: the marker dimension typed on the sketch turns from grey to solid; ↺ in the panel", async ({ page }) => {
@@ -250,7 +248,7 @@ test("3 · Label: inside the rectangle, two lines, a typed X offset (no offset d
     dx_mm: +(s.plan.label.at[0] - at0[0]).toFixed(4), height_mm: s.plan.label.height_mm, side: s.feature.label.side,
     rect: { x0: r.cx - r.w / 2, x1: r.cx + r.w / 2, y0: r.cy - r.h / 2, y1: r.cy + r.h / 2 },
     offset_dim: await page.locator('[data-dim="label.offset_mm"]').count(),
-    preset: (await page.getByTestId("preset-chip").textContent())?.trim(),
+    preset: (await page.getByTestId("panel-preset").textContent())?.trim(),
   };
   await unionClip(page, "03-label-tab", [page.locator('[data-tab-body="label"]')], 6);
   await shot(page, "03a-label-full");
@@ -258,7 +256,7 @@ test("3 · Label: inside the rectangle, two lines, a typed X offset (no offset d
   // 3D print: the label as blocky pixel ink
   const preset = await choosePreset(page, /^Default$/);
   s = await state(page);
-  facts.label_pixel = { preset, font: s.plan.label.font, polygons: (s.plan.label.polygons ?? []).length, method: s.doc.preset.method };
+  facts.label_pixel = { preset, font: s.plan.label.font, polygons: (s.plan.label.polygons ?? []).length, method: s.feature.preset.method };
   expect(s.plan.label.font).toBe("pixel");
   await sketchOf(page, "03c-label-pixel");
 });
@@ -350,9 +348,7 @@ test("6 · auto id: two markers get different driven ids; a typed clash is red u
 test("7 · the presets modal: a click shows the preset's Info on the right; a copy is editable there", async ({ page }) => {
   await openStudio(page);
   await coreReady(page);
-  await page.getByTestId("preset-chip").click();
-  const modal = page.getByTestId("presets-modal");
-  await expect(modal).toBeVisible();
+  const modal = await openPresets(page);
   await modal.locator('[data-coll="builtin"]').click();
   const cards = modal.locator(".card[data-card]");
   await expect(cards.first()).toBeVisible();
@@ -392,7 +388,7 @@ test("9 · Sheet: eight stickers, Tight | Spaced and Fewest cuts | Fewest sheets
   for (const [a, b] of RECTS) await rectFeature(page, a, b);
   expect((await state(page)).doc.features).toHaveLength(8);
   await shot(page, "09-eight");
-  await page.getByTestId("tool-sheet").click();
+  await page.getByTestId("act-print").click();
   await expect(page.getByTestId("print-dialog")).toBeVisible();
   await expect(page.locator('[data-testid="print-page"] svg')).toBeVisible({ timeout: 45_000 });
   await page.getByTestId("print-mode").locator('[data-value="fit"]').click();
@@ -448,7 +444,7 @@ test("10 · the plate's sticker on the page: the whole face (Trim Profile), the 
   await idle(page);
   await page.getByTestId("panel-ok").click();
   await idle(page);
-  await page.getByTestId("tool-sheet").click();
+  await page.getByTestId("act-print").click();
   const pg = page.getByTestId("print-page");
   await expect(pg.locator("svg").first()).toBeVisible({ timeout: 45_000 });
   await idle(page);
@@ -476,7 +472,7 @@ test("11 · Verify: OpenCV reads the marker; Tilt is the manual sweep; the autom
   const fid = await plateFeature(page);
   await clickMarker(page, fid);
   const t0 = Date.now();
-  await page.getByTestId("tool-verify").click();
+  await page.getByTestId("act-verify").click();
   await expect(page.getByTestId("verify-dialog")).toBeVisible();
   const loading = await page.getByTestId("verify-loading").textContent().catch(() => null);
   const image = page.getByTestId("verify-image");
@@ -514,7 +510,7 @@ test("11 · Verify: OpenCV reads the marker; Tilt is the manual sweep; the autom
 test("12 · dark theme", async ({ page }) => {
   const fid = await plateFeature(page);
   await clickMarker(page, fid);
-  await page.getByTestId("theme-toggle").click();
+  await toggleTheme(page);
   await page.waitForTimeout(300);
   await shot(page, "12-dark");
 });
@@ -536,7 +532,7 @@ test("14 · the inkjet preset: no FDM nozzle lint anywhere in the panel", async 
   const s = await state(page);
   const panelText = (await page.getByTestId("extrude-panel").textContent()) ?? "";
   const issues = await page.locator('[data-testid="extrude-panel"] [data-level]').allTextContents();
-  facts.inkjet_lint = { preset: s.doc.preset.name, method: s.doc.preset.method, nozzle_in_panel: /nozzle/i.test(panelText), issues };
+  facts.inkjet_lint = { preset: s.feature.preset.name, method: s.feature.preset.method, nozzle_in_panel: /nozzle/i.test(panelText), issues };
   expect(/nozzle/i.test(panelText)).toBe(false);
   await unionClip(page, "14-preset-row", [page.locator('[data-row="preset"]')], 6);
 });
@@ -546,7 +542,7 @@ test("15 · the local Preview (REPORT_PREVIEW_URL): the app with its Stable / Pr
   test.skip(!url, "REPORT_PREVIEW_URL is not set");
   await page.goto(url!);
   await expect(page.getByTestId("app")).toBeVisible();
-  await expect(page.getByTestId("core-chip")).toHaveAttribute("data-state", "ready", { timeout: 60_000 });
+  await coreReady(page);
   await page.waitForTimeout(1500);
   facts.preview = { url, title: await page.title(), body: (await page.locator("body").innerText()).slice(-400) };
   await shot(page, "15-preview");

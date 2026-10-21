@@ -8,7 +8,7 @@
 // flow into that folder.
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, idle, labelOn, loadExample, openStudio, planOutline, state } from "./helpers";
+import { CORE, clickAt, coreReady, idle, labelOn, loadExample, openPresets, openStudio, planOutline, state } from "./helpers";
 
 const SHOTS = process.env.VIEW3D_SHOTS ?? "test-results/view3d";
 
@@ -23,10 +23,11 @@ async function arrow(page: Page, key: string): Promise<Arrow> {
   return (await v3(page))!.arrows.find((a) => a.key === key)!;
 }
 
-/** Choose the first built-in preset of a method in the presets modal. */
+/** Choose the first built-in preset of a method in the presets modal: the open
+ *  marker's (a preset is per marker since 2026-10-20 night), else the one a new
+ *  marker starts with. */
 async function preset(page: Page, chip: "3D print" | "Inkjet"): Promise<void> {
-  await page.getByTestId("preset-chip").click();
-  const modal = page.getByTestId("presets-modal");
+  const modal = await openPresets(page);
   await modal.locator('[data-coll="builtin"]').click();
   await modal.getByTestId("presets-nav").locator(`[data-chip="${chip}"]`).click();
   await modal.locator(".card[data-card]").first().click();
@@ -41,9 +42,18 @@ async function tile(page: Page, inkjet = false): Promise<string> {
   await coreReady(page);
   await loadExample(page, "custom-placement");
   await idle(page);
-  if (!inkjet) await preset(page, "3D print");
+  if (!inkjet) {
+    // the tile's own preset: its panel's Preset row, then OK
+    const o = await planOutline(page);
+    await clickAt(page, o.cx, o.cy);
+    await expect(page.getByTestId("extrude-panel")).toBeVisible();
+    await preset(page, "3D print");
+    await page.getByTestId("panel-ok").click();
+    await expect(page.getByTestId("extrude-panel")).toHaveCount(0);
+    await idle(page);
+  }
   const s = await state(page);
-  expect(s.doc.preset.method).toBe(inkjet ? "inkjet" : "print3d");
+  expect(s.feature.preset.method).toBe(inkjet ? "inkjet" : "print3d");
   expect(s.plan?.extrude, "the core answers MarkerPlan.extrude").toBeTruthy();
   return s.feature.id;
 }
@@ -330,7 +340,7 @@ test.describe(`the 3D view (${CORE} core)`, () => {
     const s = await state(page);
     const v = (await v3(page))!;
     expect(v.arrows.map((a) => a.key)).toEqual(["paper_mm"]);
-    expect(v.arrows[0]).toMatchObject({ field: "extrude.paper_mm", value: s.doc.preset.thickness_mm, driven: true, dir: 1 });
+    expect(v.arrows[0]).toMatchObject({ field: "extrude.paper_mm", value: s.feature.preset.thickness_mm, driven: true, dir: 1 });
     expect(v.arrows[0].base3d[2]).toBeCloseTo(layer(s.plan, "white").z[1], 6);
     await expect(page.locator('[data-testid="v3-box"]')).toHaveCount(1);
     await page.waitForTimeout(100);

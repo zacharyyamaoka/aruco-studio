@@ -8,7 +8,7 @@
 // colours. Screenshots (1280 × 800) go to PANEL_SHOTS (default test-results/panel).
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, dragWorld, idle, labelOn, loadExample, openStudio, state } from "./helpers";
+import { CORE, clickAt, coreReady, dragWorld, idle, labelOn, loadExample, openStudio, pickSkin, state } from "./helpers";
 
 const SHOTS = process.env.PANEL_SHOTS ?? "test-results/panel";
 
@@ -65,8 +65,10 @@ async function usePreset(page: Page, method: "inkjet" | "print3d"): Promise<any>
   await expect(modal).toHaveCount(0);
   await idle(page);
   const s = await state(page);
-  expect(s.doc.preset.id).toBe(id);
-  return s.doc.preset;
+  // the marker the panel is open on is made by it, and a new marker starts with it
+  expect(s.feature.preset.id).toBe(id);
+  expect(s.doc.default_preset.id).toBe(id);
+  return s.feature.preset;
 }
 
 /** Barrier 10's driven rule (the core's rule 1): whole layers of the preset,
@@ -118,7 +120,7 @@ test.describe(`the panel, V1 Command Dialog (${CORE} core)`, () => {
     await platePanel(page);
     const make = page.locator('[data-tab-body="make"]');
     // inkjet: the one height, driven by the preset's thickness
-    const ink = (await state(page)).doc.preset;
+    const ink = (await state(page)).feature.preset;
     expect(ink.method).toBe("inkjet");
     expect(await make.locator('[data-row^="extrude."]').evaluateAll((els) => els.map((e) => e.getAttribute("data-row")))).toEqual(["extrude.paper_mm"]);
     await expect(page.locator('[data-drv="extrude.paper_mm"]')).toHaveAttribute("data-driven", "1");
@@ -218,7 +220,7 @@ test.describe(`the panel, V1 Command Dialog (${CORE} core)`, () => {
     await idle(page);
     s = await state(page);
     expect(s.feature.extrude).toEqual({});
-    expect(Number(await paper.inputValue())).toBeCloseTo(s.doc.preset.thickness_mm, 6);
+    expect(Number(await paper.inputValue())).toBeCloseTo(s.feature.preset.thickness_mm, 6);
   });
 
   test("c · Flip is on Make for a face profile and for a rectangle profile; the note says which side is out", async ({ page }) => {
@@ -344,9 +346,7 @@ test.describe(`the panel, V1 Command Dialog (${CORE} core)`, () => {
     }
     await tab(page, "make");
     for (const skin of ["fusion", "onshape"]) {
-      await page.getByTestId("menu-skin").click();
-      await page.getByTestId(`skin-${skin}`).click();
-      await expect(page.locator("html")).toHaveAttribute("data-skin", skin);
+      await pickSkin(page, skin as "fusion" | "onshape");
       await idle(page);
       // the same rows, the skin's row height
       const row = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--row")));

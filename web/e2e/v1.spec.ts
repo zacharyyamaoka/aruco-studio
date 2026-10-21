@@ -3,7 +3,8 @@
 // beside the clicked marker, words instead of icons, the Label tab per the
 // contract (inside the rectangle, no offset readout on the canvas), the
 // ChArUco origin square, auto id with its ledger, the Download for CAD menu,
-// and Sheet and Verify on the toolbar. On the static build; every check
+// and Verify | Print (on the top-right pill since the Figma layout, V2
+// 2026-10-20 night; they were Sheet and Verify on the toolbar). On the static build; every check
 // measures the probe's numbers, the drawn boxes or the computed colours.
 // Screenshots (1280 × 800) go to V1_SHOTS (default test-results/v1).
 import { readFileSync, writeFileSync } from "node:fs";
@@ -121,7 +122,7 @@ test.describe(`V1 click-to-inspect (${CORE} core)`, () => {
       await expect(seg("marker.type", v).locator("svg")).toHaveCount(0);
     }
     for (const t of [0, 90, 180, 270]) await expect(seg("marker.turn", String(t))).toHaveText(`${t}°`);
-    await expect(page.locator('[data-testid="toolbar"] [data-testid="tool-sheet"]')).toContainText("Sheet");
+    await expect(page.locator('[data-testid="actions-pill"] [data-testid="act-print"]')).toHaveText("Print");
     await seg("marker.type", "grid").click();
     await idle(page);
     const s = await state(page);
@@ -350,22 +351,23 @@ test.describe(`V1 click-to-inspect (${CORE} core)`, () => {
     await page.screenshot({ path: path.join(SHOTS, "v1-download-for-cad.png") });
   });
 
-  test("g · the toolbar's Sheet and Verify open their dialogs", async ({ page }) => {
+  test("g · the top-right pill's Verify | Print open their dialogs; the dock stays at the bottom centre", async ({ page }) => {
     await plateFeature(page);
     const tb = page.getByTestId("toolbar");
-    await expect(tb.getByTestId("tool-sheet")).toHaveText(/Sheet/);
-    await expect(tb.getByTestId("tool-verify")).toHaveText(/Verify/);
-    await tb.getByTestId("tool-sheet").click();
+    const pill = page.getByTestId("actions-pill");
+    await expect(pill.getByTestId("act-print")).toHaveText(/Print/);
+    await expect(pill.getByTestId("act-verify")).toHaveText(/Verify/);
+    await pill.getByTestId("act-print").click();
     await expect.poll(async () => (await state(page)).modal).toBe("print");
     await expect(page.getByTestId("print-page")).toBeVisible({ timeout: 45_000 });
     await page.keyboard.press("Escape");
     await expect.poll(async () => (await state(page)).modal).toBeNull();
-    await tb.getByTestId("tool-verify").click();
+    await pill.getByTestId("act-verify").click();
     await expect.poll(async () => (await state(page)).modal).toBe("verify");
-    // the toolbar stays one strip at the bottom centre with its words
+    // the dock stays one strip at the bottom centre (V2: 40 px tools in a 52 px dock)
     const vp = (await page.getByTestId("viewport").boundingBox())!;
     const b = (await tb.boundingBox())!;
     expect(Math.abs(b.x + b.width / 2 - (vp.x + vp.width / 2))).toBeLessThanOrEqual(1);
-    expect(b.height).toBeLessThanOrEqual(44);
+    expect(b.height).toBeLessThanOrEqual(56);
   });
 });

@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Dialog, NumberField, Select, registerGlyphs, type Opt } from "@bam/ui";
 import type { MarkerPlan, PlanRequest, Readability, VerifyResult } from "../core/contract";
 import { core } from "../coreSource";
-import { featureNumber, getFeature, idRange, planRequest, type Doc, type Feature } from "../model/doc";
+import { featureNumber, featurePreset, getFeature, idRange, planRequest, type Doc, type Feature } from "../model/doc";
 import { CoreWait, WaitLine, useCallWait, useCoreWait } from "../panel/Waiting";
 import { activeFeatureId, useStudio } from "../store";
 import {
@@ -73,7 +73,7 @@ export function VerifyDialog() {
       {open && (it
         ? <Bench all={all} it={it} onPick={setPick} doc={doc} />
         // features but no preset: they plan once the core's presets are in
-        : doc.features.length && !doc.preset ? <CoreWait needFacts testid="verify-wait" />
+        : doc.features.some((f) => !featurePreset(doc, f)) ? <CoreWait needFacts testid="verify-wait" />
         : <div className="pad muted">Nothing to verify yet: make an ArUco Extrude (A) first.</div>)}
     </Dialog>
   );

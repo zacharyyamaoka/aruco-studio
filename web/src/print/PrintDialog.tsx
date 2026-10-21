@@ -1,7 +1,11 @@
-// The Sheet dialog (V1 "Click-to-inspect", 2026-10-18: a dialog off the
-// bottom toolbar's Sheet, modal "print"): every feature on the preset's page
-// from core.sheet() (one sheet item per feature, model/doc.ts sheetItems),
-// at true scale (CSS millimetres are real millimetres at 100 % zoom), with a
+// The Sheet dialog (V1 "Click-to-inspect", 2026-10-18: a dialog off Print,
+// modal "print"): the inkjet features on their preset's page from
+// core.sheet() (one sheet item per feature), one group per preset
+// (model/doc.ts sheetGroups: each preset's page can differ), a tab each when
+// there are several; 3D-print features are not on paper, and a line says so.
+// WHY per preset (Zach, 2026-10-20 night): "Preset shouldn't be on the file
+// because it's applied on a per marker basis!"
+// Each group's sheet is laid out at true scale (CSS millimetres are real millimetres at 100 % zoom), with a
 // 50 mm scale bar to measure on screen (the core's page carries its own bar
 // for paper). Beside the page: the auto layout (Tight | Spaced, the gap,
 // Optimize: Fewest cuts | Fewest sheets), the core's pages, cuts and fill,
@@ -10,13 +14,13 @@
 // @page sized to the paper); Download PDF / SVG save the core's own files.
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Button, Dialog, FieldRow, Messages, NumberField, Section, SegmentedRow } from "@bam/ui";
+import { Button, Dialog, FieldRow, Glyph, Messages, NumberField, Section, SegmentedRow } from "@bam/ui";
 import type { Sheet, SheetMode, SheetRequest } from "../core/contract";
 import { core } from "../coreSource";
 import { downloadBase64, downloadText, slug } from "../io/files";
-import { sheetItems } from "../model/doc";
+import { featurePreset, getFeature, presetKey, sheetGroups } from "../model/doc";
 import { CoreWait, WaitLine, useCallWait, useCoreWait } from "../panel/Waiting";
-import { useStudio } from "../store";
+import { activeFeatureId, useStudio } from "../store";
 import "./sheet.css";
 
 const MM_PX = 96 / 25.4;
@@ -55,19 +59,37 @@ export function PrintDialog() {
   const [objective, setObjective] = useState<Objective>("fewest_sheets");
   const [shown, setShown] = useState(0);
   const [printing, setPrinting] = useState(false);
+  /** the group on screen (its preset's key); the marker in focus's when it opens */
+  const [groupKey, setGroupKey] = useState<string | null>(null);
   /** Retry's count: a new one lays the sheet out again */
   const [tries, setTries] = useState(0);
   const stage = useRef<HTMLDivElement>(null);
   const [room, setRoom] = useState<[number, number]>([820, 600]);
-  const items = open ? sheetItems(doc) : [];
+  const groups = open ? sheetGroups(doc) : [];
+  const group = groups.find((g) => g.key === groupKey) ?? groups[0] ?? null;
+  const items = group?.items ?? [];
+  // the features without a preset yet (the core's presets have not arrived), and the 3D-printed ones
+  const unset = doc.features.filter((f) => !featurePreset(doc, f)).length;
+  const printed3d = doc.features.filter((f) => featurePreset(doc, f)?.method === "print3d").length;
   const req: SheetRequest = { items, cut_lines: true, mode: layout, objective, ...(layout === "spaced" ? { gap_mm: gap } : {}) };
   const key = JSON.stringify(req);
+
+  // opening: the group of the marker in focus
+  useEffect(() => {
+    if (!open) { setGroupKey(null); return; }
+    const s = useStudio.getState();
+    const own = featurePreset(s.doc, getFeature(s.doc, activeFeatureId(s)));
+    setGroupKey(own ? presetKey(own) : null);
+  }, [open]);
 
   useEffect(() => {
     if (!open) { setLaid(null); setError(null); setShown(0); return; }
     // features but no preset yet: they plan once the core's presets are in (CoreWait says which wait)
-    if (!items.length && doc.features.length && !doc.preset) { setError(null); return; }
-    if (!items.length) { setError("Nothing to print yet: make an ArUco Extrude (A) first."); return; }
+    if (!items.length && doc.features.length && unset) { setError(null); return; }
+    if (!items.length) {
+      setError(printed3d ? "Nothing on paper: every marker here is 3D printed." : "Nothing to print yet: make an ArUco Extrude (A) first.");
+      return;
+    }
     let live = true;
     // the last layout stays on screen while the next one is worked out
     setError(null);
@@ -87,12 +109,12 @@ export function PrintDialog() {
 
   const sheet = laid?.sheet ?? null;
   const busy = !!laid && laid.key !== key && !error;
-  const coreWait = useCoreWait(open && !doc.preset);
+  const coreWait = useCoreWait(open && unset > 0);
   const callWait = useCallWait(open && !coreWait && !!items.length && laid?.key !== key, items.length ? error : null, "laying out the page", () => setTries((n) => n + 1));
 
   const pageIndex = sheet ? Math.min(shown, sheet.svg.length - 1) : 0;
   const page = sheet?.svg[pageIndex] ?? "";
-  const fallback = (doc.preset?.page_mm ?? [215.9, 279.4]) as [number, number];
+  const fallback = (group?.preset.page_mm ?? [215.9, 279.4]) as [number, number];
   const [pw, ph] = page ? svgSizeMm(page, fallback) : fallback;
   const fitK = Math.max(0.1, Math.min(1, room[0] / (pw * MM_PX), room[1] / ((ph + 16) * MM_PX)));
   const k = mode === "fit" ? fitK : 1;
@@ -111,10 +133,25 @@ export function PrintDialog() {
 
   return (
     <>
-      <Dialog open={open} onClose={() => useStudio.getState().openModal(null)} title={doc.preset ? `Sheet · ${doc.preset.name}` : "Sheet"}
+      <Dialog open={open} onClose={() => useStudio.getState().openModal(null)} title={group ? `Sheet · ${group.preset.name}` : "Sheet"}
         icon="print" testid="print-dialog" width={1180} className="sheet-dialog">
         <div className="sheet-body" data-busy={busy ? "1" : "0"}>
           <div className="sheet-view">
+            {groups.length > 1 && (
+              <div className="sheet-groups" role="tablist" aria-label="Presets" data-testid="sheet-groups">
+                {groups.map((g) => (
+                  <button key={g.key} type="button" role="tab" aria-selected={g === group} className={g === group ? "on" : ""}
+                    data-sheet-group={g.preset.id} data-testid="sheet-group" onClick={() => { setGroupKey(g.key); setShown(0); }}>
+                    <Glyph name="inkjet" /><span>{g.preset.name}</span><span className="sheet-group-n">{g.items.length}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {printed3d > 0 && (
+              <div className="sheet-3d muted" data-testid="sheet-3d-note">
+                {printed3d === 1 ? "1 marker is 3D printed: it isn't on the paper sheet." : `${printed3d} markers are 3D printed: they aren't on the paper sheet.`}
+              </div>
+            )}
             <div className="sheet-view-head">
               {many && sheet && (
                 <div className="sheet-tabs" role="tablist" data-testid="sheet-page-tabs">
@@ -129,7 +166,7 @@ export function PrintDialog() {
               <SegmentedRow compact value={mode} onChange={(v) => setMode(v as "actual" | "fit")} testid="print-mode"
                 options={[{ value: "actual", label: "Actual size" }, { value: "fit", label: "Fit" }]} />
             </div>
-            {coreWait ? <CoreWait needFacts={!doc.preset} testid="print-wait" />
+            {coreWait ? <CoreWait needFacts={unset > 0} testid="print-wait" />
               : callWait ? <div className="print-error"><WaitLine wait={callWait} testid="print-wait" /></div>
               : error && <div className="print-error">{error}</div>}
             <div className="print-stage sheet-stage" data-testid="print-stage" data-mode={mode} ref={stage}>

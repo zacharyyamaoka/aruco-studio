@@ -6,12 +6,17 @@
 // Info; a double-click or Select uses it. My presets are edited in place in
 // Info and saved in this browser (./local.ts); a built-in is read-only:
 // Duplicate to edit. New / Duplicate / Delete, Import and Export as JSON.
+// Use applies the preset to the marker the panel is open on (and a new marker
+// starts with it); with no panel open it is only the new markers' default, and
+// the footer says which. WHY per marker (Zach, 2026-10-20 night): "Preset
+// shouldn't be on the file because it's applied on a per marker basis!"
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Button, FieldRow, Glyph, NumberField, SegmentedRow, Select, TextField } from "@bam/ui";
 import { Copy, Download, Plus, Trash2, Upload } from "lucide-react";
 import type { Preset } from "../core/contract";
 import { downloadText } from "../io/files";
 import { CoreWait } from "../panel/Waiting";
+import { featureNumber, featurePreset, getFeature } from "../model/doc";
 import { useStudio } from "../store";
 import { chipValues, filterPresets, infoRows, methodName, NO_FILTERS, PAGES, withField, type Filters, type InfoRow } from "./fields";
 import { blankPreset, exportJson, importJson, myPresets, presetNumbers, recentIds, saveMine } from "./local";
@@ -112,7 +117,10 @@ export function PresetsModal() {
 
 function PresetsLibrary() {
   const builtins = useStudio((s) => s.builtins);
-  const current = useStudio((s) => s.doc.preset);
+  // the open marker's preset, else the one a new marker starts with
+  const target = useStudio((s) => (s.panel.open ? getFeature(s.doc, s.panel.featureId) : null));
+  const current = useStudio((s) => (target ? featurePreset(s.doc, target) : s.doc.default_preset));
+  const targetName = useStudio((s) => (target ? `ArUco Extrude ${featureNumber(s.doc, target.id)}` : null));
   const setPreset = useStudio((s) => s.setPreset);
   const close = () => useStudio.getState().openModal(null);
   const [mine, setMine] = useState<Preset[]>(myPresets());
@@ -231,8 +239,11 @@ function PresetsLibrary() {
         <footer className="lib-foot">
           <span className="muted">{sel ? sel.name : "No preset picked"}</span>
           <span className="grow" />
+          <span className="pl-target" data-testid="presets-target" data-target={target ? target.id : "new"}>
+            {targetName ? <>Use applies to <b>{targetName}</b> and the next new marker</> : <>No marker open: Use sets the preset <b>new markers</b> start with</>}
+          </span>
           <Button onClick={close} testid="presets-cancel">Cancel</Button>
-          <Button variant="primary" onClick={() => choose(picked)} disabled={!sel} testid="presets-select">Select</Button>
+          <Button variant="primary" onClick={() => choose(picked)} disabled={!sel} testid="presets-select">Use</Button>
         </footer>
       </div>
       <input ref={file} type="file" accept="application/json,.json" hidden data-testid="preset-import-file"

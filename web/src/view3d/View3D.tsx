@@ -23,7 +23,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { token, useTheme } from "@bam/ui";
 import type { Polygon, Vec2 } from "../core/contract";
-import { getFeature, referenceFace } from "../model/doc";
+import { featurePreset, getFeature, referenceFace } from "../model/doc";
 import { profileLoops, shapeLoop, sketchBox } from "../sketch/model";
 import { activeFeatureId, useStudio } from "../store";
 import { dimLine, extrudeArrow, zOnAxis } from "./Gizmo";
@@ -115,7 +115,8 @@ export function View3D() {
   const focus = useMemo(() => {
     const f = getFeature(doc, active);
     const plan = f ? plans[f.id] : null;
-    const h = plan && doc.preset ? heightsOf(plan, doc.preset.method) : null;
+    const preset = featurePreset(doc, f);
+    const h = plan && preset ? heightsOf(plan, preset.method) : null;
     return { fid: f?.id ?? null, specs: f && plan && h ? arrowsOf(f, plan, h) : [] };
   }, [doc, plans, active]);
 
@@ -229,8 +230,8 @@ export function View3D() {
       if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < DRAG_PX) return;
       d.moved = true;
       const st = useStudio.getState();
-      const v = snapHeight(d.spec.value + d.spec.dir * (zOnAxis(rayAt(e).ray, d.base) - d.grab), st.doc.preset, e.shiftKey);
       const f = getFeature(st.doc, d.fid);
+      const v = snapHeight(d.spec.value + d.spec.dir * (zOnAxis(rayAt(e).ray, d.base) - d.grab), featurePreset(st.doc, f), e.shiftKey);
       if (f && f.extrude[d.spec.key] !== v) st.setFieldFor(d.fid, d.spec.field, v);
     };
     const onUp = (e: PointerEvent) => {
@@ -274,7 +275,7 @@ export function View3D() {
       const plan = f ? st.plans[f.id] : null;
       return {
         feature: state.arrows.length ? activeFeatureId(st) : null,
-        heights: plan && st.doc.preset ? heightsOf(plan, st.doc.preset.method) : null,
+        heights: plan && featurePreset(st.doc, f) ? heightsOf(plan, featurePreset(st.doc, f)!.method) : null,
         arrows, solids, faces, project: (x: number, y: number, z: number) => client(new THREE.Vector3(x, y, z)),
         top: (showMarks = true) => {
           // straight down on the feature in focus (a hair off vertical, so screen up stays +y, as in 2D)

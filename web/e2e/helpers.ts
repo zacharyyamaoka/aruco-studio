@@ -1,7 +1,7 @@
 // Shared steps for the online Studio's e2e. Numbers come from the page's
 // probe (window.__aruco, web/src/probe.ts) and from what is drawn
 // (getBoundingClientRect), never from DOM presence alone.
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /** E2E_CORE=mock runs on the mock core; the default is the real one. */
 export const CORE: "real" | "mock" = process.env.E2E_CORE === "mock" ? "mock" : "real";
@@ -15,9 +15,50 @@ export async function openStudio(page: Page): Promise<void> {
   await expect.poll(() => page.evaluate(() => (window as any).__aruco?.kind)).toBe(CORE);
 }
 
+/** The core is up (the probe's status: the chrome has no core chip since the
+ *  Figma layout, Zach 2026-10-20 night), and nothing is in flight. */
 export async function coreReady(page: Page): Promise<void> {
-  await expect(page.getByTestId("core-chip")).toHaveAttribute("data-state", "ready", { timeout: 60_000 });
+  await expect.poll(() => page.evaluate(() => (window as any).__aruco.state().core.state), { timeout: 60_000, message: "the core is ready" }).toBe("ready");
   await idle(page);
+}
+
+/** The presets dialog: from the panel's Preset row when the panel is open
+ *  (this marker's preset), else Edit › Presets… (the one new markers start with). */
+export async function openPresets(page: Page): Promise<Locator> {
+  if (await page.getByTestId("extrude-panel").count()) {
+    // the Preset row is on Make (a reopened panel keeps the tab it last had)
+    if (!(await page.getByTestId("panel-preset").count())) await panelTab(page, "make");
+    await page.getByTestId("panel-preset").click();
+  } else {
+    await page.getByTestId("menu-edit").click();
+    await page.getByTestId("cmd-presets").click();
+  }
+  const modal = page.getByTestId("presets-modal");
+  await expect(modal).toBeVisible();
+  return modal;
+}
+
+/** Open the document's ⌄ menu (Theme, Skin; on a phone also File … GitHub), run `fn`, close it. */
+export async function inDocMenu(page: Page, fn: (menu: Locator) => Promise<void>): Promise<void> {
+  const menu = page.getByTestId("doc-menu");
+  if (!(await menu.count())) await page.getByTestId("menu-doc").click();
+  await expect(menu).toBeVisible();
+  await fn(menu);
+  if (await menu.count()) await page.getByTestId("menu-doc").click();
+  await expect(menu).toHaveCount(0);
+}
+
+/** The ⌄ menu's Theme: the other one (it was a toggle in the old top bar). */
+export async function toggleTheme(page: Page): Promise<void> {
+  const dark = (await page.locator("html").getAttribute("data-theme")) === "dark";
+  await inDocMenu(page, (m) => m.getByTestId(dark ? "theme-light" : "theme-dark").click());
+  await expect(page.locator("html")).toHaveAttribute("data-theme", dark ? "light" : "dark");
+}
+
+/** The ⌄ menu's Skin. */
+export async function pickSkin(page: Page, id: "studio" | "unstyled" | "fusion" | "onshape"): Promise<void> {
+  await inDocMenu(page, (m) => m.getByTestId(`skin-${id}`).click());
+  await expect(page.locator("html")).toHaveAttribute("data-skin", id);
 }
 
 export async function idle(page: Page): Promise<void> {

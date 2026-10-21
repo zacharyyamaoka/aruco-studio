@@ -46,7 +46,7 @@ async function feature(page: Page, a: [number, number], b: [number, number]): Pr
 }
 
 async function openSheet(page: Page): Promise<void> {
-  await page.locator('[data-testid="tool-sheet"], [data-testid="tool-print"]').first().click();
+  await page.getByTestId("act-print").click();
   await expect(page.getByTestId("print-dialog")).toBeVisible();
   await expect(page.locator('[data-testid="print-page"] svg')).toBeVisible({ timeout: 45_000 });
   await idle(page);

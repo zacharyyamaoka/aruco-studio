@@ -11,7 +11,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { clickAt, coreReady, dragWorld, idle, loadExample, openStudio, panelTab, planOutline, state, toClient } from "./helpers";
+import { clickAt, coreReady, dragWorld, idle, loadExample, openPresets, openStudio, panelTab, planOutline, state, toClient } from "./helpers";
 
 const SRC = process.env.LANDING_SRC ?? "";
 const SHOTS = path.join(SRC, "shots");
@@ -94,18 +94,17 @@ test("2 · heights on the model: the 3D view, the white and black arrows with th
   await coreReady(page);
   await loadExample(page, "custom-placement");
   await idle(page);
-  // the first built-in 3D print preset
-  await page.getByTestId("preset-chip").click();
-  const modal = page.getByTestId("presets-modal");
+  // the tile's panel, then the first built-in 3D print preset on it (a preset is per marker)
+  const o = await planOutline(page);
+  await clickAt(page, o.cx, o.cy);
+  await expect(page.getByTestId("extrude-panel")).toBeVisible();
+  const modal = await openPresets(page);
   await modal.locator('[data-coll="builtin"]').click();
   await modal.getByTestId("presets-nav").locator('[data-chip="3D print"]').click();
   await modal.locator(".card[data-card]").first().click();
   await page.getByTestId("presets-select").click();
   await expect(modal).toHaveCount(0);
   await idle(page);
-  const o = await planOutline(page);
-  await clickAt(page, o.cx, o.cy);
-  await expect(page.getByTestId("extrude-panel")).toBeVisible();
   await page.keyboard.press("3");
   await expect(page.getByTestId("view3d")).toBeVisible();
   const v3 = () => page.evaluate(() => JSON.parse(JSON.stringify((window as any).__aruco.view3d())));
@@ -119,7 +118,7 @@ test("2 · heights on the model: the 3D view, the white and black arrows with th
   await page.waitForTimeout(400);
   const s = await state(page);
   const arrows = (await v3()).arrows;
-  facts.heights = { preset: s.doc.preset.name, extrude: s.plan.extrude, arrows: arrows.map((a: any) => ({ key: a.key, value: a.value, driven: a.driven })) };
+  facts.heights = { preset: s.feature.preset.name, extrude: s.plan.extrude, arrows: arrows.map((a: any) => ({ key: a.key, value: a.value, driven: a.driven })) };
   await page.mouse.move(2, 2);
   await page.waitForTimeout(300);
   await page.screenshot({ path: path.join(SHOTS, "heights-3d.png") });

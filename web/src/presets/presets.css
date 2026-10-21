@@ -38,3 +38,6 @@
 .presets-lib .pl-list .card .where { flex: none; }
 .presets-lib .pl-list .card-mark { position: static; flex: none; }
 .presets-lib .empty { padding: 12px 8px; color: var(--muted); }
+/* whom Use applies to: the open marker, or the new markers' default */
+.pl-target { color: var(--muted); font-size: 11px; margin-right: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pl-target b { color: var(--text); font-weight: 600; }
