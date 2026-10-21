@@ -15,7 +15,7 @@
 // rectangle profile … it's just going to be a profile"): the core places the
 // marker in the profile, like an extrude; a rectangle profile is used exactly
 // (contract.ts PlanRequest, barrier 9).
-import type { ExtrudeParams, IdItem, IdRequest, IdResult, LabelParams, MarkerParams, MarkerType, PlanRequest, Preset, Suggestion, Trim, Turn } from "../core/contract";
+import type { ExtrudeParams, IdItem, IdRequest, IdResult, LabelParams, MarkerParams, MarkerType, PlanRequest, Preset, RangeNeed, Suggestion, Trim, Turn } from "../core/contract";
 import { dimShapes, type SketchDim } from "../sketch/constraints";
 import { plainRect, profileLoops, sameProfile, type ProfileRef, type RectShape, type Shape } from "../sketch/model";
 import { cleanPreset } from "../presets/local";
@@ -56,6 +56,12 @@ export interface Feature {
    *  encoding for ("marker.cols", "label.gap_mm", ...). The rest say it in
    *  their own value: see isSet(). */
   set: string[];
+  /** Verify's required viewing distance (contract barrier 13 RangeNeed, Zach
+   *  2026-10-21: "batch set minimum and maximum viewing distance"): what the
+   *  marker's reading range must cover to PASS. Absent, or an end absent:
+   *  nothing required there. Never sent to plan (it changes no geometry);
+   *  set through setField("verify.min_mm" | "verify.max_mm") like any row. */
+  verify?: RangeNeed;
 }
 
 export interface Doc {
@@ -250,6 +256,7 @@ const unmark = (set: string[], paths: string[]) => set.filter((p) => !paths.incl
  *  flags overflow). */
 export function setField(f: Feature, path: string, value: unknown): Feature {
   if (path === "trim") return { ...f, trim: value as Trim, set: mark(f.set, path) };
+  if (path === "verify" || path.startsWith("verify.")) return setVerify(f, path, value);
   const [part, key] = path.split(".") as ["marker" | "label" | "extrude", string];
   if (part === "extrude") return { ...f, extrude: { ...f.extrude, [key]: value } };
   if (part === "label") {
@@ -266,6 +273,7 @@ export function setField(f: Feature, path: string, value: unknown): Feature {
 
 /** Back to driven: auto on / 0 for the encoded fields, the default for the rest. */
 export function resetField(f: Feature, path: string): Feature {
+  if (path === "verify" || path.startsWith("verify.")) return setVerify(f, path, null);
   if (path === "marker.marker_mm") return { ...f, marker: { ...f.marker, auto: true } };
   if (path === "marker.checker_mm") return { ...f, marker: { ...f.marker, checker_mm: 0 } };
   if (path === "marker.separation_mm") return { ...f, marker: { ...f.marker, separation_mm: 0 } };
@@ -286,6 +294,23 @@ export function resetField(f: Feature, path: string): Feature {
     return { ...f, marker, set: marker === f.marker ? set : unmark(set, ["marker.cols", "marker.rows"]) };
   }
   return { ...f, marker: { ...f.marker, [key]: drivenValue(f.marker, path) }, set };
+}
+
+/** The required viewing distance: "verify.min_mm" / "verify.max_mm" set (a
+ *  number) or cleared (null), "verify" as a whole replaced or cleared (null).
+ *  A requirement with neither end left is no requirement (the field goes). */
+export function setVerify(f: Feature, path: string, value: unknown): Feature {
+  let need: RangeNeed;
+  if (path === "verify") need = value && typeof value === "object" ? { ...(value as RangeNeed) } : {};
+  else {
+    const key = path.slice("verify.".length) as keyof RangeNeed;
+    need = { ...f.verify };
+    if (typeof value === "number" && Number.isFinite(value)) need[key] = value;
+    else delete need[key];
+  }
+  for (const k of ["min_mm", "max_mm"] as const) if (need[k] == null) delete need[k];
+  const { verify: _old, ...rest } = f;
+  return Object.keys(need).length ? { ...rest, verify: need } : rest;
 }
 
 /** A picked suggestion sets its numbers (the size, and the counts of a grid
@@ -482,6 +507,20 @@ function readFeature(raw: Record<string, unknown>): Feature {
     else f.profile = rectProfile(rectId);
   } else if ("rectId" in raw) f.profile = null;
   if (f.rect !== undefined && typeof f.rect !== "string") delete f.rect;
+  // barrier 13: a requirement is {min_mm?, max_mm?}; anything else, or an empty one, is none
+  if (f.verify !== undefined) {
+    const v = f.verify as unknown;
+    const num = (x: unknown) => typeof x === "number" && Number.isFinite(x) && x >= 0;
+    if (!v || typeof v !== "object" || Array.isArray(v)) delete f.verify;
+    else {
+      const o = v as Record<string, unknown>;
+      const need: RangeNeed = {};
+      if (num(o.min_mm)) need.min_mm = o.min_mm as number;
+      if (num(o.max_mm)) need.max_mm = o.max_mm as number;
+      if (Object.keys(need).length) f.verify = need;
+      else delete f.verify;
+    }
+  }
   // "rectangle" (deprecated 2026-10-20 evening) is a rectangle profile cut to
   // the profile; a file from before trim (2026-10-18), or an unknown one: the
   // profile, driven
@@ -630,6 +669,13 @@ export function validateDoc(doc: Doc): void {
     if (!pair(l.offset_mm)) throw new Error(`${at}: label.offset_mm must be [x, y]`);
     for (const k of ["white_mm", "black_mm", "paper_mm"] as const) {
       if (f.extrude[k] !== undefined && !finite(f.extrude[k])) throw new Error(`${at}: extrude.${k} must be a number`);
+    }
+    if (f.verify !== undefined) {
+      if (!f.verify || typeof f.verify !== "object" || Array.isArray(f.verify)) throw new Error(`${at}: verify must be {min_mm, max_mm}`);
+      for (const k of ["min_mm", "max_mm"] as const) {
+        const v = f.verify[k];
+        if (v != null && (!finite(v) || v < 0)) throw new Error(`${at}: verify.${k} must be a number of 0 or more`);
+      }
     }
     if (f.preset) cleanPreset(f.preset, `${at}: its preset`);
   });
