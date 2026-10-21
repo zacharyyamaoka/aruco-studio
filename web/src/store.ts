@@ -15,8 +15,8 @@ import { create } from "zustand";
 import type { CoreInfo, IdResult, Issue, LabelParams, MarkerPlan, Preset, Suggestion } from "./core/contract";
 import { core, coreStatus } from "./coreSource";
 import {
-  addFeature, addShape, applyIds, deleteShape, emptyDoc, featureOfProfile, featureOfRect, fillPresets, getFeature, keyOwner, newFeature, newId, nextTurn, pickSuggestion,
-  rectProfile, removeFeature, resetField, setField, setShape, updateFeature, type Doc, type Feature, type Holes,
+  addFeature, addShape, applyIds, refusedKeys, deleteShape, emptyDoc, featureOfProfile, featureOfRect, fillPresets, getFeature, keyOwner, newFeature, newId, nextTurn, pickSuggestion,
+  rectProfile, removeFeature, resetField, setField, setShape, updateFeature, validateDoc, withoutRect, type Doc, type Feature, type Holes,
 } from "./model/doc";
 import { applyBatch, resetBatch } from "./model/batch";
 import { boxOf, fitBox, rectCorners, type Camera } from "./model/geom";
@@ -71,6 +71,12 @@ export interface Studio {
   planErrors: Record<string, string>;
   /** auto id's last warnings (core.assign_ids): each names its feature by Issue.key */
   idIssues: Issue[];
+  /** the keys auto id last refused ids (doc.ts refusedKeys): Print and Export leave them out */
+  idRefused: string[];
+  /** the id request (JSON of idRequest(doc)) whose answer the document holds
+   *  (planner.ts): output is made only of a document whose request this is
+   *  (app/output.ts idsReady) */
+  idSettledKey: string;
   /** for the feature the panel edits */
   suggestions: Suggestion[];
   info: CoreInfo | null;
@@ -235,8 +241,12 @@ export const useStudio = create<Studio>((set, get) => {
   let last: { key: string; at: number } | null = null;
   /** an open gesture: its first change is a step, the rest join it */
   let held: { stepped: boolean } | null = null;
-  /** past's length when the panel opened: Cancel rewinds the history to it */
+  /** past's length when the panel opened: Cancel rewinds the history to it
+   *  (-1: no panel, or an undo went past its opening: nothing of it to take back) */
   let openAt = -1;
+  /** the snapshot at openAt was dropped off the end of the history (HISTORY):
+   *  Cancel falls back to the panel's backup */
+  let openLost = false;
   const same = (a: Doc, b: Doc) => a === b || JSON.stringify(a) === JSON.stringify(b);
   const flags = () => ({ canUndo: past.length > 0, canRedo: future.length > 0 });
   /** Note a change of the document from `prev` to `next`. */
@@ -250,7 +260,7 @@ export const useStudio = create<Studio>((set, get) => {
     }
     if (same(prev, next)) return;
     past.push(prev);
-    if (past.length > HISTORY) { past.shift(); if (openAt > 0) openAt -= 1; }
+    if (past.length > HISTORY) { past.shift(); if (openAt > 0) openAt -= 1; else if (openAt === 0) openLost = true; }
     future = [];
     last = key ? { key, at: now } : null;
     if (held) held.stepped = true;
@@ -297,6 +307,8 @@ export const useStudio = create<Studio>((set, get) => {
   const open = (doc: Doc, f: Feature, fresh: boolean) => {
     const backup = get().doc;
     openAt = past.length;
+    openLost = false;
+    last = null;   // the panel's first edit is a step of its own, never joined to one before it
     put({
       doc: fresh ? addFeature(doc, f) : doc,
       panel: { ...PANEL0, open: true, featureId: f.id, backup, tab: get().panel.tab, collapsed: get().panel.collapsed },
@@ -317,6 +329,8 @@ export const useStudio = create<Studio>((set, get) => {
     plans: {},
     planErrors: {},
     idIssues: [],
+    idRefused: [],
+    idSettledKey: "",
     suggestions: [],
     info: null,
     builtins: [],
@@ -330,6 +344,8 @@ export const useStudio = create<Studio>((set, get) => {
     setDoc: (doc, key) => put({ doc }, key),
     setName: (name) => { if (name !== get().doc.name) set({ doc: { ...get().doc, name } }); },
     loadDoc: (doc) => {
+      // a document that cannot be drawn is refused before anything is replaced
+      validateDoc(doc);
       const preset = doc.default_preset ?? get().doc.default_preset;
       // WHY a fresh history (as Excalidraw and Figma do): Ctrl+Z after Open,
       // an example or New must not bring the previous document back -- an
@@ -339,7 +355,7 @@ export const useStudio = create<Studio>((set, get) => {
       last = null;
       held = null;
       openAt = -1;
-      set({ doc: fillPresets({ ...doc, dims: doc.dims ?? [], default_preset: preset }, preset), ...only(null), panel: PANEL0, plans: {}, planErrors: {}, idIssues: [], suggestions: [], tool: "select", ...flags() });
+      set({ doc: fillPresets({ ...doc, dims: doc.dims ?? [], default_preset: preset }, preset), ...only(null), panel: PANEL0, plans: {}, planErrors: {}, idIssues: [], idRefused: [], suggestions: [], tool: "select", ...flags() });
       get().fit();
     },
     newDoc: (exampleId) => {
@@ -474,8 +490,10 @@ export const useStudio = create<Studio>((set, get) => {
       // driven, it takes the next id after the highest in use (core autoid rule 3')
       const features = clip.features.map((f) => {
         const id = newId("f");
-        return { ...structuredClone(f), id, key: id, set: f.set.filter((p) => p !== "marker.first_id"),
+        const g = { ...structuredClone(f), id, key: id, set: f.set.filter((p) => p !== "marker.first_id"),
           profile: { outer: map[f.profile!.outer], holes: f.profile!.holes.map((h) => map[h]) } };
+        // a legacy placement rectangle comes along when it was copied (doc.ts Feature.rect)
+        return f.rect && map[f.rect] ? { ...g, rect: map[f.rect] } : withoutRect(g);
       });
       const dims = clip.dims.map((d) => renameDim(d, newId("d"), map));
       const allDims = [...doc.dims, ...dims];
@@ -537,6 +555,8 @@ export const useStudio = create<Studio>((set, get) => {
         // 2 or more: every rectangle has one now
         const ids = selectionFeatureIds(next, multi);
         openAt = past.length;
+        openLost = false;
+        last = null;
         put({
           doc: next,
           panel: { ...PANEL0, open: true, featureId: ids[0], featureIds: ids, backup: doc, tab: panel.tab, collapsed: panel.collapsed },
@@ -620,17 +640,24 @@ export const useStudio = create<Studio>((set, get) => {
       openAt = -1;
       put({ panel: { ...PANEL0, tab: panel.tab }, doc: f && !f.profile ? removeFeature(doc, f.id) : doc });
     },
+    // WHY the panel's transaction, not its backup (review finding #7, 2026-10-21):
+    // the backup is the whole document when the panel opened, so Cancel after
+    // an undo past that point brought undone steps back and lost redo, and it
+    // put a rename made meanwhile back. Cancel takes back the steps made since
+    // the panel opened (as if it never opened), keeps today's name, and after
+    // an undo past its opening (openAt -1) only closes.
     cancel: () => {
       const { panel } = get();
-      const next = { panel: { ...PANEL0, tab: panel.tab }, doc: panel.backup ?? get().doc, ...only(null) };
-      // Cancel takes the panel's steps back out of the history: as if it never opened
-      if (openAt >= 0 && past.length >= openAt && panel.backup) {
+      const close = { panel: { ...PANEL0, tab: panel.tab }, ...only(null) };
+      if (openAt >= 0 && past.length >= openAt) {
+        const before = openLost ? panel.backup : past.length > openAt ? past[openAt] : get().doc;
         past.length = openAt;
         future = [];
         last = null;
-        set({ ...next, ...flags() });
-      } else put(next);
+        set({ ...close, doc: named(before ?? get().doc)!, ...flags() });
+      } else set(close);
       openAt = -1;
+      openLost = false;
     },
     editFeature: (id) => {
       const { doc, panel, sel } = get();
@@ -658,13 +685,16 @@ export const useStudio = create<Studio>((set, get) => {
       put({ doc: { ...ids.reduce((d, id) => updateFeature(d, id, (f) => ({ ...f, preset: p })), doc), default_preset: p } });
     },
     // the planner's next auto id call (with this ledger) keeps these ids
-    reId: (res) => put({ doc: applyIds(get().doc, res) }),
+    // its warnings and refusals too: a Re-ID that ran out of ids says so (review finding #5)
+    reId: (res) => put({ doc: applyIds(get().doc, res), idIssues: res.warnings, idRefused: refusedKeys(res) }),
     openModal: (modal) => set({ modal }),
     say: (note) => set({ note }),
 
     undo: () => {
       const doc = named(past.pop());
       if (!doc) return;
+      // past the panel's opening: its steps are all undone, Cancel has nothing to take back
+      if (openAt >= 0 && past.length < openAt) openAt = -1;
       future.push(get().doc);
       last = null;
       held = null;

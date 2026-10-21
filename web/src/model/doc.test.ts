@@ -7,7 +7,7 @@ import v3Fixture from "../../e2e/fixtures/v3-a4.arucostudio-web.json?raw";
 import {
   DEFAULT_MARKER, addFeature, addShape, applyIds, deleteShape, emptyDoc, featureNumber, featurePreset, fillPresets, featureOfProfile, featureOfRect, featureRect, idCount, idItems,
   idRange, idRequest, isSet, keyOwner, newFeature, nextTurn, parseDoc, pickSuggestion, planRequest, rectProfile, referenceFace, removeFeature,
-  resetField, serialise, setField, setMarker, setType, sheetGroups, sheetItems } from "./doc";
+  resetField, serialise, setField, setMarker, setType, sheetGroups, sheetItems, validateDoc, refusedKeys } from "./doc";
 
 const preset: Preset = { id: "builtin:x", name: "X", method: "inkjet", builtin: true, page: "A4", page_mm: [210, 297] };
 
@@ -492,5 +492,95 @@ describe("version 3 files migrate: the file's preset goes on every feature (fixt
     const d = parseDoc(v3Fixture);
     expect(JSON.parse(serialise(d)).version).toBe(4);
     expect(parseDoc(serialise(d))).toEqual(d);
+  });
+});
+
+describe("validateDoc (review finding #4): every document the Studio makes itself passes", () => {
+  it("every example, and the old fixtures as migrated", async () => {
+    const { EXAMPLES } = await import("./examples");
+    for (const ex of EXAMPLES) {
+      const d = { ...emptyDoc(ex.name, structuredClone(ex.shapes)), features: structuredClone(ex.features ?? []), id_ledger: { ...ex.id_ledger } };
+      expect(() => validateDoc(d), ex.id).not.toThrow();
+    }
+    for (const fx of [v1Fixture, v2Fixture, v3Fixture]) expect(() => parseDoc(fx)).not.toThrow();
+  });
+});
+
+describe("version 2 trim modes keep both the placement and the cut (review finding #3)", () => {
+  // the fixture's f2: rectId r2 (50 × 80) inscribed in the face plate (120 × 80, two holes)
+  const withTrim = (trim: string) => {
+    const raw = JSON.parse(v2Fixture);
+    raw.features[1].trim = trim;
+    return parseDoc(JSON.stringify(raw));
+  };
+  const r2 = { cx: 60, cy: 40, w: 50, h: 80, angle_deg: 0 };
+
+  it("trim profile: the face stays the profile (holes and all) and r2 the placement; the request carries both", () => {
+    const d = withTrim("profile");
+    const f = d.features[1];
+    expect(f.profile).toEqual({ outer: "plate", holes: ["plate-h1", "plate-h2"] });
+    expect(f.rect).toBe("r2");
+    const req = planRequest(d, f)!;
+    expect(req.trim).toBe("profile");
+    expect(req.rect).toEqual(r2);
+    expect(req.profile!.loops).toHaveLength(3);
+    expect(req.profile!.loops[0]).toEqual([[0, 0], [120, 0], [120, 80], [0, 80]]);
+    expect(parseDoc(serialise(d))).toEqual(d);
+  });
+
+  it("trim rectangle and trim marker: r2 on its own is the profile, no placement field (the cut never needed the face)", () => {
+    for (const [trim, want] of [["rectangle", "profile"], ["marker", "marker"]] as const) {
+      const f = withTrim(trim).features[1];
+      expect(f.profile, trim).toEqual({ outer: "r2", holes: [] });
+      expect(f, trim).not.toHaveProperty("rect");
+      expect(f.trim, trim).toBe(want);
+      const req = planRequest(withTrim(trim), f)!;
+      expect(req, trim).not.toHaveProperty("rect");
+      expect(req.profile!.loops, trim).toEqual([[[35, 0], [85, 0], [85, 80], [35, 80]]]);
+    }
+  });
+
+  it("deleting the placement rectangle keeps the feature, now placed in its profile; a missing one is refused on open", () => {
+    const d = withTrim("profile");
+    const g = deleteShape(d, "r2").features.find((x) => x.id === "f2")!;
+    expect(g).not.toHaveProperty("rect");
+    expect(g.profile!.outer).toBe("plate");
+    const raw = JSON.parse(serialise(d));
+    raw.shapes = raw.shapes.filter((x: { id: string }) => x.id !== "r2");
+    expect(() => parseDoc(JSON.stringify(raw))).toThrow(/feature 2 \("f2"\): its placement names rect "r2"/);
+  });
+});
+
+describe("a refused id assignment (review finding #5)", () => {
+  // 51 singles in DICT_4X4_50: 50 get ids 0..49, the 51st is refused (ids []),
+  // its first_id only the block the core wanted (7, already f7's)
+  const n = 51;
+  const doc = () => {
+    let d = emptyDoc("Full", Array.from({ length: n }, (_, i) => rectShape(`r${i}`, i * 40, 0, i * 40 + 30, 30)), preset);
+    for (let i = 0; i < n; i++) d = addFeature(d, newFeature(rectProfile(`r${i}`), `f${i}`, preset));
+    return d;
+  };
+  const res = {
+    items: Array.from({ length: n }, (_, i) => (i < 50
+      ? { key: `f${i}`, first_id: i, ids: [i], driven: true }
+      : { key: `f${i}`, first_id: 7, ids: [], driven: true })),
+    ledger: Object.fromEntries(Array.from({ length: 50 }, (_, i) => [`f${i}`, i])),
+    warnings: [{ field: "marker.first_id", level: "error" as const, key: "f50", text: "DICT_4X4_50 is full (50 ids): no free id left" }],
+  };
+
+  it("applyIds never takes a refused item's fallback first id", () => {
+    const d = applyIds({ ...doc(), features: doc().features.map((f, i) => (i === 50 ? { ...f, marker: { ...f.marker, first_id: 0 } } : f)) }, res);
+    const printed = d.features.slice(0, 50).map((f) => f.marker.first_id);
+    expect(new Set(printed).size).toBe(50);
+    expect(d.features[50].marker.first_id).not.toBe(7);
+    expect(refusedKeys(res)).toEqual(["f50"]);
+  });
+
+  it("the sheet leaves the refused marker out: 50 stickers, 50 different ids", () => {
+    const d = applyIds(doc(), res);
+    const items = sheetGroups(d, refusedKeys(res)).flatMap((g) => g.items);
+    expect(items).toHaveLength(50);
+    expect(new Set(items.map((r) => r.marker.first_id)).size).toBe(50);
+    expect(sheetItems(d, "f50", refusedKeys(res))).toHaveLength(50);
   });
 });
