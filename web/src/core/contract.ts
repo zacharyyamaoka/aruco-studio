@@ -283,6 +283,11 @@ export interface SheetRequest {
   /** what the packer optimizes first (Zach, 2026-10-18: "fewest cut lines"
    *  or "most compact (fewest number of sheets)"); default "fewest_sheets" */
   objective?: "fewest_cuts" | "fewest_sheets";
+  /** the 50 mm scale bar (barrier 12, Zach 2026-10-20 night: "Hide, show on
+   *  first page, show on every page"); default "first": the printer's scale is
+   *  the same for a whole job, and a bar on every page costs sticker area. A
+   *  page without the bar gives that space to stickers. */
+  scale_bar?: "hide" | "first" | "every";
 }
 
 /** True-scale pages for the preset's paper. svg pages use mm units. */
