@@ -5,12 +5,19 @@
 // the arrows' client positions, the plan's layers and MarkerPlan.extrude),
 // never DOM presence alone. Screenshots (1280 × 800) go to VIEW3D_SHOTS
 // (default test-results/view3d); VIEW3D_VIDEO records the drag-then-type
-// flow into that folder.
+// flow into that folder; VIEW3D_BENCH times a 12-marker sheet.
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { CORE, clickAt, coreReady, idle, labelOn, loadExample, openPresets, openStudio, panelTab, planOutline, state } from "./helpers";
 
 const SHOTS = process.env.VIEW3D_SHOTS ?? "test-results/view3d";
+/** below this luminance (0-255) a rendered pixel reads as ink, from above */
+const LIGHT = 110;
+/** from below the ink reads ~10, the paper's / tile's white underside ~135, the face body's ~104 */
+const INK = 60;
+/** a Letter sheet's fitted distance (mm): the 3D view fits the document, and
+ *  the depth buffer has to tell 0.05 mm of paper apart from this far */
+const SHEET_FAR = 500;
 
 type Arrow = { key: string; field: string; value: number; driven: boolean; base3d: [number, number, number]; dir: number;
   base: [number, number]; tip: [number, number]; box: { x: number; y: number; w: number; h: number } | null };
@@ -89,9 +96,9 @@ async function focusBox(page: Page, input: ReturnType<Page["locator"]>): Promise
 
 const layer = (plan: any, colour: string) => plan.layers.find((L: any) => L.op === "add" && L.colour === colour && L.part !== "label");
 
-/** The tile on a 3D-print preset, its marker clicked in 2D: selected, its panel open. */
-async function inspectTile(page: Page): Promise<void> {
-  await tile(page);
+/** The tile on a 3D-print preset (or inkjet), its marker clicked in 2D: selected, its panel open. */
+async function inspectTile(page: Page, inkjet = false): Promise<void> {
+  await tile(page, inkjet);
   const o = await planOutline(page);
   await clickAt(page, o.cx, o.cy);
   await expect(page.getByTestId("extrude-panel")).toBeVisible();
@@ -152,11 +159,16 @@ function gridPoints(outer: Pt[], black: Poly[], cell: number): Pt[] {
   return out;
 }
 
-/** The 3D view straight down (no arrows or boxes), then the luminance (0-255)
- *  of its rendered canvas at each sketch point, projected on the tile's outer face (z white_mm). */
-async function topPixels(page: Page, pts: Pt[]): Promise<number[]> {
-  const z = ((await state(page)).plan.extrude.white_mm as number);
-  await page.evaluate(() => (window as any).__aruco.top3d(false));
+/** The 3D view on the feature in focus (no arrows or boxes): straight from
+ *  above (`top`) or from below (`bottom`: straight up, or `tilt` degrees off
+ *  from `far` mm), then the luminance (0-255) of its rendered canvas at each
+ *  sketch point, projected at height z (mm). */
+async function pixels(page: Page, pts: Pt[], z: number, side: "top" | "bottom", tilt = 0, far?: number): Promise<number[]> {
+  // (top3d is the probe's own; the bottom view rides on view3d(), which passes it through)
+  await page.evaluate(([sd, t, f]) => {
+    const a = (window as any).__aruco;
+    if (sd === "top") a.top3d(false); else a.view3d().bottom(false, t, f ?? undefined);
+  }, [side, tilt, far ?? null] as const);
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   const client = await page.evaluate(([ps, zz]) => (ps as Pt[]).map(([x, y]) => (window as any).__aruco.project3d(x, y, zz)), [pts, z] as const);
   return page.evaluate((cs) => {
@@ -174,6 +186,11 @@ async function topPixels(page: Page, pts: Pt[]): Promise<number[]> {
       return 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
     });
   }, client);
+}
+
+/** The top view's luminance at each sketch point, on the tile's outer face (z white_mm). */
+async function topPixels(page: Page, pts: Pt[]): Promise<number[]> {
+  return pixels(page, pts, (await state(page)).plan.extrude.white_mm as number, "top");
 }
 
 test.describe(`the 3D view (${CORE} core)`, () => {
@@ -434,9 +451,9 @@ test.describe(`the 3D view (${CORE} core)`, () => {
       expect(cellsOut.length).toBeGreaterThan(cells.length / 2);
       for (const c of cellsOut) expect(inPolys(black, c), "a cell centre is ink in plan.black").toBe(true);
       const lum = await topPixels(page, [...pts, ...cellsOut]);
-      const bad = pts.map((p, i) => ({ p, want: want[i] ? "dark" : "light", got: lum[i] })).filter((x) => (x.want === "dark") !== (x.got < 110));
+      const bad = pts.map((p, i) => ({ p, want: want[i] ? "dark" : "light", got: lum[i] })).filter((x) => (x.want === "dark") !== (x.got < LIGHT));
       expect(bad.slice(0, 5), `turn ${turn}: ${bad.length} of ${pts.length} points off`).toEqual([]);
-      const badCells = lum.slice(pts.length).filter((v) => v >= 110).length;
+      const badCells = lum.slice(pts.length).filter((v) => v >= LIGHT).length;
       expect(badCells, `turn ${turn}: cells drawn light`).toBe(0);
       if (turn === 0) await page.screenshot({ path: path.join(SHOTS, "top-view-turn0.png") });
     }
@@ -476,9 +493,119 @@ test.describe(`the 3D view (${CORE} core)`, () => {
     const flipped = pts.filter(([x, y]) => inPolys(s.plan.black, [x, y]) !== inPolys(s.plan.black, [x, 2 * lab.at[1] - y])).length;
     expect(flipped, "points a mirrored label would get wrong").toBeGreaterThan(10);
     const lum = await topPixels(page, pts);
-    const bad = pts.map((p, i) => ({ p, want: want[i] ? "dark" : "light", got: Math.round(lum[i]) })).filter((x) => (x.want === "dark") !== (x.got < 110));
+    const bad = pts.map((p, i) => ({ p, want: want[i] ? "dark" : "light", got: Math.round(lum[i]) })).filter((x) => (x.want === "dark") !== (x.got < LIGHT));
     expect(bad.slice(0, 5), `${bad.length} of ${pts.length} label points off`).toEqual([]);
     await page.screenshot({ path: path.join(SHOTS, "top-view-label.png") });
+  });
+
+  /** From below: every marker-area point (as (g) samples them) must not read
+   *  as ink -- the paper's / tile's white underside or the face body hides it
+   *  (`inked` false: the plan has no ink, White only).
+   *  Straight up with the feature filling the view, and 50 degrees off from a
+   *  Letter sheet's fitted distance (Zach's view: orbited under the grid). */
+  async function noInkBelow(page: Page, what: string, inked = true): Promise<void> {
+    const s = await state(page);
+    const { black, outer, cell_mm } = s.plan;
+    const pts = gridPoints(outer, black, cell_mm);
+    expect(pts.length, "sample points").toBeGreaterThan(200);
+    if (inked) expect(pts.filter((p) => inPolys(black, p)).length, "some of them over the ink").toBeGreaterThan(20);
+    const z0 = Math.min(0, ...s.plan.layers.filter((L: any) => L.op === "add").map((L: any) => L.z[0] as number));
+    for (const [tilt, far] of [[0, undefined], [50, SHEET_FAR]] as const) {
+      const lum = await pixels(page, pts, z0, "bottom", tilt, far);
+      const dark = pts.map((p, i) => ({ p, ink: inPolys(black, p), got: Math.round(lum[i]) })).filter((x) => x.got < INK);
+      expect(dark.slice(0, 5), `${what}, ${tilt} degrees off: ${dark.length} of ${pts.length} points dark from below`).toEqual([]);
+    }
+  }
+
+  /** A screenshot from below, 50 degrees off, the feature filling the view (no arrows or boxes). */
+  async function shotBelow(page: Page, name: string): Promise<void> {
+    await page.evaluate(() => (window as any).__aruco.view3d().bottom(false, 50));
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await page.screenshot({ path: path.join(SHOTS, name) });
+  }
+
+  test("i · from below, inkjet: the paper's white underside hides the ink -- no marker point dark", async ({ page }) => {
+    await inspectTile(page, true);
+    await to3d(page);
+    expect((await state(page)).plan.extrude.method).toBe("inkjet");
+    await noInkBelow(page, "inkjet");
+    await shotBelow(page, "below-inkjet.png");
+  });
+
+  test("j · from below, 3D print Both on a free tile: the white tile hides the inlay; Flip turns it over (the ink below, exact; none above)", async ({ page }) => {
+    await inspectTile(page);
+    await to3d(page);
+    expect((await state(page)).plan.extrude).toMatchObject({ mode: "both", flipped: false });
+    await noInkBelow(page, "Both");
+    await shotBelow(page, "below-3d-both.png");
+
+    // Flip: the ink's face is now the bottom one
+    const flip = page.locator('[role="switch"][data-path="marker.flip"]');
+    for (const tab of await page.locator('.fpanel [role="tab"]').all()) {
+      if (await flip.isVisible()) break;
+      await tab.click();
+    }
+    await flip.click();
+    await idle(page);
+    const s = await state(page);
+    expect(s.plan.extrude.flipped).toBe(true);
+    const ink = layer(s.plan, "black");
+    const W = s.plan.extrude.white_mm as number;
+    expect(layer(s.plan, "white").z).toEqual([-W, 0]);
+    const pts = gridPoints(s.plan.outer, ink.polygons, s.plan.cell_mm);
+    const want = pts.map((p) => inPolys(ink.polygons, p));
+    expect(want.filter(Boolean).length, "some ink").toBeGreaterThan(20);
+    expect(want.filter((w) => !w).length, "some white").toBeGreaterThan(20);
+    const below = await pixels(page, pts, -W, "bottom");
+    const bad = pts.map((p, i) => ({ p, want: want[i] ? "dark" : "light", got: Math.round(below[i]) })).filter((x) => (x.want === "dark") !== (x.got < INK));
+    expect(bad.slice(0, 5), `flipped, from below: ${bad.length} of ${pts.length} points off`).toEqual([]);
+    await shotBelow(page, "below-3d-flipped.png");
+    const above = await pixels(page, pts, 0, "top");
+    const dark = pts.filter((_, i) => above[i] < LIGHT);
+    expect(dark.slice(0, 5), `flipped, from above: ${dark.length} of ${pts.length} points dark`).toEqual([]);
+  });
+
+  test("k · from below, a face profile: Black only goes into the face body, which hides it; White only too", async ({ page }) => {
+    await openStudio(page);
+    await coreReady(page);
+    await loadExample(page, "plate");
+    await preset(page, "3D print");
+    await clickAt(page, 60, 40);
+    await page.keyboard.press("a");
+    await idle(page);
+    await expect(page.getByTestId("extrude-panel")).toBeVisible();
+    expect((await state(page)).plan.extrude).toMatchObject({ mode: "black", flipped: false });
+    await to3d(page);
+    await noInkBelow(page, "Black only");
+    await shotBelow(page, "below-face-black.png");
+    await panelRow(page, "extrude.mode", '[data-value="white"]');
+    expect((await state(page)).plan.extrude.mode).toBe("white");
+    await noInkBelow(page, "White only", false);
+    await shotBelow(page, "below-face-white.png");
+  });
+
+  test("l · a 12-marker sheet, its pockets carved: a frame renders in under 50 ms (VIEW3D_BENCH)", async ({ page }) => {
+    test.skip(!process.env.VIEW3D_BENCH, "VIEW3D_BENCH=1 times it (headless Chrome renders on the CPU: a loaded machine skews it)");
+    await openStudio(page);
+    await coreReady(page);
+    await loadExample(page, "sticker-sheet");
+    await idle(page);
+    const s = await state(page);
+    expect(Object.keys(s.plans).length, "markers planned").toBe(12);
+    await page.keyboard.press("3");
+    await expect(page.getByTestId("view3d")).toBeVisible();
+    await expect.poll(async () => Object.keys((await v3(page))?.solids ?? {}).length).toBe(12);
+    const cuts = Object.values(s.plans).reduce((n: number, p: any) => n + p.layers.filter((L: any) => L.op === "cut").reduce((m: number, L: any) => m + L.polygons.length, 0), 0);
+    expect(cuts, "pocket polygons carved").toBeGreaterThan(12);
+    const { build, frames } = await page.evaluate(() => {
+      const v = (window as any).__aruco.view3d();
+      const ms = Array.from({ length: 32 }, () => v.frame() as number).slice(2).sort((a, b) => a - b);
+      return { build: v.buildMs as number, frames: ms };
+    });
+    const median = frames[frames.length >> 1];
+    test.info().annotations.push({ type: "12 markers", description: `${cuts} pocket polygons; build ${build.toFixed(1)} ms, frame median ${median.toFixed(1)} ms (max ${frames[frames.length - 1].toFixed(1)})` });
+    console.log(test.info().annotations.map((x) => `${x.type}: ${x.description}`).join("\n"));
+    expect(median, "one frame, ms").toBeLessThan(50);
   });
 
   test("video · the drag-then-type flow (VIEW3D_VIDEO)", async ({ browser }) => {
