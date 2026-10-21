@@ -194,7 +194,9 @@ test.describe("landing page and crawling", () => {
     const sx = await sitemap.text();
     expect(sx).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
     const locs = [...sx.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
-    expect(locs).toEqual(["https://arucostudio.com/", "https://arucostudio.com/about/"]);
+    // the guides (2026-10-21, docs/build_guides.py) after the two front pages
+    expect(locs).toEqual(["https://arucostudio.com/", "https://arucostudio.com/about/", "https://arucostudio.com/guides/",
+      ...["label-placement", "profile-first", "size-step", "heights", "trim", "auto-id"].map((g) => `https://arucostudio.com/guides/${g}/`)]);
   });
 
   test("5 · the JSON-LD parses: a free SoftwareApplication, the same on / and /about/", async ({ request }) => {
