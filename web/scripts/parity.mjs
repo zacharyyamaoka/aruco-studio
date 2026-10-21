@@ -30,6 +30,9 @@ function cases(presets) {
   const disc = (cx, cy, rad, n = 72) => Array.from({ length: n }, (_, k) =>
     [cx + rad * Math.cos(-2 * Math.PI * k / n), cy + rad * Math.sin(-2 * Math.PI * k / n)]);
   const plate = { loops: [[[-60, -40], [60, -40], [60, 40], [-60, 40]], disc(-35, 0, 10), disc(35, 0, 10)] };
+  const printdims = () => ({ trim: "profile", profile: { loops: [[[-61.75, -20], [61.75, -20], [61.75, 20], [-61.75, 20]]] },
+    holes: "avoid", marker: marker({ type: "grid", cols: 3, rows: 1, first_id: 19 }), label: label(), preset: letter,
+    reference_face: false, extrude: {} });
   return [
     ["presets", "presets", {}],
     ["plan single auto", "plan", req({}, { w: 20, h: 20 })],
@@ -49,6 +52,11 @@ function cases(presets) {
     ["suggest charuco, 3D lines", "suggest", req({ type: "charuco" }, { w: 80, h: 60 }, {}, { ...d3, cell_step_mm: 0.675 })],
     ["svg single with label", "svg", req({ auto: false, marker_mm: 15 }, { w: 20, h: 20 }, { on: true, text: "#{id} {dict}" })],
     ["sheet letter, 3 items", "sheet", { items: [req({}, { w: 20, h: 20 }, { on: true, text: "part {id}" }), req({ type: "grid", cols: 3, rows: 2, first_id: 10 }), req({ auto: false, marker_mm: 300 }, { w: 300, h: 300 })], cut_lines: true, date: "2026-10-18" }],
+    // printdims (2026-10-21): Zach's 123.5 x 40 rectangle profile holding a 3 x 1 grid -- the
+    // outer the Studio shows is the cut the sheet prints, in both runtimes
+    ["plan printdims: 123.5 x 40 profile, grid 3x1", "plan", printdims()],
+    ["plan printdims: trim marker, turned 90", "plan", { ...printdims(), trim: "marker", marker: marker({ type: "grid", cols: 3, rows: 1, first_id: 19, turn: 90 }) }],
+    ["sheet printdims", "sheet", { items: [printdims()], cut_lines: true, date: "2026-10-21" }],
     ["bad request", "plan", {}],
   ];
 }

@@ -12,7 +12,9 @@
 // the rubber band; a typed value is a driving dimension. Every feature's marker, outline, Joint Origin and
 // label are drawn as its plan() returned them: no marker geometry is made
 // here. The sticker's white is the plan's cut_shape (the trim: the profile
-// with its holes, or the quiet zone), under the marker. A label is drawn in
+// with its holes, or the quiet zone), under the marker; when the cut is not
+// the quiet zone's edge, that edge is a dashed guide and a selected marker
+// outlines its cut, the edge that prints. A label is drawn in
 // the colour it prints in, selected or not. View › Marker info puts the
 // sheet's caption under every marker (a view overlay, never printed). The
 // turn arc belongs to the feature in focus (the panel's, else the selected
@@ -92,6 +94,18 @@ const fmt = (v: number) => String(+v.toFixed(1));
 // the outline only draws the quiet-zone edge over it (and still takes a click)
 const WHITE = { fill: "var(--t-white)", stroke: "none" };
 const OUTLINE = { fill: "transparent" };
+// WHY (Zach, 2026-10-21: a 123.5 mm profile whose plate read 112 on the canvas,
+// "I am expecting 123.5"): when the sticker is cut elsewhere (Trim Profile, the
+// marker not filling it) the quiet zone's edge prints nothing, so it is drawn
+// as a guide (dashed, faint: the fit box's construction look) and the
+// selection outlines the cut, the edge that prints. Overflow keeps its red.
+const OUTLINE_GUIDE = { fill: "transparent", stroke: "var(--muted)", strokeWidth: 1, strokeDasharray: "5 4", opacity: 0.7 };
+const CUT_SEL = { fill: "none", stroke: "var(--pick)", strokeWidth: 2.5, strokeLinejoin: "round" as const };
+/** Two loops with the same bounding box (to 1e-6 mm): the cut IS the outline. */
+const sameBox = (a: Vec2[], b: Vec2[]) => {
+  const p = boxOf(a), q = boxOf(b);
+  return Math.abs(p.x0 - q.x0) < 1e-6 && Math.abs(p.y0 - q.y0) < 1e-6 && Math.abs(p.x1 - q.x1) < 1e-6 && Math.abs(p.y1 - q.y1) < 1e-6;
+};
 
 /** What the sticker is cut to: the plan's cut_shape, else (a core without
  *  trim, the mock) its cut, else the marker's outline as before. */
@@ -1006,13 +1020,19 @@ export function Viewport() {
                 data-cut-white={f.id} data-trim={f.trim} />;
             })}
           </g>
-          {drawn.map(({ f, plan }) => (
-            <g key={f.id} className={`marker${sel?.kind === "feature" && sel.id === f.id ? " on" : ""}`} data-marker={f.id}>
-              <path d={sl(plan.outer)} className={`outline${plan.overflow_mm > 0 ? " bad" : ""}`} data-marker-outline="1" style={OUTLINE}
-                data-overflow={plan.overflow_mm} />
-              <path d={plan.black.map((p) => sl(p.outer) + p.holes.map(sl).join("")).join("")} fillRule="evenodd" className="black" data-marker-black="1" />
-            </g>
-          ))}
+          {drawn.map(({ f, plan }) => {
+            const on = sel?.kind === "feature" && sel.id === f.id;
+            const cs = cutShape(plan);
+            const guide = !(plan.overflow_mm > 0) && !sameBox(cs.outer, plan.outer);
+            return (
+              <g key={f.id} className={`marker${on ? " on" : ""}`} data-marker={f.id}>
+                <path d={sl(plan.outer)} className={`outline${plan.overflow_mm > 0 ? " bad" : ""}`} data-marker-outline="1" style={guide ? OUTLINE_GUIDE : OUTLINE}
+                  data-overflow={plan.overflow_mm} data-guide={guide ? "1" : "0"} />
+                {on && guide && <path d={sl(cs.outer) + cs.holes.map(sl).join("")} fillRule="evenodd" data-cut-sel={f.id} style={CUT_SEL} />}
+                <path d={plan.black.map((p) => sl(p.outer) + p.holes.map(sl).join("")).join("")} fillRule="evenodd" className="black" data-marker-black="1" />
+              </g>
+            );
+          })}
           {shapes.map((s) => (
             <path key={s.id} d={sl(shapeLoop(s))} data-shape={s.id} data-kind={s.kind}
               className={[

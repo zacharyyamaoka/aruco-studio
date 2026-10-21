@@ -158,8 +158,14 @@ test.describe("canvas3 (real core)", () => {
     await expect(dims.locator('[data-dim="marker.separation_mm"]')).toHaveCount(1);
     const outer = dims.locator('[data-dim="outer"]');
     await expect(outer).toHaveCount(2);
-    const plan = (await state(page)).plans[grid.id];
-    const want = plan.outer_mm.map((v: number) => String(+v.toFixed(2))).sort();
+    // WHY the profile, not plan.outer_mm (printdims, Zach 2026-10-21: "I am
+    // expecting 123.5"): Outer is the sticker as it prints, and this grid is
+    // cut to its 50 x 50 rectangle profile (Trim Profile) while its marker's
+    // quiet-zone box (outer_mm) is 49.5 x 49.5
+    const st = await state(page);
+    const rect = st.doc.shapes.find((x: any) => x.id === grid.profile.outer);
+    expect(grid.trim).toBe("profile");
+    const want = [rect.w, rect.h].map((v: number) => String(+v.toFixed(2))).sort();
     expect((await outer.locator("text").allTextContents()).sort()).toEqual(want);
     const muted = await resolved(page, "var(--muted)");
     for (let i = 0; i < 2; i++) {
