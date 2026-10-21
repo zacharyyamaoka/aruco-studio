@@ -9,6 +9,8 @@ vi.mock("./coreSource", () => ({
 const { useStudio } = await import("./store");
 const { emptyDoc, parseDoc } = await import("./model/doc");
 const { rectShape } = await import("./sketch/model");
+const { idsReady, settledDoc, settledOutput } = await import("./app/output");
+const { idRequest } = await import("./model/doc");
 
 const st = () => useStudio.getState();
 
@@ -48,5 +50,36 @@ describe("a failed open (review finding #4)", () => {
     expect(() => parseDoc(doc([{ ...r("a"), w: "wide" }], []))).toThrow(/shape 1 \("a"\): a rect needs a number w/);
     expect(() => parseDoc(doc([{ kind: "circle", id: "c", cx: 0, cy: 0, r: -1 }], []))).toThrow(/circle's r/);
     expect(() => parseDoc(doc([r("a")], [{ ...f("f1", "k", "a"), marker: { first_id: "7" } }]))).toThrow(/marker.first_id/);
+  });
+});
+
+describe("output from a settled revision (review finding #6)", () => {
+  const settle = () => useStudio.setState({ idSettledKey: JSON.stringify(idRequest(st().doc)) });
+
+  it("waits for the ids of the document as it is now, through edits meanwhile", async () => {
+    useStudio.setState({ idSettledKey: "" });
+    let got: unknown = null;
+    void settledDoc().then((d) => { got = d; });
+    await Promise.resolve();
+    expect(got).toBeNull();
+    st().addShape(rectShape("r1", 0, 0, 10, 10));       // an edit while waiting
+    await Promise.resolve();
+    expect(got).toBeNull();
+    settle();
+    await Promise.resolve();
+    expect(got).toBe(st().doc);
+    expect(idsReady(st())).toBe(true);
+  });
+
+  it("starts again when the document's request moved on while the core worked", async () => {
+    settle();
+    const built: string[] = [];
+    const out = await settledOutput((doc) => doc.name, async (name) => {
+      built.push(name);
+      if (built.length === 1) { st().setName("Moved"); settle(); }
+      return name.toUpperCase();
+    });
+    expect(built).toEqual(["Start", "Moved"]);
+    expect(out!.out).toBe("MOVED");
   });
 });

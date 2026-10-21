@@ -73,6 +73,10 @@ export interface Studio {
   idIssues: Issue[];
   /** the keys auto id last refused ids (doc.ts refusedKeys): Print and Export leave them out */
   idRefused: string[];
+  /** the id request (JSON of idRequest(doc)) whose answer the document holds
+   *  (planner.ts): output is made only of a document whose request this is
+   *  (app/output.ts idsReady) */
+  idSettledKey: string;
   /** for the feature the panel edits */
   suggestions: Suggestion[];
   info: CoreInfo | null;
@@ -320,6 +324,7 @@ export const useStudio = create<Studio>((set, get) => {
     planErrors: {},
     idIssues: [],
     idRefused: [],
+    idSettledKey: "",
     suggestions: [],
     info: null,
     builtins: [],
