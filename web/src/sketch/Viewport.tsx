@@ -3,7 +3,10 @@
 // millimetres; pan with the middle button or Space-drag, zoom at the cursor,
 // F fits. A right-button drag is a selection box (a window left to right, a
 // crossing right to left), and so is a left-button drag on empty canvas or
-// on a fill no marker owns (Figma's marquee); Shift+click (Ctrl, Cmd too)
+// on a fill no marker owns (Figma's marquee); a right-click that does not
+// move (./click.ts) opens the canvas menu there (./CanvasMenu.tsx: what is
+// under the pointer, then the zoom: fit, selection, Actual size, 100 %);
+// Shift+click (Ctrl, Cmd too)
 // adds or removes a shape, pressed on its edge, its fill or its marker; a
 // drag on a selected shape moves every selected one; several selected get
 // their bounds and an "N selected" chip. D dimensions (./constraints.ts):
@@ -39,8 +42,10 @@ import { DimEditor, Dims, layoutDims, type LaidDim } from "./Dims";
 import { diameterLocked, dimFromPicks, refusal, resizable, typedValue, type DimRef, type SketchDim } from "./constraints";
 import {
   boxPick, circleFrom, hitTest, inShape, profileLoops, rectAt, rectOf, resizeShape, sameProfile, shapeLoop, shapeUnder, sketchBox,
-  type Hit, type ProfileRef, type RectShape, type Shape,
+  type Hit, type ProfileRef, type RectShape, type Selection, type Shape,
 } from "./model";
+import { CanvasMenu, type MenuAt, type MenuTarget } from "./CanvasMenu";
+import { isDrag } from "./click";
 import { pointer } from "./pointer";
 import { SketchDims, ValueBox, laySketchDim, visibleSketchDims, type LaidSketchDim } from "./SketchDims";
 
@@ -71,8 +76,6 @@ const sameRef = (a: DimRef, b: DimRef) => JSON.stringify(a) === JSON.stringify(b
 const handleSides = (h: Handle): [-1 | 0 | 1, -1 | 0 | 1] => [h.includes("e") ? 1 : h.includes("w") ? -1 : 0, h.includes("n") ? 1 : h.includes("s") ? -1 : 0];
 
 const EDGE_PX = 6;
-/** how far a press must travel (px) to be a drag, not a click */
-const DRAG_PX = 4;
 /** the selection boxes: a window solid blue, a crossing dashed green (Fusion's) */
 // WHY inline (the stylesheet is not this lane's): D's centre crosses, the pick under the pointer, the picks
 const PICK_CSS = `
@@ -181,6 +184,8 @@ export function Viewport() {
   const [rot, setRot] = useState<{ id: string; live: boolean } | null>(null);
   /** the last Profile-row pick: a double-click right after it re-picks for the same feature */
   const picked = useRef<{ fid: string; at: number } | null>(null);
+  /** the right-click menu: where it opened and on what */
+  const [menu, setMenu] = useState<MenuAt | null>(null);
   const space = useRef(false);
   const fitted = useRef(false);
 
@@ -390,7 +395,10 @@ export function Viewport() {
       return;
     }
     if (e.button === 2 && !space.current) {
-      setDrag({ kind: "box", a: local(e), b: local(e), add: e.shiftKey || e.ctrlKey || e.metaKey, moved: false });
+      // a drag is the selection box; a click (no move past DRAG_PX) opens the menu where it was released
+      const on = target, at = { client: [e.clientX, e.clientY] as Vec2, local: local(e), world: world(e) };
+      setMenu(null);
+      setDrag({ kind: "box", a: local(e), b: local(e), add: e.shiftKey || e.ctrlKey || e.metaKey, moved: false, click: () => openMenu(on, at) });
       return;
     }
     if (e.button === 1 || space.current) {
@@ -519,6 +527,49 @@ export function Viewport() {
     picked.current = fid ? { fid, at: performance.now() } : null;
   };
 
+  /** A right-click that did not move: what it was on is selected as a left
+   *  click selects it -- but a marker's panel is not opened (the menu's Edit
+   *  does), only moved off another marker's, so the panel stays on the
+   *  selection -- and what is selected already stays selected (Figma's). Then
+   *  the menu opens there with what applies to it. */
+  const openMenu = (el: Element, at: Omit<MenuAt, "target">) => {
+    const st = useStudio.getState();
+    const p = at.world;
+    const marker = (fid: string): MenuTarget => {
+      if (st.panel.open && st.panel.featureId !== fid) st.inspect(fid);
+      else if (!st.panel.open) st.select({ kind: "feature", id: fid });
+      return { kind: "marker", fid };
+    };
+    const shapes = (sel: Selection): MenuTarget => {
+      if (st.panel.open) st.ok();
+      st.select(sel);
+      return { kind: "shapes" };
+    };
+    let target: MenuTarget = { kind: "canvas" };
+    // the Profile row waiting for a pick: the selection is the panel's, left as it is
+    if (!st.panel.selector) {
+      // a marker, or what is drawn for it (its label, its Joint Origin, the turn arc)
+      const fid = el.closest("[data-marker]")?.getAttribute("data-marker") ?? el.closest("[data-feature]")?.getAttribute("data-feature");
+      const f = fid ? getFeature(st.doc, fid) : null;
+      const hit = hitTest(st.doc.shapes, p, EDGE_PX / z);
+      const edge = hit?.kind === "edge" ? st.doc.shapes.find((x) => x.id === hit.id) : undefined;
+      const selShape = selectedShape();
+      if (f) target = inGroup(featureRect(st.doc, f)?.id) ? { kind: "shapes" } : marker(f.id);
+      else if (edge) {
+        const owner = featureOfRect(st.doc, edge.id);
+        target = inGroup(edge.id) ? { kind: "shapes" } : owner ? marker(owner.id) : shapes({ kind: "shape", id: edge.id });
+      } else if (st.multi.length > 1 && st.doc.shapes.some((x) => st.multi.includes(x.id) && inShape(x, p))) target = { kind: "shapes" };
+      else if (selShape && inShape(selShape, p)) {
+        const own = selectedFeatureId(st.doc, st.sel);
+        target = own ? { kind: "marker", fid: own } : { kind: "shapes" };
+      } else if (hit?.kind === "region") {
+        const owner = featureOfProfile(st.doc, hit.ref);
+        target = owner ? marker(owner.id) : shapes({ kind: "profile", ref: hit.ref });
+      }
+    }
+    setMenu({ ...at, target });
+  };
+
   /** A double-click on a rectangle (its edge or inside it): its outer edges
    *  alone are the profile, whatever is inside it (Zach, 2026-10-20 evening:
    *  "you could double click on a rectangle and it would select the outer
@@ -563,14 +614,14 @@ export function Viewport() {
     }
     if (drag.kind === "box") {
       const b = local(e);
-      setDrag({ ...drag, b, moved: drag.moved || Math.hypot(b[0] - drag.a[0], b[1] - drag.a[1]) > DRAG_PX });
+      setDrag({ ...drag, b, moved: drag.moved || isDrag(drag.a, b) });
       return;
     }
     if (drag.kind === "dim") return;
     const p = world(e);
     if (drag.kind === "rotate") {
       const q = local(e);
-      if (!drag.moved && Math.hypot(q[0] - drag.press[0], q[1] - drag.press[1]) <= DRAG_PX) return;
+      if (!drag.moved && !isDrag(drag.press, q)) return;
       let d = drag;
       if (!drag.moved) {
         // the rectangle as it is now (a typed angle may have landed since the press), one undo step from here
@@ -621,13 +672,13 @@ export function Viewport() {
     if (drag?.kind === "draw" && !drag.clicked) drag = { ...drag, b: world(e) };
     if (drag?.kind === "box") {
       const b = local(e);
-      drag = { ...drag, b, moved: drag.moved || Math.hypot(b[0] - drag.a[0], b[1] - drag.a[1]) > DRAG_PX };
+      drag = { ...drag, b, moved: drag.moved || isDrag(drag.a, b) };
     }
     if (drag?.kind === "draw") {
       if (drag.clicked) return;
       // a press without a drag: the first corner (centre) was a click, the band follows the pointer (Fusion)
       const [ax, ay] = scr(drag.a), [bx, by] = scr(drag.b);
-      if (Math.hypot(bx - ax, by - ay) <= DRAG_PX) { setDrag({ ...drag, clicked: true }); return; }
+      if (!isDrag([ax, ay], [bx, by])) { setDrag({ ...drag, clicked: true }); return; }
       commitDraw(drag, drawVals);
       return;
     }
@@ -642,7 +693,7 @@ export function Viewport() {
     }
     if (drag?.kind === "dim") {
       const q = local(e);
-      if (Math.hypot(q[0] - drag.press[0], q[1] - drag.press[1]) > DRAG_PX) placeDim(world(e));
+      if (isDrag(drag.press, q)) placeDim(world(e));
       setDrag(null);
       return;
     }
@@ -984,6 +1035,7 @@ export function Viewport() {
   const rotAt: Vec2 | null = rotShape ? (knob ? [knob[0], knob[1] - 26] : scr([rotShape.cx, rotShape.cy])) : null;
 
   return (
+    <>
     <div ref={host} className="viewport" data-testid="viewport" data-tool={tool} style={{ cursor }}
       onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
       onPointerLeave={() => { pointer.at = null; if (!drag) setHover(null); }} onDoubleClick={onDoubleClick}
@@ -1088,5 +1140,10 @@ export function Viewport() {
         </div>
       )}
     </div>
+    {/* WHY beside the viewport, not in it: React bubbles a portal's events
+        through its owner, and the viewport's press handler would take a
+        click on a menu row (it captures the pointer) */}
+    <CanvasMenu at={menu} onClose={() => setMenu(null)} />
+    </>
   );
 }

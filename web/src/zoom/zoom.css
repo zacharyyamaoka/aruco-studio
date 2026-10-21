@@ -1,0 +1,53 @@
+/* Actual size (./scale.ts): the zoom indicator bottom left, its "estimated"
+   words, and the calibration dialog's card and ruler. Kit tokens only, so the
+   skins restyle it with the rest. */
+
+/* ------------------------------------------------------------ the zoom indicator */
+/* WHY its width capped to the dock's left: the dock is centred (about 190 px
+   each side of the middle); the words wrap to a second line before they reach it */
+.zoom-pill { position: absolute; left: 12px; bottom: 14px; z-index: 10; display: flex; align-items: center; flex-wrap: wrap;
+  min-height: 38px; max-width: max(120px, calc(50% - 214px)); padding: 2px 12px 2px 3px; background: var(--panel); color: var(--text);
+  border: 1px solid var(--line); border-radius: 19px; box-shadow: var(--shadow-sm); }
+.zi-btn { height: 32px; padding: 0 9px; border: 0; border-radius: 16px; background: none; color: inherit; font: inherit; font-weight: 600;
+  white-space: nowrap; font-variant-numeric: tabular-nums; cursor: pointer; }
+.zi-btn:hover, .zi-btn[data-popup-open] { background: var(--hover); }
+.zi-btn:focus-visible, .zi-cal:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* "(estimated — calibrate)": a word's space after "Actual size"; wrapped to its own line, under its text */
+.zoom-pill[data-actual="1"][data-calibrated="0"] .zi-btn { padding-right: 2px; }
+.zi-est { color: var(--muted); padding-left: 9px; }
+.zi-cal { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+/* in a menu row: Actual size's "estimated" */
+.zm-est { margin-left: 4px; color: var(--muted); font-size: 11px; }
+
+/* a phone: only while at Actual size (its words matter), under the document pill */
+@media (max-width: 640px) {
+  .zoom-pill { top: 82px; bottom: auto; left: 8px; max-width: calc(100% - 16px); }
+  .zoom-pill[data-actual="0"] { display: none; }
+}
+
+/* ------------------------------------------------------------ the calibration dialog */
+.cal-body { display: flex; flex-direction: column; gap: 12px; padding: 4px 16px 8px; }
+.cal-how { margin: 0; }
+.cal-stage { position: relative; flex: none; }
+/* the card: its outer edge is the size (the border inside it) */
+.cal-card { position: absolute; left: 0; top: 0; border: 1px solid var(--accent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, var(--panel)), color-mix(in srgb, var(--accent) 6%, var(--panel))); }
+.cal-chip { position: absolute; border-radius: 3px; border: 1px solid color-mix(in srgb, #b08d2e 60%, var(--line));
+  background: linear-gradient(135deg, #e9d48a, #c9a54a); opacity: 0.85; }
+.cal-card-text { position: absolute; right: 18px; bottom: 8px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+/* the edge to drag: the whole right side, a bar in its middle */
+.cal-grip { position: absolute; top: 0; right: -8px; bottom: 0; width: 16px; cursor: ew-resize; touch-action: none; }
+.cal-grip::after { content: ""; position: absolute; right: 5px; top: 50%; width: 6px; height: 30px; margin-top: -15px; border-radius: 3px; background: var(--accent); }
+.cal-row { display: flex; align-items: center; gap: 8px; }
+.cal-step { width: 28px; padding: 0; justify-content: center; }
+.cal-slider { flex: 1; min-width: 80px; accent-color: var(--accent); }
+.cal-value { min-width: 156px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cal-ruler { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
+.cal-ruler-label { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.cal-mm { width: 76px; text-align: right; font-variant-numeric: tabular-nums; }
+/* the line to measure, end to end: its ends are inside its width */
+.cal-line { position: relative; height: 14px; border-bottom: 2px solid var(--text); }
+.cal-line i { position: absolute; bottom: -2px; width: 2px; height: 14px; background: var(--text); }
+.cal-line i:first-child { left: 0; }
+.cal-line i:last-child { right: 0; }
+.cal-status { color: var(--muted); font-size: 11px; }

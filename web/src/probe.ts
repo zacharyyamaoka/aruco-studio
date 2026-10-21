@@ -10,6 +10,7 @@ import { getFeature } from "./model/doc";
 import { activeFeatureId, useStudio } from "./store";
 import { view3d, type View3DProbe } from "./view3d/probe3d";
 import { exampleMarksKnown } from "./app/thumbs";
+import { useScale } from "./zoom/scale";
 
 export interface Probe {
   kind: "real" | "mock";
@@ -42,6 +43,8 @@ function snapshot() {
     selection: s.multi, dimSel: s.dimSel,
     // the canvas3 lane (2026-10-21): View › Marker info, and how many markers each example's thumbnail knows
     markerInfo: s.markerInfo, thumbs: exampleMarksKnown(),
+    // the actualsize lane (2026-10-21): this screen's scale (px per mm) for Actual size, and whether it is calibrated
+    scale: (({ key, pxPerMm, calibrated, basis }) => ({ key, pxPerMm, calibrated, basis }))(useScale.getState().scale),
   };
 }
 

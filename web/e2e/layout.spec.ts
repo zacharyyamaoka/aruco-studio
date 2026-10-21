@@ -12,9 +12,9 @@ const FIXTURE_V3 = path.join(import.meta.dirname, "fixtures", "v3-a4.arucostudio
 const GITHUB = "https://github.com/zacharyyamaoka/aruco-studio";
 const ZIP = "**/py/aruco_studio.zip";
 /** the chrome's own boxes, and the controls in them */
-const CHROME = ["doc-pill", "actions-pill", "toolbar", "corner"];
+const CHROME = ["doc-pill", "actions-pill", "toolbar", "corner", "zoom-indicator"];
 const CONTROLS = ["menu-main", "menu-doc", "menu-cad", "act-verify", "act-print",
-  "tool-select", "tool-rect", "tool-circle", "tool-dim", "tool-extrude", "tool-fit", "view-toggle", "help", "github"];
+  "tool-select", "tool-rect", "tool-circle", "tool-dim", "tool-extrude", "tool-fit", "view-toggle", "help", "github", "zoom-menu"];
 
 type R = { x: number; y: number; w: number; h: number };
 const box = async (l: Locator): Promise<R> => l.evaluate((e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
