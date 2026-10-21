@@ -47,9 +47,9 @@ async function customPanel(page: Page): Promise<string> {
   return "custom-f1";
 }
 
-/** The presets dialog: the first built-in preset of a method, Select. */
+/** The presets dialog from the Preset row (on Marker, the skeleton): the first built-in preset of a method, Select. */
 async function usePreset(page: Page, method: "inkjet" | "print3d"): Promise<void> {
-  await panelTab(page, "make");
+  await panelTab(page, "marker");
   await page.getByTestId("panel-preset").click();
   const modal = page.getByTestId("presets-modal");
   await modal.locator('[data-coll="builtin"]').click();
@@ -177,21 +177,24 @@ test.describe("panel polish (real core)", () => {
     expect(await resetsInside(page)).toBeGreaterThanOrEqual(2);
   });
 
-  test("c · Marker: groups Marker, Size, Orientation, Border top to bottom, Suggest first in Size; Label: a divider before Corner mark", async ({ page }) => {
+  test("c · Marker: groups Where, How, Marker, Size, Orientation, Details top to bottom, Suggest last in Size (the skeleton); Label: a divider before Corner mark", async ({ page }) => {
     await platePanel(page);
     await panelTab(page, "marker");
     const body = '[data-tab-body="marker"]';
     const titles = await page.locator(`${body} [data-group-title]`).evaluateAll((els) =>
       els.map((e) => ({ t: e.getAttribute("data-group-title"), y: e.getBoundingClientRect().top })));
-    expect(titles.map((x) => x.t)).toEqual(["Marker", "Size", "Orientation", "Border"]);
+    expect(titles.map((x) => x.t)).toEqual(["Where", "How", "Marker", "Size", "Orientation", "Details"]);
     for (let i = 1; i < titles.length; i++) expect(titles[i].y).toBeGreaterThan(titles[i - 1].y);
     const rows = await page.locator(`${body} [data-row]`).evaluateAll((els) =>
       els.map((e) => ({ r: e.getAttribute("data-row"), y: e.getBoundingClientRect().top })));
     const inGroup = (g: number) => rows.filter((x) => x.y > titles[g].y && (g + 1 >= titles.length || x.y < titles[g + 1].y)).sort((a, b) => a.y - b.y).map((x) => x.r);
-    expect(inGroup(0)).toEqual(["marker.type", "marker.dictionary", "marker.first_id", "feature.key"]);
-    expect(inGroup(1).slice(0, 2)).toEqual(["marker.suggest", "marker.marker_mm"]);
-    expect(inGroup(2)).toEqual(["marker.turn", "profile.angle_deg"]);
-    expect(inGroup(3)).toEqual(["marker.quiet_modules"]);
+    expect(inGroup(0)).toEqual(["profile", "holes"]);
+    expect(inGroup(1)).toEqual(["preset"]);
+    expect(inGroup(2)).toEqual(["marker.type", "marker.dictionary", "marker.first_id"]);
+    expect(inGroup(3)).toEqual(["marker.marker_mm", "marker.suggest"]);
+    // a face profile: Turn only (Rotation is a rectangle profile's, the skeleton)
+    expect(inGroup(4)).toEqual(["marker.turn"]);
+    expect(inGroup(5)).toEqual(["marker.quiet_modules", "feature.key"]);
     // each group's rule is drawn: a 1 px line after its title
     const rule = await page.locator(`${body} [data-group-title="Size"]`).evaluate((e) => getComputedStyle(e, "::after").borderTopWidth);
     expect(rule).toBe("1px");
@@ -216,7 +219,7 @@ test.describe("panel polish (real core)", () => {
     expect(await page.locator(`${lbody} [data-group-title]`).evaluateAll((els) => els.map((e) => e.getAttribute("data-group-title")))).toEqual(["Label", "Corner mark"]);
     await panelTab(page, "make");
     expect(await page.locator('[data-tab-body="make"] [data-group-title]').evaluateAll((els) => els.map((e) => e.getAttribute("data-group-title"))))
-      .toEqual(["Where", "How", "Heights", "Outward side"]);
+      .toEqual(["Size & cut", "Heights", "Outward side"]);
   });
 
   test("d · a rectangle profile rotates on the sketch: drag the arc ~40° → 45 (15° snap), type 30 → 30, the marker turns with it, Ctrl+Z restores it in one step", async ({ page }) => {
@@ -301,7 +304,7 @@ test.describe("panel polish (real core)", () => {
     expect(free % 15, `free: ${free}`).not.toBe(0);
   });
 
-  test("d2 · a click on the arc still turns the marker 90°; a face profile's Rotation row says the core places it", async ({ page }) => {
+  test("d2 · a click on the arc still turns the marker 90°; a face profile has no Rotation row (the core places it: Turn only)", async ({ page }) => {
     await customPanel(page);
     const kb = (await page.getByTestId("turn-arc").locator(".turn-knob").boundingBox())!;
     await page.mouse.click(kb.x + kb.width / 2, kb.y + kb.height / 2);
@@ -313,8 +316,8 @@ test.describe("panel polish (real core)", () => {
 
     await platePanel(page);
     await panelTab(page, "marker");
-    await expect(page.getByTestId("rotation-face")).toBeVisible();
-    await expect(page.getByTestId("rotation-face")).toContainText("Turn");
+    await expect(page.locator('[data-tab-body="marker"] [data-row="marker.turn"]')).toBeVisible();
+    await expect(page.locator('[data-row="profile.angle_deg"]')).toHaveCount(0);
     await expect(page.locator('input[data-path="profile.angle_deg"]')).toHaveCount(0);
   });
 
@@ -328,11 +331,11 @@ test.describe("panel polish (real core)", () => {
       expect(b.width, `${row} icon is small`).toBeLessThanOrEqual(14);
       expect(b.width).toBeGreaterThanOrEqual(10);
     };
-    for (const [r, n] of [["profile", "row-square-dashed-mouse-pointer"], ["trim", "row-scissors"], ["extrude.paper_mm", "row-arrow-up-from-line"],
-      ["marker.flip", "row-flip-vertical"]]) await expectIcon(r, n);
     await panelTab(page, "marker");
-    for (const [r, n] of [["marker.type", "row-grid-2x2"], ["marker.dictionary", "row-book-open"], ["marker.first_id", "row-hash"],
-      ["marker.marker_mm", "row-ruler"], ["marker.turn", "row-rotate-cw"], ["profile.angle_deg", "row-rotate-ccw"], ["marker.quiet_modules", "row-square-square"]]) await expectIcon(r, n);
+    for (const [r, n] of [["profile", "row-square-dashed-mouse-pointer"], ["marker.type", "row-grid-2x2"], ["marker.dictionary", "row-book-open"], ["marker.first_id", "row-hash"],
+      ["marker.marker_mm", "row-ruler"], ["marker.turn", "row-rotate-cw"], ["marker.quiet_modules", "row-square-square"], ["feature.key", "row-key-round"]]) await expectIcon(r, n);
+    await panelTab(page, "make");
+    for (const [r, n] of [["trim", "row-scissors"], ["extrude.paper_mm", "row-arrow-up-from-line"], ["marker.flip", "row-flip-vertical"]]) await expectIcon(r, n);
     await panelTab(page, "label");
     for (const [r, n] of [["label.on", "row-type"], ["marker.corner_mark", "row-triangle-right"]]) await expectIcon(r, n);
   });
@@ -341,7 +344,7 @@ test.describe("panel polish (real core)", () => {
     await platePanel(page);
     for (const method of ["inkjet", "print3d"] as const) {
       if (method === "print3d") await usePreset(page, "print3d");
-      for (const t of ["make", "marker", "label"] as const) {
+      for (const t of ["marker", "label", "make"] as const) {
         await panelTab(page, t);
         if (t === "label" && !(await state(page)).feature.label.on) {
           await page.locator('[data-path="label.on"]').click();

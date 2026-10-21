@@ -10,7 +10,7 @@
 // test-results/profile).
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, circleGap, clickAt, coreReady, dblClickAt, dragWorld, fitRect, idle, loadExample, openStudio, planOutline, state, toClient, type Rect, openMenu } from "./helpers";
+import { CORE, circleGap, clickAt, coreReady, dblClickAt, dragWorld, fitRect, idle, loadExample, openStudio, panelTab, planOutline, state, toClient, type Rect, openMenu } from "./helpers";
 
 const SHOTS = process.env.PROFILE_SHOTS ?? "test-results/profile";
 const FIXTURE = path.join(import.meta.dirname, "fixtures", "v2-rect.arucostudio-web.json");
@@ -159,6 +159,8 @@ test.describe(`profile-first (${CORE} core)`, () => {
 
   test("c · Trim offers exactly Profile | Marker; Profile cuts to the face with its holes, Marker to the quiet zone", async ({ page }) => {
     const fid = await plateFace(page);
+    // Trim is on Make (the skeleton: a new feature opens on Marker)
+    await panelTab(page, "make");
     const btns = page.locator('[data-row="trim"] .kit-seg-btn');
     expect(await btns.evaluateAll((els) => els.map((e) => e.getAttribute("data-value")))).toEqual(["profile", "marker"]);
     expect(await btns.allTextContents()).toEqual(["Profile", "Marker"]);

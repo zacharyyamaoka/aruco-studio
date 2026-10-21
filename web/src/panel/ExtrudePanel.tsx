@@ -1,29 +1,32 @@
 // The ArUco Extrude panel (Fusion's feature dialog) for the feature it
 // edits. It opens beside the clicked marker (V1 "Click-to-inspect",
 // 2026-10-18) and follows it; on a phone it docks to the bottom. Three tabs
-// and nothing above them but the title bar: Make (Where: Profile, Holes; How:
-// the Preset with what it makes as grey lines, Trim; Heights; Outward side:
-// Flip), Marker (Marker, Size, Orientation, Border), Label (Label, Corner
-// mark). Every row of a tab is in view, each group under a small title and a
-// thin rule; the footer is the summary line, then OK / Cancel. Every row shows
+// and nothing above them but the title bar, in the skeleton's order
+// (docs/design/panel_skeleton.md, one order for this panel and the Fusion
+// add-in): Marker (Where: Profile, Holes; How: the Preset with what it makes as a
+// grey line; Marker; Size, then Suggest; Orientation; Details: Quiet zone,
+// Key), Label (Label, Corner mark), Make -- its icon the preset's method,
+// an inkjet or a 3D printer (Size & cut: Size step, Trim; Heights; Outward
+// side: Flip). A new feature opens on Marker. Every row of a tab is in view, each
+// group under a small title and a thin rule; the footer is the summary line,
+// then OK / Cancel. Every row shows
 // its own issues from plan().warnings -- and the id's from auto id -- under it.
 // Every value is driven (grey: the core's, a rule's, the preset's, auto id's or
 // the default) or set (typed: normal, with ↺ inside the field);
 // ../ui/DrivenField.tsx. Manual values always go through; the plan flags what
 // does not fit, it never refuses.
-// WHY three flat tabs, Profile inside Make (Zach, 2026-10-20 night, panel
-// proposal V1 "Command Dialog", reports/media/panel-proposals-2026-10-20.html):
-// "I like separating the concerns"; "when you click it the first thing you
-// need to decide is manufacturing method and the location (so profile
-// selection in first tab)" -- and no row above the tabs, no Advanced fold.
+// WHY three flat tabs (Zach, 2026-10-20 night, panel proposal V1 "Command
+// Dialog", reports/media/panel-proposals-2026-10-20.html): "I like separating
+// the concerns" -- and no row above the tabs, no Advanced fold.
 // WHY words, not icons, on the segmented choices (Zach, 2026-10-18: "I like
-// the use of text instead of icons here") -- and a small icon beside a row's
+// the use of text instead of icons here"; the Fusion skin's Type is icons, as
+// Fusion's own dialog draws it) -- and a small icon beside a row's
 // name, the groups and Suggest first in Size (Zach, 2026-10-20 night: "add
 // more visual grouping to help the eye"; "change the order of where you have
 // the suggestion drop down so it's more natural"; "icons next to the words in
 // the fields where appropriate").
 import { useLayoutEffect, type ReactNode } from "react";
-import { FieldRow, Glyph, Messages, NumberField, SegmentedRow, Select, Switch, Tabs, TextField, Button, type Issue as KitIssue, type Opt } from "@bam/ui";
+import { FieldRow, Glyph, Messages, NumberField, SegmentedRow, Select, Switch, Tabs, Button, type Issue as KitIssue, type Opt } from "@bam/ui";
 import { X } from "lucide-react";
 import type { ExtrudeParams, Issue, LabelParams, MarkerParams, Trim } from "../core/contract";
 import { DEFAULT_MARKER, DEFAULT_TRIM, featureNumber, featurePreset, featureRect, getFeature, idRange, isSet, referenceFace, typeCounts } from "../model/doc";
@@ -31,9 +34,10 @@ import { boxOf, rectCorners, toScreen } from "../model/geom";
 import { presetStep, stepKey, stepLabel, stepOf, stepOptions } from "../presets/fields";
 import { presetNumbers, samePreset, myPresets } from "../presets/local";
 import { profileLoops } from "../sketch/model";
+import { useSkin } from "../skins/skins";
 import { useStudio, type Tab } from "../store";
 import type { Box } from "../ui/anchor";
-import { DrivenChoice, DrivenField } from "../ui/DrivenField";
+import { DrivenChoice, DrivenField, DrivenText } from "../ui/DrivenField";
 import { FloatingPanel } from "../ui/FloatingPanel";
 import { TextArea } from "../ui/TextArea";
 import { routeIssues, tabLevel, tabRows } from "./issues";
@@ -68,6 +72,11 @@ const MODES: Opt[] = [
   { value: "white", label: "White", hint: "Only the white is made: the pattern into a dark body" },
   { value: "both", label: "Both", hint: "A white tile with the black inlaid" },
 ];
+/** A segmented row's choices as icons: the Fusion skin draws Type, Trim and
+ *  Extrude as icon buttons, as Fusion's own dialog does (the hint is the
+ *  tooltip); the other skins keep the words. */
+const asIcons = (opts: Opt[], prefix = "") => opts.map((o) => ({ ...o, icon: `${prefix}${o.value}` }));
+const TYPE_ICONS = asIcons(TYPES), TRIM_ICONS = asIcons(TRIM_OPTS, "trim-"), MODE_ICONS = asIcons(MODES, "mode-");
 const PLACES: Opt[] = [
   { value: "on_marker", label: "On marker", hint: "In the marker's border: the black row or the white quiet zone" },
   { value: "outside", label: "Outside", hint: "In a band beside the marker" },
@@ -108,9 +117,6 @@ const Group = ({ title }: { title: string }) => (
   <div className="xp-group" data-group-title={title} role="presentation"><span className="xp-group-title">{title}</span></div>
 );
 
-/** A faint rule between two parts of one group (the Preset's lines and Trim). */
-const Rule = () => <hr className="xp-rule" />;
-
 /** An angle into [0, 360). */
 const deg360 = (a: number) => +((((a % 360) + 360) % 360).toFixed(6));
 
@@ -124,11 +130,12 @@ export function ExtrudePanel() {
   const st = useStudio();
   const { doc, plans, panel, suggestions, info, builtins } = st;
   const f = getFeature(doc, panel.featureId);
+  const [skin] = useSkin();
   // a feature made by this opening (not in the document before it) starts on
-  // Make; a reopened one keeps the tab the panel last had
+  // Marker (the skeleton); a reopened one keeps the tab the panel last had
   const fresh = panel.open && !!f && !!panel.backup && !getFeature(panel.backup, f.id);
   useLayoutEffect(() => {
-    if (fresh) useStudio.getState().setTab("make");
+    if (fresh) useStudio.getState().setTab("marker");
   }, [panel.featureId, fresh]);
   if (!panel.open || !f) return null;
   const m = f.marker, l = f.label;
@@ -138,6 +145,10 @@ export function ExtrudePanel() {
   // this marker's own preset (Zach, 2026-10-20 night: "applied on a per marker basis")
   const preset = featurePreset(doc, f);
   const method = preset?.method ?? "inkjet";
+  // the Make tab's icon, the Preset row and the presets dialog name and draw the method alike
+  const methodName = method === "print3d" ? "3D print" : "Inkjet";
+  const methodIcon = method === "print3d" ? "print3d" : "inkjet";
+  const fusion = skin.id === "fusion";
   const rows = tabRows(m, l, method);
   const issues: Issue[] = plan && f.profile ? [...plan.warnings] : [];
   // auto id's issues for this feature (Issue.key): a collision, a full dictionary
@@ -184,8 +195,12 @@ export function ExtrudePanel() {
   const anchor = screenBox(f.id);
   const others = doc.features.filter((g) => g.id !== f.id).map((g) => screenBox(g.id)).filter((b): b is Box => !!b);
 
-  const makeTab = (
-    <div data-tab-body="make">
+  // WHY Profile then Preset first, on Marker (docs/design/panel_skeleton.md; Zach,
+  // 2026-10-21): "The first thing you do is select the profile then second in
+  // your mind you need to decide how to manufacture it ... now I want to be
+  // thinking about the marker."
+  const markerTab = (
+    <div data-tab-body="marker">
       <Group title="Where" />
       <SelRow path="profile" label="Profile" icon="profile" rowIcon="row-square-dashed-mouse-pointer" testid="sel-profile" count={f.profile ? 1 : 0} emptyText="Select…"
         active={panel.selector === "profile"} issues={iss("profile")}
@@ -198,16 +213,116 @@ export function ExtrudePanel() {
       )}
       <Group title="How" />
       <FieldRow path="preset" label="Preset" issues={iss("preset")}>
-        <button type="button" className="preset-pick" data-testid="panel-preset" onClick={() => st.openModal("presets")}
+        <button type="button" className="preset-pick" data-testid="panel-preset" data-method={method} onClick={() => st.openModal("presets")}
           title="How this marker is made: open the presets (the next new marker starts with it too)">
-          <Glyph name={method === "print3d" ? "print3d" : "inkjet"} />
+          <Glyph name={methodIcon} />
           <span className="preset-name">{preset ? preset.name : <PresetWait />}{modified && <i className="modified"> (modified)</i>}</span>
         </button>
         <button type="button" className="kit-ib" title="Presets…" aria-label="Presets" data-testid="panel-preset-more" onClick={() => st.openModal("presets")}>
           <Glyph name="dots" />
         </button>
       </FieldRow>
-      {preset && <Note testid="preset-lines">{method === "print3d" ? "3D print" : "Inkjet"} · {presetNumbers(preset)}</Note>}
+      {preset && <Note testid="preset-lines">{methodName} · {presetNumbers(preset)}</Note>}
+      <Group title="Marker" />
+      <FieldRow path="marker.type" label="Type" icon="row-grid-2x2" issues={iss("marker.type")}>
+        <DrivenChoice {...drv("marker.type")} value={m.type} driver={`${DEFAULT} (single)`}>
+          <SegmentedRow path="marker.type" value={m.type} options={fusion ? TYPE_ICONS : TYPES} onChange={(v) => st.setField("marker.type", v as MarkerParams["type"])} />
+        </DrivenChoice>
+      </FieldRow>
+      <FieldRow path="marker.dictionary" label="Dictionary" icon="row-book-open" issues={iss("marker.dictionary")}>
+        <DrivenChoice {...drv("marker.dictionary")} value={m.dictionary} driver={`${DEFAULT} (${DEFAULT_MARKER.dictionary.replace("DICT_", "")})`}>
+          <Select path="marker.dictionary" value={m.dictionary} options={dicts} onChange={(v) => st.setField("marker.dictionary", String(v))} />
+        </DrivenChoice>
+      </FieldRow>
+      <FieldRow path="marker.first_id" label={m.type === "single" ? "ID" : "First ID"} icon="row-hash" issues={iss("marker.first_id")}>
+        <DrivenField {...drv("marker.first_id")} value={m.first_id} driver={`auto id: from the key "${f.key}", unique in this document`}
+          int min={0} bad={bad("marker.first_id")} />
+        <span className="range" data-testid="id-range">{idRange(m, showPlan ? showPlan.ids : undefined)}</span>
+      </FieldRow>
+      <Group title="Size" />
+      <FieldRow path="marker.marker_mm" label="Marker size" icon="row-ruler" issues={iss("marker.marker_mm")}>
+        <DrivenField {...drv("marker.marker_mm")} value={!m.auto ? m.marker_mm : showPlan ? showPlan.marker_mm : m.marker_mm}
+          driver={fills} unit="mm" min={0.1} step={0.5} bad={bad("marker.marker_mm")} />
+      </FieldRow>
+      {m.type !== "single" && (
+        <FieldRow path="marker.cols" label="Columns × Rows" icon="row-grid-3x3" issues={iss("marker.cols")}>
+          <DrivenField {...drv("marker.cols")} value={m.cols} driver={counts} int min={1} max={50} bad={bad("marker.cols")} />
+          <span className="times">×</span>
+          <DrivenField {...drv("marker.rows")} value={m.rows} driver={counts} int min={1} max={50} bad={bad("marker.cols")} />
+        </FieldRow>
+      )}
+      {m.type === "grid" && (
+        <FieldRow path="marker.separation_mm" label="Separation" icon="row-move-horizontal" issues={iss("marker.separation_mm")} title="The gap between markers">
+          <DrivenField {...drv("marker.separation_mm")} value={m.separation_mm > 0 ? m.separation_mm : showPlan ? showPlan.separation_mm : null}
+            driver="core rule: the grid's gap rule, from the marker size" unit="mm" min={0} step={0.5} bad={bad("marker.separation_mm")} />
+        </FieldRow>
+      )}
+      {m.type === "charuco" && (
+        <FieldRow path="marker.checker_mm" label="Checker" icon="row-ruler" issues={iss("marker.checker_mm")}>
+          <DrivenField {...drv("marker.checker_mm")} value={m.checker_mm > 0 ? m.checker_mm : showPlan ? showPlan.checker_mm : null}
+            driver={m.auto ? fills : "core rule: the smallest 0.5 mm square that leaves the marker one module of white"}
+            unit="mm" min={0} step={0.5} bad={bad("marker.checker_mm")} />
+        </FieldRow>
+      )}
+      {m.type === "charuco" && (
+        <FieldRow path="marker.origin_square" label="Origin" icon="joint" issues={iss("marker.origin_square")} title="Where the Joint Origin sits on the board">
+          <DrivenChoice path="marker.origin_square" driven={!isSet(f, "marker.origin_square")} value={square ? "square" : "corner"}
+            driver={`${DEFAULT} (OpenCV's board corner)`} onReset={() => st.resetField("marker.origin_square")}
+            onSet={(v) => (v === "square" ? st.setField("marker.origin_square", square ?? [0, 0]) : st.resetField("marker.origin_square"))}>
+            <SegmentedRow path="marker.origin_square" compact value={square ? "square" : "corner"} options={ORIGINS}
+              onChange={(v) => (v === "square" ? st.setField("marker.origin_square", [0, 0]) : st.resetField("marker.origin_square"))} />
+          </DrivenChoice>
+        </FieldRow>
+      )}
+      {m.type === "charuco" && square && (
+        <FieldRow path="marker.origin_square.at" label="Column, row" title="The square, 0-based from OpenCV's origin corner">
+          <NumberField path="marker.origin_square.col" value={square[0]} int min={0} onCommit={(v) => st.setField("marker.origin_square", [v, square[1]])} />
+          <span className="times">,</span>
+          <NumberField path="marker.origin_square.row" value={square[1]} int min={0} onCommit={(v) => st.setField("marker.origin_square", [square[0], v])} />
+        </FieldRow>
+      )}
+      {/* Suggest after the size rows: picking one sets them */}
+      <FieldRow path="marker.suggest" label="Suggest" icon="row-wand-sparkles" issues={iss("marker.suggest")} title="Good value sets for this rectangle: picking one sets the size rows above">
+        <SuggestSelect suggestions={suggestions} empty={f.profile ? "…" : "needs a profile"} onPick={st.pick}
+          current={m.auto ? -1 : suggestions.findIndex((s) => s.params.cols === m.cols && s.params.rows === m.rows && Math.abs(s.params.marker_mm - m.marker_mm) < 1e-6)} />
+      </FieldRow>
+      <Group title="Orientation" />
+      <FieldRow path="marker.turn" label="Turn" icon="row-rotate-cw" issues={iss("marker.turn")}>
+        <DrivenChoice {...drv("marker.turn")} value={m.turn} driver={`${DEFAULT} (0°)`}>
+          <SegmentedRow path="marker.turn" compact value={m.turn} options={TURNS} onChange={(v) => st.setField("marker.turn", Number(v) as MarkerParams["turn"])} />
+        </DrivenChoice>
+      </FieldRow>
+      {/* WHY (Zach, 2026-10-20 night): "I like how previously there was the ability to rotate the marker on the page";
+          a rectangle profile turns about its centre (the arc on the sketch drags it); the skeleton shows
+          Rotation for a rectangle profile only (a face's box is the core's: Turn it) */}
+      {rect && (
+        <FieldRow path="profile.angle_deg" label="Rotation" icon="row-rotate-ccw"
+          title="The rectangle profile's angle, counter-clockwise: drag the arc over the marker, or type it">
+          <NumberField path="profile.angle_deg" value={rect.angle_deg} unit="°" step={15}
+            onCommit={(v) => st.updateShape({ ...rect, angle_deg: deg360(v) })} />
+        </FieldRow>
+      )}
+      <Group title="Details" />
+      {/* the quiet zone has no driven record in the document: its default (1) is the driven value */}
+      <FieldRow path="marker.quiet_modules" label="Quiet zone" icon="row-square-square" issues={iss("marker.quiet_modules")} title="The white border round the marker, in cells">
+        <DrivenField path="marker.quiet_modules" value={m.quiet_modules} driven={m.quiet_modules === DEFAULT_MARKER.quiet_modules}
+          driver={`${DEFAULT} (${DEFAULT_MARKER.quiet_modules} cell)`} unit="cells" min={0} step={1} bad={bad("marker.quiet_modules")}
+          onSet={(v) => st.setField("marker.quiet_modules", v)} onReset={() => st.resetField("marker.quiet_modules")} />
+      </FieldRow>
+      {/* WHY driven (Zach, 2026-10-21: "The key should be grey outed I think beacuse its being automtically set"):
+          a feature's key is its id until typed; empty + Enter or ↺ gives the id back */}
+      <FieldRow path="feature.key" label="Key" icon="row-key-round" title="Auto id keeps the first id under this stable key; keys are unique in the document">
+        <DrivenText path="feature.key" value={f.key} driven={f.key === f.id} driver={`the feature's own id (${f.id})`}
+          onSet={st.setKey} onReset={() => st.setKey("")} />
+      </FieldRow>
+    </div>
+  );
+
+  // WHY tuned last (docs/design/panel_skeleton.md; Zach, 2026-10-21): "if its a
+  // good preset right then the defaults should be good"
+  const makeTab = (
+    <div data-tab-body="make">
+      <Group title="Size & cut" />
       {preset && sizeStep && presetSize && (
         <FieldRow path="marker.size_step" label="Size step" icon="row-grip" issues={iss("marker.size_step")} title="What driven sizes round to; typed sizes are never rounded">
           {method === "inkjet" || isSet(f, "marker.size_step") ? (
@@ -218,10 +333,9 @@ export function ExtrudePanel() {
           ) : <span className="xp-grey" data-testid="size-step-line">{stepLabel(presetSize, preset)}</span>}
         </FieldRow>
       )}
-      <Rule />
       <FieldRow path="trim" label="Trim" icon="row-scissors" title="What the sticker is cut to: everything inside the cut is white" issues={iss("trim")}>
         <DrivenChoice {...drv("trim")} value={f.trim} driver={`${DEFAULT} (${DEFAULT_TRIM})`}>
-          <SegmentedRow path="trim" compact value={f.trim} options={TRIM_OPTS} onChange={(v) => st.setField("trim", v as Trim)} />
+          <SegmentedRow path="trim" compact value={f.trim} options={fusion ? TRIM_ICONS : TRIM_OPTS} onChange={(v) => st.setField("trim", v as Trim)} />
         </DrivenChoice>
       </FieldRow>
       <Group title="Heights" />
@@ -230,7 +344,7 @@ export function ExtrudePanel() {
           <FieldRow path="extrude.mode" label="Extrude" icon="row-layers-2" issues={iss("extrude.mode")} title="Which colours are made">
             <DrivenChoice {...drv("extrude.mode")} value={mode}
               driver={`auto: ${refFace ? "black only, on a reference face (the body is the white)" : "both, in open space"}`}>
-              <SegmentedRow path="extrude.mode" compact value={mode} options={MODES} onChange={(v) => st.setField("extrude.mode", v)} />
+              <SegmentedRow path="extrude.mode" compact value={mode} options={fusion ? MODE_ICONS : MODES} onChange={(v) => st.setField("extrude.mode", v)} />
             </DrivenChoice>
           </FieldRow>
           <FieldRow path="extrude.white_mm" label="White height" icon="row-arrow-up-from-line" issues={iss("extrude.white_mm")} title="The white tile, from the face to its outer face">
@@ -260,99 +374,6 @@ export function ExtrudePanel() {
         </DrivenChoice>
       </FieldRow>
       <Note testid="flip-out">Outward side: {outward}</Note>
-    </div>
-  );
-
-  const markerTab = (
-    <div data-tab-body="marker">
-      <Group title="Marker" />
-      <FieldRow path="marker.type" label="Type" icon="row-grid-2x2" issues={iss("marker.type")}>
-        <DrivenChoice {...drv("marker.type")} value={m.type} driver={`${DEFAULT} (single)`}>
-          <SegmentedRow path="marker.type" value={m.type} options={TYPES} onChange={(v) => st.setField("marker.type", v as MarkerParams["type"])} />
-        </DrivenChoice>
-      </FieldRow>
-      <FieldRow path="marker.dictionary" label="Dictionary" icon="row-book-open" issues={iss("marker.dictionary")}>
-        <DrivenChoice {...drv("marker.dictionary")} value={m.dictionary} driver={`${DEFAULT} (${DEFAULT_MARKER.dictionary.replace("DICT_", "")})`}>
-          <Select path="marker.dictionary" value={m.dictionary} options={dicts} onChange={(v) => st.setField("marker.dictionary", String(v))} />
-        </DrivenChoice>
-      </FieldRow>
-      <FieldRow path="marker.first_id" label={m.type === "single" ? "ID" : "First ID"} icon="row-hash" issues={iss("marker.first_id")}>
-        <DrivenField {...drv("marker.first_id")} value={m.first_id} driver={`auto id: from the key "${f.key}", unique in this document`}
-          int min={0} bad={bad("marker.first_id")} />
-        <span className="range" data-testid="id-range">{idRange(m, showPlan ? showPlan.ids : undefined)}</span>
-      </FieldRow>
-      <FieldRow path="feature.key" label="Key" icon="row-key-round" title="Auto id keeps the first id under this stable key; keys are unique in the document">
-        <TextField path="feature.key" value={f.key} onCommit={st.setKey} placeholder={f.id} />
-      </FieldRow>
-      {/* Suggest first: picking one sets the numbers under it */}
-      <Group title="Size" />
-      <FieldRow path="marker.suggest" label="Suggest" icon="row-wand-sparkles" issues={iss("marker.suggest")} title="Good value sets for this rectangle: picking one sets them">
-        <SuggestSelect suggestions={suggestions} empty={f.profile ? "…" : "needs a profile"} onPick={st.pick}
-          current={m.auto ? -1 : suggestions.findIndex((s) => s.params.cols === m.cols && s.params.rows === m.rows && Math.abs(s.params.marker_mm - m.marker_mm) < 1e-6)} />
-      </FieldRow>
-      <FieldRow path="marker.marker_mm" label="Marker size" icon="row-ruler" issues={iss("marker.marker_mm")}>
-        <DrivenField {...drv("marker.marker_mm")} value={!m.auto ? m.marker_mm : showPlan ? showPlan.marker_mm : m.marker_mm}
-          driver={fills} unit="mm" min={0.1} step={0.5} bad={bad("marker.marker_mm")} />
-      </FieldRow>
-      {m.type === "charuco" && (
-        <FieldRow path="marker.checker_mm" label="Checker" icon="row-ruler" issues={iss("marker.checker_mm")}>
-          <DrivenField {...drv("marker.checker_mm")} value={m.checker_mm > 0 ? m.checker_mm : showPlan ? showPlan.checker_mm : null}
-            driver={m.auto ? fills : "core rule: the smallest 0.5 mm square that leaves the marker one module of white"}
-            unit="mm" min={0} step={0.5} bad={bad("marker.checker_mm")} />
-        </FieldRow>
-      )}
-      {m.type === "grid" && (
-        <FieldRow path="marker.separation_mm" label="Separation" icon="row-move-horizontal" issues={iss("marker.separation_mm")} title="The gap between markers">
-          <DrivenField {...drv("marker.separation_mm")} value={m.separation_mm > 0 ? m.separation_mm : showPlan ? showPlan.separation_mm : null}
-            driver="core rule: the grid's gap rule, from the marker size" unit="mm" min={0} step={0.5} bad={bad("marker.separation_mm")} />
-        </FieldRow>
-      )}
-      {m.type !== "single" && (
-        <FieldRow path="marker.cols" label="Columns × Rows" icon="row-grid-3x3" issues={iss("marker.cols")}>
-          <DrivenField {...drv("marker.cols")} value={m.cols} driver={counts} int min={1} max={50} bad={bad("marker.cols")} />
-          <span className="times">×</span>
-          <DrivenField {...drv("marker.rows")} value={m.rows} driver={counts} int min={1} max={50} bad={bad("marker.cols")} />
-        </FieldRow>
-      )}
-      <Group title="Orientation" />
-      <FieldRow path="marker.turn" label="Turn" icon="row-rotate-cw" issues={iss("marker.turn")}>
-        <DrivenChoice {...drv("marker.turn")} value={m.turn} driver={`${DEFAULT} (0°)`}>
-          <SegmentedRow path="marker.turn" compact value={m.turn} options={TURNS} onChange={(v) => st.setField("marker.turn", Number(v) as MarkerParams["turn"])} />
-        </DrivenChoice>
-      </FieldRow>
-      {/* WHY (Zach, 2026-10-20 night): "I like how previously there was the ability to rotate the marker on the page";
-          a rectangle profile turns about its centre (the arc on the sketch drags it); a face's box is the core's */}
-      <FieldRow path="profile.angle_deg" label="Rotation" icon="row-rotate-ccw"
-        title={rect ? "The rectangle profile's angle, counter-clockwise: drag the arc over the marker, or type it" : "The core places the marker's box in a face: Turn it"}>
-        {rect ? (
-          <NumberField path="profile.angle_deg" value={rect.angle_deg} unit="°" step={15}
-            onCommit={(v) => st.updateShape({ ...rect, angle_deg: deg360(v) })} />
-        ) : <span className="xp-grey" data-testid="rotation-face">Turn only, in a face</span>}
-      </FieldRow>
-      {m.type === "charuco" && (
-        <FieldRow path="marker.origin_square" label="Origin" icon="joint" issues={iss("marker.origin_square")} title="Where the Joint Origin sits on the board">
-          <DrivenChoice path="marker.origin_square" driven={!isSet(f, "marker.origin_square")} value={square ? "square" : "corner"}
-            driver={`${DEFAULT} (OpenCV's board corner)`} onReset={() => st.resetField("marker.origin_square")}
-            onSet={(v) => (v === "square" ? st.setField("marker.origin_square", square ?? [0, 0]) : st.resetField("marker.origin_square"))}>
-            <SegmentedRow path="marker.origin_square" compact value={square ? "square" : "corner"} options={ORIGINS}
-              onChange={(v) => (v === "square" ? st.setField("marker.origin_square", [0, 0]) : st.resetField("marker.origin_square"))} />
-          </DrivenChoice>
-        </FieldRow>
-      )}
-      {m.type === "charuco" && square && (
-        <FieldRow path="marker.origin_square.at" label="Column, row" title="The square, 0-based from OpenCV's origin corner">
-          <NumberField path="marker.origin_square.col" value={square[0]} int min={0} onCommit={(v) => st.setField("marker.origin_square", [v, square[1]])} />
-          <span className="times">,</span>
-          <NumberField path="marker.origin_square.row" value={square[1]} int min={0} onCommit={(v) => st.setField("marker.origin_square", [square[0], v])} />
-        </FieldRow>
-      )}
-      <Group title="Border" />
-      {/* the quiet zone has no driven record in the document: its default (1) is the driven value */}
-      <FieldRow path="marker.quiet_modules" label="Quiet zone" icon="row-square-square" issues={iss("marker.quiet_modules")} title="The white border round the marker, in cells">
-        <DrivenField path="marker.quiet_modules" value={m.quiet_modules} driven={m.quiet_modules === DEFAULT_MARKER.quiet_modules}
-          driver={`${DEFAULT} (${DEFAULT_MARKER.quiet_modules} cell)`} unit="cells" min={0} step={1} bad={bad("marker.quiet_modules")}
-          onSet={(v) => st.setField("marker.quiet_modules", v)} onReset={() => st.resetField("marker.quiet_modules")} />
-      </FieldRow>
     </div>
   );
 
@@ -426,8 +447,13 @@ export function ExtrudePanel() {
   );
 
   const body: Record<Tab, ReactNode> = { make: makeTab, marker: markerTab, label: labelTab };
+  // Fusion's title: "ARUCO EXTRUDE" for a new feature, "EDIT ARUCO EXTRUDE" for one
+  // being edited (the skin shows "Edit" and hides the number; ../skins/fusion.css)
+  const title = (
+    <>{!fresh && <span className="xp-title-edit">Edit </span>}ArUco Extrude<span className="xp-title-num"> {featureNumber(doc, f.id)}</span></>
+  );
   return (
-    <FloatingPanel title={`ArUco Extrude ${featureNumber(doc, f.id)}`} icon={<Glyph name="extrude" />} collapsed={panel.collapsed} onCollapse={st.collapse} testid="extrude-panel"
+    <FloatingPanel title={title} icon={<Glyph name="extrude" />} collapsed={panel.collapsed} onCollapse={st.collapse} testid="extrude-panel"
       anchor={anchor} anchorKey={f.id} avoid={others} width={320} className="xpanel"
       footer={
         <>
@@ -443,11 +469,12 @@ export function ExtrudePanel() {
       }>
       <Tabs value={panel.tab} onChange={(t) => st.setTab(t as Tab)}
         tabs={[
-          { id: "make", name: "Make", level: tabLevel(routed, rows.make) },
-          { id: "marker", name: "Marker", level: tabLevel(routed, rows.marker) },
-          { id: "label", name: "Label", level: tabLevel(routed, rows.label) },
+          { id: "marker", name: "Marker", icon: "tab-marker", level: tabLevel(routed, rows.marker) },
+          { id: "label", name: "Label", icon: "tab-label", level: tabLevel(routed, rows.label) },
+          // WHY always "Make", the method as its icon (Zach, 2026-10-21: "keep it just Make so we always know where we should go looking")
+          { id: "make", name: "Make", icon: `tab-${methodIcon}`, level: tabLevel(routed, rows.make) },
         ]} />
-      <div className="tab-body">{body[panel.tab] ?? makeTab}</div>
+      <div className="tab-body">{body[panel.tab] ?? markerTab}</div>
     </FloatingPanel>
   );
 }

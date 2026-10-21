@@ -25,6 +25,8 @@ async function plateFeature(page: Page): Promise<string> {
   await idle(page);
   const s = await state(page);
   expect(s.feature.profile, "the feature's profile is the face").toEqual({ outer: "plate", holes: ["plate-h1", "plate-h2"] });
+  // Trim is on Make (the skeleton: a new feature opens on Marker)
+  await panelTab(page, "make");
   return s.panel.featureId as string;
 }
 
@@ -177,6 +179,7 @@ test.describe(`trim (${CORE} core)`, () => {
     const s = await state(page);
     const fid = s.feature.id as string;
     expect(s.feature.trim).toBe("profile");
+    await panelTab(page, "make");
     const btn = page.locator('[data-row="trim"] .kit-seg-btn[data-value="profile"]');
     await expect(btn).toBeEnabled();
     near(await screenBox(page, `[data-cut-white="${fid}"]`), await screenBox(page, `[data-shape="${s.feature.profile.outer}"]`), 1,

@@ -88,9 +88,11 @@ test.describe(`V1 click-to-inspect (${CORE} core)`, () => {
     expect(pb.y).toBeGreaterThanOrEqual(vp.y);
     expect(pb.x + pb.width).toBeLessThanOrEqual(vp.x + vp.width);
     expect(pb.y + pb.height).toBeLessThanOrEqual(vp.y + vp.height);
-    // the tabs first, nothing above them (V1 Command Dialog, 2026-10-20 night: the Preset is a row of Make)
+    // the tabs first, nothing above them (V1 Command Dialog, 2026-10-20 night), in the skeleton's
+    // order (2026-10-21: Marker | Label | Make, the Preset a row of Marker under the Profile)
     const rows = await panel.locator("[data-row], [role=tab]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row") ?? `tab:${e.getAttribute("data-tab")}`));
-    expect(rows.slice(0, 3)).toEqual(["tab:make", "tab:marker", "tab:label"]);
+    expect(rows.slice(0, 3)).toEqual(["tab:marker", "tab:label", "tab:make"]);
+    expect(rows.slice(3, 5)).toEqual(["profile", "preset"]);
     expect(rows.indexOf("tab:marker")).toBeLessThan(rows.indexOf("marker.type"));
     await page.screenshot({ path: path.join(SHOTS, "v1-panel-beside-marker.png") });
 

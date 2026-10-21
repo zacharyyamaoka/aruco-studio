@@ -12,7 +12,10 @@
 /* the tabs: first in the body, kept in view while a long tab scrolls */
 .xpanel .fpanel-body { padding-top: 0; }
 .xpanel .kit-tabs { position: sticky; top: 0; z-index: 2; margin-top: 0; }
-.xpanel .kit-tab { font-size: var(--font-size, 12px); }
+/* a tab is its icon, then its name, on one line (the Make tab's icon is the
+   preset's method: an inkjet or a 3D printer) */
+.xpanel .kit-tab { flex-direction: row; gap: 5px; font-size: var(--font-size, 12px); }
+.xpanel .kit-tab > .kit-glyph { flex: none; }
 .xpanel .tab-body { padding: 6px 0 4px; }
 /* a group: its small title, then a thin rule to the right edge (Fusion's
    command dialog); the first group of a tab sits right under the tabs */
@@ -20,8 +23,6 @@
   letter-spacing: 0.02em; color: color-mix(in srgb, var(--text) 70%, transparent); user-select: none; }
 .xpanel .xp-group:first-child { margin-top: 2px; }
 .xpanel .xp-group::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
-/* a faint rule between two parts of one group */
-.xpanel .xp-rule { border: 0; border-top: 1px solid var(--line-soft); margin: 3px 10px 3px calc(var(--xp-label) + var(--gap) + 10px); }
 /* the row icons: small and muted; a row without one keeps its name in line */
 .xpanel .row-label > .kit-glyph { flex: none; width: 13px; height: 13px; color: var(--muted); }
 .xpanel .row-label:not(:has(> .kit-glyph)) { padding-left: 18px; }
@@ -34,3 +35,8 @@
 .xpanel .summary-line { font-weight: 600; }
 .xpanel .xp-actions { display: flex; justify-content: flex-end; gap: 6px; padding: 6px 10px 7px; }
 .xpanel.collapsed .fpanel-foot .summary { display: none; }
+/* the title's "Edit" and the Fusion title bar's "−" and "▸▸" (../ui/FloatingPanel.tsx):
+   only a skin that draws them shows them (../skins/fusion.css) */
+.xpanel .xp-title-edit, .fpanel-minus, .fpanel-tail { display: none; }
+/* the Key (a driven text, ../ui/DrivenField.tsx) reads as text, not a number */
+.xpanel .drv-text input { font-variant-numeric: normal; }

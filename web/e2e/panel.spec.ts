@@ -1,9 +1,10 @@
 // The ArUco Extrude panel as V1 "Command Dialog" (Zach's pick, 2026-10-20
-// night; the gallery is reports/media/panel-proposals-2026-10-20.html): three
-// flat tabs Make | Marker | Label and nothing above them but the title bar;
-// Make holds the Profile, the Preset, Trim, the heights of the preset's method
-// (contract barrier 10) and Flip; Corner mark is on Label; the presets are a
-// three-pane library dialog. Every check measures the probe's numbers, what
+// night; the gallery is reports/media/panel-proposals-2026-10-20.html), in the
+// skeleton's order (docs/design/panel_skeleton.md, 2026-10-21): three flat tabs
+// Marker | Label | Make and nothing above them but the title bar; Marker opens
+// with the Profile, then the Preset; Make holds Trim, the heights of the
+// preset's method (contract barrier 10) and Flip; Corner mark is on Label; the
+// presets are a three-pane library dialog. Every check measures the probe's numbers, what
 // the core was sent, the drawn boxes (getBoundingClientRect) or the computed
 // colours. Screenshots (1280 × 800) go to PANEL_SHOTS (default test-results/panel).
 import path from "node:path";
@@ -53,8 +54,9 @@ const tab = async (page: Page, t: string) => { await page.locator(`[role=tab][da
 const top = (page: Page, sel: string) => page.locator(sel).evaluate((e) => e.getBoundingClientRect().top);
 const colour = (page: Page, p: string) => page.locator(`input[data-path="${p}"]`).evaluate((e) => getComputedStyle(e).color);
 
-/** The presets dialog: pick the first preset of a method, Select. */
+/** The presets dialog from the Preset row (on Marker): pick the first preset of a method, Select. */
 async function usePreset(page: Page, method: "inkjet" | "print3d"): Promise<any> {
+  await tab(page, "marker");
   await page.getByTestId("panel-preset").click();
   const modal = page.getByTestId("presets-modal");
   await modal.locator('[data-coll="builtin"]').click();
@@ -79,20 +81,22 @@ function wholeLayers(p: any, min: number, none: number): number {
 }
 
 test.describe(`the panel, V1 Command Dialog (${CORE} core)`, () => {
-  test("a · three tabs; a new feature opens on Make: Profile, Preset, Trim, the heights, top to bottom; a reopened one keeps its tab", async ({ page }) => {
+  test("a · three tabs; a new feature opens on Marker: Profile, Preset first; Make: Trim, the heights, top to bottom; a reopened one keeps its tab", async ({ page }) => {
     const fid = await platePanel(page);
     const panel = page.getByTestId("extrude-panel");
-    await expect(panel.locator("[role=tab]")).toHaveText(["Make", "Marker", "Label"]);
-    expect(await panel.locator("[role=tab]").evaluateAll((els) => els.map((e) => e.getAttribute("data-tab")))).toEqual(["make", "marker", "label"]);
-    expect((await state(page)).panel.tab).toBe("make");
-    await expect(panel.locator('[role=tab][data-tab="make"]')).toHaveAttribute("aria-selected", "true");
-    const order = ["profile", "preset", "trim", "extrude.paper_mm"];
-    const ys: number[] = [];
-    for (const r of order) {
-      await expect(panel.locator(`[data-tab-body="make"] [data-row="${r}"]`), r).toBeVisible();
-      ys.push(await top(page, `[data-tab-body="make"] [data-row="${r}"]`));
+    await expect(panel.locator("[role=tab]")).toHaveText(["Marker", "Label", "Make"]);
+    expect(await panel.locator("[role=tab]").evaluateAll((els) => els.map((e) => e.getAttribute("data-tab")))).toEqual(["marker", "label", "make"]);
+    expect((await state(page)).panel.tab).toBe("marker");
+    await expect(panel.locator('[role=tab][data-tab="marker"]')).toHaveAttribute("aria-selected", "true");
+    for (const [t, order] of [["marker", ["profile", "preset", "marker.type"]], ["make", ["trim", "extrude.paper_mm"]]] as const) {
+      await tab(page, t);
+      const ys: number[] = [];
+      for (const r of order) {
+        await expect(panel.locator(`[data-tab-body="${t}"] [data-row="${r}"]`), r).toBeVisible();
+        ys.push(await top(page, `[data-tab-body="${t}"] [data-row="${r}"]`));
+      }
+      for (let i = 1; i < ys.length; i++) expect(ys[i], `${order[i]} below ${order[i - 1]}`).toBeGreaterThan(ys[i - 1]);
     }
-    for (let i = 1; i < ys.length; i++) expect(ys[i], `${order[i]} below ${order[i - 1]}`).toBeGreaterThan(ys[i - 1]);
     await page.screenshot({ path: path.join(SHOTS, "panel-inkjet-make.png") });
 
     // a reopened feature keeps the tab the panel last had
@@ -104,7 +108,7 @@ test.describe(`the panel, V1 Command Dialog (${CORE} core)`, () => {
     await expect(panel).toBeVisible();
     expect((await state(page)).panel.tab).toBe("label");
     await expect(panel.locator('[data-tab-body="label"]')).toBeVisible();
-    // and a new feature starts on Make again
+    // and a new feature starts on Marker again
     await clickAt(page, -6, 40);
     await expect(panel).toHaveCount(0);
     await page.keyboard.press("r");
@@ -112,12 +116,13 @@ test.describe(`the panel, V1 Command Dialog (${CORE} core)`, () => {
     await page.keyboard.press("a");
     await expect(panel).toBeVisible();
     await idle(page);
-    expect((await state(page)).panel.tab).toBe("make");
-    await expect(panel.locator('[data-tab-body="make"]')).toBeVisible();
+    expect((await state(page)).panel.tab).toBe("marker");
+    await expect(panel.locator('[data-tab-body="marker"]')).toBeVisible();
   });
 
   test("b · inkjet shows only Paper thickness (grey, = the preset's); 3D shows Extrude, White and Black height; typed is set and sent, ↺ drives it, Ctrl+Z takes it back in one step", async ({ page }) => {
     await platePanel(page);
+    await tab(page, "make");
     const make = page.locator('[data-tab-body="make"]');
     // inkjet: the one height, driven by the preset's thickness
     const ink = (await state(page)).feature.preset;
@@ -207,6 +212,7 @@ test.describe(`the panel, V1 Command Dialog (${CORE} core)`, () => {
 
   test("b2 · inkjet: a typed paper thickness is set and sent; ↺ back to the preset's", async ({ page }) => {
     await platePanel(page);
+    await tab(page, "make");
     const paper = page.locator('input[data-path="extrude.paper_mm"]');
     await paper.fill("0.2");
     await paper.press("Enter");
@@ -225,6 +231,7 @@ test.describe(`the panel, V1 Command Dialog (${CORE} core)`, () => {
 
   test("c · Flip is on Make for a face profile and for a rectangle profile; the note says which side is out", async ({ page }) => {
     await platePanel(page);
+    await tab(page, "make");
     const flip = page.locator('[data-tab-body="make"] [data-row="marker.flip"]');
     await expect(flip).toBeVisible();
     await expect(page.getByTestId("flip-out")).toHaveText("Outward side: out of the face");
@@ -245,6 +252,7 @@ test.describe(`the panel, V1 Command Dialog (${CORE} core)`, () => {
     await idle(page);
     s = await state(page);
     expect(s.feature.profile.holes).toEqual([]);
+    await tab(page, "make");
     await expect(flip).toBeVisible();
     await expect(page.getByTestId("flip-out")).toHaveText("Outward side: up");
   });

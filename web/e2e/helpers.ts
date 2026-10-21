@@ -28,8 +28,8 @@ export async function coreReady(page: Page): Promise<void> {
  *  (this marker's preset), else Edit › Presets… (the one new markers start with). */
 export async function openPresets(page: Page): Promise<Locator> {
   if (await page.getByTestId("extrude-panel").count()) {
-    // the Preset row is on Make (a reopened panel keeps the tab it last had)
-    if (!(await page.getByTestId("panel-preset").count())) await panelTab(page, "make");
+    // the Preset row is on Marker, under the Profile (the skeleton; a reopened panel keeps the tab it last had)
+    if (!(await page.getByTestId("panel-preset").count())) await panelTab(page, "marker");
     await page.getByTestId("panel-preset").click();
   } else {
     await openMenu(page, "edit");
