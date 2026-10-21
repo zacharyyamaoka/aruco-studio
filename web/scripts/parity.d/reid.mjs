@@ -21,7 +21,7 @@ export default function cases() {
       { items: [item("a"), item("b"), item("c"), item("d")], ledger: { b: 1, d: 40, gone: 2 }, mode: "sequential" }],
     ["reid sequential fresh drops the ledger, typed still win", "assign_ids",
       { items: [item("a"), item("x", "single", "DICT_4X4_50", 1, 0), item("y", "single", "DICT_4X4_50", 1, 0), item("b")], ledger: { a: 0, b: 30 }, mode: "sequential", fresh: true }],
-    ["reid hash fresh (a page re-hashed)", "assign_ids", { items: page, ledger: { p0: 1, p7: 2 }, fresh: true }],
+    ["reid hash fresh (a page re-hashed)", "assign_ids", { items: page, ledger: { p0: 1, p7: 2 }, mode: "hash", fresh: true }],
     ["reid sequential fresh, 40 on a page", "assign_ids", { items: page, ledger: { p0: 1, p7: 2 }, mode: "sequential", fresh: true }],
     ["reid sequential 60 in DICT_4X4_50 (full)", "assign_ids",
       { items: Array.from({ length: 60 }, (_, k) => item(`s${59 - k}`)), mode: "sequential", start: 3 }],

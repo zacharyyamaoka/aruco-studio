@@ -346,8 +346,10 @@ export interface Readability {
   measured?: boolean;
 }
 
-/** Auto id (Zach, 2026-10-18): a stable key per marker feature, hashed to a
- *  preferred first id; unique across the document by default; a typed id wins. */
+/** Auto id (Zach, 2026-10-18): a stable key per marker feature, its first id
+ *  kept by the ledger under that key (a new one numbered after the highest id
+ *  in use: IdRequest.mode "next"); unique across the document by default; a
+ *  typed id wins. */
 export interface IdItem {
   key: string;               // stable: never changes for this marker (the feature's id by default)
   type: MarkerType;
@@ -370,12 +372,17 @@ export interface IdRequest {
    *  older tool). A plain list reserves the ids in EVERY family; a map
    *  reserves them per dictionary family ("4x4", "5x5", ...: core.numbering.family) */
   reserved?: number[] | Record<string, number[]>;
-  /** Re-ID (Zach, 2026-10-20: "lots of markers on a page and then re-id them"):
-   *  "hash" (default) keeps today's stable hashed ids; "sequential" numbers the
-   *  driven markers in document order from `start`, each grid / board a
-   *  contiguous range. `fresh` ignores the ledger so every driven id is given
-   *  out anew (the returned ledger replaces the old one). Typed ids always win. */
-  mode?: "hash" | "sequential";
+  /** "next" (default, 2026-10-20 night: "it would be simplest if they simply
+   *  increment") gives a new driven marker the first free block after the
+   *  highest id in use in its family, in document order (past the dictionary's
+   *  end it wraps to the lowest free block, with an info issue); "hash" hashes
+   *  its key to a preferred id. Re-ID (Zach, 2026-10-20: "lots of markers on a
+   *  page and then re-id them"): "sequential" numbers the driven markers in
+   *  document order from `start`, each grid / board a contiguous range.
+   *  `fresh` ignores the ledger so every driven id is given out anew (the
+   *  returned ledger replaces the old one). Typed ids always win; ledger ids
+   *  never move in any mode without `fresh`. */
+  mode?: "next" | "hash" | "sequential";
   start?: number;
   fresh?: boolean;
 }

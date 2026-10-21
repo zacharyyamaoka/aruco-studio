@@ -65,4 +65,5 @@ def test_a_bad_request_is_answered_in_words(payload):
 def test_the_facade_is_the_core():
     from aruco_studio.core import autoid
     items = [item("a"), item("b", "grid", count=6)]
-    assert web_ids.assign_ids({"items": items, "ledger": {"a": 3}}) == autoid.assign(items, {"a": 3})
+    assert web_ids.assign_ids({"items": items, "ledger": {"a": 3}}) == autoid.assign(items, {"a": 3},
+                                                                                   mode=autoid.DEFAULT_MODE)

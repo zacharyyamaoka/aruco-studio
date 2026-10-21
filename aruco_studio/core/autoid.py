@@ -51,14 +51,32 @@ reproducible with no ledger. What is guaranteed:
     * with the ledger the last call returned: adding or removing OTHER
       features never moves an existing id (a new feature, typed or driven,
       never displaces a ledger id; a removed one only frees ids);
-    * with no ledger: the same set of items always gives the same ids,
-      whatever order they arrive in (sorted keys, sha256 -- never Python's
-      salted hash()).
+    * with no ledger, in mode "hash": the same set of items always gives the
+      same ids, whatever order they arrive in (sorted keys, sha256 -- never
+      Python's salted hash()). Modes "next" and "sequential" number in
+      document order instead.
+
+Next id -- rule 3, version 2 (mode "next", the request's default since
+2026-10-20 night; DEFAULT_MODE. Zach: "As I copy paste new single markers,
+how are the new IDs calculated? It seems like it would be simplest if they
+simply increment"). Rule 3 above is version 1 (mode "hash", still asked for
+by name); rules 1 and 2 are the same in both:
+
+    3'. every other driven item, in REQUEST (document) order, takes the first
+        free block of its count that starts after the HIGHEST id in use in its
+        family -- ledger, typed, held and reserved ids, and the blocks this
+        call already gave out -- so pasting #5 three times gives #6, #7, #8;
+        a typed or reserved id in the way is stepped over. Past the end of its
+        dictionary it wraps to the lowest free block, with an info issue that
+        says so; then held blocks and a full dictionary as rule 3. `start` is
+        sequential's and is ignored. Ids freed by a removed feature are
+        reused only by that wrap.
 
 Re-ID (IdRequest.mode / start / fresh, Zach, 2026-10-20: "we should be able
 to have lots of the markers on a page and then re-id them"):
 
-    * mode "hash" (the default) is everything above, unchanged;
+    * mode "hash" is everything above, unchanged (assign()'s own keyword
+      default, so its pinned answers hold; the request's default is "next");
     * mode "sequential" swaps rule 3's preferred id for a counter: the driven
       items, in REQUEST (document) order, each take the next free block of
       their count from the counter -- typed, ledger, held and reserved ids
@@ -206,7 +224,8 @@ def reserved_in(reserved) -> Dict[Optional[str], Set[int]]:
     return {None: set(reserved_of(reserved))}
 
 
-MODES = ("hash", "sequential")
+MODES = ("hash", "sequential", "next")
+DEFAULT_MODE = "next"               # IdRequest.mode when absent (web_ids): rule 3'
 
 
 def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None,
@@ -216,8 +235,9 @@ def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None,
     IdResult). An item that cannot get ids (out of its dictionary, or the
     dictionary is full) comes back with ids [] and an error. `reserved`:
     ids never handed out, a list in every family or a map per family (see
-    the module's words). `mode` "hash" | "sequential", `start` (sequential's
-    first id) and `fresh` (ignore the ledger): Re-ID, the module's words."""
+    the module's words). `mode` "hash" | "sequential" | "next" (rule 3'),
+    `start` (sequential's first id) and `fresh` (ignore the ledger): Re-ID,
+    the module's words."""
     if mode not in MODES:
         raise ValueError(f"mode: {' or '.join(map(repr, MODES))}, got {mode!r}")
     if _whole(start, "start") < 0:
@@ -225,6 +245,7 @@ def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None,
     if not isinstance(fresh, bool):
         raise ValueError(f"fresh: true or false, got {fresh!r}")
     sequential, origin = mode == "sequential", start      # `start` is reused below
+    after_highest = mode == "next"
     its = [item_of(d) for d in (items or [])]
     by_family = reserved_in(reserved)
     every = by_family.get(None, set())
@@ -349,13 +370,25 @@ def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None,
                 for k in range(it.count):
                     hold.setdefault(led[it.key] + k, it.key)
     # 3. the rest, driven: the preferred block, else the next free one (wrapping);
-    #    sequential: in request order, from its family's counter
+    #    sequential: in request order, from its family's counter;
+    #    next (3'): in request order, after the highest id in use in its family
     counter: Dict[str, int] = {}
     wrapped: Set[str] = set()
-    for it in (its if sequential else order):
+
+    def highest(fam: str) -> int:
+        """The highest id in use in the family (-1: none): printed, held or reserved."""
+        return max([*claims.get(fam, {}), *held.get(fam, {}), *res_of(fam)], default=-1)
+    for it in (its if sequential or after_highest else order):
         if it.key in out:
             continue
-        if sequential:
+        if after_highest:
+            # WHY after the highest and never into a gap below it: an id a removed
+            # feature freed may still be printed on a part somewhere, so it comes
+            # back only when the dictionary has nothing left above (the wrap)
+            if it.family not in counter:
+                counter[it.family] = highest(it.family) + 1
+            want = counter[it.family]
+        elif sequential:
             want = counter.get(it.family, origin)
             if origin > it.capacity - 1 and it.dictionary not in wrapped:
                 # keyed to no item: it is the request's start, not any one marker's
@@ -368,6 +401,11 @@ def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None,
         last = it.capacity - it.count
         starts = list(range(want, last + 1)) + list(range(0, min(want, last + 1)))
         start = next((s for s in starts if not clash(it, s, True)), None)
+        if after_highest and start is not None and start < want:
+            warnings.append(_issue("info", it.key,
+                                   f"past {it.dictionary}'s last id {it.capacity - 1}: it wraps "
+                                   f"to the lowest free {'id' if it.count == 1 else 'block'} "
+                                   f"{_label(start, it.count)}"))
         if start is None:                          # a held block, never a reserved one
             start = next((s for s in starts if not clash(it, s) and not on_reserved(it, s)), None)
             if start is not None:
@@ -390,5 +428,6 @@ def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None,
             refuse(it, want, True)
             continue
         take(it, start, True)
-        counter[it.family] = start + it.count
+        # next: a wrapped block is below the counter, which stays past the highest
+        counter[it.family] = max(counter[it.family], start + it.count) if after_highest else start + it.count
     return {"items": [out[it.key] for it in its], "ledger": new_ledger, "warnings": warnings}

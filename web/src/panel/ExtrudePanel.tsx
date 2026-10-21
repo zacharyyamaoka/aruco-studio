@@ -267,7 +267,7 @@ export function ExtrudePanel() {
           int min={0} bad={bad("marker.first_id")} />
         <span className="range" data-testid="id-range">{idRange(m, showPlan ? showPlan.ids : undefined)}</span>
       </FieldRow>
-      <FieldRow path="feature.key" label="Key" icon="row-key-round" title="Auto id hashes this stable key to the first id; keys are unique in the document">
+      <FieldRow path="feature.key" label="Key" icon="row-key-round" title="Auto id keeps the first id under this stable key; keys are unique in the document">
         <TextField path="feature.key" value={f.key} onCommit={st.setKey} placeholder={f.id} />
       </FieldRow>
       {/* Suggest first: picking one sets the numbers under it */}

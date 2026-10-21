@@ -316,7 +316,7 @@ export const useStudio = create<Studio>((set, get) => {
     newDoc: (exampleId) => {
       const ex = exampleId ? example(exampleId) : undefined;
       const doc = emptyDoc(ex?.name ?? "Untitled", ex ? structuredClone(ex.shapes) : [], get().doc.default_preset);
-      get().loadDoc(ex?.features ? { ...doc, features: structuredClone(ex.features) } : doc);
+      get().loadDoc(ex?.features ? { ...doc, features: structuredClone(ex.features), id_ledger: { ...ex.id_ledger } } : doc);
     },
     setTool: (tool) => set({ tool }),
     select: (sel) => set(only(sel)),
@@ -440,9 +440,13 @@ export const useStudio = create<Studio>((set, get) => {
         return { ...moveShape(structuredClone(s), dx, dy), id: map[s.id] };
       });
       // new ids and keys: auto id hands each pasted feature new marker ids; every setting is kept
+      // WHY a typed first id is driven in the copy (Zach, 2026-10-20 night: "simplest if they
+      // simply increment"): kept typed, the copy would print the same id as its original;
+      // driven, it takes the next id after the highest in use (core autoid rule 3')
       const features = clip.features.map((f) => {
         const id = newId("f");
-        return { ...structuredClone(f), id, key: id, profile: { outer: map[f.profile!.outer], holes: f.profile!.holes.map((h) => map[h]) } };
+        return { ...structuredClone(f), id, key: id, set: f.set.filter((p) => p !== "marker.first_id"),
+          profile: { outer: map[f.profile!.outer], holes: f.profile!.holes.map((h) => map[h]) } };
       });
       const dims = clip.dims.map((d) => renameDim(d, newId("d"), map));
       const allDims = [...doc.dims, ...dims];
@@ -609,7 +613,7 @@ export const useStudio = create<Studio>((set, get) => {
       const { doc, panel } = get();
       put({ doc: { ...updateFeature(doc, panel.open ? panel.featureId : null, (f) => ({ ...f, preset: p })), default_preset: p } });
     },
-    // the planner's next auto id call (hash, with this ledger) keeps these ids
+    // the planner's next auto id call (with this ledger) keeps these ids
     reId: (res) => put({ doc: applyIds(get().doc, res) }),
     openModal: (modal) => set({ modal }),
     say: (note) => set({ note }),

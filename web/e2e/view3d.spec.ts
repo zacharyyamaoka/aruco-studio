@@ -8,7 +8,7 @@
 // flow into that folder.
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, idle, labelOn, loadExample, openPresets, openStudio, planOutline, state } from "./helpers";
+import { CORE, clickAt, coreReady, idle, labelOn, loadExample, openPresets, openStudio, panelTab, planOutline, state } from "./helpers";
 
 const SHOTS = process.env.VIEW3D_SHOTS ?? "test-results/view3d";
 
@@ -444,6 +444,15 @@ test.describe(`the 3D view (${CORE} core)`, () => {
 
   test("h · top view: the label's band reads as the plan has it -- glyphs knocked out light, the black round them dark, nothing mirrored", async ({ page }) => {
     await inspectTile(page);
+    // WHY a typed id: auto id numbers a new marker from 0 since 2026-10-20 night
+    // (core autoid "next"), and "#0" reads the same mirrored top to bottom; 27 is
+    // the id the hash gave this tile before, whose label a flip does change
+    await panelTab(page, "marker");
+    const id = page.locator('input[data-path="marker.first_id"]');
+    await id.fill("27");
+    await id.press("Enter");
+    await idle(page);
+    expect((await state(page)).plan.ids).toEqual([27]);
     await labelOn(page);   // off by default since 2026-10-20 night
     await to3d(page);
     const s = await state(page);
