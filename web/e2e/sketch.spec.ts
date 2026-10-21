@@ -176,10 +176,18 @@ test.describe("the sketch's tools", () => {
     await expect(page.getByTestId("select-box")).toHaveCount(0);
     let s = await state(page);
     expect([...s.selection].sort()).toEqual([a, b].sort());
-    // a right-click without a drag changes nothing
-    const [cx, cy] = await toClient(page, 30, 0);
+    // a right-click without a drag is no box: on the selection it keeps it; since 2026-10-21 it
+    // opens the canvas menu (e2e/actualsize.spec.ts), and on another shape it selects that one
+    // first, as Figma's does (here c's fill: its profile)
+    let [cx, cy] = await toClient(page, 0, 0);
     await page.mouse.click(cx, cy, { button: "right" });
     expect([...(await state(page)).selection].sort()).toEqual([a, b].sort());
+    await expect(page.getByTestId("canvas-menu")).toHaveAttribute("data-target", "shapes");
+    [cx, cy] = await toClient(page, 30, 0);
+    await page.mouse.click(cx, cy, { button: "right" });
+    expect((await state(page)).sel).toMatchObject({ kind: "profile", ref: { outer: c } });
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("canvas-menu")).toHaveCount(0);
     // right to left: a crossing that only touches c's left edge
     await rightDrag(page, [25, 15], [-45, -15], async (p) => {
       await expect(p.getByTestId("select-box")).toHaveAttribute("data-select-box", "crossing");

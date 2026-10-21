@@ -3,11 +3,11 @@
 // a ruler and type its length. Either gives this screen's CSS px per mm,
 // kept per screen in this browser (./scale.ts); Actual size follows it at
 // once when it is showing (./zoom.ts followScale).
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Button, Dialog } from "@bam/ui";
 import { useStudio } from "../store";
 import "./zoom.css";
-import { CARD_MM, MAX_PX_PER_MM, MIN_PX_PER_MM, clampScale, fromCard, fromRuler, perInchOf, useScale } from "./scale";
+import { CARD_MM, clampScale, fromCard, fromRuler, perInchOf, useScale } from "./scale";
 
 /** The ruler line's longest (CSS px): long enough to read to 0.5 % on a ruler. */
 const LINE_MAX = 400;
@@ -70,15 +70,17 @@ export function CalibrateDialog() {
     if (!kept) useStudio.getState().say("This browser won't store the calibration: it holds until you reload.");
   };
   const forget = () => { useScale.getState().forget(); close(); };
-  const bind = (el: HTMLDivElement | null) => {
+  // the body's width, followed (one observer for the dialog's life, not one per render)
+  const bind = useCallback((el: HTMLDivElement | null) => {
     ro.current?.disconnect();
+    ro.current = null;
     if (!el) return;
     // its content box: the padding (16 px a side) is not room for the card
     const measure = () => setAvail(Math.max(200, el.clientWidth - 32));
     ro.current = new ResizeObserver(measure);
     ro.current.observe(el);
     measure();
-  };
+  }, []);
 
   const s = scale.screen;
   const when = scale.cal?.at ? new Date(scale.cal.at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "";
@@ -100,8 +102,8 @@ export function CalibrateDialog() {
             style={{ width: cw, height: ch, borderRadius: CARD_MM.r * draft }}>
             <span className="cal-chip" style={{ width: 11 * draft, height: 8.5 * draft, left: 10 * draft, top: (landscape ? 19 : 12) * draft }} />
             <span className="cal-card-text">85.60 × 53.98 mm</span>
-            <span className="cal-grip" data-testid="cal-grip" role="slider" aria-label="The card's width" aria-valuenow={+draft.toFixed(3)}
-              aria-valuemin={MIN_PX_PER_MM} aria-valuemax={MAX_PX_PER_MM}
+            {/* the pointer's handle; the keys' is the slider under the card */}
+            <span className="cal-grip" data-testid="cal-grip" aria-hidden="true" title="Drag to the card's edge"
               onPointerDown={onGrip} onPointerMove={onGripMove} onPointerUp={onGripUp} onPointerCancel={onGripUp} />
           </div>
         </div>
