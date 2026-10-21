@@ -1,3 +1,4 @@
+# WHY: range per camera, requirement on the feature, OpenCV policy -- docs/peps/0003-verify-reading-range.md
 """Verify's reading range (V4 "Range strip", Zach 2026-10-21): how near and how
 far a marker reads on one camera, through a budget of tilt, blur, grain and
 glare. Zach: "maybe I can just select the camera and then Verify can tell me
