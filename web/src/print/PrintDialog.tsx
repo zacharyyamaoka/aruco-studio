@@ -7,7 +7,8 @@
 // because it's applied on a per marker basis!"
 // Each group's sheet is laid out at true scale (CSS millimetres are real millimetres at 100 % zoom), with a
 // 50 mm scale bar to measure on screen (the core's page carries its own bar
-// for paper). Beside the page: the auto layout (Tight | Spaced, the gap,
+// for paper, on the pages Scale bar says: Hide | First page | Every page, and
+// the screen's follows the page). Beside the page: the auto layout (Tight | Spaced, the gap,
 // Optimize: Fewest cuts | Fewest sheets), the core's pages, cuts and fill,
 // and Print / PDF / SVG. Every change lays the sheet out again. Print opens
 // the browser's dialog on a print-only page (the sheet's SVGs at 100 %,
@@ -24,8 +25,10 @@ import { activeFeatureId, useStudio } from "../store";
 import "./sheet.css";
 
 const MM_PX = 96 / 25.4;
+const BAR_MARK = "must measure 100 mm";   // the caption core.sheet draws over the bar, on its pages only
 const GAP_MM = 4;              // core.sheet's SheetSettings.gap_mm, the field's first value
 type Objective = NonNullable<SheetRequest["objective"]>;
+type ScaleBarOption = NonNullable<SheetRequest["scale_bar"]>;
 
 /** The page size an SVG states in mm ("215.9mm"), else the fallback. */
 export function svgSizeMm(svg: string, fallback: [number, number]): [number, number] {
@@ -34,7 +37,9 @@ export function svgSizeMm(svg: string, fallback: [number, number]): [number, num
   return w && h ? [Number(w[1]), Number(h[1])] : fallback;
 }
 
-function ScaleBar() {
+function ScaleBar({ onPage }: { onPage: boolean }) {
+  // WHY (Zach, 2026-10-20 night): a page printed without the bar is previewed without it
+  if (!onPage) return null;
   return (
     <div className="scalebar" data-testid="scale-bar" style={{ width: "50mm" }}>
       <div className="scalebar-ticks">{Array.from({ length: 11 }, (_, i) => <i key={i} style={{ left: `${i * 5}mm` }} className={i % 2 ? "" : "major"} />)}</div>
@@ -57,6 +62,8 @@ export function PrintDialog() {
   const [layout, setLayout] = useState<SheetMode>("spaced");
   const [gap, setGap] = useState(GAP_MM);
   const [objective, setObjective] = useState<Objective>("fewest_sheets");
+  // WHY first (Zach, 2026-10-20 night): a printer's scale is the same for a whole job, and a bar on every page costs sticker area
+  const [scaleBar, setScaleBar] = useState<ScaleBarOption>("first");
   const [shown, setShown] = useState(0);
   const [printing, setPrinting] = useState(false);
   /** the group on screen (its preset's key); the marker in focus's when it opens */
@@ -71,7 +78,7 @@ export function PrintDialog() {
   // the features without a preset yet (the core's presets have not arrived), and the 3D-printed ones
   const unset = doc.features.filter((f) => !featurePreset(doc, f)).length;
   const printed3d = doc.features.filter((f) => featurePreset(doc, f)?.method === "print3d").length;
-  const req: SheetRequest = { items, cut_lines: true, mode: layout, objective, ...(layout === "spaced" ? { gap_mm: gap } : {}) };
+  const req: SheetRequest = { items, cut_lines: true, mode: layout, objective, scale_bar: scaleBar, ...(layout === "spaced" ? { gap_mm: gap } : {}) };
   const key = JSON.stringify(req);
 
   // opening: the group of the marker in focus
@@ -118,6 +125,8 @@ export function PrintDialog() {
   const [pw, ph] = page ? svgSizeMm(page, fallback) : fallback;
   const fitK = Math.max(0.1, Math.min(1, room[0] / (pw * MM_PX), room[1] / ((ph + 16) * MM_PX)));
   const k = mode === "fit" ? fitK : 1;
+  // the core's page carries its bar as a text run; the screen's 50 mm bar follows it
+  const barOnPage = page.includes(BAR_MARK);
   const name = slug(doc.name);
   const many = (sheet?.svg.length ?? 0) > 1;
 
@@ -174,8 +183,8 @@ export function PrintDialog() {
               {sheet && (
                 <div className="print-scaled" style={{ width: pw * MM_PX * k, height: (ph + 16) * MM_PX * k }}>
                   <div style={{ transform: `scale(${k})`, transformOrigin: "0 0", width: `${pw}mm` }}>
-                    <ScaleBar />
-                    <div className="print-page" data-testid="print-page" data-page={pageIndex + 1} data-page-mm={`${pw}x${ph}`} style={{ width: `${pw}mm`, height: `${ph}mm` }}
+                    <ScaleBar onPage={barOnPage} />
+                    <div className="print-page" data-testid="print-page" data-page={pageIndex + 1} data-scale-bar={barOnPage ? "1" : "0"} data-page-mm={`${pw}x${ph}`} style={{ width: `${pw}mm`, height: `${ph}mm` }}
                       dangerouslySetInnerHTML={{ __html: page }} />
                   </div>
                 </div>
@@ -198,6 +207,11 @@ export function PrintDialog() {
                 <SegmentedRow compact value={objective} onChange={(v) => setObjective(v as Objective)} testid="sheet-objective"
                   options={[{ value: "fewest_cuts", label: "Fewest cuts" }, { value: "fewest_sheets", label: "Fewest sheets" }]} />
               </FieldRow>
+              <FieldRow path="sheet.scale_bar" label="Scale bar">
+                <SegmentedRow compact value={scaleBar} onChange={(v) => setScaleBar(v as ScaleBarOption)} testid="sheet-scale-bar"
+                  options={[{ value: "hide", label: "Hide" }, { value: "first", label: "First page" }, { value: "every", label: "Every page" }]} />
+              </FieldRow>
+              <div className="sheet-note muted">{scaleBar === "hide" ? "no bar: measure a marker to check the print" : scaleBar === "first" ? "pages 2+ give the bar's band to stickers" : "the bar takes a band on every page"}</div>
             </Section>
             <div className="sheet-stats" data-testid="sheet-stats">
               <Stat testid="sheet-pages" raw={sheet?.pages} value={sheet ? String(sheet.pages) : "–"} label={sheet?.pages === 1 ? "page" : "pages"} />
