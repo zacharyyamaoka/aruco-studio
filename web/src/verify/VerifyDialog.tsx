@@ -11,6 +11,7 @@ import { Badge, Dialog, NumberField, Select, registerGlyphs, type Opt } from "@b
 import type { MarkerPlan, PlanRequest, Readability, VerifyResult } from "../core/contract";
 import { core } from "../coreSource";
 import { featureNumber, getFeature, idRange, planRequest, type Doc, type Feature } from "../model/doc";
+import { CoreWait, WaitLine, useCallWait, useCoreWait } from "../panel/Waiting";
 import { activeFeatureId, useStudio } from "../store";
 import {
   KNOBS0, SWEEP_TILTS, benchCamera, calcCamera, loadCalc, readsTo, saveCalc, share, viewOf, type CalcCamera, type Knobs,
@@ -71,6 +72,8 @@ export function VerifyDialog() {
       title={it ? `Verify · ${markerName(it.f, it.plan)}` : "Verify"}>
       {open && (it
         ? <Bench all={all} it={it} onPick={setPick} doc={doc} />
+        // features but no preset: they plan once the core's presets are in
+        : doc.features.length && !doc.preset ? <CoreWait needFacts testid="verify-wait" />
         : <div className="pad muted">Nothing to verify yet: make an ArUco Extrude (A) first.</div>)}
     </Dialog>
   );
@@ -159,18 +162,22 @@ function Bench({ all, it, onPick, doc }: { all: Item[]; it: Item; onPick: (id: s
   const r = shot?.r ?? null;
   // the last image stays while the next renders; another marker's never shows
   const fresh = shot?.key === it.key;
-  const loading = busy && !warm;
+  // the core's own start first: OpenCV loads only once Python is up
+  const coreWait = useCoreWait(false);
+  const loading = busy && !warm && !coreWait;
+  const retry = () => { done.current = null; setError(null); void pump(); };
+  const callWait = useCallWait(busy && warm, error, "rendering", retry);
   return (
     <div className="vf">
       <div className="vf-cam">
         <div className="vf-frame" data-busy={busy ? "1" : "0"}>
           {r?.image_png_base64 && fresh
             ? <img data-testid="verify-image" data-renders={shot!.n} src={`data:image/png;base64,${r.image_png_base64}`} alt="The bench camera's view, with OpenCV's detections drawn" />
-            : <div className="vf-empty muted">{it.plan ? "" : "Planning the marker…"}</div>}
+            : <div className="vf-empty muted">{coreWait ? <WaitLine wait={coreWait} testid="verify-wait" /> : it.plan ? "" : "Planning the marker…"}</div>}
           {loading && <div className="vf-loading" data-testid="verify-loading"><span className="vf-spin" />Loading OpenCV (13 MB)…</div>}
           {busy && !loading && <div className="vf-busy">Rendering…</div>}
         </div>
-        {error && <div className="vf-error" data-testid="verify-error">{error}</div>}
+        {callWait && <div className="vf-error" data-testid="verify-error"><WaitLine wait={callWait} testid="verify-retry" /></div>}
         {r && fresh && <Verdict r={r} />}
       </div>
       <div className="vf-side">

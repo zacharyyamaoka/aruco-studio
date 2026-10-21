@@ -20,6 +20,9 @@ export function onCoreStatus(cb: () => void): () => void { listeners.add(cb); re
 export function useCoreStatus(): CoreStatus { return useSyncExternalStore(onCoreStatus, coreStatus); }
 
 const t0 = typeof performance !== "undefined" ? performance.now() : 0;
+/** How long the core has been starting (ms, from this module's load): the
+ *  waits the UI shows count from here. */
+export function coreElapsedMs(): number { return performance.now() - t0; }
 
 // WHY a dynamic import per kind: the mock must not boot Pyodide, and the
 // real build must not ship the mock in its main chunk.
@@ -37,10 +40,29 @@ const idleWaiters = new Set<() => void>();
 export function callsInFlight(): number { return inflight; }
 export function onCallsSettled(cb: () => void): () => void { idleWaiters.add(cb); return () => { idleWaiters.delete(cb); }; }
 
+/** A test-only fault hook (web/e2e/startup.spec.ts), inert unless the page
+ *  sets window.__arucoFault: `{presets: 1}` rejects the next presets call
+ *  (Infinity: every one), `{delay: {plan: 9000}}` holds each plan call 9 s
+ *  before it goes out. */
+interface Fault { delay?: Partial<Record<keyof CoreApi, number>>; [name: string]: unknown }
+
+async function injected(name: keyof CoreApi): Promise<void> {
+  const fault = (globalThis as { __arucoFault?: Fault }).__arucoFault;
+  if (!fault) return;
+  const hold = fault.delay?.[name];
+  if (hold) await new Promise((r) => setTimeout(r, hold));
+  const n = fault[name];
+  if (typeof n === "number" && n > 0) {
+    fault[name] = n - 1;
+    throw new Error(`${name}: injected fault`);
+  }
+}
+
 function counted<K extends keyof CoreApi>(name: K): CoreApi[K] {
   return (async (...args: unknown[]) => {
     inflight += 1;
     try {
+      await injected(name);
       const api = await source;
       return await (api[name] as (...a: unknown[]) => Promise<unknown>)(...args);
     } finally {

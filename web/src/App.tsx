@@ -96,12 +96,15 @@ export function App() {
   useEffect(() => {
     const stop = startPlanner();
     window.addEventListener("keydown", onKey);
-    // the dictionaries and presets once the core answers (the sketch works before)
-    let asked = false;
+    // the dictionaries and presets each time the core becomes ready without
+    // them (the sketch works before); loadCoreFacts retries, then holds its
+    // error in the store for the panel's Retry
+    let was: string | null = null;
     const ask = () => {
-      if (asked || coreStatus().state !== "ready") return;
-      asked = true;
-      loadCoreFacts().catch((e) => useStudio.getState().say(`The core did not answer: ${(e as Error).message}`));
+      const now = coreStatus().state;
+      const rose = now === "ready" && was !== "ready";
+      was = now;
+      if (rose && useStudio.getState().facts.state !== "ok") void loadCoreFacts();
     };
     const un = onCoreStatus(ask);
     ask();

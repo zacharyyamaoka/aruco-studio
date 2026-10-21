@@ -15,6 +15,7 @@ import type { Sheet, SheetMode, SheetRequest } from "../core/contract";
 import { core } from "../coreSource";
 import { downloadBase64, downloadText, slug } from "../io/files";
 import { sheetItems } from "../model/doc";
+import { CoreWait, WaitLine, useCallWait, useCoreWait } from "../panel/Waiting";
 import { useStudio } from "../store";
 import "./sheet.css";
 
@@ -54,6 +55,8 @@ export function PrintDialog() {
   const [objective, setObjective] = useState<Objective>("fewest_sheets");
   const [shown, setShown] = useState(0);
   const [printing, setPrinting] = useState(false);
+  /** Retry's count: a new one lays the sheet out again */
+  const [tries, setTries] = useState(0);
   const stage = useRef<HTMLDivElement>(null);
   const [room, setRoom] = useState<[number, number]>([820, 600]);
   const items = open ? sheetItems(doc) : [];
@@ -62,6 +65,8 @@ export function PrintDialog() {
 
   useEffect(() => {
     if (!open) { setLaid(null); setError(null); setShown(0); return; }
+    // features but no preset yet: they plan once the core's presets are in (CoreWait says which wait)
+    if (!items.length && doc.features.length && !doc.preset) { setError(null); return; }
     if (!items.length) { setError("Nothing to print yet: make an ArUco Extrude (A) first."); return; }
     let live = true;
     // the last layout stays on screen while the next one is worked out
@@ -69,7 +74,7 @@ export function PrintDialog() {
     core.sheet(req).then((s) => { if (live) setLaid({ key, sheet: s }); })
       .catch((e) => { if (live) { setLaid(null); setError((e as Error).message); } });
     return () => { live = false; };
-  }, [open, key]);
+  }, [open, key, tries]);
 
   // Fit: the page and its scale bar inside the stage as it is now
   useEffect(() => {
@@ -82,6 +87,8 @@ export function PrintDialog() {
 
   const sheet = laid?.sheet ?? null;
   const busy = !!laid && laid.key !== key && !error;
+  const coreWait = useCoreWait(open && !doc.preset);
+  const callWait = useCallWait(open && !coreWait && !!items.length && laid?.key !== key, items.length ? error : null, "laying out the page", () => setTries((n) => n + 1));
 
   const pageIndex = sheet ? Math.min(shown, sheet.svg.length - 1) : 0;
   const page = sheet?.svg[pageIndex] ?? "";
@@ -122,9 +129,11 @@ export function PrintDialog() {
               <SegmentedRow compact value={mode} onChange={(v) => setMode(v as "actual" | "fit")} testid="print-mode"
                 options={[{ value: "actual", label: "Actual size" }, { value: "fit", label: "Fit" }]} />
             </div>
-            {error && <div className="print-error">{error}</div>}
+            {coreWait ? <CoreWait needFacts={!doc.preset} testid="print-wait" />
+              : callWait ? <div className="print-error"><WaitLine wait={callWait} testid="print-wait" /></div>
+              : error && <div className="print-error">{error}</div>}
             <div className="print-stage sheet-stage" data-testid="print-stage" data-mode={mode} ref={stage}>
-              {!sheet && !error && <div className="muted pad">Laying out the page…</div>}
+              {!sheet && !error && !coreWait && !callWait && <div className="muted pad">Laying out the page…</div>}
               {sheet && (
                 <div className="print-scaled" style={{ width: pw * MM_PX * k, height: (ph + 16) * MM_PX * k }}>
                   <div style={{ transform: `scale(${k})`, transformOrigin: "0 0", width: `${pw}mm` }}>

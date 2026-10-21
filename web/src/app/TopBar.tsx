@@ -4,6 +4,7 @@
 import { Glyph, Menu, MenuItem, MenuSeparator, useTheme } from "@bam/ui";
 import { LoaderCircle, Moon, Sun } from "lucide-react";
 import { coreKind, useCoreStatus } from "../coreSource";
+import { reload, startingText, useTick } from "../panel/Waiting";
 import { useStudio } from "../store";
 import { SKINS, useSkin } from "../skins/skins";
 import { exportPdf, exportSvg, openDoc, openPrint, saveDoc } from "./commands";
@@ -36,14 +37,21 @@ function BrandCube() {
   );
 }
 
+/** The core's state; its tooltip says how long Python took to start (or how
+ *  long it has been starting), or the error, with Reload beside it. */
 export function CoreChip() {
   const s = useCoreStatus();
+  useTick(s.state === "loading", 1000);
+  const what = coreKind === "mock" ? "Mock core" : "Python";
   const text = s.state === "ready" ? (coreKind === "mock" ? "Mock core" : "Python ready") : s.state === "error" ? "Core failed" : "Core loading…";
+  const title = s.state === "ready" ? `${what} ready in ${((s.ms ?? 0) / 1000).toFixed(1)} s`
+    : s.state === "error" ? `The Python core failed to start: ${s.detail ?? "no reason given"}. Reload the page to try again.`
+    : startingText();
   return (
-    <span className={`chip-core st-${s.state}`} data-testid="core-chip" data-state={s.state} data-kind={coreKind}
-      title={[s.detail, s.ms ? `${(s.ms / 1000).toFixed(1)} s` : null].filter(Boolean).join(" · ") || undefined}>
+    <span className={`chip-core st-${s.state}`} data-testid="core-chip" data-state={s.state} data-kind={coreKind} title={title}>
       {s.state === "loading" ? <LoaderCircle size={12} className="spin" /> : <i className="dot" />}
       <span className="chip-text">{text}</span>
+      {s.state === "error" && <button type="button" className="chip-reload" data-testid="core-reload" title={title} onClick={reload}>Reload</button>}
     </span>
   );
 }

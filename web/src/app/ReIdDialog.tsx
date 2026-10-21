@@ -12,6 +12,7 @@ import { Badge, Button, Dialog, FieldRow, Glyph, Messages, NumberField, Segmente
 import type { IdAssignment, IdRequest, IdResult, Issue } from "../core/contract";
 import { core } from "../coreSource";
 import { featureNumber, idItems, idRange, isSet, type Feature } from "../model/doc";
+import { WaitLine, useCallWait, useCoreWait } from "../panel/Waiting";
 import { useStudio } from "../store";
 import "./reid.css";
 
@@ -36,6 +37,8 @@ export function ReIdDialog() {
   // the preview on screen and the request it answers
   const [got, setGot] = useState<{ key: string; res: IdResult } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Retry's count: a new one asks again */
+  const [tries, setTries] = useState(0);
   const close = () => useStudio.getState().openModal(null);
   const items = open ? idItems(doc) : [];
   const req: IdRequest = { items, mode: how, fresh: true, ...(how === "sequential" ? { start } : {}) };
@@ -49,9 +52,13 @@ export function ReIdDialog() {
     core.assign_ids(req).then((res) => { if (live) setGot({ key, res }); })
       .catch((e) => { if (live) { setGot(null); setError((e as Error).message); } });
     return () => { live = false; };
-  }, [open, key]);
+  }, [open, key, tries]);
 
   const res = got?.key === key ? got.res : null;
+  // what the preview waits for: the core's start, else this call when it is slow or failed
+  const coreWait = useCoreWait(false);
+  const callWait = useCallWait(open && !coreWait && !!items.length && !res, items.length ? error : null, "working it out", () => setTries((n) => n + 1));
+  const wait = open ? coreWait ?? callWait : null;
   // the kit's Messages take {field, level, text}
   const plain = (is: Issue[]) => is.map((i) => ({ field: i.field, level: i.level, text: i.text }));
   const byKey = (k: string) => plain((res?.warnings ?? []).filter((i) => i.key === k));
@@ -67,7 +74,7 @@ export function ReIdDialog() {
     <Dialog open={open} onClose={close} title="Re-ID all markers" icon="marker" testid="reid-dialog" width={640} className="reid-dialog"
       footer={<>
         <span className="reid-sum muted" data-testid="reid-summary">
-          {res ? `${moved} of ${doc.features.length} marker${doc.features.length === 1 ? "" : "s"} change` : error ? "" : "Working it out…"}
+          {res ? `${moved} of ${doc.features.length} marker${doc.features.length === 1 ? "" : "s"} change` : wait ? <WaitLine wait={wait} testid="reid-wait" /> : error ? "" : "Working it out…"}
         </span>
         <span className="grow" />
         <Button onClick={close} testid="reid-cancel">Cancel</Button>
@@ -88,7 +95,7 @@ export function ReIdDialog() {
             <span className="muted">typed ids always win; untype them first to renumber them</span></span>
         </FieldRow>
         <div className="reid-issues" data-testid="reid-issues">
-          {error && <Messages path="reid" issues={[{ field: "reid", level: "error", text: error }]} />}
+          {error && !wait && <Messages path="reid" issues={[{ field: "reid", level: "error", text: error }]} />}
           <Messages path="reid" issues={general} />
         </div>
       </div>
