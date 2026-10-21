@@ -36,6 +36,11 @@ def m(mm) -> str:
     return f"{mm / 1000.0:.2f} m" if mm >= 1000.0 else f"{mm:.0f} mm"
 
 
+def span(near, far) -> str:
+    """A range's words; reading nowhere says so."""
+    return "reads nowhere" if far is None else f"{m(near)}–{m(far)}"
+
+
 def s(ms) -> str:
     return "—" if ms is None else f"{ms / 1000.0:.1f} s"
 
@@ -60,7 +65,7 @@ CSS = r"""
 :root{--bg:#f6f7f9;--panel:#fff;--line:#e2e5ea;--text:#1c222b;--muted:#6b7480;--accent:#2f6fed;--ok:#18865a;--bad:#cf3b3b;--warn:#a8650e;
  --f:Inter,"Segoe UI",system-ui,-apple-system,sans-serif;--mono:ui-monospace,"Cascadia Mono",Consolas,monospace}
 @media (prefers-color-scheme:dark){:root{--bg:#14171c;--panel:#1c2027;--line:#2c323b;--text:#e6e9ee;--muted:#98a1ad;--accent:#5b8ff0;--ok:#4cc27a;--bad:#f06a5f;--warn:#e3ac4b}}
-*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 var(--f)}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 var(--f);overflow-wrap:break-word}
 main{max-width:1060px;margin:0 auto;padding:28px 16px 60px}
 h1{font-size:26px;line-height:1.25;margin:0 0 6px} h2{font-size:18px;margin:34px 0 8px} h3{font-size:14px;margin:18px 0 6px}
 .kick{font:600 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
@@ -71,7 +76,7 @@ figure{margin:12px 0} figcaption{font-size:12.5px;color:var(--muted);margin-top:
 img,video{max-width:100%;height:auto;border-radius:6px;border:1px solid var(--line);display:block}
 table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
 th{font:600 10.5px/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.tw{overflow-x:auto} code{font:12.5px var(--mono)} pre{font:12px/1.45 var(--mono);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;overflow-x:auto}
+.tw{overflow-x:auto} code{font:12.5px var(--mono);overflow-wrap:anywhere} pre{font:12px/1.45 var(--mono);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;overflow-x:auto}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px} @media (max-width:760px){.grid2{grid-template-columns:1fr}}
 ul{padding-left:20px} li{margin:3px 0}
 .pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11.5px;border:1px solid var(--line)}
@@ -101,7 +106,7 @@ def build(src: Path) -> str:
             tot[h] += r["metrics"]["ms_sum"]
             d = r["detail"]
             cells.append(f'<td><b>{s(r["metrics"]["ms_sum"])}</b><br><span class="muted">{r["metrics"]["renders_sum"]} views · '
-                         f'{m(d["near_mm"])}–{m(d["far_mm"])}</span></td>')
+                         f'{span(d["near_mm"], d["far_mm"])}</span></td>')
         trs.append(f'<tr><td>{esc(bd["name"])}</td>{"".join(cells)}<td class="muted">32 s</td></tr>')
     trs.append('<tr><td><b>The document (one worker, one after another)</b></td>'
                + "".join(f'<td><b>{s(tot.get(h))}</b></td>' for h in ("browser", "cpython-cv411", "cpython")) + '<td class="muted">128 s</td></tr>')
@@ -123,7 +128,7 @@ def build(src: Path) -> str:
         same = (a["detail"]["near_mm"], a["detail"]["far_mm"], a["detail"]["band_mm"]) == (br["detail"]["near_mm"], br["detail"]["far_mm"], br["detail"]["band_mm"]) if br else None
         fa, fc = a["detail"]["far_mm"], c["detail"]["far_mm"]
         worse = "4.11" if (fa or -1) <= (fc or -1) else "5.0"
-        tw.append(f'<tr><td>{esc(bd["name"])}</td><td>{m(a["detail"]["near_mm"])}–{m(fa)}</td><td>{m(c["detail"]["near_mm"])}–{m(fc)}</td>'
+        tw.append(f'<tr><td>{esc(bd["name"])}</td><td>{span(a["detail"]["near_mm"], fa)}</td><td>{span(c["detail"]["near_mm"], fc)}</td>'
                   f'<td>{"identical" if same else ("differs" if same is False else "—")}</td><td>{worse}</td></tr>')
     sw = "".join(f'<tr><td>{esc(r["board"])}</td><td>{esc(r["d"])}</td><td>{esc(r["cv5img_cv5det"])}</td><td>{esc(r["cv4img_cv5det"])}</td>'
                  f'<td>{esc(r["cv5img_cv4det"])}</td><td>{esc(r["cv4img_cv4det"])}</td></tr>' for r in ev["swap"])
@@ -178,7 +183,8 @@ def build(src: Path) -> str:
 <p class="verdict"><b>Pick a camera; every marker shows the distances it reads at, on one axis; a required distance, batch-set, turns each into PASS or FAIL with the fix.</b>
 On <code>lane/os-verifyrange</code>, not merged. The browser runs OpenCV 4.11 and the repo's CPython 5.0, and they disagree by up to 2× near the limits (below).</p>
 {hero}
-<div class="grid2">{still("strip-verdicts", "The strip: two markers on the D435, a required 300 mm–2 m set on both at once; one PASS, one FAIL with its size fix")}
+{still("doc-strip", ev.get("doc_caption", "Your document of 2026-10-21 on the D435"))}
+<div class="grid2">{still("strip-verdicts", "Two markers on the D435, a required distance set on both at once: one PASS, one FAIL with its size fix")}
 {still("camera-picker", "The camera library, searched: every row is the maker's own numbers, linked")}</div>
 <div class="grid2">{still("strip-measuring", "While it measures: the selected marker first, a slice at a time; nothing else waits")}
 {still("bench-at-far", "A band's far end opens the bench on that camera at that distance (the manual sweep stays)")}</div>
