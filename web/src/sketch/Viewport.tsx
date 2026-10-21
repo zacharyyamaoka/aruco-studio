@@ -42,7 +42,7 @@ import {
   type Hit, type ProfileRef, type RectShape, type Shape,
 } from "./model";
 import { pointer } from "./pointer";
-import { SketchDims, ValueBox, laySketchDim, type LaidSketchDim } from "./SketchDims";
+import { SketchDims, ValueBox, laySketchDim, visibleSketchDims, type LaidSketchDim } from "./SketchDims";
 
 type Drag =
   | { kind: "pan"; sx: number; sy: number; cx: number; cy: number }
@@ -1035,7 +1035,7 @@ export function Viewport() {
             {picks.map((r) => refMark(r, "pick-on"))}
           </g>
         )}
-        <SketchDims dims={sketchDims} selected={dimSel} editing={sdimEdit ?? placing?.id ?? null} preview={previewDim}
+        <SketchDims dims={visibleSketchDims(sketchDims, laid.length > 0 && sel?.kind !== "shape" && tool !== "dim" ? dimOf?.f.profile ?? null : null)} selected={dimSel} editing={sdimEdit ?? placing?.id ?? null} preview={previewDim}
           onSelect={(id) => useStudio.getState().selectDim(id)} onEdit={(id) => setSdimEdit(id)} />
         {fitBoxOf && (
           <path d={sl(rectCorners(fitBoxOf.rect))} data-fit-rect={fitBoxOf.f.id} className="fit-rect"
