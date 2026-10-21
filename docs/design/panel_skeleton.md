@@ -40,6 +40,10 @@ Nothing is an "Auto" checkbox: a driven value is shown grey, typing sets it.
 10. **Quiet zone**
 11. **Key** — driven (grey) until typed
 (Fusion may fold 10–11 under "Details".)
+12. — divider — **Operation** — Fusion only, the LAST row of Marker, where Fusion's own Extrude puts it
+    (Zach 2026-10-21: "I have muscle memory expecting it to be there"): New Body | New Component
+    (default), with Fusion's own icons (local add-in only, never published). The tag builds in the
+    ACTIVE component, root included, like Fusion's Extrude. The online Studio has no components.
 
 ### 2 Label
 1. **On** — off by default
@@ -54,8 +58,6 @@ Nothing is an "Auto" checkbox: a driven value is shown grey, typing sets it.
 3. **Heights** — inkjet: Paper thickness · 3D print: Extrude (Black | White | Both),
    White height, Black height (from the white's outer face)
 4. **Flip** (outward side)
-5. **Operation** — Fusion only: New Component (default) | New Body; the tag builds in the ACTIVE
-   component, root included, like Fusion's Extrude (Zach 2026-10-21). The online Studio has no components.
 
 ### Footer (every tab)
 The one-line summary ("Single DICT_4X4_50 #3 · 44.0 mm · outer 58.7 × 58.7 mm") and OK / Cancel.
