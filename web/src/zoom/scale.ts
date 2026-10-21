@@ -1,3 +1,4 @@
+// WHY: an estimate first, calibrated per screen key and never scaled across DPR -- docs/peps/0002-actual-size-per-screen.md
 // Actual size: 1 mm on the model is 1 mm on the glass (Zach, 2026-10-21: "I
 // want the option to scale to actual size, vs fit. When actual size it should
 // determine my screen resolution etc and correctly display it so I can see
