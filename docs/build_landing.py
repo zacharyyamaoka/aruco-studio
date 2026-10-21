@@ -576,6 +576,7 @@ footer .ctas {{ justify-content: flex-start; margin-bottom: 16px; }}
     <a class="btn" href="/">Try Online</a>
   </div>
   ArUco Studio by Zach Yamaoka. Source on <a href="{GITHUB}">GitHub</a>; no licence chosen yet.
+  <br><a href="/privacy/">Privacy Policy</a> &middot; <a href="/terms/">Terms of Use</a>
 </footer>
 </div>
 </body>
