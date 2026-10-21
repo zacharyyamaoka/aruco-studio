@@ -305,23 +305,32 @@ test.describe("Simple Hosted Files", () => {
     await expect(page.getByTestId("shf-status")).not.toHaveAttribute("data-kind", "saved");
   });
 
-  test("g · ⌄ is this file: its status line, Duplicate makes a copy on the server, Move to trash puts it in File › Trash…", async ({ page }) => {
+  test("g · ⌄ is this file: its status line; Duplicate opens \"Copy of <name>\" in a new tab with the copy in it (Canva's Make a copy, SPEC v2.11), this tab keeps the original; Move to trash puts it in File › Trash…", async ({ page, context }) => {
     await open(page);
     await signIn(page, newEmail());
     await saveAs(page, "Kept");
     const id = await openFileId(page);
+    const kept = (await state(page)).doc;
     let menu = await docMenu(page);
     await expect(menu.getByTestId("shf-menu-status")).toHaveText(/^Saved · /);
     await page.screenshot({ path: test.info().outputPath("name-menu-saved.png") });
-    await menu.getByTestId("shf-action-duplicate").click();
+    const [tab] = await Promise.all([context.waitForEvent("page"), menu.getByTestId("shf-action-duplicate").click()]);
     await expect(menu).toHaveCount(0);
     const names = async () => ((await (await api(page, "/v1/files?app=aruco-studio")).json()).files as { name: string }[]).map((f) => f.name).sort();
-    await expect.poll(names).toEqual(["Kept", "Kept (copy)"]);
+    await expect.poll(names).toEqual(["Copy of Kept", "Kept"]);
+    // the new tab opened the copy (its openFromUrl), not an empty editor
+    await expect(tab.getByTestId("app")).toBeVisible();
+    await expect(tab.getByTestId("doc-name")).toHaveText("Copy of Kept", { timeout: 30_000 });
+    await saved(tab);
+    expect((await state(tab)).doc.shapes).toEqual(kept.shapes);
+    expect(new URL(tab.url()).searchParams.get("file")).toBeNull();
+    await tab.close();
     // the open file is still the one it was
     expect(await openFileId(page)).toBe(id);
+    await expect(page.getByTestId("doc-name")).toHaveText("Kept");
     menu = await docMenu(page);
     await menu.getByTestId("shf-action-trash").click();
-    await expect.poll(names).toEqual(["Kept (copy)"]);
+    await expect.poll(names).toEqual(["Copy of Kept"]);
     await (await openMenu(page, "file")).getByTestId("shf-action-trash-view").click();
     const dialog = page.getByTestId("shf-files-dialog");
     await expect(dialog.getByTestId("shf-file-row")).toHaveCount(1);

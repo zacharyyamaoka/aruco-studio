@@ -27,6 +27,10 @@ export function hostedFiles(): HostedFiles {
   hosted = new HostedFiles({ server: hostedServer(), app: HOSTED_APP, appName: APP_NAME, warnOnUnsavedClose: false, ...adapter.options });
   adapter.bind(hosted);
   oneName(hosted, adapter);
+  // SPEC v2.11: Duplicate opens "Copy of <name>" in a new tab at ?file=<id>;
+  // this opens that file there (and takes the parameter off the address).
+  // Once per page, so here, where the one instance is made.
+  void hosted.openFromUrl();
   return hosted;
 }
 
