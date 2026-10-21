@@ -116,6 +116,21 @@ describe("the runner", () => {
     expect(R.ranges.state("k50").state).toBe("queued");
   });
 
+  it("a slice that comes back after the dialog closed leaves the marker queued, to start over", async () => {
+    R.ranges.want([task(60)]);
+    await until("step 60");
+    const steps = log.filter((x) => x === "step 60").length;
+    R.ranges.cancelAll();                      // while the next slice may be out
+    await settle();
+    expect(R.ranges.state("k60").state).toBe("queued");
+    expect(log.filter((x) => x === "step 60").length).toBeLessThanOrEqual(steps + 1);
+    log.length = 0;
+    R.ranges.want([task(60)]);
+    await settle();
+    expect(log[0]).toBe("start 60");           // a new job, not the cancelled one
+    expect(R.ranges.state("k60").state).toBe("done");
+  });
+
   it("shows an error, and Retry measures again", async () => {
     failNextStart = "30";
     R.ranges.want([task(30)]);

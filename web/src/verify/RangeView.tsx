@@ -85,6 +85,8 @@ export function RangeView({ all, doc, onBench }: {
   const results = all.map((it) => { const s = states.get(it.f.id); return s?.state === "done" ? s.result : null; });
   const needs = all.map((it) => it.f.verify ?? null);
   const [lo, hi] = axisOf(results, needs);
+  // the budget and the counts as the core used them (its answer), not as this file remembers them
+  const first = results.find((r): r is ReadingRange => !!r) ?? null;
   const scale = stripScale(all.map((it) => it.plan));
 
   const done = [...states.values()].filter((s) => s.state === "done").length;
@@ -106,8 +108,8 @@ export function RangeView({ all, doc, onBench }: {
           </button>
           {picker && <CameraPicker lib={lib} error={libError} pick={pick} onPick={setPick} onClose={() => setPicker(false)} />}
         </div>
-        <span className="vr-chip" title="Every id must read in 95 % of 48 cameras drawn from this budget, at every distance in the band">
-          Field: tilt ≤ 45° · blur ≤ 1.5 px · grain ≤ 0.2 · glare ≤ 0.5
+        <span className="vr-chip" data-testid="range-budget" title={`Every id must read in ${pct(first?.p_read ?? 0.95)} of ${first?.cases ?? 48} cameras drawn from this budget, at every distance in the band`}>
+          {budgetWords(first)}
         </span>
         <span className="vr-status muted" data-testid="range-status">
           {!coreVersion ? "Waiting for the core…"
@@ -130,12 +132,22 @@ export function RangeView({ all, doc, onBench }: {
       </div>
       <Requirement doc={doc} all={all} sel={sel} onSelectAll={() => setSel(all.map((x) => x.f.id))} onClear={() => setSel([])} />
       <div className="vr-foot muted" data-testid="range-foot">
-        Each band: the nearest and farthest distance at which every id reads in 95 % of 48 seeded cameras from the budget
-        (6+ distances, fitted; the pale end is the far end's 90 % interval), {opencvWords(results)}.
+        Each band: the nearest and farthest distance at which every id reads in {pct(first?.p_read ?? 0.95)} of {first?.cases ?? 48} seeded
+        cameras from the budget (6+ distances, fitted; the pale end is the far end's 90 % interval), {opencvWords(results)}.
         Click a band's end to open the bench there.
       </div>
     </div>
   );
+}
+
+const pct = (x: number) => `${Math.round(x * 100)} %`;
+
+/** "Field: tilt ≤ 45° · blur ≤ 1.5 px · grain ≤ 0.2 · glare ≤ 0.5", from the answer's own budget. */
+function budgetWords(r: ReadingRange | null): string {
+  const b = r?.budget;
+  if (!b) return "Field: tilt ≤ 45° · blur ≤ 1.5 px · grain ≤ 0.2 · glare ≤ 0.5";
+  return `${b.name}: tilt ≤ ${b.tilt_max_deg}° · blur ≤ ${b.blur_px[1]} px · grain ≤ ${b.noise[1]} · glare ≤ ${b.glare[1]}`
+    + (b.occlusion > 0 ? ` · dirt ${pct(b.occlusion)}` : "");
 }
 
 /** Which OpenCV drew and read the views (its warps differ between releases: a
@@ -182,7 +194,8 @@ function Column({ it, task, state, lo, hi, scale, selected, onClick, onEnd }: {
   const r = state.state === "done" ? state.result : null;
   const need = it.f.verify;
   const v = useVerdict(task, r, need);
-  const tone = !r || !r.far_mm ? "bad" : v?.verdict === "pass" ? "ok" : v?.verdict === "fail" ? "bad" : "plain";
+  // no answer yet is neither good nor bad; reading nowhere is bad with or without a requirement
+  const tone = !r ? "plain" : !r.far_mm ? "bad" : v?.verdict === "pass" ? "ok" : v?.verdict === "fail" ? "bad" : "plain";
   const lint = (it.plan?.warnings ?? []).filter((w) => w.level !== "info" && /^(label|marker)/.test(w.field)).slice(0, 2);
   return (
     <div className={`vr-col${selected ? " on" : ""}`} data-testid="range-col" data-feature={it.f.id} data-state={state.state}

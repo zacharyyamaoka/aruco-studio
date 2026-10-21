@@ -194,6 +194,9 @@ class Runner {
             this.jobs.delete(task.key);
             keep(task.key, st.result, st.ms ?? null);
             this.set(task.key, { state: "done", result: st.result, ms: st.ms ?? null, cached: false });
+          } else if (this.jobs.get(task.key) !== job) {
+            // cancelled while this slice was out (the dialog closed, another camera): it starts over when wanted
+            this.set(task.key, { state: "queued" });
           } else {
             this.set(task.key, { state: "running", fraction: st.fraction ?? 0, phase: st.phase, renders: st.renders, ms: st.ms ?? 0 });
           }

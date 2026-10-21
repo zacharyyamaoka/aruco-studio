@@ -133,12 +133,17 @@ def build(src: Path) -> str:
     cal = ev["calibration"]
 
     # ---- the library
-    lib = "".join(
-        f'<tr><td><b>{esc(c["name"])}</b></td><td>{esc(c["stream"])}</td><td>{c["resolution"][0]}×{c["resolution"][1]}</td>'
-        f'<td>{c["hfov_deg"]}°{"*" if c["derived"] else ""}</td><td>{m(c["focus_mm"]) if c["focus_mm"] else "—"}</td>'
-        f'<td class="muted">{esc(c["note"])}{(" · derived: " + esc(c["derived"])) if c["derived"] else ""}</td>'
-        f'<td>{" ".join(f"<a href={chr(34)}{esc(x["url"])}{chr(34)}>[{i + 1}]</a>" for i, x in enumerate(c["sources"]))}</td></tr>'
-        for c in ev["library"])
+    def links(c):
+        return " ".join('<a href="%s">[%d]</a>' % (esc(x["url"]), i + 1) for i, x in enumerate(c["sources"]))
+
+    def lib_row(c):
+        derived = (" · derived: " + esc(c["derived"])) if c["derived"] else ""
+        focus = m(c["focus_mm"]) if c["focus_mm"] else "—"
+        star = "*" if c["derived"] else ""
+        return (f'<tr><td><b>{esc(c["name"])}</b></td><td>{esc(c["stream"])}</td><td>{c["resolution"][0]}×{c["resolution"][1]}</td>'
+                f'<td>{c["hfov_deg"]}°{star}</td><td>{focus}</td><td class="muted">{esc(c["note"])}{derived}</td><td>{links(c)}</td></tr>')
+
+    lib = "".join(lib_row(c) for c in ev["library"])
 
     # ---- media
     vid = src / "hero.mp4"
