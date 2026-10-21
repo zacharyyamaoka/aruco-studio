@@ -18,7 +18,7 @@ import { downloadText } from "../io/files";
 import { CoreWait } from "../panel/Waiting";
 import { featureNumber, featurePreset, getFeature } from "../model/doc";
 import { useStudio } from "../store";
-import { chipValues, filterPresets, infoRows, methodName, NO_FILTERS, PAGES, withField, type Filters, type InfoRow } from "./fields";
+import { chipValues, filterPresets, infoRows, methodName, NO_FILTERS, PAGES, presetStep, stepKey, stepLabel, stepOf, stepOptions, withField, type Filters, type InfoRow } from "./fields";
 import { blankPreset, exportJson, importJson, myPresets, presetNumbers, recentIds, saveMine } from "./local";
 import "./presets.css";
 
@@ -104,6 +104,13 @@ function PresetInfo({ p, onChange, onDuplicate }: { p: Preset; onChange: (p: Pre
           onChange={(m) => m !== p.method && onChange({ ...blankPreset(m as Preset["method"]), id: p.id, name: p.name })} />
       </FieldRow>
       {infoRows(p.method).map(row)}
+      {/* barrier 11: what driven sizes round to; a 3D printer's is its line */}
+      <FieldRow path="preset.size_step" label="Size step" title="What driven sizes round to; typed sizes are never rounded">
+        {p.method === "inkjet" ? (
+          <Select path="preset.size_step" value={stepKey(presetStep(p))} disabled={ro} testid="preset-size-step"
+            options={stepOptions(presetStep(p), p)} onChange={(k) => onChange({ ...p, size_step: stepOf(String(k)) })} />
+        ) : <span className="muted" data-testid="preset-size-step">{stepLabel(presetStep(p), p)}</span>}
+      </FieldRow>
       {ro && <div className="pl-info-note muted">Built-in presets are fixed.</div>}
     </div>
   );

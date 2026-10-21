@@ -6,7 +6,9 @@ export default function (presets, { marker, label, rect }) {
   const [d3, letter, a4] = presets;
   const req = (m, r = {}, l = {}, preset = letter, face = false) =>
     ({ rect: rect(r), marker: marker(m), label: label(l), preset, reference_face: face });
-  const dots = { ...letter, cell_step_mm: 0.042333 };
+  // barrier 11: no size step over it, so the cell step is what it is made by
+  const { size_step: _, ...noStep } = letter;
+  const dots = { ...noStep, cell_step_mm: 0.042333 };
   const grid31 = { type: "grid", cols: 3, rows: 1 };
   return [
     ["round: Zach's 3x1 in 112 x 40 (was 29.9718 / 6.0113)", "plan", req(grid31, { w: 112, h: 40 })],

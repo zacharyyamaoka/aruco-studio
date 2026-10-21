@@ -197,6 +197,7 @@ const ENCODED: Record<string, (f: Feature) => boolean> = {
   "marker.separation_mm": (f) => f.marker.separation_mm > 0,
   "label.height_mm": (f) => f.label.height_mm > 0,
   "marker.origin_square": (f) => f.marker.origin_square != null,   // driven = null: OpenCV's board corner
+  "marker.size_step": (f) => f.marker.size_step != null,           // barrier 11: driven = absent / null, the preset's
   // barrier 10: an extrude field is set when present (absent = driven by the preset)
   "extrude.mode": (f) => f.extrude.mode !== undefined,
   "extrude.white_mm": (f) => f.extrude.white_mm !== undefined,
@@ -257,6 +258,7 @@ export function resetField(f: Feature, path: string): Feature {
   if (path === "marker.separation_mm") return { ...f, marker: { ...f.marker, separation_mm: 0 } };
   if (path === "label.height_mm") return { ...f, label: { ...f.label, height_mm: 0 } };
   if (path === "marker.origin_square") return { ...f, marker: { ...f.marker, origin_square: null } };
+  if (path === "marker.size_step") return { ...f, marker: { ...f.marker, size_step: null } };
   if (path === "trim") return { ...f, trim: DEFAULT_TRIM, set: unmark(f.set, [path]) };
   const [part, key] = path.split(".") as ["marker" | "label" | "extrude", string];
   if (part === "extrude") {

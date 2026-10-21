@@ -28,6 +28,7 @@ import { X } from "lucide-react";
 import type { ExtrudeParams, Issue, LabelParams, MarkerParams, Trim } from "../core/contract";
 import { DEFAULT_MARKER, DEFAULT_TRIM, featureNumber, featurePreset, featureRect, getFeature, idRange, isSet, referenceFace, typeCounts } from "../model/doc";
 import { boxOf, rectCorners, toScreen } from "../model/geom";
+import { presetStep, stepKey, stepLabel, stepOf, stepOptions } from "../presets/fields";
 import { presetNumbers, samePreset, myPresets } from "../presets/local";
 import { profileLoops } from "../sketch/model";
 import { useStudio, type Tab } from "../store";
@@ -165,6 +166,9 @@ export function ExtrudePanel() {
   const layer = preset?.layer_mm || 0.1;
   // a rectangle profile (the custom placement) turns on the sketch; a face's box is the core's
   const rect = featureRect(doc, f);
+  // barrier 11: the marker's size step, else its preset's (driven)
+  const presetSize = preset ? presetStep(preset) : null;
+  const sizeStep = m.size_step ?? presetSize;
   const outward = refFace ? (m.flip ? "into the face (flipped)" : "out of the face") : (m.flip ? "down (flipped)" : "up");
 
   // what the panel opens beside: the box the marker was placed in, the marker
@@ -204,6 +208,16 @@ export function ExtrudePanel() {
         </button>
       </FieldRow>
       {preset && <Note testid="preset-lines">{method === "print3d" ? "3D print" : "Inkjet"} · {presetNumbers(preset)}</Note>}
+      {preset && sizeStep && presetSize && (
+        <FieldRow path="marker.size_step" label="Size step" icon="row-grip" issues={iss("marker.size_step")} title="What driven sizes round to; typed sizes are never rounded">
+          {method === "inkjet" || isSet(f, "marker.size_step") ? (
+            <DrivenChoice {...drv("marker.size_step")} value={stepKey(sizeStep)} driver={`the preset (${stepLabel(presetSize, preset)})`}>
+              <Select path="marker.size_step" value={stepKey(sizeStep)} options={stepOptions(sizeStep, preset)}
+                onChange={(k) => st.setField("marker.size_step", stepOf(String(k)))} />
+            </DrivenChoice>
+          ) : <span className="xp-grey" data-testid="size-step-line">{stepLabel(presetSize, preset)}</span>}
+        </FieldRow>
+      )}
       <Rule />
       <FieldRow path="trim" label="Trim" icon="row-scissors" title="What the sticker is cut to: everything inside the cut is white" issues={iss("trim")}>
         <DrivenChoice {...drv("trim")} value={f.trim} driver={`${DEFAULT} (${DEFAULT_TRIM})`}>

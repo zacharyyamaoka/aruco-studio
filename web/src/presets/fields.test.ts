@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Preset } from "../core/contract";
-import { chipValues, filterPresets, infoRows, NO_FILTERS, withField } from "./fields";
+import { chipValues, filterPresets, infoRows, NO_FILTERS, presetStep, stepKey, stepLabel, stepOf, stepOptions, withField } from "./fields";
 import { blankPreset } from "./local";
 
 const ink: Preset = { ...blankPreset("inkjet"), id: "builtin:a4", name: "Inkjet · A4 vinyl", builtin: true, page: "A4", page_mm: [210, 297] };
@@ -44,5 +44,21 @@ describe("editing a field", () => {
   it("a typed page size that is not the paper's is Custom", () => {
     expect(withField(ink, "page_mm", [200, 297]).page).toBe("Custom");
     expect(withField(ink, "page_mm", [210, 297]).page).toBe("A4");
+  });
+});
+
+describe("the size step (barrier 11)", () => {
+  it("a preset's own step, else derived from its cell step", () => {
+    expect(presetStep({ ...ink, size_step: { of: "dots" } })).toEqual({ of: "dots" });
+    expect(presetStep({ ...ink, cell_step_mm: 0 })).toEqual({ of: "mm", mm: 0.5 });
+    expect(presetStep(fdm)).toEqual({ of: "line" });
+  });
+  it("keys round-trip and read in words", () => {
+    for (const s of [{ of: "dots" }, { of: "mm", mm: 0.1 }, { of: "mm", mm: 1 }, { of: "line" }] as const) expect(stepOf(stepKey(s))).toEqual(s);
+    expect(stepLabel({ of: "dots" })).toBe("Whole printer dots (exact)");
+    expect(stepLabel({ of: "mm", mm: 0.5 })).toBe("0.5 mm");
+    expect(stepLabel({ of: "line" }, fdm)).toBe("Line width (0.45 mm)");
+    expect(stepOptions({ of: "mm", mm: 0.5 }, ink).map((o) => o.label)).toEqual(["Whole printer dots (exact)", "0.1 mm", "0.5 mm", "1 mm"]);
+    expect(stepOptions({ of: "mm", mm: 0.25 }, ink).map((o) => o.value)).toEqual(["dots", "mm:0.1", "mm:0.5", "mm:1", "mm:0.25"]);
   });
 });

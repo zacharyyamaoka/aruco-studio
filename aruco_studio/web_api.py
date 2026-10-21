@@ -24,6 +24,7 @@ Fusion composes a Joint Origin: core.geometry.jo_compose).
 | `preset` (method inkjet) | `settings.make` = core.make.new_make("sticker", profile): rule 2, its page, margins and paper thickness |
 | `preset` (method print3d) | `settings.make` = new_make("print3d") |
 | `preset.cell_step_mm`, `min_cell_mm` | `settings.cells` {"of": "cell", "mm": step} (0 = no snap: {"of": "marker", "mm": 0.5}, the legacy step; an inkjet's is rule 2, autosize.ROUND_RULE: its driven grid gap on 0.5 mm too) |
+| `marker.size_step`, else `preset.size_step` (barrier 11, 2026-10-20 night) | size_step_of -> cells_of: "dots" {"rule": 3, "of": "cell", "mm": 25.4 / dpi} (autosize.DOTS_RULE: whole printer dots per cell, typed sizes as typed); "mm" {"rule": 2, "of": "marker", "mm": step} (the built-ins' 0.5, rule 2 generalised); "line" or neither: from `cell_step_mm` as before, so a request without size_step is byte-identical |
 | `reference_face` | the target is a "profile" with a body else "free": it picks the starting outward side (Auto's Black only), and `marker.flip` still turns it over (barrier 10) |
 | `extrude` (barrier 10, 2026-10-20 night) -> `MarkerPlan.extrude` | web_extrude: `mode` -> `settings.mode`, `white_mm` / `black_mm` -> `numbers.*_offset` / `*_height` (the black from the white's outer face), `paper_mm` -> the sticker's stock; unset = driven (core.presets.driven_heights, the preset's thickness). `MarkerPlan.extrude` only when the request has one, so every plan without stays as it was |
 | `label` on, `place` "outside" (2026-10-18) | core.rect_fill.fill: a band inside the rectangle on `label.side`; the marker is planned in the box it leaves (the target), centred there; "sans" text for an inkjet preset, the pixel font's ink for 3D. `height_mm` 0: one module of the marker drawn (the search in _outside) |
@@ -40,6 +41,7 @@ deprecated trim -> "trim"; a profile with no room for the marker -> "tag".
 from __future__ import annotations
 
 import base64
+import copy
 import datetime
 import json
 import math
@@ -62,7 +64,8 @@ from .plan import mesh as _ME
 from .scene import sheet as _SS
 from . import web_extrude as _EX
 
-API = ("info", "presets", "inscribe", "plan", "suggest", "svg", "sheet", "verify", "readable", "assign_ids")
+API = ("info", "presets", "legacy_presets", "inscribe", "plan", "suggest", "svg", "sheet", "verify", "readable",
+       "assign_ids")
 
 # core key path -> the contract's field (contract.ts Issue.field)
 FIELDS = {"numbers.size": "marker.marker_mm", "numbers.square": "marker.checker_mm",
@@ -184,29 +187,94 @@ def make_of(preset: dict, issues: list, paper_mm=None) -> dict:
     return mk
 
 
-def cells_of(preset: dict) -> dict:
+SIZE_STEPS = ("dots", "mm", "line")
+
+
+def size_step_of(req: dict, issues=None):
+    """The SizeStep a request's driven sizes round to (contract barrier 11):
+    the marker's `size_step`, else its preset's, else None (derived from
+    `cell_step_mm`, as before). One that cannot be read is said on its row
+    (`issues`) and the next one is used: "dots" needs the preset's dpi, "mm"
+    a step autosize takes (0.01 to 20 mm)."""
+    pre = req.get("preset") or {}
+    for field, st in (("marker.size_step", (req.get("marker") or {}).get("size_step")),
+                      ("preset", pre.get("size_step"))):
+        if st is None:
+            continue
+        why = _bad_step(st, pre)
+        if why is None:
+            return st
+        if issues is not None:
+            issues.append({"field": field, "level": "warn",
+                           "text": f"size step {why}: the {'preset' if field == 'marker.size_step' else 'cell step'}'s is used"})
+    return None
+
+
+def _bad_step(st, pre: dict):
+    """Why a SizeStep cannot be used with this preset, or None."""
+    of = st.get("of") if isinstance(st, dict) else None
+    if of not in SIZE_STEPS:
+        return f"{st!r} is not one of {', '.join(SIZE_STEPS)}"
+    if of == "dots" and not float(pre.get("dpi") or 0.0) > 0:
+        return "whole dots needs the preset's dpi"
+    if of == "mm":
+        mm = st.get("mm")
+        lo, hi = _A.MIN_STEP_M * 1000.0, _A.MAX_STEP_M * 1000.0
+        if isinstance(mm, bool) or not isinstance(mm, (int, float)) or not lo <= mm <= hi:
+            return f"{mm!r} mm is not {lo:g} to {hi:g} mm"
+    return None
+
+
+def cells_for(req: dict, issues=None) -> dict:
+    """`settings.cells` for a request: its preset's under its size step."""
+    pre = req.get("preset") or {}
+    return cells_of(pre, size_step_of(req, issues))
+
+
+def cells_of(preset: dict, step=None) -> dict:
     """`settings.cells` for a flat preset: cells a whole number of
     `cell_step_mm` (the line, the dot), or the marker in the legacy 0.5 mm
     steps when it is 0; `min_cell_mm` the minimum either way. An inkjet's 0
     is rule 2 (autosize.ROUND_RULE): its driven grid gap on 0.5 mm as well;
-    a 3D preset's stays rule 1, byte for byte."""
-    step = float(preset.get("cell_step_mm") or 0.0)
+    a 3D preset's stays rule 1, byte for byte. `step` (a SizeStep, barrier
+    11; size_step_of): "dots" is rule 3 (autosize.DOTS_RULE) on 25.4 / dpi
+    exactly, "mm" rule 2 on that step; "line" and None read as before."""
+    step_of = step.get("of") if isinstance(step, dict) else None
     mn = float(preset.get("min_cell_mm") or 0.0)
+    if step_of == "dots":
+        # WHY 25.4 / dpi unrounded: the old 0.042333 put 110 dots 0.0002 mm
+        # short (27.9398 for 27.94), so a "whole dot" cell was not one
+        return {"rule": _A.DOTS_RULE, "of": "cell", "mm": 25.4 / float(preset["dpi"]),
+                "min_mm": round(mn, 6)}
+    if step_of == "mm":
+        return {"rule": _A.ROUND_RULE, "of": "marker", "mm": float(step["mm"]), "min_mm": round(mn, 6)}
+    step = float(preset.get("cell_step_mm") or 0.0)
     if step > 0:
         return {"rule": _A.CELL_RULE, "of": "cell", "mm": round(step, 6), "min_mm": round(mn, 6)}
     rule = _A.ROUND_RULE if preset.get("method") == "inkjet" else _A.CELL_RULE
     return {"rule": rule, "of": "marker", "mm": 0.5, "min_mm": round(mn, 6)}
 
 
+DOT_TOL_MM = 5.0001e-5               # half the core's 0.1 um length quantum (autosize._r7)
+
+
 def dots_note(preset: dict, cells: dict, marker_mm: float, modules: int):
     """Rule 2's line on the Marker row: what the printer's dots do to the
     0.5 mm marker ("29.5 mm → cell 4.92 mm (116.1 dots); the printer rounds
-    by ≤ 0.02 mm"), or None (not an inkjet's rule 2, or no dpi)."""
+    by ≤ 0.02 mm"), or None (not an inkjet's rule 2 / 3, or no dpi). Rule 3
+    (whole dots): "27.94 mm = 6 cells × 110 dots at 600 dpi, exact" when
+    the cells are whole dots, else (a typed size) rule 2's line."""
     dpi = float(preset.get("dpi") or 0.0)
-    if cells.get("rule") != _A.ROUND_RULE or preset.get("method") != "inkjet" or dpi <= 0:
+    if cells.get("rule") not in (_A.ROUND_RULE, _A.DOTS_RULE) or preset.get("method") != "inkjet" or dpi <= 0:
         return None
     dot = 25.4 / dpi
     cell = marker_mm / modules
+    k = round(cell / dot)
+    if cells["rule"] == _A.DOTS_RULE and k > 0 and abs(marker_mm - modules * k * dot) <= DOT_TOL_MM:
+        mm = f"{marker_mm:.4f}".rstrip("0").rstrip(".")
+        # WHY ", exact", not "(exact)": the panel shows an issue up to its
+        # first " (" (the kit's shortText), and "exact" is the point of it
+        return f"{mm} mm = {modules} cells × {k} dots at {dpi:g} dpi, exact"
     return (f"{_mm(marker_mm)} mm → cell {cell:.2f} mm ({cell / dot:.1f} dots); "
             f"the printer rounds by ≤ {dot / 2.0:.2f} mm")
 
@@ -226,7 +294,7 @@ def spec_of(req: dict, issues: list) -> TagSpec:
          "corner_mark": m.get("corner_mark") or "none",
          "make": make_of(req.get("preset") or {}, issues,
                          ex["paper_mm"] if "paper_mm" in ex["set"] else None),
-         "cells": cells_of(req.get("preset") or {})}
+         "cells": cells_for(req, issues)}
     if kind != "single":
         s["force"] = [int(m.get("cols") or 1), int(m.get("rows") or 1)]
     n = {"marker_id": int(m.get("first_id") or 0)}
@@ -538,7 +606,35 @@ def core_version() -> str:
 
 
 def presets() -> list:
-    return [flat_preset(p) for p in _builtins()]
+    out = [flat_preset(p) for p in _builtins()]
+    for p in out:
+        if p["method"] == "inkjet":
+            # barrier 11: the inkjet built-ins' 0.5 mm, said (it was derived
+            # from their cell_step_mm 0); a marker can override it
+            p["size_step"] = {"of": "mm", "mm": 0.5}
+    return out
+
+
+# The inkjet built-ins as main 03594f9's presets() gave them, before cells
+# rule 2 (0b134f4) set their cell_step_mm to 0: literals, never derived.
+LEGACY_PRESETS = (
+    {"id": "builtin:inkjet-letter-vinyl@1", "name": "Inkjet \u00b7 Letter vinyl", "builtin": True,
+     "min_cell_mm": 1.0, "cell_step_mm": 0.042333, "method": "inkjet", "page": "Letter",
+     "page_mm": [215.9, 279.4], "margin_mm": 10.0, "thickness_mm": 0.1, "dpi": 600},
+    {"id": "builtin:inkjet-a4-vinyl@1", "name": "Inkjet \u00b7 A4 vinyl", "builtin": True,
+     "min_cell_mm": 1.0, "cell_step_mm": 0.042333, "method": "inkjet", "page": "A4",
+     "page_mm": [210.0, 297.0], "margin_mm": 10.0, "thickness_mm": 0.1, "dpi": 600},
+)
+
+
+def legacy_presets() -> list:
+    """The pre-rule-2 inkjet built-ins, `@1` ids, no size_step: for shells
+    that pin an old record's preset (not offered in the UI's list).
+    WHY: old records pin the preset object they were made with; {of: "dots"}
+    is NOT the legacy path, because 25.4/dpi != 0.042333 -- a preset with no
+    size_step and cell_step_mm 0.042333 takes the old dot path (rule 1 on
+    0.042333), byte for byte."""
+    return copy.deepcopy(list(LEGACY_PRESETS))
 
 
 def _plain_rect(loops):
@@ -1209,14 +1305,17 @@ def plan(req: dict) -> dict:
 
 def _dots_on_marker(req: dict, issues: list, marker_mm: float, modules: int) -> list:
     """Rule 2: the core's cells line ("marker in 0.5 mm steps · cell 4.92
-    mm", on the preset) becomes dots_note on the Marker row, in its place."""
+    mm", on the preset) becomes dots_note on the Marker row, in its place;
+    rule 3's ("cells 4.66 mm = 110 × 0.0423333 mm") likewise."""
     pre = req.get("preset") or {}
-    dn = dots_note(pre, cells_of(pre), marker_mm, modules)
+    cells = cells_for(req)
+    dn = dots_note(pre, cells, marker_mm, modules)
     if dn is None:
         return issues
+    line = "cells " if cells["rule"] == _A.DOTS_RULE else "marker in "
     out, said = [], False
     for i in issues:
-        if i["field"] == "preset" and i["level"] == "info" and i["text"].startswith("marker in "):
+        if i["field"] == "preset" and i["level"] == "info" and i["text"].startswith(line):
             if not said:
                 out.append({"field": "marker.marker_mm", "level": "info", "text": dn})
                 said = True
@@ -1501,6 +1600,8 @@ def call(name: str, payload_json: str) -> str:
             out = info()
         elif name == "presets":
             out = presets()
+        elif name == "legacy_presets":
+            out = legacy_presets()
         elif name == "inscribe":
             out = inscribe(p.get("profile") or {}, p.get("holes") or "avoid")
         elif name == "sheet":

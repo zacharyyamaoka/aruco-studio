@@ -86,6 +86,15 @@ up when nearest is under one module (L / n); a typed gap as typed. Zach,
 on an inkjet 3 x 1 at 29.97 / 6.0113 mm: "we should by default recommend
 to the nearest like .5 mm". "cell" cells under rule 2 are rule 1's.
 
+Rule 3 (DOTS_RULE, contract barrier 11, 2026-10-20 night; "rule": 3):
+"cell" cells whose TYPED sizes are used as typed -- never snapped onto the
+grid, no "cell multiple" note; a typed ChArUco marker with a driven checker
+gets the smallest square on the grid that leaves it one module of white, a
+typed checker the largest marker on the grid it holds. Driven sizes are rule
+1's (whole cells, the gap UP to whole m). It is the web's "whole printer
+dots" size step (m = 25.4 / dpi exactly), where "typed sizes are never
+rounded". "marker" cells under rule 3 are rule 2's.
+
 Standard library only (this module is loaded inside Fusion).
 """
 from __future__ import annotations
@@ -195,7 +204,8 @@ def _mmx(x_m: float) -> str:
 
 CELL_RULE = 1                 # what a tag's "cells" setting means today
 ROUND_RULE = 2                # rule 2: a "marker" grid's gap on the step too (module docstring)
-CELL_RULES = (CELL_RULE, ROUND_RULE)
+DOTS_RULE = 3                 # rule 3: a "cell" grid's typed sizes as typed (module docstring)
+CELL_RULES = (CELL_RULE, ROUND_RULE, DOTS_RULE)
 CELL_OF = ("cell", "marker")
 MIN_STEP_M = 1e-5             # a multiple under 0.01 mm is not one
 MAX_STEP_M = 0.02
@@ -207,7 +217,8 @@ def cells_of(cells):
     every tag made before 2026-10-14). A dict as the settings store it (mm):
     {"rule": 1, "of": "cell" | "marker", "mm": 0.68, "min_mm": 2.0}; a tuple
     (of, step_m, min_m) passes through. Anything unreadable is None. Rule 2
-    (ROUND_RULE) -> (of, step_m, min_m, 2); any other rule reads as rule 1."""
+    (ROUND_RULE) -> (of, step_m, min_m, 2), rule 3 (DOTS_RULE) -> (..., 3);
+    any other rule reads as rule 1."""
     if cells is None:
         return None
     rule = CELL_RULE
@@ -226,6 +237,8 @@ def cells_of(cells):
         return None
     if rule == ROUND_RULE and not isinstance(rule, bool):
         return (of, float(step), float(mn), ROUND_RULE)
+    if rule == DOTS_RULE and not isinstance(rule, bool):
+        return (of, float(step), float(mn), DOTS_RULE)
     return (of, float(step), float(mn))
 
 
@@ -258,6 +271,8 @@ class _Grid:
         # rule 2: a "marker" grid's gap on the step (gap); every other grid
         # takes the gap exactly as before
         self.round_gap = c is not None and len(c) == 4 and not self.cell
+        # rule 3: a "cell" grid's typed sizes as typed (_typed, pair_ok)
+        self.typed_exact = c is not None and len(c) == 4 and c[3] == DOTS_RULE and self.cell
         # Sizes are kept to 0.1 um (_r7). A step that is not a whole number
         # of 0.1 um (a sticker printer's dot, 25.4 / 600 mm) puts k Ls and
         # j m up to 0.05 um off the grid, more than _K_EPS / EPS_M allow:
@@ -383,8 +398,9 @@ class _Grid:
         return _r7(math.ceil(s / self.m - self.ke_m) * self.m)
 
     def pair_ok(self, L: float, S: float) -> bool:
-        """cell: L and S on the grid, whole white around the marker."""
-        if not self.cell:
+        """cell: L and S on the grid, whole white around the marker (rule 3:
+        a typed pair as typed; a driven one is made on the grid)."""
+        if not self.cell or self.typed_exact:
             return True
         n, k, j = self.n, self.L_k(L), self.S_j(S)
         return (k >= 1 and (n + 2) * k <= j and (j - n * k) % 2 == 0
@@ -589,16 +605,20 @@ def _typed(kind: str, marker_m, square_m, G: _Grid, notes=None) -> Tuple[float, 
     marker only -> the smallest 0.5 mm square that leaves it one module of
     white; square only -> the largest 0.5 mm marker that fits in it (the
     grid's step for "marker" cells). "cell" cells: snapped DOWN onto the
-    grid, the change noted in `notes` (_typed_cells)."""
+    grid, the change noted in `notes` (_typed_cells); under rule 3 as typed,
+    a driven partner on the grid."""
     L = _r7(max(0.0, _num(marker_m)))
     S = _r7(max(0.0, _num(square_m)))
-    if G.cell:
+    if G.cell and not G.typed_exact:
         return _typed_cells(kind, L, S, G, notes)
     if kind == "charuco":
+        # rule 3: lmax / smin pair whole cells with whole white; a typed size
+        # off the grid has neither, so its partner is the largest marker (the
+        # smallest square) on the grid with one module of white
         if L <= 0 < S:
-            L = G.lmax(S)
+            L = G.L_down(_lmax(S, G.n)) if G.typed_exact else G.lmax(S)
         elif S <= 0 < L:
-            S = G.smin(L)
+            S = G.S_up(L * (G.n + 2.0) / G.n) if G.typed_exact else G.smin(L)
     return L, S
 
 

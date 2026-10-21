@@ -301,6 +301,17 @@ describe("auto id", () => {
     expect(resetField(s, "marker.origin_square").marker.origin_square).toBeNull();
     expect(setField(s, "marker.type", "grid").marker.origin_square).toBeNull();
   });
+
+  it("a size step is driven while absent (the preset's), set when present, ↺ back to null (barrier 11)", () => {
+    const f = newFeature(rectProfile("r1"), "f1");
+    expect(isSet(f, "marker.size_step")).toBe(false);
+    const s = setField(f, "marker.size_step", { of: "dots" });
+    expect(s.marker.size_step).toEqual({ of: "dots" });
+    expect(isSet(s, "marker.size_step")).toBe(true);
+    const r = resetField(s, "marker.size_step");
+    expect(r.marker.size_step).toBeNull();
+    expect(isSet(r, "marker.size_step")).toBe(false);
+  });
 });
 
 describe("version 1 files migrate", () => {

@@ -117,16 +117,19 @@ def test_the_inkjet_built_ins_are_rule_2_and_3d_is_not():
     assert W.cells_of(D3_LINES)["of"] == "cell" and W.cells_of(D3_LINES)["rule"] == A.CELL_RULE
     # a user's inkjet preset with dots keeps its dots
     assert W.cells_of(dict(INK, cell_step_mm=0.042333))["of"] == "cell"
-    assert (A.CELL_RULE, A.ROUND_RULE, A.CELL_RULES) == (1, 2, (1, 2))
+    # rule 3 (A.DOTS_RULE, barrier 11): tests/web/test_web_sizestep.py
+    assert (A.CELL_RULE, A.ROUND_RULE, A.CELL_RULES) == (1, 2, (1, 2, A.DOTS_RULE))
 
 
 def test_only_the_cells_step_of_the_built_ins_changed():
     """presets(): the inkjet built-ins' cell_step_mm 0.042333 -> 0, nothing
-    else (the digest main pinned, with that one field set back)."""
+    else (the digest main pinned, with that one field set back); barrier 11
+    added their size_step, said and taken off here."""
     out = json.loads(W.call("presets", "{}"))
     for p in out["result"][1:]:
         assert p["cell_step_mm"] == 0.0
         p["cell_step_mm"] = 0.042333
+        assert p.pop("size_step") == {"of": "mm", "mm": 0.5}
     text = json.dumps(out, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     assert hashlib.sha256(text.encode()).hexdigest() == \
         "dd7c0cf29534e61a5aa1f26c082b7d9b875ddf88254679680400e7734209496d"
@@ -139,7 +142,7 @@ def test_zachs_3x1_is_round():
     r = {"w": 112.0, "h": 40.0}
     p = W.plan(req(TYPES["grid 3x1"], rect=r))
     assert (p["marker_mm"], p["separation_mm"], p["overflow_mm"]) == (30.0, 6.0, 0.0)
-    dots = W.plan(req(TYPES["grid 3x1"], rect=r, pre=dict(INK, cell_step_mm=0.042333)))
+    dots = W.plan(req(TYPES["grid 3x1"], rect=r, pre=preset(cell_step_mm=0.042333)))
     assert (dots["marker_mm"], dots["separation_mm"]) == (29.9718, 6.0113)
     assert W.suggest(req({"type": "grid"}, rect=r))[0]["label"] == "3×1 @ 30.0 mm"
     # wider than it is tall: the gap rounded to nearest lets the marker grow
@@ -229,7 +232,7 @@ def test_the_marker_row_says_what_the_dots_do():
     typed = W.plan(req({"auto": False, "marker_mm": 29.97}, rect={"w": 40.0, "h": 40.0}))
     assert any(w["text"] == "29.97 mm → cell 5.00 mm (118.0 dots); the printer rounds by ≤ 0.02 mm"
                for w in typed["warnings"])
-    for pre in (D3, D3_LINES, dict(INK, cell_step_mm=0.042333)):
+    for pre in (D3, D3_LINES, preset(cell_step_mm=0.042333)):
         assert not [w for w in W.plan(req({}, rect={"w": 40.0, "h": 40.0}, pre=pre))["warnings"]
                     if "printer rounds" in w["text"]]
 

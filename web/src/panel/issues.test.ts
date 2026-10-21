@@ -23,10 +23,10 @@ describe("per-row issues", () => {
     expect(t.make).toContain("marker.flip");
     expect(routeIssues([I("marker.flip")], shownRows(DEFAULT_MARKER, DEFAULT_LABEL, "print3d"))["marker.flip"]).toHaveLength(1);
   });
-  it("Make: Profile, Preset, Trim, the method's heights, Flip, in that order", () => {
-    expect(tabRows(DEFAULT_MARKER, DEFAULT_LABEL, "inkjet").make).toEqual(["profile", "preset", "trim", "extrude.paper_mm", "marker.flip"]);
+  it("Make: Profile, Preset, Size step, Trim, the method's heights, Flip, in that order", () => {
+    expect(tabRows(DEFAULT_MARKER, DEFAULT_LABEL, "inkjet").make).toEqual(["profile", "preset", "marker.size_step", "trim", "extrude.paper_mm", "marker.flip"]);
     expect(tabRows(DEFAULT_MARKER, DEFAULT_LABEL, "print3d").make)
-      .toEqual(["profile", "preset", "trim", "extrude.mode", "extrude.white_mm", "extrude.black_mm", "marker.flip"]);
+      .toEqual(["profile", "preset", "marker.size_step", "trim", "extrude.mode", "extrude.white_mm", "extrude.black_mm", "marker.flip"]);
   });
   it("a height issue goes under its row; the other method's goes to Preset", () => {
     const ink = shownRows(DEFAULT_MARKER, DEFAULT_LABEL, "inkjet");

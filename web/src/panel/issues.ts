@@ -36,7 +36,7 @@ const OWNER: Record<string, string> = {
 
 /** The rows each tab draws for these numbers, by field path, top to bottom. */
 export function tabRows(m: MarkerParams, l: Pick<LabelParams, "on" | "place">, method: Method): Record<Tab, string[]> {
-  const make = ["profile", "preset", "trim"];
+  const make = ["profile", "preset", "marker.size_step", "trim"];
   if (method === "print3d") make.push("extrude.mode", "extrude.white_mm", "extrude.black_mm");
   else make.push("extrude.paper_mm");
   make.push("marker.flip");
