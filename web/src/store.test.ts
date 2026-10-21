@@ -155,3 +155,57 @@ describe("Cancel takes back the panel's own steps, nothing else (review finding 
     expect(ids()).toEqual(["p", "m"]);
   });
 });
+
+describe("Duplicate (Ctrl+D, the canvas menu): Paste's put-down, beside, the clipboard untouched", () => {
+  // the marker f1 on the rectangle m (10..40 x 10..40), on the plate p
+  const withMarker = () => {
+    const d = emptyDoc("Start", [rectShape("p", 0, 0, 120, 80), rectShape("m", 10, 10, 40, 40)]);
+    st().loadDoc(addFeature(d, newFeature(rectProfile("m"), "f1")));
+  };
+
+  it("a marker: its rectangle and its feature, 30 + 10 mm to the right, new ids and keys, selected, one undo step", () => {
+    withMarker();
+    st().select({ kind: "feature", id: "f1" });
+    expect(st().canPaste()).toBe(false);
+    st().duplicate();
+    const { doc } = st();
+    expect(doc.shapes).toHaveLength(3);
+    const copy = doc.shapes[2];
+    expect(copy).toMatchObject({ kind: "rect", cx: 25 + 40, cy: 25, w: 30, h: 30 });
+    expect(copy.id).not.toBe("m");
+    expect(doc.features).toHaveLength(2);
+    const f2 = doc.features[1];
+    expect(f2.profile).toEqual({ outer: copy.id, holes: [] });
+    expect(f2.id).not.toBe("f1");
+    expect(f2.key).toBe(f2.id);
+    expect(st().multi).toEqual([copy.id]);
+    expect(st().sel).toEqual({ kind: "shape", id: copy.id });
+    // the clipboard is not touched: nothing to paste still
+    expect(st().canPaste()).toBe(false);
+    st().undo();
+    expect(st().doc.shapes.map((s) => s.id)).toEqual(["p", "m"]);
+    expect(st().doc.features.map((f) => f.id)).toEqual(["f1"]);
+  });
+
+  it("several shapes: their box's width + 10 mm on; after a copy, Paste still pastes the copy (10 mm on), not the duplicate", () => {
+    withMarker();
+    st().addShape(rectShape("r1", 50, 10, 70, 30));
+    st().selectShapes(["m", "r1"]);
+    st().copy();
+    expect(st().canPaste()).toBe(true);
+    st().duplicate();
+    const moved = st().doc.shapes.slice(3);
+    expect(moved.map((s) => (s as { cx: number }).cx)).toEqual([25 + 70, 60 + 70]);
+    st().paste(null);
+    const pasted = st().doc.shapes.slice(5);
+    expect(pasted.map((s) => [(s as { cx: number }).cx, (s as { cy: number }).cy])).toEqual([[35, 15], [70, 10]]);
+  });
+
+  it("nothing selected: nothing happens", () => {
+    withMarker();
+    st().select(null);
+    const before = st().doc;
+    st().duplicate();
+    expect(st().doc).toBe(before);
+  });
+});

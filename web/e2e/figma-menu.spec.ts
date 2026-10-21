@@ -24,9 +24,9 @@ const SUBMENUS: [string, string, string[]][] = [
 ];
 
 /** The chrome: its boxes, and every control in them. */
-const CHROME = ["doc-pill", "actions-pill", "toolbar", "corner"];
+const CHROME = ["doc-pill", "actions-pill", "toolbar", "corner", "zoom-indicator"];
 const CONTROLS = ["menu-main", "doc-name", "menu-doc", "menu-cad", "act-verify", "act-print",
-  "tool-select", "tool-rect", "tool-circle", "tool-dim", "tool-extrude", "tool-fit", "view-toggle", "help", "github"];
+  "tool-select", "tool-rect", "tool-circle", "tool-dim", "tool-extrude", "tool-fit", "view-toggle", "help", "github", "zoom-menu"];
 
 /** Every element in the chrome whose content runs out of its box, or that a
  *  box around it (overflow not visible) cuts; and every pair of chrome boxes

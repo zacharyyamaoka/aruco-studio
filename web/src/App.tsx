@@ -4,7 +4,9 @@
 // left (the main menu behind the logo, the file's name), Download for CAD and
 // Verify | Print top right, the dock of tools with 2D | 3D bottom centre, ?
 // and GitHub bottom right; the floating ArUco Extrude panel; the presets
-// modal, Print, Verify, Examples and Re-ID; Home ("Back to files") over it all.
+// modal, Print, Verify, Examples and Re-ID; Home ("Back to files") over it all;
+// the zoom indicator bottom left and the canvas's right-click menu, Actual size
+// among its zooms (./zoom/: the screen's millimetre, calibrated per screen).
 // WHY no timeline (Zach, 2026-10-18): "too specific to CAD … just clicking the
 // marker on the screen is what brings up the relevant inspector window".
 import { useEffect, useState } from "react";
@@ -27,6 +29,10 @@ import { pointer } from "./sketch/pointer";
 import { Viewport } from "./sketch/Viewport";
 import { View3D } from "./view3d/View3D";
 import { loadCoreFacts, useStudio } from "./store";
+import { CalibrateDialog } from "./zoom/CalibrateDialog";
+import { ZoomIndicator } from "./zoom/ZoomIndicator";
+import { watchScreen } from "./zoom/scale";
+import { actualSize, followScale, zoomToSelection } from "./zoom/zoom";
 
 /** A key the tool should not take: typing in a field, a list / menu / dialog
  *  open, or Home in front. */
@@ -53,16 +59,18 @@ function onUndoKey(e: KeyboardEvent): boolean {
 }
 
 /** Ctrl+C / Ctrl+X / Ctrl+V (Cmd on a Mac): the selected shapes, the features
- *  on them and their dims; a paste lands at the pointer. In a field they are the field's own. */
+ *  on them and their dims; a paste lands at the pointer. Ctrl+D duplicates
+ *  them beside themselves (Figma's). In a field they are the field's own. */
 function onClipKey(e: KeyboardEvent): boolean {
   if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return false;
   const k = e.key.toLowerCase();
-  if (k !== "c" && k !== "x" && k !== "v") return false;
+  if (k !== "c" && k !== "x" && k !== "v" && k !== "d") return false;
   if (keyIsElsewhere(e) || window.getSelection()?.toString()) return true;
   e.preventDefault();
   const st = useStudio.getState();
   if (k === "c") st.copy();
   else if (k === "x") st.cut();
+  else if (k === "d") st.duplicate();
   else st.paste(pointer.at);
   return true;
 }
@@ -75,6 +83,15 @@ function onKey(e: KeyboardEvent) {
   if (onClipKey(e)) return;
   if (e.ctrlKey || e.metaKey || e.altKey || keyIsElsewhere(e)) return;
   const st = useStudio.getState();
+  // Figma's zoom keys, by the key's place (Shift+1 types "!" on a US layout):
+  // Shift+1 fits (F too), Shift+2 the selection, Shift+0 Actual size (Figma's
+  // 100 %; here the screen's real millimetre, ./zoom/scale.ts)
+  if (e.shiftKey && (e.code === "Digit1" || e.code === "Digit2" || e.code === "Digit0")) {
+    if (e.code === "Digit1") st.fit();
+    else if (!st.view3d) { if (e.code === "Digit2") zoomToSelection(); else actualSize(); }
+    e.preventDefault();
+    return;
+  }
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   // a sketch tool in 3D goes back to the sketch first (as entering a sketch does in Fusion)
   if (st.view3d && (k === "r" || k === "c" || k === "d")) st.setView3d(false);
@@ -117,7 +134,10 @@ export function App() {
     };
     const un = onCoreStatus(ask);
     ask();
-    return () => { stop(); un(); window.removeEventListener("keydown", onKey); };
+    // Actual size: this screen's scale, kept up as the window moves between monitors
+    const unScreen = watchScreen();
+    const unFollow = followScale();
+    return () => { stop(); un(); unScreen(); unFollow(); window.removeEventListener("keydown", onKey); };
   }, []);
   useEffect(() => {
     if (!note) return;
@@ -138,6 +158,7 @@ export function App() {
             <ActionsPill />
             <Toolbar />
             <HelpCorner help={help} setHelp={setHelp} />
+            <ZoomIndicator />
             <ExtrudePanel />
             {note && <div className="toast" role="status" data-testid="note">{note}</div>}
             <HostedToast />
@@ -150,6 +171,7 @@ export function App() {
         <VerifyDialog />
         <ExamplesDialog />
         <ReIdDialog />
+        <CalibrateDialog />
       </HostedProvider>
     </TooltipProvider>
   );

@@ -41,6 +41,7 @@ import { WaitLine, failedDetail, reload, startingText, useTick } from "../panel/
 import { useStudio } from "../store";
 import { SKINS, useSkin } from "../skins/skins";
 import { exportPdf, exportSvg, openDoc, openPrint, openVerify, saveDoc } from "./commands";
+import { ZoomItems } from "../zoom/ZoomItems";
 import { openHome } from "./home";
 
 export const GITHUB = "https://github.com/zacharyyamaoka/aruco-studio";
@@ -283,6 +284,8 @@ function MainMenu({ onHelp }: { onHelp: () => void }) {
                 onClick={() => st().setMarkerInfo(!markerInfo)} />
               <MenuSeparator />
               <MenuItem icon="fit" label="Fit" hint="F" testid="cmd-fit" onClick={() => st().fit()} />
+              {/* Zoom to selection, Actual size, Zoom 100 %, Calibrate… (the canvas's right-click menu has them too) */}
+              <ZoomItems prefix="cmd" fit={false} />
             </Sub>
             <Sub label="Preferences" testid="menu-prefs" inline={inline}>
               <div className="mm-h">{theme === "dark" ? <Moon size={12} /> : <Sun size={12} />}Theme</div>
@@ -457,8 +460,10 @@ export function ActionsPill() {
 /** The keys App.tsx binds. */
 const KEYS: [string, string][] = [
   ["V", "Select"], ["R", "Rectangle"], ["C", "Circle"], ["D", "Dimension"], ["A", "ArUco Extrude"], ["F", "Fit"], ["3", "2D | 3D"],
+  ["Shift+1", "Zoom to fit"], ["Shift+2", "Zoom to selection"], ["Shift+0", "Actual size"],
   ["S", "Print (P too)"], ["K", "Verify"],
   ["Ctrl+Z", "Undo"], ["Ctrl+Shift+Z", "Redo (Ctrl+Y too)"], ["Ctrl+C", "Copy"], ["Ctrl+X", "Cut"], ["Ctrl+V", "Paste at the pointer"],
+  ["Ctrl+D", "Duplicate"], ["Right-click", "The menu (a right-drag selects)"],
   ["← ↑ → ↓", "Nudge 1 mm (Shift: 10 mm)"], ["Del", "Delete"], ["Esc", "Back to Select; close the panel"],
 ];
 
