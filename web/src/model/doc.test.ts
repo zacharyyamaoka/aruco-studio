@@ -7,7 +7,7 @@ import v3Fixture from "../../e2e/fixtures/v3-a4.arucostudio-web.json?raw";
 import {
   DEFAULT_MARKER, addFeature, addShape, applyIds, deleteShape, emptyDoc, featureNumber, featurePreset, fillPresets, featureOfProfile, featureOfRect, featureRect, idCount, idItems,
   idRange, idRequest, isSet, keyOwner, newFeature, nextTurn, parseDoc, pickSuggestion, planRequest, rectProfile, referenceFace, removeFeature,
-  resetField, serialise, setField, setMarker, setType, sheetGroups, sheetItems } from "./doc";
+  resetField, serialise, setField, setMarker, setType, sheetGroups, sheetItems, validateDoc } from "./doc";
 
 const preset: Preset = { id: "builtin:x", name: "X", method: "inkjet", builtin: true, page: "A4", page_mm: [210, 297] };
 
@@ -492,5 +492,16 @@ describe("version 3 files migrate: the file's preset goes on every feature (fixt
     const d = parseDoc(v3Fixture);
     expect(JSON.parse(serialise(d)).version).toBe(4);
     expect(parseDoc(serialise(d))).toEqual(d);
+  });
+});
+
+describe("validateDoc (review finding #4): every document the Studio makes itself passes", () => {
+  it("every example, and the old fixtures as migrated", async () => {
+    const { EXAMPLES } = await import("./examples");
+    for (const ex of EXAMPLES) {
+      const d = { ...emptyDoc(ex.name, structuredClone(ex.shapes)), features: structuredClone(ex.features ?? []), id_ledger: { ...ex.id_ledger } };
+      expect(() => validateDoc(d), ex.id).not.toThrow();
+    }
+    for (const fx of [v1Fixture, v2Fixture, v3Fixture]) expect(() => parseDoc(fx)).not.toThrow();
   });
 });

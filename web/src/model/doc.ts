@@ -18,6 +18,7 @@
 import type { ExtrudeParams, IdItem, IdRequest, IdResult, LabelParams, MarkerParams, MarkerType, PlanRequest, Preset, Suggestion, Trim, Turn } from "../core/contract";
 import { dimShapes, type SketchDim } from "../sketch/constraints";
 import { plainRect, profileLoops, sameProfile, type ProfileRef, type RectShape, type Shape } from "../sketch/model";
+import { cleanPreset } from "../presets/local";
 
 export type Holes = "avoid" | "ignore";
 
@@ -504,7 +505,99 @@ export function parseDoc(text: string): Doc {
   const dims: SketchDim[] = Array.isArray(d.dims)
     ? d.dims.filter((x: SketchDim) => x && typeof x.id === "string" && dimShapes(x).every((id) => ids.has(id))) : [];
   const defaultPreset: Preset | null = d.default_preset && typeof d.default_preset === "object" ? d.default_preset : null;
-  return fillPresets({
+  const doc = fillPresets({
     format: "arucostudio-web", version: 4, name: String(d.name ?? "Untitled"), shapes, dims, features, id_ledger: ledger, default_preset: defaultPreset,
   }, defaultPreset);
+  validateDoc(doc);
+  return doc;
+}
+
+// ------------------------------------------------------------ checking a whole document
+
+const finite = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+const pair = (v: unknown): boolean => Array.isArray(v) && v.length === 2 && v.every(finite);
+const nonEmpty = (v: unknown): v is string => typeof v === "string" && v.length > 0;
+
+/** Every field the editor, the sketch and the requests read, checked: a
+ *  shape's geometry, ids and keys unique, a profile's shapes in the sketch, a
+ *  dimension's numbers, the ledger, each preset. Throws the first problem,
+ *  naming where it is ("shape 3 (\"bad\"): ...").
+ *  WHY before anything is replaced (review finding #4, 2026-10-21): a file
+ *  that only failed once loadDoc drew it had already swapped the document and
+ *  cleared the history; parseDoc and loadDoc both call this first. */
+export function validateDoc(doc: Doc): void {
+  if (typeof doc.name !== "string") throw new Error("the name is not text");
+  if (!Array.isArray(doc.shapes) || !Array.isArray(doc.features) || !Array.isArray(doc.dims)) throw new Error("shapes, features and dims must be lists");
+  const shapeIds = new Set<string>();
+  doc.shapes.forEach((sh, i) => {
+    const at = `shape ${i + 1}${nonEmpty(sh?.id) ? ` ("${sh.id}")` : ""}`;
+    if (!sh || typeof sh !== "object") throw new Error(`${at} is not a shape`);
+    if (!nonEmpty(sh.id)) throw new Error(`${at}: its id must be text`);
+    if (shapeIds.has(sh.id)) throw new Error(`${at}: the id "${sh.id}" is used twice`);
+    shapeIds.add(sh.id);
+    if (sh.kind === "rect") {
+      for (const k of ["cx", "cy", "w", "h", "angle_deg"] as const) if (!finite(sh[k])) throw new Error(`${at}: a rect needs a number ${k}`);
+      if (sh.w <= 0 || sh.h <= 0) throw new Error(`${at}: a rect's w and h must be above 0`);
+    } else if (sh.kind === "circle") {
+      for (const k of ["cx", "cy", "r"] as const) if (!finite(sh[k])) throw new Error(`${at}: a circle needs a number ${k}`);
+      if (sh.r <= 0) throw new Error(`${at}: a circle's r must be above 0`);
+    } else if (sh.kind === "poly") {
+      if (!Array.isArray(sh.pts) || sh.pts.length < 3 || !sh.pts.every(pair)) throw new Error(`${at}: a poly needs pts, 3 or more [x, y] points`);
+    } else throw new Error(`${at}: unknown kind ${JSON.stringify((sh as { kind?: unknown }).kind)}`);
+  });
+  const dimIds = new Set<string>();
+  doc.dims.forEach((dm, i) => {
+    const at = `dimension ${i + 1}${nonEmpty(dm?.id) ? ` ("${dm.id}")` : ""}`;
+    if (!dm || !nonEmpty(dm.id)) throw new Error(`${at}: its id must be text`);
+    if (dimIds.has(dm.id)) throw new Error(`${at}: the id "${dm.id}" is used twice`);
+    dimIds.add(dm.id);
+    if (!["w", "h", "d", "x", "y"].includes(dm.kind)) throw new Error(`${at}: unknown kind ${JSON.stringify(dm.kind)}`);
+    if (!finite(dm.value)) throw new Error(`${at}: its value must be a number`);
+    if (!pair(dm.at)) throw new Error(`${at}: at must be [x, y]`);
+    for (const id of dimShapes(dm)) if (!shapeIds.has(id)) throw new Error(`${at}: names shape "${id}", which is not in the sketch`);
+  });
+  const featureIds = new Set<string>(), keys = new Set<string>();
+  doc.features.forEach((f, i) => {
+    const at = `feature ${i + 1}${nonEmpty(f?.id) ? ` ("${f.id}")` : ""}`;
+    if (!f || typeof f !== "object") throw new Error(`${at} is not a feature`);
+    if (!nonEmpty(f.id)) throw new Error(`${at}: its id must be text`);
+    if (featureIds.has(f.id)) throw new Error(`${at}: the id "${f.id}" is used twice`);
+    featureIds.add(f.id);
+    if (!nonEmpty(f.key)) throw new Error(`${at}: its key must be text`);
+    if (keys.has(f.key)) throw new Error(`${at}: the key "${f.key}" is used twice (keys are unique)`);
+    keys.add(f.key);
+    if (f.profile !== null) {
+      const pr = f.profile as Partial<ProfileRef> | undefined;
+      if (!pr || !nonEmpty(pr.outer) || !Array.isArray(pr.holes) || !pr.holes.every(nonEmpty)) throw new Error(`${at}: its profile must be {outer, holes} or null`);
+      for (const id of [pr.outer, ...pr.holes]) if (!shapeIds.has(id)) throw new Error(`${at}: its profile names shape "${id}", which is not in the sketch`);
+    }
+    if (f.holes !== "avoid" && f.holes !== "ignore") throw new Error(`${at}: holes must be "avoid" or "ignore"`);
+    if (!TRIMS.includes(f.trim)) throw new Error(`${at}: unknown trim ${JSON.stringify(f.trim)}`);
+    if (!Array.isArray(f.set) || !f.set.every((x) => typeof x === "string")) throw new Error(`${at}: set must be a list of field names`);
+    const m = f.marker;
+    if (!m || typeof m !== "object") throw new Error(`${at}: its marker is missing`);
+    if (!["single", "grid", "charuco"].includes(m.type)) throw new Error(`${at}: unknown marker type ${JSON.stringify(m.type)}`);
+    if (!nonEmpty(m.dictionary)) throw new Error(`${at}: marker.dictionary must be text`);
+    if (!Number.isInteger(m.first_id) || m.first_id < 0) throw new Error(`${at}: marker.first_id must be a whole number of 0 or more`);
+    for (const k of ["cols", "rows"] as const) if (!Number.isInteger(m[k]) || m[k] < 1) throw new Error(`${at}: marker.${k} must be a whole number of 1 or more`);
+    for (const k of ["marker_mm", "checker_mm", "separation_mm", "quiet_modules"] as const) {
+      if (!finite(m[k]) || m[k] < 0) throw new Error(`${at}: marker.${k} must be a number of 0 or more`);
+    }
+    if (![0, 90, 180, 270].includes(m.turn)) throw new Error(`${at}: marker.turn must be 0, 90, 180 or 270`);
+    if (typeof m.auto !== "boolean" || typeof m.flip !== "boolean") throw new Error(`${at}: marker.auto and marker.flip must be true or false`);
+    if (m.origin_square != null && !pair(m.origin_square)) throw new Error(`${at}: marker.origin_square must be [col, row] or null`);
+    const l = f.label;
+    if (!l || typeof l !== "object") throw new Error(`${at}: its label is missing`);
+    if (typeof l.on !== "boolean" || typeof l.text !== "string") throw new Error(`${at}: label.on must be true or false, label.text text`);
+    if (!["below", "above", "left", "right"].includes(l.side)) throw new Error(`${at}: unknown label.side ${JSON.stringify(l.side)}`);
+    if (!finite(l.height_mm) || l.height_mm < 0 || !finite(l.gap_mm)) throw new Error(`${at}: label.height_mm and label.gap_mm must be numbers`);
+    if (!pair(l.offset_mm)) throw new Error(`${at}: label.offset_mm must be [x, y]`);
+    for (const k of ["white_mm", "black_mm", "paper_mm"] as const) {
+      if (f.extrude[k] !== undefined && !finite(f.extrude[k])) throw new Error(`${at}: extrude.${k} must be a number`);
+    }
+    if (f.preset) cleanPreset(f.preset, `${at}: its preset`);
+  });
+  if (!doc.id_ledger || typeof doc.id_ledger !== "object" || Array.isArray(doc.id_ledger)) throw new Error("id_ledger must be {key: first id}");
+  for (const [k, v] of Object.entries(doc.id_ledger)) if (!Number.isInteger(v) || v < 0) throw new Error(`id_ledger "${k}": must be a whole number of 0 or more`);
+  if (doc.default_preset) cleanPreset(doc.default_preset, "the new markers' preset");
 }

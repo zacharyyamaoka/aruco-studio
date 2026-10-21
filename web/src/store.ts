@@ -16,7 +16,7 @@ import type { CoreInfo, IdResult, Issue, LabelParams, MarkerPlan, Preset, Sugges
 import { core, coreStatus } from "./coreSource";
 import {
   addFeature, addShape, applyIds, deleteShape, emptyDoc, featureOfProfile, featureOfRect, fillPresets, getFeature, keyOwner, newFeature, newId, nextTurn, pickSuggestion,
-  rectProfile, removeFeature, resetField, setField, setShape, updateFeature, type Doc, type Feature, type Holes,
+  rectProfile, removeFeature, resetField, setField, setShape, updateFeature, validateDoc, type Doc, type Feature, type Holes,
 } from "./model/doc";
 import { applyBatch, resetBatch } from "./model/batch";
 import { boxOf, fitBox, rectCorners, type Camera } from "./model/geom";
@@ -330,6 +330,8 @@ export const useStudio = create<Studio>((set, get) => {
     setDoc: (doc, key) => put({ doc }, key),
     setName: (name) => { if (name !== get().doc.name) set({ doc: { ...get().doc, name } }); },
     loadDoc: (doc) => {
+      // a document that cannot be drawn is refused before anything is replaced
+      validateDoc(doc);
       const preset = doc.default_preset ?? get().doc.default_preset;
       // WHY a fresh history (as Excalidraw and Figma do): Ctrl+Z after Open,
       // an example or New must not bring the previous document back -- an
