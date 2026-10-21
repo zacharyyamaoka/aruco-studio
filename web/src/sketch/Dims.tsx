@@ -16,8 +16,12 @@
 // WHY the outer W × H after all, read-only (Zach, 2026-10-21, from Fusion: "I
 // want to see the marker and spacing dimensions here and the outer
 // dimensions as driven"; docs/design/panel_skeleton.md, "On the model /
-// canvas"): the core's two "outer" dims (the outline's top and left edges)
-// are drawn grey, in the driven style, and take no click: nothing types them.
+// canvas"): the core's two "outer" dims are drawn grey, in the driven style,
+// and take no click: nothing types them. They measure the sticker as it
+// prints -- the cut's top and left edges (the profile under Trim Profile, the
+// quiet zone under Trim Marker), not the marker's outline. WHY (Zach,
+// 2026-10-21: a 123.5 mm profile whose Outer read 112, "I am expecting
+// 123.5"): Outer is what the sheet cuts (tests/web/test_web_printdims.py).
 //
 // WHY screen-space rings: the core stands each dimension offset_mm outside
 // the box it placed the marker in (MarkerPlan.fit_rect: "the rectangle"
@@ -80,6 +84,8 @@ export interface LaidDim {
   set: boolean;
   /** read-only (the outer size): driven always, no click types it */
   fixed: boolean;
+  /** a read-only dim's "driven by" words, for its tooltip */
+  why?: string;
   bad: boolean;
   /** the measured points on the geometry, and the arrow tips (screen px) */
   a: Vec2; b: Vec2; p: Vec2; q: Vec2;
@@ -152,6 +158,7 @@ function laidOne(f: Feature, d: Dimension, i: number, nw: Vec2, off: number, scr
   const bad = set && errors.has(d.field);
   return {
     key: `${d.field}:${i}`, field: d.field, value: d.value_mm, text, set, fixed, bad,
+    why: fixed ? (f.trim === "marker" ? "the marker's size and the quiet zone set it" : "the profile the sticker is cut to sets it") : undefined,
     a: A, b: B, p, q, inside, fits, at, angle, tw,
   };
 }
@@ -232,7 +239,7 @@ export function Dims({ fid, dims, editing, onEdit }: {
             <path className="arw" data-tip="b" d={arrow(d.q, d.inside ? d.p : add(d.q, dir, 1))} />
             {d.fixed && (
               <g className="val" data-dim-label={d.field} transform={`rotate(${d.angle} ${d.at[0]} ${d.at[1]})`}>
-                <title>{`${NAMES[d.field] ?? d.field}: ${d.text} mm, driven (the marker's size and the quiet zone set it)`}</title>
+                <title>{`${NAMES[d.field] ?? d.field}: ${d.text} mm as it prints, driven (${d.why ?? "the marker's size and the quiet zone set it"})`}</title>
                 <rect className="chip" x={d.at[0] - d.tw / 2} y={d.at[1] - TEXT_H / 2} width={d.tw} height={TEXT_H} rx={3} />
                 <text x={d.at[0]} y={d.at[1]} textAnchor="middle" dominantBaseline="central">{d.text}</text>
               </g>

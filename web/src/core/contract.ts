@@ -215,10 +215,10 @@ export interface MarkerPlan {
   ids: number[];
   // geometry, already placed in the sketch frame (rect centre, angle, turn, flip)
   black: Polygon[];          // the ink
-  outer: Loop;               // the white outline (quiet-zone edge)
+  outer: Loop;               // the marker's outline (quiet-zone edge); the sticker that prints is `cut_shape`
   cut?: Loop;                // the sticker's cut line (outer loop), per `trim`: rectangle, profile or marker
   cut_shape?: Polygon;       // the same with holes (a profile's holes are cut out); white fills it
-  outer_mm: Vec2;            // its width and height in the marker's own frame
+  outer_mm: Vec2;            // the outline's width and height in the marker's own frame (not the printed size: see dims)
   marker_mm: number;
   checker_mm: number;        // 0 unless ChArUco
   separation_mm: number;     // 0 unless grid
@@ -239,7 +239,12 @@ export interface MarkerPlan {
    *  16 numbers, row-major 4x4, mm (the Joint Origin) */
   origin: number[];
   label: PlacedLabel | null;
-  dims?: Dimension[];        // marker size, checker, separation, outer, rectangle, label offset
+  /** marker size, checker, separation, outer, rectangle, label offset. The
+   *  two "outer" (the canvas's driven Outer W × H) measure the sticker as the
+   *  sheet cuts it, `cut_shape`'s box in the rectangle's frame, for a request
+   *  with a profile (2026-10-21, Zach: "I am expecting 123.5"); a rect-only
+   *  request keeps the marker's outline there, as before */
+  dims?: Dimension[];
   // ---- for CAD shells (the Fusion adapter, 2026-10-18 N-6 report) ----
   /** the bodies as built: z along the face normal (mm, 0 = the face plane,
    *  + out of it), op "add" | "cut" | "keep", polygons in the sketch frame.
@@ -256,7 +261,7 @@ export interface MarkerPlan {
   /** where the Joint Origin (`origin`) sits along z, mm (the detector's plane:
    *  the printed surface) */
   origin_z_mm?: number;
-  summary: string;           // one line: "Grid 2×3 DICT_4X4_50 #0–5 · 16.2 mm · outer 41.0 × 60.5 mm"
+  summary: string;           // one line: "Grid 2×3 DICT_4X4_50 #0–5 · 16.2 mm · outer 41.0 × 60.5 mm" (outer: as dims' outer)
   warnings: Issue[];
 }
 

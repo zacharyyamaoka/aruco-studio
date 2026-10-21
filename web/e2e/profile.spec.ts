@@ -215,9 +215,13 @@ test.describe(`profile-first (${CORE} core)`, () => {
     // as JSON (what a saved plan is): -0 and 0 are one number there
     const now = JSON.parse(JSON.stringify(s.plans.f1));
     expect(now.ids).toEqual([7]);
-    for (const k of ["ok", "ids", "black", "outer", "outer_mm", "marker_mm", "cell_mm", "overflow_mm", "origin", "label", "summary"]) {
+    for (const k of ["ok", "ids", "black", "outer", "outer_mm", "marker_mm", "cell_mm", "overflow_mm", "origin", "label"]) {
       expect(now[k], `plan.${k}`).toEqual(old[k]);
     }
+    // the summary too, but its outer: a profile request's is the sticker as it
+    // prints, the rectangle (printdims, 2026-10-21); the legacy rect-only
+    // request keeps the marker's outline there, byte for byte
+    expect(now.summary, "plan.summary").toBe(old.summary.replace(/outer [\d.]+ × [\d.]+ mm$/, `outer ${r1.w.toFixed(1)} × ${r1.h.toFixed(1)} mm`));
     // the cut: the same outline (from whichever corner each starts)
     expect(canon(now.cut), "plan.cut").toEqual(canon(old.cut));
     expect(canon(now.cut_shape.outer), "plan.cut_shape.outer").toEqual(canon(old.cut_shape.outer));

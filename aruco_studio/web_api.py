@@ -34,6 +34,7 @@ Fusion composes a Joint Origin: core.geometry.jo_compose).
 | `MarkerPlan.layers`, `cells`, `pattern_to_sketch`, `origin_z_mm` (CAD shells, N-6) | the TagPlan's `layers` placed like `black`; core.markers.cell_boxes; the matrix `black` is placed with; `origin`'s z (the printed surface: inkjet t, 3D the tile's top, on a face 0; Flip negates) |
 | `profile` with no `rect`, `holes` (barrier 9, 2026-10-20 evening) -> `MarkerPlan.fit_rect` | placed_in / fit_box: the profile itself when it is a rectangle (rect_profile, rotated too), else inscribe's largest clear box; then planned as a rect is. A request with a rect is planned in it (fit_rect = rect) |
 | `trim` (2026-10-18; barrier 9) -> `MarkerPlan.cut`, `cut_shape` | not the core's: `profile`'s loops as given (default; a rect-only request's profile is its rect), or `outer` ("marker"); "rectangle" reads as "profile", said on "trim"; the plan is the same for both. svg, sheet and the inkjet paper layer (`sticker`) are cut to it, white inside |
+| a `profile` (2026-10-21, printdims) -> `dims` "outer", `summary`'s outer, the Marker row's "sticker W × H", the page lint | the sticker as the sheet cuts it: cut_box_of, the cut's box in the rectangle's frame (Trim Profile: the profile; Marker: the quiet zone), not the marker's outline (`outer`, `outer_mm`: the core's tile, its own frame); "Over the page" judged as sheet() places it (page_lint). A rect-only request keeps the outline there, byte for byte (Fusion and old callers) |
 
 Issue fields: the core's key paths renamed (FIELDS); the page lint ("Over
 the page ...") and the cell / make rows -> "preset"; target -> "rect"; the
@@ -894,6 +895,14 @@ def cut_local(req: dict, d: dict, fl, trim: str, loops) -> dict:
             "holes": []}
 
 
+def cut_box_of(req: dict, d: dict, fl, trim: str, loops):
+    """The box (u0, v0, u1, v1) of the sticker as the sheet cuts it
+    (cut_local: the trim), in the rectangle's own frame -- the frame the
+    sketch draws it in and the sheet prints it in (sticker_parts), so its
+    size is the printed sticker's W x H before the sheet turns it."""
+    return _box(cut_local(req, d, fl, trim, loops)["outer"])
+
+
 def _ids_guess(m: dict) -> list:
     """The ids a request prints before it is planned (the label's text needs
     them to size its band): the counts are typed (`settings.force`)."""
@@ -1041,10 +1050,12 @@ def origin_square(m: dict, d: dict, frame: list, issues: list) -> list:
     return _RF.square_origin(frame, sq[0], sq[1], mk["square_length_m"] * 1000.0)
 
 
-def plan_dims(req: dict, d: dict, fl, L, lay: dict) -> list:
+def plan_dims(req: dict, d: dict, fl, L, lay: dict, cut_box=None) -> list:
     """The contract's `dims` (core.rect_fill.dimensions), measured on the
     drawn geometry in the rectangle's frame (L: pattern -> that frame), placed
-    in the sketch."""
+    in the sketch. The two "outer" dims measure `cut_box` (u0, v0, u1, v1),
+    the sticker as the sheet cuts it (cut_box_of), each standing outside both
+    the rectangle and that box; without one, the marker's outline."""
     rect = req["rect"]
     w, h = float(rect["w"]), float(rect["h"])
     kind = lay["kind"]
@@ -1054,14 +1065,32 @@ def plan_dims(req: dict, d: dict, fl, L, lay: dict) -> list:
     S_mm = mk.get("square_length_m", 0.0) * 1000.0 if kind == "charuco" else 0.0
     lab = req.get("label") or {}
     off = [float(v) for v in (lab.get("offset_mm") or [0.0, 0.0])]
+    # WHY the cut, not the marker's outline (Zach, 2026-10-21, arucostudio.com:
+    # a 123.5 x 40 rectangle profile holding a 3 x 1 grid whose quiet-zone box
+    # is 112 x 40; "I am expecting 123.5"): the canvas draws these two as the
+    # driven Outer W x H, and the sheet prints the sticker cut to its trim, so
+    # Outer is what prints -- the profile under Trim Profile, the quiet zone
+    # under Trim Marker (tests/web/test_web_printdims.py decodes the PDF)
+    outer = cut_box if cut_box is not None else _bbox(L, _rect_loop(d["guides"]["sticker"]))
     got = _RF.dimensions(
-        w, h, _bbox(L, _rect_loop(d["guides"]["sticker"])),
+        w, h, outer,
         markers=[b for b in boxes if _square(b, L_mm)], marker_mm=_r(L_mm),
         squares=[b for b in boxes if _square(b, S_mm)] if kind == "charuco" else (),
         checker_mm=_r(lay["square_mm"]) if kind == "charuco" else 0.0,
         separation_mm=_r(lay["separation_mm"]) if kind == "grid" else 0.0,
         spot=fl.spot if fl is not None else None, at=fl.at if fl is not None else None,
         offset_mm=math.hypot(*off) if fl is not None else 0.0)
+    if cut_box is not None:
+        # a face's cut reaches past the box the marker was placed in: the core
+        # stands "outer" outside that box, so out here it stands outside both
+        # (the same numbers whenever the cut is inside the rectangle)
+        s = _RF.dim_step(w, h)
+        u0, v0, u1, v1 = cut_box
+        for g in got:
+            if g["field"] == "outer" and g["a"][1] == g["b"][1]:          # the top edge
+                g["offset_mm"] = max(h / 2.0, v1) - v1 + 3.0 * s
+            elif g["field"] == "outer":                                    # the left edge
+                g["offset_mm"] = u0 - min(-w / 2.0, u0) + s
     R = rect_matrix(rect)
     # WHY 1e-9 for the endpoints (the plan's numbers are 1e-6): a dimension
     # reads |b - a|, and two points each rounded to 1e-6 on a turned
@@ -1232,12 +1261,78 @@ def pattern_cells(d: dict) -> list:
 
 
 def _summary(kind, dictionary, ids, lay, outer_mm) -> str:
+    """The one-line summary; `outer_mm`: the sticker as it prints (plan's
+    cut_mm: the cut's W x H in the rectangle's frame, cut_box_of)."""
     idw = "#%d" % ids[0] if len(ids) == 1 else "#%d–%d" % (ids[0], ids[-1])
     head = "Single" if kind == "single" else f"{TYPE_WORDS[kind]} {lay['cols']}×{lay['rows']}"
     size = (f"{_mm(lay['square_mm'])} / {_mm(lay['marker_mm'])} mm" if kind == "charuco"
             else f"{_mm(lay['marker_mm'])} mm")
     return (f"{head} {dictionary} {idw} · {size} · outer {outer_mm[0]:.1f} × "
             f"{outer_mm[1]:.1f} mm")
+
+
+_STICKER_WORDS = re.compile(r"· sticker \d+(?:\.\d+)?(?: × \d+(?:\.\d+)?)? mm \(white border ")
+
+
+def sticker_words(issues: list, cut_mm, profile: bool) -> list:
+    """The Marker row's size line (core.form.size_line: "marker 30.0 mm ·
+    sticker 112.0 × 40.0 mm (white border 1 module = 5.00 mm)") with the
+    sticker as the sheet cuts it, `cut_mm` (W x H in the rectangle's frame);
+    `profile`: it is cut to the profile, not round the white border, and the
+    words say so. The core's own words are the marker's tile, in the
+    marker's frame (a turned board's W and H swapped)."""
+    w, h = cut_mm
+    box = f"{w:.1f} mm" if abs(w - h) < 1e-6 else f"{w:.1f} × {h:.1f} mm"
+    say = f"· sticker {box} ({'cut to the profile; ' if profile else ''}white border "
+    return [dict(it, text=_STICKER_WORDS.sub(lambda _m: say, it["text"], count=1))
+            if it["field"] == "marker.marker_mm" and _STICKER_WORDS.search(it["text"]) else it
+            for it in issues]
+
+
+_PAGE_WORDS = re.compile(r"^(Over the page by |fits .+ only: the sheet turns it)")
+_LETTER_LINT = "; Over the page is checked against Letter"     # _page_key's words
+
+
+def page_lint(issues: list, req: dict, cut_mm, trim: str) -> list:
+    """An inkjet request's page lint (CF-6: built anyway, flagged red) judged
+    as sheet() lays the page out: the sticker as it is cut, `cut_mm`, on the
+    preset's paper as given (sheet_page; never landscape: the sheet turns a
+    sticker instead), either way round -- core.sheet.fit_area on the area
+    core.sheet.layout_stickers places in. The core's own "Over the page" /
+    "fits ... only" words, which judge the marker's tile on a named page
+    either way up, are dropped. WHY (printdims, 2026-10-21): a 260 mm
+    profile round a 40 mm marker printed nothing with no word in the panel,
+    and a 200 mm marker typed into a 60 mm profile was "Over the page"
+    while the sheet cut it to the profile and printed it."""
+    pre = req.get("preset") or {}
+    if pre.get("method") != "inkjet":
+        return issues
+    # (a custom paper: this lint is on that paper, not on Letter as _page_key says)
+    out = [dict(it, text=it["text"].replace(_LETTER_LINT, "")) if _LETTER_LINT in it["text"] else it
+           for it in issues if not _PAGE_WORDS.match(it["text"])]
+    page, custom = sheet_page(pre)
+    margin = float(pre["margin_mm"]) if pre.get("margin_mm") is not None else _MK.PAGE_MARGIN_MM
+    try:
+        area = _SH._area(_SH.SheetSettings(page=page, custom_page_mm=custom, margin_mm=margin,
+                                           scale_bar="first"))
+    except ValueError:
+        return out                                 # no room on the page at all: sheet() says so
+    aw, ah = area[4], area[5]
+    w, h = cut_mm
+    fit = _SH.fit_area(w, h, {"portrait": (aw, ah)}, page, margin)
+    paper = (f"the {custom[0]:g} × {custom[1]:g} mm page" if custom is not None
+             else _MK.page_words(page))
+    if not fit["fits"]:
+        how = ("a smaller profile, Trim Marker or a bigger page fits it" if trim != "marker"
+               else "a smaller Marker size, Auto size or a bigger page fits it")
+        out.append({"field": "preset", "level": "error",
+                    "text": f"Over the page by {fit['worst_mm']:.1f} mm: the sticker is {w:.1f} × "
+                            f"{h:.1f} mm, {paper} less {margin:g} mm margins prints {aw:.1f} × "
+                            f"{ah:.1f} mm (either way round). The sheet will not place it: {how}"})
+    elif fit["how"] == "portrait, turned":
+        out.append({"field": "marker.marker_mm", "level": "info",
+                    "text": f"fits {paper} turned only: the sheet turns it"})
+    return out
 
 
 def _refused(m: dict, issues: list, summary: str) -> dict:
@@ -1305,6 +1400,18 @@ def plan(req: dict) -> dict:
         overflow = _r(max(0.0, u1 - w / 2.0, -w / 2.0 - u0, v1 - h / 2.0, -h / 2.0 - v0))
     outer = _loop(M, _rect_loop(sticker), True)
     trim, loops = trim_of(req)
+    # the sticker as the sheet cuts it: Outer, the summary and the size line
+    # say this for a profile request (barrier 9: the web UI's); a rect-only
+    # request (Fusion and old callers) keeps the marker's outline there, byte
+    # for byte (tests/web: the parity cases' pins)
+    cb, cut_mm = None, outer_mm
+    if (req.get("profile") or {}).get("loops"):
+        cb = cut_box_of(req, d, fl, trim, loops)
+        cut_mm = [_r(cb[2] - cb[0]), _r(cb[3] - cb[1])]
+        quiet = _bbox(_local(d, fl, False), _rect_loop(sticker))
+        issues = sticker_words(issues, cut_mm, trim != "marker" and any(
+            abs(a - b) > SNAP_TOL_MM for a, b in zip(cb, quiet)))
+        issues = page_lint(issues, req, cut_mm, trim)
     if trim == "profile":                          # the sketch frame as given
         cut = {"outer": [[_r(u), _r(v)] for u, v in loops[0]],
                "holes": [[[_r(u), _r(v)] for u, v in hl] for hl in loops[1:]]}
@@ -1322,7 +1429,7 @@ def plan(req: dict) -> dict:
            "auto": bool(m.get("auto")), "overflow_mm": overflow,
            "fit_rect": {k: _r(rect.get(k) or 0.0) for k in ("cx", "cy", "w", "h", "angle_deg")},
            "origin": origin, "label": label,
-           "dims": plan_dims(req, d, fl, L, lay),
+           "dims": plan_dims(req, d, fl, L, lay, cb),
            "layers": cad_layers(d, M, cut, label, cutout=pattern_cutout(
                req, d, fl, flip, white_only=ex["method"] == "print3d" and ex["mode"] == "white")),
            "cells": pattern_cells(d),
@@ -1331,7 +1438,7 @@ def plan(req: dict) -> dict:
            # and places every cell by it, so a rounded rotation (an error of
            # 5e-7 per entry, ~5e-5 mm at 100 mm) would build up there
            "pattern_to_sketch": [float(v) + 0.0 for v in M], "origin_z_mm": origin[11],
-           "summary": _summary(kind, mk["dictionary"], ids, lay, outer_mm),
+           "summary": _summary(kind, mk["dictionary"], ids, lay, cut_mm),
            "warnings": issues}
     if req.get("extrude") is not None:
         # WHY only when asked: a request without `extrude` (every caller
