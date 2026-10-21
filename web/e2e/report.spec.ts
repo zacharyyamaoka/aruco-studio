@@ -476,6 +476,8 @@ test("11 · Verify: OpenCV reads the marker; Tilt is the manual sweep; the autom
   const t0 = Date.now();
   await page.getByTestId("act-verify").click();
   await expect(page.getByTestId("verify-dialog")).toBeVisible();
+  // Verify opens on its range strip since 2026-10-21 (lane verifyrange): the bench is the next segment
+  await page.locator('[data-testid="verify-view"] [data-value="bench"]').click();
   const loading = await page.getByTestId("verify-loading").textContent().catch(() => null);
   const image = page.getByTestId("verify-image");
   await expect(image).toBeVisible({ timeout: 90_000 });

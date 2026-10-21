@@ -7,15 +7,18 @@
 // calculate it … but it's nice being able to look at it myself." So Tilt
 // re-renders while it is dragged, and the chart's columns drive it too.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Dialog, NumberField, Select, registerGlyphs, type Opt } from "@bam/ui";
-import type { MarkerPlan, PlanRequest, Readability, VerifyResult } from "../core/contract";
+import { Badge, Dialog, NumberField, SegmentedRow, Select, registerGlyphs, type Opt } from "@bam/ui";
+import type { Camera, PlanRequest, Readability, VerifyResult } from "../core/contract";
 import { core } from "../coreSource";
-import { featureNumber, featurePreset, getFeature, idRange, planRequest, type Doc, type Feature } from "../model/doc";
+import { featureNumber, featurePreset, getFeature, planRequest, type Doc } from "../model/doc";
 import { CoreWait, WaitLine, useCallWait, useCoreWait } from "../panel/Waiting";
 import { activeFeatureId, useStudio } from "../store";
 import {
   KNOBS0, SWEEP_TILTS, benchCamera, calcCamera, loadCalc, readsTo, saveCalc, share, viewOf, type CalcCamera, type Knobs,
 } from "./bench";
+import { items, markerName, type Item } from "./items";
+import { ranges } from "./range";
+import { RangeView } from "./RangeView";
 import { SweepChart, type Series } from "./SweepChart";
 import "./verify.css";
 
@@ -39,23 +42,17 @@ const KNOB_ROWS: { key: keyof Knobs; label: string; min: number; max: number; st
   { key: "occlusion", label: "Occlusion", min: 0, max: 1, step: 0.05, fmt: (v) => `${Math.round(v * 100)} %` },
 ];
 
-/** "Marker #39", "Grid 2×3 #0–5", "ChArUco 5×4 #10–19". */
-export function markerName(f: Feature, plan?: MarkerPlan): string {
-  const m = f.marker, ids = idRange(m, plan?.ids);
-  if (m.type === "single") return `Marker ${ids}`;
-  return `${m.type === "grid" ? "Grid" : "ChArUco"} ${plan?.cols ?? m.cols}×${plan?.rows ?? m.rows} ${ids}`;
-}
+export { markerName } from "./items";
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-interface Item { f: Feature; req: PlanRequest; plan: MarkerPlan | undefined; key: string; slot: number }
-
-function items(doc: Doc, plans: Record<string, MarkerPlan>): Item[] {
-  return doc.features.flatMap((f, slot) => {
-    const req = planRequest(doc, f);
-    return req ? [{ f, req, plan: plans[f.id], key: JSON.stringify(req), slot }] : [];
-  });
-}
+export type VerifyView = "range" | "bench";
+/** The view the next open shows (the e2e hook's open() asks for the bench; the Verify button and K, the range). */
+let nextView: VerifyView = "range";
+const VIEWS: Opt[] = [
+  { value: "range", label: "Range", hint: "Every marker's reading range on a camera" },
+  { value: "bench", label: "Bench", hint: "One marker under your own tilt, blur and glare" },
+];
 
 export function VerifyDialog() {
   const open = useStudio((s) => s.modal === "verify");
@@ -64,14 +61,31 @@ export function VerifyDialog() {
   const plans = useStudio((s) => s.plans);
   const all = useMemo(() => items(doc, plans), [doc, plans]);
   const [pick, setPick] = useState<string | null>(null);
+  const [view, setView] = useState<VerifyView>("range");
+  /** the bench opened at a band's end: that camera at that distance, until "the bench camera" */
+  const [at, setAt] = useState<{ fid: string; camera: Camera; words: string } | null>(null);
   // the selected feature each time it opens; the picker for the rest
-  useEffect(() => { if (open) setPick(activeFeatureId(useStudio.getState())); }, [open]);
+  useEffect(() => {
+    if (open) { setPick(activeFeatureId(useStudio.getState())); setView(nextView); setAt(null); nextView = "range"; }
+    // WHY cancel on close: a range runs in the core's one worker, a slice at a
+    // time; nothing is left running behind a closed dialog (finished ones are kept)
+    else ranges.cancelAll();
+  }, [open]);
   const it = all.find((x) => x.f.id === pick) ?? all[all.length - 1] ?? null;
+  const title = view === "range" ? `Verify · ${all.length === 1 ? "1 marker" : `${all.length} markers`}` : it ? `Verify · ${markerName(it.f, it.plan)}` : "Verify";
   return (
-    <Dialog open={open} onClose={close} icon="eye" testid="verify-dialog" className="verify-dialog"
-      title={it ? `Verify · ${markerName(it.f, it.plan)}` : "Verify"}>
+    <Dialog open={open} onClose={close} icon="eye" testid="verify-dialog" className="verify-dialog" title={title}>
       {open && (it
-        ? <Bench all={all} it={it} onPick={setPick} doc={doc} />
+        ? (
+          <div className="vf-wrap">
+            <div className="vf-views">
+              <SegmentedRow value={view} options={VIEWS} onChange={(v) => setView(v as VerifyView)} testid="verify-view" />
+            </div>
+            {view === "range"
+              ? <RangeView all={all} doc={doc} onBench={(fid, camera, words) => { setPick(fid); setAt({ fid, camera, words }); setView("bench"); }} />
+              : <Bench all={all} it={it} onPick={(id) => { setPick(id); setAt(null); }} doc={doc}
+                at={at && at.fid === it.f.id ? at : null} onBenchCamera={() => setAt(null)} />}
+          </div>)
         // features but no preset: they plan once the core's presets are in
         : doc.features.some((f) => !featurePreset(doc, f)) ? <CoreWait needFacts testid="verify-wait" />
         : <div className="pad muted">Nothing to verify yet: make an ArUco Extrude (A) first.</div>)}
@@ -79,7 +93,11 @@ export function VerifyDialog() {
   );
 }
 
-function Bench({ all, it, onPick, doc }: { all: Item[]; it: Item; onPick: (id: string) => void; doc: Doc }) {
+function Bench({ all, it, onPick, doc, at, onBenchCamera }: {
+  all: Item[]; it: Item; onPick: (id: string) => void; doc: Doc;
+  /** a band's end: the strip's camera at that distance instead of the bench camera */
+  at: { camera: Camera; words: string } | null; onBenchCamera: () => void;
+}) {
   const [knobs, setKnobs] = useState<Knobs>(KNOBS0);
   const [shot, setShot] = useState<{ r: VerifyResult; key: string; n: number } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -109,7 +127,7 @@ function Bench({ all, it, onPick, doc }: { all: Item[]; it: Item; onPick: (id: s
     running.current = false;
     if (alive.current) setBusy(false);
   };
-  const cam = it.plan ? benchCamera(it.plan) : null;
+  const cam = at ? at.camera : it.plan ? benchCamera(it.plan) : null;
   useEffect(() => {
     if (!cam) return;
     const view = viewOf(cam, knobs);
@@ -119,7 +137,7 @@ function Bench({ all, it, onPick, doc }: { all: Item[]; it: Item; onPick: (id: s
     // only folds the burst of one drag step's events
     const t = setTimeout(() => { want.current = { req: it.req, key: it.key, view, job }; void pump(); }, 30);
     return () => clearTimeout(t);
-  }, [it.key, cam?.distance_mm, knobs]);
+  }, [it.key, JSON.stringify(cam), knobs]);
 
   // ---- the automatic sweep: every marker, tilt 0 → 85°, one call at a time
   const [sweepTick, setSweepTick] = useState(0);
@@ -192,9 +210,10 @@ function Bench({ all, it, onPick, doc }: { all: Item[]; it: Item; onPick: (id: s
               <output data-testid={`knob-${k.key}`}>{k.fmt(knobs[k.key])}</output>
             </label>
           ))}
-          <div className="vf-note">
-            The bench: {r && fresh ? `${r.px_per_cell.toFixed(1)}` : "…"} px per cell head on, a {cam ? `${cam.resolution[0]} × ${cam.resolution[1]} px, ${cam.hfov_deg}°` : ""} camera
+          <div className="vf-note" data-testid="bench-note">
+            {at ? <>On the {at.words}: </> : "The bench: "}{r && fresh ? `${r.px_per_cell.toFixed(1)}` : "…"} px per cell head on, a {cam ? `${cam.resolution[0]} × ${cam.resolution[1]} px, ${cam.hfov_deg}°` : ""} camera
             {cam ? ` ${Math.round(cam.distance_mm)} mm away` : ""}; noise, glare and dirt repeat (seed 0).
+            {at && <> <button type="button" className="vr-link" data-testid="bench-camera" onClick={onBenchCamera}>Back to the bench camera</button></>}
           </div>
         </section>
         <section className="vf-sec">
@@ -289,9 +308,12 @@ function Calculator({ it }: { it: Item }) {
 // calculator's numbers are checked against).
 if (typeof window !== "undefined") {
   (window as unknown as { __arucoVerify: unknown }).__arucoVerify = {
-    open: (featureId?: string) => {
+    // WHY the bench by default here: the bench's e2e (verify.spec.ts) opens it
+    // by this hook; the Verify button and K open the range strip
+    open: (featureId?: string, view: VerifyView = "bench") => {
       const st = useStudio.getState();
       if (featureId) st.select({ kind: "feature", id: featureId });
+      nextView = view;
       st.openModal("verify");
     },
     readable: (featureId: string, camera: CalcCamera) => {

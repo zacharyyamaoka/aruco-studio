@@ -1,0 +1,18 @@
+# A second CPython for the BROWSER'S OpenCV (2026-10-21, the reading range):
+# the online Studio's Verify runs opencv-python 4.11.0.86 (Pyodide 314.0.7's,
+# web/node_modules/pyodide/pyodide-lock.json), while requirements.txt pins
+# 5.0.0.93 -- and the two render the same view differently (warpPerspective,
+# the label's warpAffine, GaussianBlur), which moves a reading range up to
+# 2x near the limits. With these pins, CPython's reading ranges of the 4-board
+# test document came out byte-identical to the browser's. Make it with:
+#   uv venv /home/bam/aruco-studio/.venv-cv411 --python 3.11
+#   uv pip install --python /home/bam/aruco-studio/.venv-cv411/bin/python -r tools/requirements-browser-opencv.txt
+# Then: .venv-cv411/bin/python -m aruco_studio.web_verify requests.json, or
+# web_verify.range_table(..., also=<its python>) from the main .venv for both.
+numpy==2.3.5
+opencv-contrib-python-headless==4.11.0.86
+pytest==8.4.2
+iniconfig==2.3.1
+packaging==26.3
+pluggy==1.7.0
+Pygments==2.21.0

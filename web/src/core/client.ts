@@ -81,4 +81,10 @@ export const core: CoreApi = {
   verify: (req, view) => send("verify", { req, view }),
   readable: (req, camera) => send("readable", { req, camera }),
   assign_ids: (req) => send("assign_ids", req),
+  cameras: () => send("cameras", {}),
+  reading_range: (req, opts) => send("reading_range", { req, ...opts }),
+  range_start: (req, opts) => send("range_start", { req, ...opts }),
+  range_step: (job, budget_ms) => send("range_step", { job, ...(budget_ms === undefined ? {} : { budget_ms }) }),
+  range_cancel: (job) => send("range_cancel", { job }),
+  range_judge: (range, need) => send("range_judge", { range, need }),
 };

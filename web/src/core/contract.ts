@@ -351,6 +351,107 @@ export interface Readability {
   measured?: boolean;
 }
 
+// ---- the reading range (contract barrier 13, Zach 2026-10-21: V4 "Range strip") ----
+// "Or maybe I can just select the camera and then Verify can tell me what is a
+// suitable range... a view where I can quickly see all the markers along the top
+// and underneath a line that represents the distance they can be viewed."
+// The engine is aruco_studio/core/reading_range.py (standard library, the same
+// bytes in Pyodide), the reader web_verify's (the plan rendered, OpenCV's
+// detector); the library aruco_studio/core/cameras.py.
+
+/** One camera of Verify's library: the stream an ArUco pipeline reads, from
+ *  its maker's own document (`sources`). */
+export interface CameraPreset {
+  id: string;
+  name: string;
+  maker: string;
+  stream: string;            // "colour 1920×1080", "left eye 1080p", ...
+  resolution: Vec2;
+  hfov_deg: number;          // across the width
+  /** the nearest distance the maker says it focuses at; null = not stated */
+  focus_mm: number | null;
+  shutter: "global" | "rolling";
+  note: string;
+  /** how the HFOV was worked out from what the maker states; "" = stated */
+  derived: string;
+  sources: { title: string; url: string; accessed: string }[];
+  keywords: string;          // what search matches besides name, stream, maker
+}
+
+/** The camera a reading range is for: a library id ("d435"), or its numbers. */
+export type RangeCamera = string | { id?: string; name?: string; resolution: Vec2; hfov_deg: number; focus_mm?: number | null };
+
+export interface RangeOptions {
+  camera: RangeCamera;
+  /** the cases' budget (core reading_range.BUDGETS): "field" = tilt ≤ 45°, blur 0.3–1.5 px, grain 0.02–0.2, glare 0–0.5 */
+  budget?: "field";
+  cases?: number;            // per distance (48)
+  seed?: number;             // the cases' (reading_range.SEED)
+  /** "opencv" (the default where it loads), "analytic" (the pinhole model, no OpenCV) */
+  reader?: "opencv" | "analytic";
+}
+
+/** A marker's reading range on one camera: every id reads in `p_read` (95 %)
+ *  of the budget's cameras from near_mm to far_mm. null ends: it reads nowhere
+ *  (`reason`). The same inputs give the same bytes (seeded). */
+export interface ReadingRange {
+  version: string;           // the method ("reading-range/1"): a cache key
+  near_mm: number | null;
+  far_mm: number | null;
+  /** the far end's 90 % interval (the cases resampled) */
+  band_mm: [number, number] | null;
+  pm: number | null;         // half the interval / far_mm
+  /** what sets the near end: the board fills 90 % of the frame, the camera's
+   *  focus distance, the label (it misses ids up close), or stepped out until it read */
+  near_by: "frame" | "focus" | "label" | "reads" | null;
+  near_checked: boolean;
+  /** what sets the far end: pixels per cell, or OpenCV's minimum outline (no resolution helps) */
+  far_limit: "cells" | "outline" | null;
+  far_px_per_cell: number | null;
+  far_outline_px: number | null;
+  min_outline_px: number;
+  /** the id that misses most near the far end (boards) */
+  weakest_id: number | null;
+  /** the far fit's evidence: at each distance, how many of the n cases read every id */
+  rows: { d_mm: number; ok: number; n: number }[];
+  renders: number;
+  cases: number;
+  seed: number;
+  p_read: number;
+  budget: { name: string; tilt_max_deg: number; blur_px: Vec2; noise: Vec2; glare: Vec2; occlusion: number };
+  camera: { id: string; name: string; resolution: Vec2; hfov_deg: number; focus_mm: number | null };
+  /** the board as the engine saw it (its own frame, label included) */
+  geometry: { bounds_mm: [number, number, number, number]; cell_mm: number; marker_mm: number; ids: number[] };
+  /** true: OpenCV read the rendered views; false: the pinhole model */
+  measured: boolean;
+  /** the OpenCV that drew and read them (its warps differ between releases); null when not measured */
+  opencv: string | null;
+  reason?: string;
+}
+
+/** One slice of a reading range (range_start / range_step). */
+export interface RangeStep {
+  job: string;
+  done: boolean;
+  phase?: "bracket" | "fit" | "near";
+  fraction?: number;         // 0..1, for a progress bar
+  renders: number;
+  ms?: number;               // this job's rendering time so far
+  result?: ReadingRange;     // when done
+}
+
+/** A required viewing distance (Zach, 2026-10-21: "batch set minimum and
+ *  maximum viewing distance"); either end may be absent. */
+export interface RangeNeed { min_mm?: number | null; max_mm?: number | null }
+
+/** A reading range against a RangeNeed: pass when it covers it. */
+export interface RangeVerdict {
+  verdict: "pass" | "fail" | null;   // null: nothing required
+  checks: { side: "min" | "max"; need_mm: number; got_mm: number | null; ok: boolean; by_mm: number | null }[];
+  hints: string[];           // what to change, computed (a size, the label, the camera)
+  size_mm: number | null;    // the marker size the hint names, if one size fixes it
+}
+
 /** Auto id (Zach, 2026-10-18): a stable key per marker feature, its first id
  *  kept by the ledger under that key (a new one numbered after the highest id
  *  in use: IdRequest.mode "next"); unique across the document by default; a
@@ -423,6 +524,17 @@ export interface CoreApi {
   verify(req: PlanRequest, view: ViewConditions): Promise<VerifyResult>;
   readable(req: PlanRequest, camera: Camera): Promise<Readability>;
   assign_ids(req: IdRequest): Promise<IdResult>;
+  /** Verify's camera library (barrier 13) */
+  cameras(): Promise<CameraPreset[]>;
+  /** one marker's reading range in one call (OpenCV loads first) */
+  reading_range(req: PlanRequest, opts: RangeOptions): Promise<ReadingRange>;
+  /** the same in slices, so nothing waits long behind it: start, then step
+   *  until done (each returns after about budget_ms), or cancel */
+  range_start(req: PlanRequest, opts: RangeOptions): Promise<RangeStep>;
+  range_step(job: string, budget_ms?: number): Promise<RangeStep>;
+  range_cancel(job: string): Promise<{ job: string; cancelled: boolean }>;
+  /** a reading range against a required viewing distance */
+  range_judge(range: ReadingRange, need: RangeNeed): Promise<RangeVerdict>;
 }
 
 export type CoreState = "loading" | "ready" | "error";

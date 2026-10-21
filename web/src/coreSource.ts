@@ -76,4 +76,6 @@ export const core: CoreApi = {
   info: counted("info"), presets: counted("presets"), inscribe: counted("inscribe"), plan: counted("plan"),
   suggest: counted("suggest"), svg: counted("svg"), sheet: counted("sheet"),
   verify: counted("verify"), readable: counted("readable"), assign_ids: counted("assign_ids"),
+  cameras: counted("cameras"), reading_range: counted("reading_range"), range_start: counted("range_start"),
+  range_step: counted("range_step"), range_cancel: counted("range_cancel"), range_judge: counted("range_judge"),
 };

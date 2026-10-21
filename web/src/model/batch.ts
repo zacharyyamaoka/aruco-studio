@@ -111,7 +111,7 @@ export function rowValue(f: Feature, path: string, plan?: MarkerPlan | null): { 
 }
 
 /** One value for them all, or MIXED. */
-function common(xs: unknown[]): unknown {
+export function common(xs: unknown[]): unknown {
   const first = JSON.stringify(xs[0]);
   return xs.every((x) => JSON.stringify(x) === first) ? xs[0] : MIXED;
 }

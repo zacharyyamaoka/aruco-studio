@@ -281,7 +281,14 @@ class View:
     occluded: float
 
 
-def simulate(scene: Scene, cam: Cam, view: dict) -> View:
+def simulate(scene: Scene, cam: Cam, view: dict, cache: Optional[dict] = None) -> View:
+    """The view, rendered. `cache` (optional, the caller's dict for ONE
+    scene): the plan's top view with its label, kept by its raster size and
+    scale and reused when a later view asks for the same one -- the same
+    pixels, not a resample. WHY (2026-10-21, the reading range): near the
+    camera the raster is capped at RASTER_MAX_PX, so every case at every near
+    distance asks for the identical picture, and drawing it was ~65 % of a
+    near render."""
     rng = np.random.default_rng(int(view.get("seed") or 0))
     T = marker_pose(cam, float(view.get("tilt_deg") or 0.0), float(view.get("yaw_deg") or 0.0),
                     scene.centre)
@@ -309,9 +316,18 @@ def simulate(scene: Scene, cam: Cam, view: dict) -> View:
     rpm = min(rpm, RASTER_MAX_PX / max(u1 - u0, v1 - v0))
     W = max(1, int(math.ceil((u1 - u0) * rpm)))
     Hh = max(1, int(math.ceil((v1 - v0) * rpm)))
-    r = top_view(scene.plan, px_per_mm=rpm, ss=1, grid=(u0, v1, W, Hh))
-    if scene.label:
-        _draw_label(r, scene.label)
+    key = (rpm, W, Hh)
+    r = cache.get(key) if cache is not None else None
+    if r is None:
+        r = top_view(scene.plan, px_per_mm=rpm, ss=1, grid=(u0, v1, W, Hh))
+        if scene.label:
+            _draw_label(r, scene.label)
+        if cache is not None:
+            if len(cache) >= 8:                    # a few rasters of a scene, never a growing pile
+                cache.pop(next(iter(cache)))
+            cache[key] = r
+    if cache is not None and float(view.get("occlusion") or 0.0) > 0:
+        r = Raster(r.img.copy(), r.px_per_mm, r.u0, r.v1)   # the dirt is drawn on a copy
     occ = _occlude(r, scene.area, float(view.get("occlusion") or 0.0), rng)
     S = np.array([[s, 0.0, (s - 1) / 2.0 - s * x0], [0.0, s, (s - 1) / 2.0 - s * y0],
                   [0.0, 0.0, 1.0]])
