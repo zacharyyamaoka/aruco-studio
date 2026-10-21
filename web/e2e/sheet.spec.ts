@@ -48,7 +48,7 @@ async function feature(page: Page, a: [number, number], b: [number, number]): Pr
 async function openSheet(page: Page): Promise<void> {
   await page.getByTestId("act-print").click();
   await expect(page.getByTestId("print-dialog")).toBeVisible();
-  await expect(page.locator('[data-testid="print-page"] svg')).toBeVisible({ timeout: 45_000 });
+  await expect(page.locator('[data-testid="print-page"] svg').first()).toBeVisible({ timeout: 45_000 });
   await idle(page);
 }
 
@@ -79,7 +79,7 @@ function core(request: Record<string, unknown>): { pages: number; cuts: number; 
 test.describe(`the Sheet dialog (${CORE} core)`, () => {
   test.skip(CORE === "mock", "the mock core has no packer: the numbers are the real core's");
 
-  test("eight features: Optimize, Tight / Spaced, the gap, the page in mm, page tabs", async ({ page }) => {
+  test("eight features: Optimize, Tight / Spaced, the gap, the page in mm, every page in one scroll", async ({ page }) => {
     await blank(page);
     for (const [a, b] of RECTS) await feature(page, a, b);
     expect((await state(page)).doc.features).toHaveLength(8);
@@ -125,18 +125,18 @@ test.describe(`the Sheet dialog (${CORE} core)`, () => {
     await expect(page.getByTestId("sheet-gap")).toBeVisible();
 
     // the page's SVG is sized in mm, and drawn at true size (Actual size)
-    const svg = page.locator('[data-testid="print-page"] svg');
+    const svg = page.locator('[data-testid="print-page"] svg').first();
     const [w, h] = [await svg.getAttribute("width"), await svg.getAttribute("height")];
     expect(w).toMatch(/^[\d.]+mm$/);
     expect(h).toMatch(/^[\d.]+mm$/);
     const box = (await svg.boundingBox())!;
     expect(box.width).toBeCloseTo(parseFloat(w!) * MM_PX, 0);
     expect(box.height).toBeCloseTo(parseFloat(h!) * MM_PX, 0);
-    await expect(page.getByTestId("sheet-page-tabs")).toHaveCount((await shown(page)).pages > 1 ? 1 : 0);
+    await expect(page.getByTestId("print-page")).toHaveCount((await shown(page)).pages);
     await page.getByTestId("print-mode").locator('[data-value="fit"]').click();
 
     // a 40 mm gap: Fewest sheets keeps one page; Fewest cuts saves a cut on
-    // a second page, and a tab per page appears
+    // a second page, which shows under the first in the same scroll
     const gap = page.locator('[data-testid="sheet-gap"] input');
     await page.getByTestId("sheet-objective").locator('[data-value="fewest_sheets"]').click();
     await gap.fill("40");
@@ -144,7 +144,7 @@ test.describe(`the Sheet dialog (${CORE} core)`, () => {
     const compact = await shown(page);
     expect(compact.request).toMatchObject({ mode: "spaced", objective: "fewest_sheets", gap_mm: 40 });
     expect(compact).toMatchObject(core(compact.request));
-    await expect(page.getByTestId("sheet-page-tabs")).toHaveCount(compact.pages > 1 ? 1 : 0);
+    await expect(page.getByTestId("print-page")).toHaveCount(compact.pages);
     fs.mkdirSync(SHOTS, { recursive: true });
     await page.screenshot({ path: path.join(SHOTS, "sheet-dialog.png") });
     await page.getByTestId("sheet-objective").locator('[data-value="fewest_cuts"]').click();
@@ -154,19 +154,22 @@ test.describe(`the Sheet dialog (${CORE} core)`, () => {
     expect(wide.cuts, "switching Optimize changes the cuts").toBeLessThan(compact.cuts);
     expect(compact.pages).toBeLessThanOrEqual(wide.pages);
     expect(wide.pages).toBeGreaterThan(1);
-    const tabs = page.getByTestId("sheet-page-tab");
-    await expect(tabs).toHaveCount(wide.pages);
-    const first = await page.getByTestId("print-page").innerHTML();
-    await tabs.nth(1).click();
-    await expect(page.getByTestId("print-page")).toHaveAttribute("data-page", "2");
-    expect(await page.getByTestId("print-page").innerHTML()).not.toBe(first);
-    await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
+    const pages = page.getByTestId("print-page");
+    await expect(pages).toHaveCount(wide.pages);
+    await expect(page.getByTestId("sheet-page-tab")).toHaveCount(0);
+    await expect(page.getByTestId("sheet-page-label")).toHaveText(Array.from({ length: wide.pages }, (_, i) => `Page ${i + 1} of ${wide.pages}`));
+    const first = await pages.nth(0).innerHTML();
+    await pages.nth(1).scrollIntoViewIfNeeded();
+    await expect(pages.nth(1)).toHaveAttribute("data-page", "2");
+    await expect(pages.nth(1).locator("svg")).toBeVisible();
+    expect(await pages.nth(1).innerHTML()).not.toBe(first);
+    expect((await pages.nth(1).boundingBox())!.y, "page 2 is under page 1").toBeGreaterThan((await pages.nth(0).boundingBox())!.y);
     await page.screenshot({ path: path.join(SHOTS, "sheet-dialog-pages.png") });
 
-    // back to one page: the tabs go
+    // back to one page: the second page goes
     await gap.fill("4");
     await gap.press("Enter");
     const back = await shown(page);
-    await expect(page.getByTestId("sheet-page-tabs")).toHaveCount(back.pages > 1 ? 1 : 0);
+    await expect(page.getByTestId("print-page")).toHaveCount(back.pages);
   });
 });
