@@ -226,6 +226,13 @@ export function selectionFeatureIds(doc: Doc, multi: string[]): string[] {
   return doc.features.filter((f) => f.profile && multi.includes(f.profile.outer)).map((f) => f.id);
 }
 
+/** The markers the selection names (Print's "Selected"): the multi-selection's
+ *  and the primary selection's, in document order. */
+export function selectedMarkerIds(doc: Doc, sel: Selection, multi: string[]): string[] {
+  const own = selectedFeatureId(doc, sel);
+  return doc.features.filter((f) => f.id === own || (f.profile && multi.includes(f.profile.outer))).map((f) => f.id);
+}
+
 /** The feature in focus: the one the panel edits, else the selected one,
  *  else the last made (Export SVG, the outer dimension and the turn arc). */
 export function activeFeatureId(s: Pick<Studio, "doc" | "sel" | "panel">): string | null {

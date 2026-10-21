@@ -7,7 +7,7 @@ import v3Fixture from "../../e2e/fixtures/v3-a4.arucostudio-web.json?raw";
 import {
   DEFAULT_MARKER, addFeature, addShape, applyIds, deleteShape, emptyDoc, featureNumber, featurePreset, fillPresets, featureOfProfile, featureOfRect, featureRect, idCount, idItems,
   idRange, idRequest, isSet, keyOwner, newFeature, nextTurn, parseDoc, pickSuggestion, planRequest, rectProfile, referenceFace, removeFeature,
-  resetField, serialise, setField, setMarker, setType, sheetGroups, sheetItems, validateDoc, refusedKeys } from "./doc";
+  resetField, serialise, setField, setMarker, setType, sheetGroups, sheetItems, validateDoc, refusedKeys, withFeatures } from "./doc";
 
 const preset: Preset = { id: "builtin:x", name: "X", method: "inkjet", builtin: true, page: "A4", page_mm: [210, 297] };
 
@@ -464,6 +464,18 @@ describe("a preset per feature (version 4, Zach 2026-10-20 night: \"applied on a
     expect(sheetItems(d, "f3").map((r) => r.preset.id)).toEqual(["builtin:letter"]);
     expect(sheetItems(d, "f2")).toHaveLength(2);
     expect(sheetItems(d)).toHaveLength(2);
+  });
+
+  it("Print's Selected: only the named features, each with its own preset and ids", () => {
+    const s0 = sheet();
+    const d = { ...s0, features: s0.features.map((f) => (f.id === "f4" ? { ...f, marker: { ...f.marker, first_id: 17 } } : f)) };
+    const only = withFeatures(d, ["f4", "f3"]);
+    expect(only.features.map((f) => f.id)).toEqual(["f3", "f4"]);
+    expect(only.shapes).toBe(d.shapes);
+    const groups = sheetGroups(only);
+    expect(groups.map((g) => [g.preset.id, g.items.length])).toEqual([["builtin:letter", 1], ["builtin:x", 1]]);
+    expect(groups[1].items[0].marker.first_id).toBe(17);
+    expect(sheetGroups(withFeatures(d, ["f2"]))).toEqual([]);
   });
 });
 

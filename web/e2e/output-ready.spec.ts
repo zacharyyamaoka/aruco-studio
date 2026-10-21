@@ -14,6 +14,21 @@ async function blank(page: Page): Promise<void> {
   await page.getByTestId("cmd-new").click();
 }
 
+/** Whether each Download menu item (print-pdf / print-svg) is enabled: the
+ *  Print dialog's PDF and SVG live in its Download menu, so it is opened,
+ *  read and closed again. */
+async function downloads(page: Page, ids: string[]): Promise<boolean[]> {
+  await page.getByTestId("print-download").click();
+  const on: boolean[] = [];
+  for (const id of ids) {
+    await expect(page.getByTestId(id)).toBeVisible();
+    on.push(await page.getByTestId(id).isEnabled());
+  }
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId(ids[0])).toHaveCount(0);
+  return on;
+}
+
 /** A 20 mm square at (-30..-10, -10..10) with its ArUco Extrude, first id typed 7. */
 async function marker7(page: Page): Promise<void> {
   await page.keyboard.press("r");
@@ -71,12 +86,14 @@ test.describe("output waits for settled ids and the current sheet", () => {
       if (on) {
         const ids = await firstIds(page);
         expect(ids, "an enabled Print has the copy's own id").toEqual([7, 8]);
-        expect(await page.getByTestId("print-pdf").isEnabled()).toBe(true);
+        expect(await downloads(page, ["print-pdf"])).toEqual([true]);
         seenOn = true;
         break;
       }
-      expect(await page.getByTestId("print-pdf").isEnabled()).toBe(false);
-      expect(await page.getByTestId("print-svg").isEnabled()).toBe(false);
+      // read while Print is off: still off once the menu has been read
+      const files = await downloads(page, ["print-pdf", "print-svg"]);
+      if (await page.getByTestId("print-go").isEnabled()) continue;
+      expect(files, "PDF and SVG are off while Print is").toEqual([false, false]);
       await page.waitForTimeout(50);
     }
     expect(seenOn, "Print comes on once the ids are in").toBe(true);
@@ -91,7 +108,9 @@ test.describe("output waits for settled ids and the current sheet", () => {
     expect(JSON.parse(before).mode).toBe("spaced");
     await page.evaluate(() => { (window as any).__arucoFault = { delay: { sheet: 2500 } }; });
     await page.getByTestId("sheet-mode").locator('[data-value="tight"]').click();
-    for (const b of ["print-go", "print-pdf", "print-svg"]) await expect(page.getByTestId(b), b).toBeDisabled();
+    await expect(page.getByTestId("print-go")).toBeDisabled();
+    expect(await downloads(page, ["print-pdf", "print-svg"]), "PDF and SVG").toEqual([false, false]);
+    await expect(page.getByTestId("print-go"), "still laying out after the menu was read").toBeDisabled();
     // the old sheet stays on screen, marked busy, until the new one lands
     await expect(page.locator(".sheet-body")).toHaveAttribute("data-busy", "1");
     await expect(page.getByTestId("print-go")).toBeEnabled({ timeout: 30_000 });

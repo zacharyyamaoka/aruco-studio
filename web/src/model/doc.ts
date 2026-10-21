@@ -391,6 +391,12 @@ export function sheetGroups(doc: Doc, refused: readonly string[] = []): SheetGro
   return [...groups.values()];
 }
 
+/** The document with only the features `ids` names (Print's "Selected"):
+ *  the rest of it as it is, so each keeps its ids and its preset. */
+export function withFeatures(doc: Doc, ids: readonly string[]): Doc {
+  return { ...doc, features: doc.features.filter((f) => ids.includes(f.id)) };
+}
+
 /** A preset's identity for grouping: its fields, in key order. */
 export function presetKey(p: Preset): string {
   return JSON.stringify(Object.keys(p).sort().map((k) => [k, (p as unknown as Record<string, unknown>)[k]]));

@@ -390,7 +390,7 @@ test("9 · Sheet: eight stickers, Tight | Spaced and Fewest cuts | Fewest sheets
   await shot(page, "09-eight");
   await page.getByTestId("act-print").click();
   await expect(page.getByTestId("print-dialog")).toBeVisible();
-  await expect(page.locator('[data-testid="print-page"] svg')).toBeVisible({ timeout: 45_000 });
+  await expect(page.locator('[data-testid="print-page"] svg').first()).toBeVisible({ timeout: 45_000 });
   await page.getByTestId("print-mode").locator('[data-value="fit"]').click();
   const stats = async () => {
     await idle(page);
@@ -421,10 +421,12 @@ test("9 · Sheet: eight stickers, Tight | Spaced and Fewest cuts | Fewest sheets
   await pick("sheet-objective", "fewest_cuts");
   out["spaced40/fewest_cuts"] = await stats();
   await shot(page, "09b-sheet-fewest-cuts");
-  await page.getByTestId("sheet-page-tab").nth(1).click();
-  await expect(page.getByTestId("print-page")).toHaveAttribute("data-page", "2");
+  // page 2, scrolled to under page 1
+  await page.getByTestId("print-page").nth(1).scrollIntoViewIfNeeded();
+  await expect(page.getByTestId("print-page").nth(1)).toHaveAttribute("data-page", "2");
+  await expect(page.getByTestId("print-page").nth(1).locator("svg")).toBeVisible();
   await shot(page, "09c-sheet-fewest-cuts-p2");
-  await page.getByTestId("sheet-page-tab").nth(0).click();
+  await page.getByTestId("print-page").nth(0).scrollIntoViewIfNeeded();
   await closeUp(page.getByTestId("sheet-side"), "09d-sheet-side");
   await gap.fill("4");
   await gap.press("Enter");

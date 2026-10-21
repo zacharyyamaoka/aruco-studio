@@ -311,18 +311,30 @@ test.describe(`the Figma layout (${CORE} core)`, () => {
     await expect(groups).toHaveCount(2);
     expect(await groups.evaluateAll((els) => els.map((e) => e.getAttribute("data-sheet-group")))).toEqual(["builtin:inkjet-a4-vinyl", letter]);
     await expect(page.getByTestId("sheet-3d-note")).toHaveText("1 marker is 3D printed: it isn't on the paper sheet.");
-    // each group on its preset's page: A4, then Letter
-    const pageMm = () => page.getByTestId("print-page").getAttribute("data-page-mm");
+    // each group a section of the one scroll, on its preset's page: A4, then Letter
+    const sections = page.getByTestId("sheet-section");
+    await expect(sections).toHaveCount(2);
+    const pageMm = (i: number) => sections.nth(i).getByTestId("print-page").first().getAttribute("data-page-mm");
+    await expect(sections.nth(0).getByTestId("print-page").first()).toBeVisible({ timeout: 45_000 });
+    await expect(sections.nth(1).getByTestId("print-page").first()).toHaveCount(1, { timeout: 45_000 });
+    await expect.poll(() => pageMm(0)).toBe("210x297");
+    await expect.poll(() => pageMm(1)).toBe("215.9x279.4");
+    const top = async (i: number) => (await sections.nth(i).boundingBox())!.y;
+    expect(await top(1), "Letter's section is under A4's").toBeGreaterThan(await top(0));
+    // a heading puts its group in focus: the side's request and the title are its
     await groups.nth(0).click();
-    await expect(page.getByTestId("print-page")).toBeVisible({ timeout: 45_000 });
-    await expect.poll(pageMm).toBe("210x297");
     await expect(dlg).toContainText("Sheet · Inkjet · A4 vinyl");
+    await expect(groups.nth(0)).toHaveAttribute("aria-current", "true");
     const a4req = JSON.parse((await page.getByTestId("sheet-side").getAttribute("data-request"))!);
     expect(a4req.items.map((i: any) => i.preset.id)).toEqual(["builtin:inkjet-a4-vinyl"]);
     await shot(page, "g-print-two-groups");
     await groups.nth(1).click();
-    await expect.poll(pageMm).toBe("215.9x279.4");
-    await expect(groups.nth(1)).toHaveAttribute("aria-selected", "true");
+    await expect(groups.nth(1)).toHaveAttribute("aria-current", "true");
+    await expect(groups.nth(0)).not.toHaveAttribute("aria-current", "true");
+    const lname = (await groups.nth(1).locator("span").first().textContent())!;
+    expect(lname).toMatch(/Letter/);
+    await expect(dlg).toContainText(`Sheet · ${lname}`);
+    await expect(sections.nth(1).getByTestId("print-page").first()).toBeInViewport();
     const lreq = JSON.parse((await page.getByTestId("sheet-side").getAttribute("data-request"))!);
     expect(lreq.items.map((i: any) => i.preset.id)).toEqual([letter]);
   });
