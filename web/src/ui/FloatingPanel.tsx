@@ -91,10 +91,14 @@ export function FloatingPanel({ title, icon, children, footer, collapsed, onColl
         onPointerUp={() => { drag.current = null; }}
         onDoubleClick={() => onCollapse(!collapsed)}>
         {icon}<span className="fpanel-title">{title}</span>
-        <button type="button" className="kit-ib" title={collapsed ? "Expand" : "Collapse"} aria-label={collapsed ? "Expand" : "Collapse"}
+        {/* one collapse button: a chevron at the right, or (a skin's choice, Fusion's dialog) a "−" first */}
+        <button type="button" className="kit-ib fpanel-collapse" title={collapsed ? "Expand" : "Collapse"} aria-label={collapsed ? "Expand" : "Collapse"}
           data-testid="panel-collapse" onClick={() => onCollapse(!collapsed)}>
-          {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+          {collapsed ? <ChevronDown size={14} className="fpanel-chev" /> : <ChevronUp size={14} className="fpanel-chev" />}
+          <span className="fpanel-minus" aria-hidden="true" />
         </button>
+        {/* Fusion's "▸▸" at the title's right end: drawn by a skin that wants it, never a control */}
+        <span className="fpanel-tail" aria-hidden="true" />
       </div>
       {!collapsed && <div className="fpanel-body">{children}</div>}
       {footer && <div className="fpanel-foot">{footer}</div>}

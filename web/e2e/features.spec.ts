@@ -107,8 +107,9 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
       expect(st.panel.featureId).toBe(f);
       expect(st.sel).toEqual({ kind: "feature", id: f });
     }
-    // a click on empty canvas closes it
-    await clickAt(page, 0, 45);
+    // a click on empty canvas closes it (below-left of the markers: the panel, Marker
+    // tab first since the skeleton, reaches over the canvas above them)
+    await clickAt(page, -60, -45);
     await expect(page.getByTestId("extrude-panel")).toHaveCount(0);
     expect((await state(page)).sel).toBeNull();
     expect((await state(page)).doc.features).toHaveLength(2);

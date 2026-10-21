@@ -110,9 +110,14 @@ export function stepLabel(s: SizeStep, p?: Preset | null): string {
 }
 
 /** The inkjet choices (Zach, 2026-10-20 night: "round to the DPI of the
- *  printer... or to use a normal number"), plus `current` when it is none of them. */
-export function stepOptions(current: SizeStep, p?: Preset | null): { value: string; label: string }[] {
+ *  printer... or to use a normal number"), plus `current` when it is none of
+ *  them; each with the Fusion add-in's size-step icon (../ui/icons.ts). */
+export function stepOptions(current: SizeStep, p?: Preset | null): { value: string; label: string; icon: string }[] {
   const keys = ["dots", "mm:0.1", "mm:0.5", "mm:1"];
   if (!keys.includes(stepKey(current))) keys.push(stepKey(current));
-  return keys.map((k) => ({ value: k, label: stepLabel(stepOf(k), p) }));
+  return keys.map((k, i) => ({ value: k, label: stepLabel(stepOf(k), p), icon: stepIcon(stepOf(k), i >= 4) }));
 }
+
+/** A size step's icon: whole dots, a mm step, the line width; a step none of the choices is, custom. */
+export const stepIcon = (s: SizeStep, custom = false): string =>
+  s.of === "dots" ? "step-dots" : s.of === "line" ? "step-lines" : custom ? "step-custom" : "step-mm";

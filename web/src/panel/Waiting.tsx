@@ -131,7 +131,8 @@ export function PlanLine({ profile, summary, error }: { profile: boolean; summar
   const since = useSince(planning);
   if (wait?.kind === "core-error") return <WaitLine wait={wait} testid="plan-wait" />;
   if (!profile) return <>Select a profile: click inside a region, or double-click a rectangle</>;
-  if (summary) return <>{summary}</>;
+  // a planned marker: the skins may mark it (Fusion: the green "✓ …" line)
+  if (summary) return <span className="plan-ok" data-testid="plan-ok">{summary}</span>;
   if (wait) return <WaitLine wait={wait} testid="plan-wait" />;
   if (error) return <WaitLine wait={{ kind: "plan-error", short: "Plan failed", text: `Plan failed: ${error}`, action: { label: "Retry", run: replan } }} testid="plan-wait" />;
   if (since > SLOW_PLAN_MS) {

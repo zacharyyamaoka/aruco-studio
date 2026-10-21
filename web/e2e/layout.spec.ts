@@ -239,15 +239,19 @@ test.describe(`the Figma layout (${CORE} core)`, () => {
     s = await state(page);
     expect(s.plans[f1].extrude.method).toBe("inkjet");
     expect(s.plans[f2].extrude.method).toBe("print3d");
-    // the Make tab shows each one's own
+    // the Preset row (Marker) and the Make tab show each one's own
     await inspect(page, f1);
+    await panelTab(page, "marker");
     await expect(page.getByTestId("panel-preset")).toContainText(ink.name);
     await expect(page.getByTestId("preset-lines")).toContainText("Inkjet");
+    await panelTab(page, "make");
     await expect(page.locator('[data-row="extrude.paper_mm"]')).toBeVisible();
     await ok(page);
     await inspect(page, f2);
+    await panelTab(page, "marker");
     await expect(page.getByTestId("panel-preset")).toContainText("Default");
     await expect(page.getByTestId("preset-lines")).toContainText("3D print");
+    await panelTab(page, "make");
     await expect(page.locator('[data-row="extrude.white_mm"]')).toBeVisible();
     await ok(page);
     // a new marker starts with the last picked: the 3D Default
@@ -280,7 +284,7 @@ test.describe(`the Figma layout (${CORE} core)`, () => {
     expect(s.doc.features.map((f: any) => f.preset.id)).toEqual(["builtin:inkjet-a4-vinyl", "builtin:inkjet-a4-vinyl"]);
     expect(s.doc.default_preset.id).toBe("builtin:inkjet-a4-vinyl");
     await inspect(page, "f2");
-    await panelTab(page, "make");
+    await panelTab(page, "marker");
     await expect(page.getByTestId("panel-preset")).toContainText("A4 vinyl");
     const req = await page.evaluate(() => (window as any).__aruco.state().feature.preset.page_mm);
     expect(req).toEqual([210, 297]);

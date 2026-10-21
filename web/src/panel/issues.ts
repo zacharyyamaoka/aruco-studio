@@ -2,8 +2,8 @@
 // A field whose row is not drawn goes to the row that owns it (rows → the
 // Columns × Rows row, checker → Marker, a hidden label field → Place or On,
 // the other method's heights → Preset); what has no row at all goes to the
-// summary line. The rows are listed per tab (Make | Marker | Label, V1 Command
-// Dialog), so a tab's dot is the worst of its own rows. Pure: vitest covers it.
+// summary line. The rows are listed per tab (Marker | Label | Make, the
+// skeleton: docs/design/panel_skeleton.md), so a tab's dot is the worst of its own rows. Pure: vitest covers it.
 import type { Issue, IssueLevel, LabelParams, MarkerParams, Method } from "../core/contract";
 import type { Tab } from "../store";
 
@@ -36,15 +36,15 @@ const OWNER: Record<string, string> = {
 
 /** The rows each tab draws for these numbers, by field path, top to bottom. */
 export function tabRows(m: MarkerParams, l: Pick<LabelParams, "on" | "place">, method: Method): Record<Tab, string[]> {
-  const make = ["profile", "preset", "marker.size_step", "trim"];
+  const marker = ["profile", "preset", "marker.type", "marker.dictionary", "marker.first_id", "marker.marker_mm"];
+  if (m.type !== "single") marker.push("marker.cols");
+  if (m.type === "grid") marker.push("marker.separation_mm");
+  if (m.type === "charuco") marker.push("marker.checker_mm", "marker.origin_square");
+  marker.push("marker.suggest", "marker.turn", "marker.quiet_modules", "feature.key");
+  const make = ["marker.size_step", "trim"];
   if (method === "print3d") make.push("extrude.mode", "extrude.white_mm", "extrude.black_mm");
   else make.push("extrude.paper_mm");
   make.push("marker.flip");
-  const marker = ["marker.type", "marker.dictionary", "marker.first_id", "marker.marker_mm"];
-  if (m.type === "charuco") marker.push("marker.checker_mm", "marker.origin_square");
-  if (m.type === "grid") marker.push("marker.separation_mm");
-  if (m.type !== "single") marker.push("marker.cols");
-  marker.push("marker.suggest", "marker.turn", "marker.quiet_modules", "feature.key");
   const label = ["label.on"];
   if (l.on) {
     const outside = l.place === "outside";

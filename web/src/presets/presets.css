@@ -28,7 +28,7 @@
    row each -- a small thumb, the name over its numbers, where it lives, "current" */
 .presets-lib .pl-list { flex: 1; min-height: 0; overflow: auto; padding: 6px 8px 10px; background: var(--panel); }
 .presets-lib .pl-group + .pl-group { margin-top: 6px; }
-.presets-lib .pl-group-head { padding: 6px 8px 3px; font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.presets-lib .pl-group-head { display: flex; align-items: center; gap: 6px; padding: 6px 8px 3px; font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
 .presets-lib .pl-list .card.pl-item { flex-direction: row; align-items: center; gap: 10px; padding: 6px 8px; border-color: transparent;
   border-radius: var(--radius); background: transparent; box-shadow: none; }
 .presets-lib .pl-list .card.pl-item:hover { border-color: var(--line-soft); }
@@ -41,3 +41,7 @@
 /* whom Use applies to: the open marker, or the new markers' default */
 .pl-target { color: var(--muted); font-size: 11px; margin-right: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .pl-target b { color: var(--text); font-weight: 600; }
+/* the method's printer before a preset's name: an inkjet or a 3D printer (../ui/icons.ts) */
+.presets-lib .pl-list .card .name { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.presets-lib .pl-method { flex: none; color: var(--muted); }
+.presets-lib .pl-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

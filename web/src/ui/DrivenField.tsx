@@ -186,3 +186,47 @@ export function DrivenChoice({ path, value, driven, driver, onSet, onReset, chil
     </>
   );
 }
+
+/** A text value that is driven or set (a feature's key: its own id until
+ *  typed). Driven: the value in grey; set: normal text with the ↺ inside the
+ *  field. Enter or a blur commits, Esc puts it back, empty + Enter returns it
+ *  to driven. A press anywhere else commits first, as DrivenField's does. */
+export function DrivenText({ path, value, driven, driver, onSet, onReset }: {
+  path: string; value: string; driven: boolean; driver: string; onSet: (v: string) => void; onReset: () => void;
+}) {
+  const [text, setText] = useState(value);
+  const [focus, setFocus] = useState(false);
+  const skip = useRef(false);
+  const input = useRef<HTMLInputElement>(null);
+  const now = useRef({ value, driven, onSet, onReset });
+  now.current = { value, driven, onSet, onReset };
+  useEffect(() => { if (!focus) setText(value); }, [value, focus]);
+  const commit = () => {
+    if (skip.current) { skip.current = false; return; }
+    const p = now.current;
+    const t = (input.current?.value ?? text).trim();
+    if (t === p.value) return;
+    if (t === "") { if (!p.driven) p.onReset(); else setText(p.value); return; }
+    p.onSet(t);
+  };
+  useEffect(() => {
+    if (!focus) return;
+    const down = (e: PointerEvent) => { if (e.target !== input.current) { skip.current = false; commit(); skip.current = true; } };
+    window.addEventListener("pointerdown", down, true);
+    return () => window.removeEventListener("pointerdown", down, true);
+  }, [focus]);
+  return (
+    <span className={cn("kit-num drv drv-text", driven ? "driven" : "set")} data-driven={driven ? "1" : "0"} data-drv={path} title={tip(driven, driver)}>
+      <input ref={input} type="text" value={text} data-path={path} aria-label={path} spellCheck={false}
+        onFocus={() => { skip.current = false; setFocus(true); }}
+        onBlur={() => { setFocus(false); commit(); }}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "Escape") { skip.current = true; setText(now.current.value); (e.target as HTMLInputElement).blur(); }
+          e.stopPropagation();
+        }} />
+      {!driven && <ResetIcon path={path} driver={driver} onReset={onReset} />}
+    </span>
+  );
+}

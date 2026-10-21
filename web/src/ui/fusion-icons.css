@@ -1,0 +1,8 @@
+/* The Fusion add-in's PNG glyphs (./icons.ts): four images each, one shown --
+   the light theme's or the dark's, 1x or (a dense screen) 2x. */
+.kit-glyph .fi { display: none; }
+:root:not([data-theme="dark"]) .kit-glyph .fi-light.fi-1x, :root[data-theme="dark"] .kit-glyph .fi-dark.fi-1x { display: inline; }
+@media (min-resolution: 1.5dppx) {
+  :root:not([data-theme="dark"]) .kit-glyph .fi-light.fi-1x, :root[data-theme="dark"] .kit-glyph .fi-dark.fi-1x { display: none; }
+  :root:not([data-theme="dark"]) .kit-glyph .fi-light.fi-2x, :root[data-theme="dark"] .kit-glyph .fi-dark.fi-2x { display: inline; }
+}

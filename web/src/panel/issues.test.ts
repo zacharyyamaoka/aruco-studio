@@ -23,10 +23,18 @@ describe("per-row issues", () => {
     expect(t.make).toContain("marker.flip");
     expect(routeIssues([I("marker.flip")], shownRows(DEFAULT_MARKER, DEFAULT_LABEL, "print3d"))["marker.flip"]).toHaveLength(1);
   });
-  it("Make: Profile, Preset, Size step, Trim, the method's heights, Flip, in that order", () => {
-    expect(tabRows(DEFAULT_MARKER, DEFAULT_LABEL, "inkjet").make).toEqual(["profile", "preset", "marker.size_step", "trim", "extrude.paper_mm", "marker.flip"]);
+  it("Make: Size step, Trim, the method's heights, Flip, in that order (the skeleton)", () => {
+    expect(tabRows(DEFAULT_MARKER, DEFAULT_LABEL, "inkjet").make).toEqual(["marker.size_step", "trim", "extrude.paper_mm", "marker.flip"]);
     expect(tabRows(DEFAULT_MARKER, DEFAULT_LABEL, "print3d").make)
-      .toEqual(["profile", "preset", "marker.size_step", "trim", "extrude.mode", "extrude.white_mm", "extrude.black_mm", "marker.flip"]);
+      .toEqual(["marker.size_step", "trim", "extrude.mode", "extrude.white_mm", "extrude.black_mm", "marker.flip"]);
+  });
+  it("Marker: Profile and Preset first, then the skeleton's rows, Key last", () => {
+    expect(tabRows(DEFAULT_MARKER, DEFAULT_LABEL, "inkjet").marker).toEqual(["profile", "preset", "marker.type", "marker.dictionary", "marker.first_id",
+      "marker.marker_mm", "marker.suggest", "marker.turn", "marker.quiet_modules", "feature.key"]);
+    expect(tabRows({ ...DEFAULT_MARKER, type: "grid" }, DEFAULT_LABEL, "inkjet").marker.slice(5, 9))
+      .toEqual(["marker.marker_mm", "marker.cols", "marker.separation_mm", "marker.suggest"]);
+    expect(tabRows({ ...DEFAULT_MARKER, type: "charuco" }, DEFAULT_LABEL, "inkjet").marker.slice(5, 10))
+      .toEqual(["marker.marker_mm", "marker.cols", "marker.checker_mm", "marker.origin_square", "marker.suggest"]);
   });
   it("a height issue goes under its row; the other method's goes to Preset", () => {
     const ink = shownRows(DEFAULT_MARKER, DEFAULT_LABEL, "inkjet");

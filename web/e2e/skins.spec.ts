@@ -40,12 +40,13 @@ interface Look { bg: string; accent: string; font: string; row: number; width: n
 async function look(page: Page): Promise<Look> {
   return page.evaluate(() => {
     const panel = document.querySelector<HTMLElement>("[data-testid=extrude-panel]")!;
-    const ok = document.querySelector<HTMLElement>("[data-testid=panel-ok]")!;
     const cs = getComputedStyle(panel);
     const body = panel.querySelector(".fpanel-body")!;
     return {
       bg: cs.backgroundColor,
-      accent: getComputedStyle(ok).backgroundColor,
+      // the accent as the panel resolves it (Fusion's OK is outlined, its fill no accent: 070007.png)
+      accent: (() => { const probe = document.createElement("i"); probe.style.color = "var(--accent)"; panel.appendChild(probe);
+        const c = getComputedStyle(probe).color; probe.remove(); return c; })(),
       font: cs.fontFamily,
       row: parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--row")),
       width: panel.getBoundingClientRect().width,
@@ -103,9 +104,13 @@ test.describe("skins", () => {
       const dRow = Math.abs(l.row - base.row);
       // each row is the skin's row height, and the panel keeps its width
       for (const h of l.kitRows) expect(Math.abs(h - l.row), `${id}: a row is --row`).toBeLessThan(0.6);
-      expect(l.width, `${id}: width`).toBe(base.width);
+      // (Fusion's is its own dialog's 400 px, measured in 070007.png: 600 px at 1.5x)
+      expect(l.width, `${id}: width`).toBe(id === "fusion" ? 400 : base.width);
       // the same top-level rows, each off by no more than its rows' height change
       expect(l.rows.length, `${id}: rows`).toBe(base.rows.length);
+      // WHY not Fusion's (2026-10-21): its tab strip, title bar and groups are its own
+      // dialog's, measured from Zach's screenshot (skeleton.spec.ts h: the side-by-side)
+      if (id === "fusion") continue;
       l.rows.forEach((r, i) => {
         const allowed = r.n * dRow + 4;
         expect(Math.abs(r.h - base.rows[i].h), `${id}: top-level row ${i} (${r.n} rows)`).toBeLessThanOrEqual(allowed);

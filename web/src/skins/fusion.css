@@ -8,22 +8,30 @@
      Pasted image 20261018123353.png  the presets modal: the tab underline #0a92d2,
        the selected collection #254b63, square corners;
      Pasted image 20261018120821.png  a selected face drawn in blue.
+     Pasted image 20261021070007.png  (2026-10-21) the same dialog beside this
+       skin, Zach: "doesn't look at all like the one in actual fusion ... The goal
+       was for those to match!!!!" -- the sizes below are measured there and
+       divided by its 1.5 screen scale (the dialog is 600 px wide, 400 here).
    Fusion's UI font is Autodesk's Artifakt Element (not shipped here); Segoe UI
-   is what Fusion falls back to on Windows. */
+   is what Fusion falls back to on Windows, Noto Sans the closest humanist sans
+   on Linux.
+   WHY more than colours here (2026-10-21): a skin that only swapped tokens kept
+   the Studio's sizes, type and chrome, so it never looked like Fusion. The ROW
+   ORDER is the skeleton's (docs/design/panel_skeleton.md); only the look is Fusion's. */
 :root[data-skin="fusion"] {
   --bg: #2a2a2a;
   --panel: #3b4454;
   --panel-2: #374050;
   --field: #2b3440;
   --field-hover: #323c4a;
-  --line: #4c5668;
-  --line-soft: #46505f;
-  --text: #e6e8eb;
-  --muted: #a3acb9;
+  --line: #5e6679;
+  --line-soft: #47505e;
+  --text: #eef3fc;
+  --muted: #858e9b;
   --accent: #0a92d2;
   --accent-soft: rgba(40, 160, 220, 0.38);
   --accent-text: #ffffff;
-  --ok: #6cc56c;
+  --ok: #8abd96;
   --warn: #f0b44c;
   --bad: #ff6b5e;
   --pick: #45b5ff;
@@ -42,32 +50,132 @@
   --t-body: #7f8893;
   --thumb-bg: #e6e9ed;
   --code-bg: #2b3440;
-  /* density and shape: 26 px rows, 2 px corners */
-  --row: 26px;
-  --ctl: 22px;
+  /* density and shape: 30 px rows, 27 px fields, 2 px corners (measured, below) */
+  --row: 30px;
+  --ctl: 27px;
   --radius: 2px;
   --radius-sm: 2px;
-  --font: "Artifakt Element", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  --font-size: 12px;
+  --font: "Artifakt Element", "Segoe UI", "Noto Sans", "Open Sans", system-ui, sans-serif;
+  --font-size: 12.5px;
   /* fields without a border, the dropdown a lighter grey, the title on the panel's grey */
   --popup: #454f60;
   --field-line: #2b3440;
   --selbox: #2b3440;
   --selbox-line: #2b3440;
   --panel-radius: 2px;
-  --head-h: 26px;
+  --head-h: 23px;
   --head-bg: var(--panel);
-  --head-text: #e6e8eb;
+  --head-text: #eef3fc;
   --head-line: var(--line-soft);
-  --head-size: 11.5px;
+  --head-size: 12.5px;
   --head-weight: 400;
   --head-case: uppercase;
-  --head-tracking: 0.03em;
-  --tab-h: 28px;
+  --head-tracking: 0.02em;
+  --tab-h: 27px;
   color-scheme: dark;
 }
 /* a picked segment is outlined in the blue on its own grey, its text stays light
    (the Type icons in 123334.png); the accent's text on the accent's tint is unreadable here */
 :root[data-skin="fusion"] .kit-seg-btn.on { color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
+/* driven: the same pick, toned -- a fainter fill and outline, grey text (../ui/driven.css) */
+:root[data-skin="fusion"] .drv-choice.driven .drv-box .kit-seg-btn.on {
+  background: rgba(40, 160, 220, 0.16); color: #c3cad6; box-shadow: inset 0 0 0 1px rgba(10, 146, 210, 0.7); font-weight: 400;
+}
 /* a row's label is in the text's light grey, not muted (123334.png: Preset, Type, Dictionary) */
 :root[data-skin="fusion"] .kit-field:not(.has-error, .has-warn) .row-label { color: var(--text); }
+
+/* ---- the ArUco Extrude dialog (../panel/ExtrudePanel.tsx), measured in
+   070007.png at 1.5x; every number below is that screenshot's px / 1.5 ---- */
+/* WHY the tighter tracking: Artifakt Element is narrower than the fallbacks;
+   at -0.025em "Dictionary" is Fusion's width within 2 px and "Marker size"
+   fits Fusion's label column */
+:root[data-skin="fusion"] .xpanel { --xp-label: 64.5px; --gap: 6px; border: 1px solid #4a525d; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  font-family: var(--font); font-size: var(--font-size); letter-spacing: -0.025em; }
+@media (min-width: 641px) {
+  /* 600 px wide there */
+  :root[data-skin="fusion"] .xpanel { width: 400px !important; }
+}
+/* the title bar: "−" at the left, the uppercase title, "▸▸" at the right, a rule under it */
+:root[data-skin="fusion"] .xpanel .fpanel-head { gap: 0; padding: 0 6px 0 0; border-bottom: 1px solid #495265; }
+:root[data-skin="fusion"] .xpanel .fpanel-head > .kit-glyph { display: none; }
+:root[data-skin="fusion"] .xpanel .fpanel-collapse { order: -1; min-width: 0; width: 28px; height: var(--head-h); margin: 0; padding: 0 0 0 4px;
+  justify-content: center; border-radius: 0; color: #a1a7b6; }
+:root[data-skin="fusion"] .xpanel .fpanel-collapse:hover { background: transparent; color: var(--text); }
+:root[data-skin="fusion"] .xpanel .fpanel-chev { display: none; }
+:root[data-skin="fusion"] .xpanel .fpanel-minus { display: block; width: 7.5px; height: 2px; background: currentColor; }
+:root[data-skin="fusion"] .xpanel .fpanel-title { padding-left: 1.5px; color: #eef5ff; }
+:root[data-skin="fusion"] .xpanel .xp-title-edit { display: inline; }
+:root[data-skin="fusion"] .xpanel .xp-title-num { display: none; }
+:root[data-skin="fusion"] .xpanel .fpanel-tail { display: block; flex: none; width: 7px; height: 6px; margin-right: 1px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 6'%3E%3Cpath d='M0 0l3 3-3 3zM3.6 0l3 3-3 3z' fill='%237f8a9c'/%3E%3C/svg%3E") center / contain no-repeat; }
+/* the tabs: icon and name, as wide as they need; the open one is a raised tab
+   (a light rule on its top, no rule under it), the others sit on the strip's rule */
+:root[data-skin="fusion"] .xpanel .kit-tab-list { gap: 0; padding: 2px 0 0; border-bottom: 0; background: var(--panel);
+  box-shadow: inset 0 -2px 0 #5e6679; }
+:root[data-skin="fusion"] .xpanel .kit-tab { flex: none; width: auto; height: var(--tab-h); padding: 0 14px 0 10px; gap: 6.5px; justify-content: flex-start;
+  border: 0; border-top: 1px solid transparent; color: var(--text); font-size: 12px; font-weight: 400; }
+:root[data-skin="fusion"] .xpanel .kit-tab .kit-glyph { width: 12px; height: 12px; }
+:root[data-skin="fusion"] .xpanel .kit-tab.on, :root[data-skin="fusion"] .xpanel .kit-tab[data-selected] {
+  color: var(--text); font-weight: 400; border-top-color: #5c6574; background: var(--panel); box-shadow: inset -1px 0 0 #434a5a, 0 2px 0 var(--panel); }
+:root[data-skin="fusion"] .xpanel .kit-tab:not(.on):hover { color: #ffffff; }
+/* no group titles: Fusion's dialog is one list of rows */
+:root[data-skin="fusion"] .xpanel .xp-group { display: none; }
+:root[data-skin="fusion"] .xpanel .tab-body { padding: 1px 0 4px; }
+/* rows: 30 px apart, the label 14 px in, the fields from 85.3 px to 32 px
+   short of the right edge, no row icons. The label column is Fusion's fixed
+   width (070007.png: the fields start 128 px / 1.5 in, whatever the labels):
+   a longer label ends in "…", as Fusion's own do (065830.png: "Thickn…",
+   "Perime…"). One grid per tab, each row on its columns (subgrid). */
+:root[data-skin="fusion"] .xpanel .tab-body > [data-tab-body] { display: grid; grid-template-columns: 64.8px minmax(0, 1fr);
+  column-gap: var(--gap); padding: 0 32px 0 13.5px; }
+:root[data-skin="fusion"] .xpanel [data-tab-body] > * { grid-column: 1 / -1; }
+:root[data-skin="fusion"] .xpanel [data-tab-body] > .kit-field { display: grid; grid-template-columns: subgrid; padding: 0; }
+:root[data-skin="fusion"] .xpanel [data-tab-body] > .kit-field > * { grid-column: 1 / -1; }
+:root[data-skin="fusion"] .xpanel [data-tab-body] > .kit-field > .kit-row { display: grid; grid-template-columns: subgrid; }
+:root[data-skin="fusion"] .xpanel .row-label { min-width: 0; }
+:root[data-skin="fusion"] .xpanel .row-label .row-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-skin="fusion"] .xpanel .row-label > .kit-glyph { display: none; }
+:root[data-skin="fusion"] .xpanel .row-label:not(:has(> .kit-glyph)) { padding-left: 0; }
+:root[data-skin="fusion"] .xpanel .row-label { font-size: var(--font-size); }
+/* fields: the dark fill (#2b3440) with no border, a typed field's top edge a
+   shade darker (sunk), a dropdown's a shade lighter (raised); the unit right
+   after the value inside it */
+:root[data-skin="fusion"] .xpanel .kit-num, :root[data-skin="fusion"] .xpanel .kit-select-trigger,
+:root[data-skin="fusion"] .xpanel .selrow, :root[data-skin="fusion"] .xpanel .preset-pick, :root[data-skin="fusion"] .xpanel .kit-text {
+  height: var(--ctl); background: var(--field); border: 1px solid var(--field-line); border-radius: 0; font-size: var(--font-size);
+  box-shadow: inset 0 1px 0 #262f3b; }
+:root[data-skin="fusion"] .xpanel .kit-select-trigger, :root[data-skin="fusion"] .xpanel .selrow, :root[data-skin="fusion"] .xpanel .preset-pick {
+  box-shadow: inset 0 1px 0 #303947; }
+:root[data-skin="fusion"] .xpanel .kit-num input { flex: 0 1 auto; width: auto; field-sizing: content; min-width: 1ch; padding: 0 0.3em 0 4px; color: var(--text); }
+:root[data-skin="fusion"] .xpanel .kit-num { cursor: text; }
+:root[data-skin="fusion"] .xpanel .kit-num .unit { order: 1; margin-right: auto; padding: 0; color: var(--text); font-size: var(--font-size); }
+:root[data-skin="fusion"] .xpanel .kit-num .drv-reset { order: 2; }
+:root[data-skin="fusion"] .xpanel .kit-num.drv.driven input, :root[data-skin="fusion"] .xpanel .kit-num.drv.driven .unit { color: var(--muted); }
+:root[data-skin="fusion"] .xpanel .drv-text input { flex: 1; field-sizing: fixed; }
+/* the dropdown arrow: a small filled triangle at the right */
+:root[data-skin="fusion"] .xpanel .kit-select-trigger { padding: 0 9px 0 7px; }
+:root[data-skin="fusion"] .xpanel .kit-select-chev svg { display: none; }
+:root[data-skin="fusion"] .xpanel .kit-select-chev { display: block; width: 0; height: 0; border-left: 4px solid transparent;
+  border-right: 4px solid transparent; border-top: 4.5px solid #c9ced8; }
+/* segmented rows: Type as square icon buttons (ExtrudePanel draws icons for this skin), the others as words */
+:root[data-skin="fusion"] .xpanel .kit-seg { height: var(--ctl); border: 0; background: transparent; gap: 2px; }
+:root[data-skin="fusion"] .xpanel .kit-seg-btn { border: 0; border-radius: 0; color: var(--text); background: var(--field); }
+:root[data-skin="fusion"] .xpanel .kit-seg-btn:not(.words) { width: 27px; min-width: 27px; padding: 0; background: transparent; }
+:root[data-skin="fusion"] .xpanel .kit-seg-btn:not(.words).on { background: #3c5267; box-shadow: inset 0 0 0 1px #4f87ad; }
+:root[data-skin="fusion"] .xpanel .drv-box:has(> .kit-seg) { border: 0; background: transparent; }
+/* the grey notes under a row: 23 px in, Fusion's note grey, the label's size */
+:root[data-skin="fusion"] .xpanel .hint-line { padding: 2px 0 6px 9.5px; font-size: var(--font-size); color: var(--muted); }
+:root[data-skin="fusion"] .xpanel .kit-msgs { margin-left: 9.5px; }
+:root[data-skin="fusion"] .xpanel .kit-msgs .issue { border-left: 0; padding-left: 0; font-size: var(--font-size); }
+/* the foot: a rule, the green "✓ …" summary on one line, a rule, outlined OK / Cancel */
+:root[data-skin="fusion"] .xpanel .fpanel-foot { background: var(--panel); border-top: 0; }
+:root[data-skin="fusion"] .xpanel .fpanel-foot .summary { min-height: 41px; display: flex; flex-direction: column; justify-content: center;
+  padding: 0 14px 0 22px; border-top: 1px solid #47505e; border-bottom: 1px solid #495265; margin-right: 0; }
+:root[data-skin="fusion"] .xpanel .summary-line { font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+:root[data-skin="fusion"] .xpanel .plan-ok { color: var(--ok); }
+:root[data-skin="fusion"] .xpanel .plan-ok::before { content: "✓ "; }
+:root[data-skin="fusion"] .xpanel .xp-actions { gap: 14px; padding: 6px 14px 6px; }
+:root[data-skin="fusion"] .xpanel .xp-actions .kit-btn { height: 23.5px; min-width: 43px; padding: 0 12px; border: 1px solid #7e8797; border-radius: 2px;
+  background: transparent; color: #f4f7fd; font-size: var(--font-size); font-weight: 400; box-shadow: none; }
+:root[data-skin="fusion"] .xpanel .xp-actions .kit-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); filter: none; }
+:root[data-skin="fusion"] .xpanel .xp-actions .kit-btn.v-primary { background: transparent; border-color: #7e8797; color: #f4f7fd; }

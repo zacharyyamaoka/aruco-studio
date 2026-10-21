@@ -217,14 +217,15 @@ function PresetsLibrary() {
               if (!group.length) return null;
               return (
                 <div key={method} className="pl-group" role="group" aria-label={methodName(method)} data-group={method}>
-                  <div className="pl-group-head">{methodName(method)}</div>
+                  {/* WHY the printer drawn beside each (Zach, 2026-10-21: "You need a better icon for ink jet vs 3D printer") */}
+                  <div className="pl-group-head"><Glyph name={method} size={14} />{methodName(method)}</div>
                   {group.map((p) => (
                     <div key={p.id} className={`card pl-item${p.id === picked ? " on" : ""}`} role="option" aria-selected={p.id === picked}
                       data-card={p.id} data-mark={p.id === current?.id ? "current" : undefined}
                       onClick={() => setPicked(p.id)} onDoubleClick={() => choose(p.id)}>
                       <div className="thumb" dangerouslySetInnerHTML={{ __html: thumb(p) }} />
                       <div className="pl-text">
-                        <div className="name">{p.name}</div>
+                        <div className="name"><Glyph name={p.method} size={12} className="pl-method" /><span className="pl-name">{p.name}</span></div>
                         <div className="sub">{presetNumbers(p)}</div>
                       </div>
                       <div className="where"><Glyph name={p.builtin ? "cube" : "star"} size={12} />{p.builtin ? "Built-in" : "My preset"}</div>
