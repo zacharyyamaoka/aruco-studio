@@ -25,7 +25,7 @@ async function plateFeature(page: Page): Promise<string> {
   await idle(page);
   const s = await state(page);
   expect(s.feature.profile, "the feature's profile is the face").toEqual({ outer: "plate", holes: ["plate-h1", "plate-h2"] });
-  // Trim is on Make (the skeleton: a new feature opens on Marker)
+  // Trim is on Manufacture (the skeleton: a new feature opens on Marker)
   await panelTab(page, "make");
   return s.panel.featureId as string;
 }

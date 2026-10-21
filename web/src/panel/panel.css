@@ -12,10 +12,11 @@
 /* the tabs: first in the body, kept in view while a long tab scrolls */
 .xpanel .fpanel-body { padding-top: 0; }
 .xpanel .kit-tabs { position: sticky; top: 0; z-index: 2; margin-top: 0; }
-/* a tab is its icon, then its name, on one line (the Make tab's icon is the
-   preset's method: an inkjet or a 3D printer) */
-.xpanel .kit-tab { flex-direction: row; gap: 5px; font-size: var(--font-size, 12px); }
-.xpanel .kit-tab > .kit-glyph { flex: none; }
+/* a tab is its name alone, on one line, never cut: "Manufacture" is the longest
+   and the tabs share the strip by their text (Zach, 2026-10-21: text only, quiet
+   like Fusion Extrude's "Feature | Configure") */
+.xpanel .kit-tab { flex: 1 0 auto; flex-direction: row; padding: 0 10px; font-size: var(--font-size, 12px); }
+.xpanel .kit-tab > span { overflow: visible; text-overflow: clip; white-space: nowrap; }
 .xpanel .tab-body { padding: 6px 0 4px; }
 /* a group: its small title, then a thin rule to the right edge (Fusion's
    command dialog); the first group of a tab sits right under the tabs */

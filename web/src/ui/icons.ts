@@ -85,7 +85,6 @@ for (const [name, svg] of Object.entries(LUCIDE)) {
 const PNGS = import.meta.glob("./fusion-icons/*/*.png", { eager: true, import: "default" }) as Record<string, string>;
 const FUSION: Record<string, string> = {
   inkjet: "k-inkjet", print3d: "k-3d",                                   // a preset's method (inkjet printer / 3D printer)
-  "tab-marker": "t-marker", "tab-label": "t-label", "tab-inkjet": "k-inkjet", "tab-print3d": "t-3d",  // the tabs (t-inkjet is k-inkjet)
   "trim-profile": "tr-profile", "trim-marker": "tr-marker",
   "mode-black": "m-black", "mode-white": "m-white", "mode-both": "m-wb",
   "step-dots": "r-dots", "step-mm": "r-mm", "step-lines": "r-lines", "step-custom": "r-custom",

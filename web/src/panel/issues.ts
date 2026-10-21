@@ -2,7 +2,7 @@
 // A field whose row is not drawn goes to the row that owns it (rows → the
 // Columns × Rows row, checker → Marker, a hidden label field → Place or On,
 // the other method's heights → Preset); what has no row at all goes to the
-// summary line. The rows are listed per tab (Marker | Label | Make, the
+// summary line. The rows are listed per tab (Marker | Label | Manufacture, the
 // skeleton: docs/design/panel_skeleton.md), so a tab's dot is the worst of its own rows. Pure: vitest covers it.
 import type { Issue, IssueLevel, LabelParams, MarkerParams, Method } from "../core/contract";
 import type { Tab } from "../store";

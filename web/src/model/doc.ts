@@ -46,7 +46,7 @@ export interface Feature {
   label: LabelParams;
   /** the heights (contract barrier 10): ONLY the fields set by hand are present;
    *  an absent one is driven from the preset (the plan's MarkerPlan.extrude says
-   *  its value). The Make tab's rows and the 3D view's drag arrows both write it
+   *  its value). The Manufacture tab's rows and the 3D view's drag arrows both write it
    *  through setField("extrude.<key>") / resetField. */
   extrude: ExtrudeParams;
   /** how it is made (inkjet or 3D print, and the numbers); null only while
@@ -364,7 +364,7 @@ export function planRequest(doc: Doc, f: Feature | null): PlanRequest | null {
     ...(place ? { rect: { cx: place.cx, cy: place.cy, w: place.w, h: place.h, angle_deg: place.angle_deg } } : {}),
     reference_face: referenceFace(doc, f),
     // always, even {}: the core answers MarkerPlan.extrude (the driven heights the
-    // Make tab and the 3D view show grey) only when the request asks
+    // Manufacture tab and the 3D view show grey) only when the request asks
     extrude: f.extrude,
   };
 }

@@ -170,7 +170,7 @@ export function overlaps(c: { cx: number; cy: number; r: number }, r: Rect, eps 
 }
 
 /** Open one of the ArUco Extrude panel's tabs (V1 Command Dialog, 2026-10-20
- *  night: Make | Marker | Label). A new feature opens on Make; a reopened one
+ *  night; 2026-10-21: Marker | Label | Manufacture, id "make"). A new feature opens on Marker; a reopened one
  *  keeps the tab the panel last had. */
 export async function panelTab(page: Page, tab: "make" | "marker" | "label"): Promise<void> {
   const t = page.locator(`[data-testid="extrude-panel"] [role=tab][data-tab="${tab}"]`);

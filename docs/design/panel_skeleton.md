@@ -18,7 +18,7 @@ both shells.
 |---|-----|-------------|------------------|
 | 1 | **Marker** | "Marker" | "The first thing you do is select the profile, then … decide how to manufacture it. … now I want to be thinking about the marker." |
 | 2 | **Label** | "Label" | the text and corner mark |
-| 3 | **Make** | always "Make", with the method's icon (inkjet printer / 3D printer) beside it | "if it's a good preset the defaults should be good" — tuned last. WHY a fixed name (Zach 2026-10-21: "keep it just Make so we always know where we should go looking"): tab labels are navigation, they never change with the content |
+| 3 | **Manufacture** | "Manufacture" in both shells, text only, no icon (on any of the three tabs) | "if it's a good preset the defaults should be good" — tuned last. WHY "Manufacture", text only (Zach 2026-10-21: "really clearly tells you what you do there"): tab labels are navigation, so the name is fixed and never changes with the content (it replaces "Make", whose method icon was dropped); the tabs are quiet text like Fusion Extrude's "Feature \| Configure". Internally the id stays `make`, so saved state does not move |
 
 A new feature opens on **Marker**.
 
@@ -51,7 +51,7 @@ Nothing is an "Auto" checkbox: a driven value is shown grey, typing sets it.
 3. — divider —
 4. **Corner mark**
 
-### 3 Make
+### 3 Manufacture
 1. **Size step** ("Cells" in Fusion) — Whole printer dots (exact) / 0.1 / 0.5 / 1 mm for
    inkjet; the line width for a 3D print. Never a line-width option on an inkjet preset.
 2. **Trim** — Profile (default) | Marker. A driven default still reads as SELECTED.

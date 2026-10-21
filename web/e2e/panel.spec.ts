@@ -1,8 +1,8 @@
 // The ArUco Extrude panel as V1 "Command Dialog" (Zach's pick, 2026-10-20
 // night; the gallery is reports/media/panel-proposals-2026-10-20.html), in the
 // skeleton's order (docs/design/panel_skeleton.md, 2026-10-21): three flat tabs
-// Marker | Label | Make and nothing above them but the title bar; Marker opens
-// with the Profile, then the Preset; Make holds Trim, the heights of the
+// Marker | Label | Manufacture and nothing above them but the title bar; Marker opens
+// with the Profile, then the Preset; Manufacture holds Trim, the heights of the
 // preset's method (contract barrier 10) and Flip; Corner mark is on Label; the
 // presets are a three-pane library dialog. Every check measures the probe's numbers, what
 // the core was sent, the drawn boxes (getBoundingClientRect) or the computed
@@ -81,10 +81,10 @@ function wholeLayers(p: any, min: number, none: number): number {
 }
 
 test.describe(`the panel, V1 Command Dialog (${CORE} core)`, () => {
-  test("a · three tabs; a new feature opens on Marker: Profile, Preset first; Make: Trim, the heights, top to bottom; a reopened one keeps its tab", async ({ page }) => {
+  test("a · three tabs; a new feature opens on Marker: Profile, Preset first; Manufacture: Trim, the heights, top to bottom; a reopened one keeps its tab", async ({ page }) => {
     const fid = await platePanel(page);
     const panel = page.getByTestId("extrude-panel");
-    await expect(panel.locator("[role=tab]")).toHaveText(["Marker", "Label", "Make"]);
+    await expect(panel.locator("[role=tab]")).toHaveText(["Marker", "Label", "Manufacture"]);
     expect(await panel.locator("[role=tab]").evaluateAll((els) => els.map((e) => e.getAttribute("data-tab")))).toEqual(["marker", "label", "make"]);
     expect((await state(page)).panel.tab).toBe("marker");
     await expect(panel.locator('[role=tab][data-tab="marker"]')).toHaveAttribute("aria-selected", "true");
@@ -229,7 +229,7 @@ test.describe(`the panel, V1 Command Dialog (${CORE} core)`, () => {
     expect(Number(await paper.inputValue())).toBeCloseTo(s.feature.preset.thickness_mm, 6);
   });
 
-  test("c · Flip is on Make for a face profile and for a rectangle profile; the note says which side is out", async ({ page }) => {
+  test("c · Flip is on Manufacture for a face profile and for a rectangle profile; the note says which side is out", async ({ page }) => {
     await platePanel(page);
     await tab(page, "make");
     const flip = page.locator('[data-tab-body="make"] [data-row="marker.flip"]');
@@ -345,7 +345,7 @@ test.describe(`the panel, V1 Command Dialog (${CORE} core)`, () => {
     await expect(modal.locator('[data-coll="mine"]')).toHaveClass(/on/);
   });
 
-  test("g · screenshots: each tab with a 3D preset; Make in Fusion 360 and Onshape", async ({ page }) => {
+  test("g · screenshots: each tab with a 3D preset; Manufacture in Fusion 360 and Onshape", async ({ page }) => {
     await platePanel(page);
     await usePreset(page, "print3d");
     for (const t of ["make", "marker", "label"]) {
