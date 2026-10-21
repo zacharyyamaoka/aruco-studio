@@ -42,8 +42,78 @@ describe("carved: a body less the pockets cut into it", () => {
     expect(capArea(g, 0, 1)).toBeCloseTo(100, 6);
   });
 
-  it("a cut across the body's edge is left out: the body is drawn whole", () => {
+  it("a cut across the body's edge is a notch in it", () => {
     const g = carved(paper, 0, 0.1, [{ z: [0.05, 0.1], polygons: [sq(8, 8, 12, 12)] }]);
-    expect(capArea(g, 0.1, 1)).toBeCloseTo(100, 6);
+    expect(capArea(g, 0.1, 1)).toBeCloseTo(100 - 4, 6);
+    expect(capArea(g, 0, -1)).toBeCloseTo(100, 6);
+    // the walls: the upper slab's outline (40 less the notch's 4 plus its 4) by 0.05, the lower's 40 by 0.05
+    expect(wallArea(g)).toBeCloseTo(40 * 0.05 + 40 * 0.05, 6);
+  });
+});
+
+/** The area of the geometry's vertical faces, mm². */
+function wallArea(geo: THREE.BufferGeometry): number {
+  const p = geo.getAttribute("position");
+  let area = 0;
+  for (let i = 0; i < p.count; i += 3) {
+    const [a, b, c] = [i, i + 1, i + 2].map((k) => [p.getX(k), p.getY(k), p.getZ(k)]);
+    const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    if (Math.abs(n[2]) < 1e-12) area += Math.hypot(...n) / 2;
+  }
+  return area;
+}
+
+/** How many up-facing triangles at height z cover the point. */
+function cover(geo: THREE.BufferGeometry, z: number, [x, y]: [number, number]): number {
+  const p = geo.getAttribute("position");
+  let n = 0;
+  for (let i = 0; i < p.count; i += 3) {
+    const v = [i, i + 1, i + 2].map((k) => [p.getX(k), p.getY(k), p.getZ(k)]);
+    if (!v.every((q) => Math.abs(q[2] - z) < 1e-6)) continue;
+    const d = (a: number[], b: number[]) => (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]);
+    if ([d(v[0], v[1]), d(v[1], v[2]), d(v[2], v[0])].every((q) => q > 0)) n++;
+  }
+  return n;
+}
+
+/** Every grid point (off the edges) covered once by the top where `want` says paper, never where it says ink. */
+function expectTop(geo: THREE.BufferGeometry, z: number, box: [number, number, number, number], want: (p: [number, number]) => boolean) {
+  const bad: string[] = [];
+  for (let x = box[0] + 0.0731; x < box[2]; x += 0.25) {
+    for (let y = box[1] + 0.0617; y < box[3]; y += 0.25) {
+      const n = cover(geo, z, [x, y]);
+      if (n !== (want([x, y]) ? 1 : 0)) bad.push(`${x.toFixed(2)},${y.toFixed(2)}: ${n}`);
+    }
+  }
+  expect(bad.slice(0, 5)).toEqual([]);
+}
+
+describe("carved: cuts that touch (Zach 2026-10-21, the inkjet sheet's slivers)", () => {
+  const inside = (polys: Polygon[], [x, y]: [number, number]) => polys.some((p) => {
+    const xs = p.outer.map((q) => q[0]), ys = p.outer.map((q) => q[1]);
+    return x > Math.min(...xs) && x < Math.max(...xs) && y > Math.min(...ys) && y < Math.max(...ys);
+  });
+
+  it("a marker's cells, sharing edges: the white's top is exactly the paper less them", () => {
+    const cells = [sq(-3, 2, 3, 3), sq(-3, -3, 3, -2), sq(-3, -2, -2, 2), sq(2, -2, 3, 2), sq(-1, -1, 0, 0), sq(0, 0, 1, 1), sq(-2, 0, -1, 1)];
+    const g = carved([sq(-5, -5, 5, 5)], 0, 0.1, [{ z: [0.05, 0.1], polygons: cells }]);
+    expectTop(g, 0.1, [-5, -5, 5, 5], (p) => !inside(cells, p));
+    expect(capArea(g, 0.1, 1)).toBeCloseTo(100 - 6 - 6 - 4 - 4 - 3, 6);
+    expect(capArea(g, 0, -1)).toBeCloseTo(100, 6);
+  });
+
+  it("a ChArUco's squares, meeting at corners and at the sticker's edge: every one carved", () => {
+    const squares = [sq(-18, 18, -6, 30), sq(6, 18, 18, 30), sq(-6, 6, 6, 18), sq(-18, -6, -6, 6), sq(6, -6, 18, 6), sq(-6, -18, 6, -6), sq(-18, -30, -6, -18), sq(6, -30, 18, -18)];
+    const g = carved([sq(-20, -30, 20, 30)], 0, 0.1, [{ z: [0.05, 0.1], polygons: squares }]);
+    expectTop(g, 0.1, [-20, -30, 20, 30], (p) => !inside(squares, p));
+    expect(capArea(g, 0.1, 1)).toBeCloseTo(2400 - 8 * 144, 6);
+  });
+
+  it("a corner triangle and overlapping cuts: the union is taken out", () => {
+    const tri: Polygon = { outer: [[0, 10], [0, 7], [3, 10]], holes: [] };
+    const g = carved([sq(0, 0, 10, 10)], 0, 0.1, [{ z: [0.05, 0.1], polygons: [tri, sq(2, 2, 6, 6), sq(4, 4, 8, 8)] }]);
+    expect(capArea(g, 0.1, 1)).toBeCloseTo(100 - 4.5 - 28, 6);
+    expectTop(g, 0.1, [0, 0, 10, 10], ([x, y]) => !(x > 0 && y < 10 && y - x > 7) && !inside([sq(2, 2, 6, 6), sq(4, 4, 8, 8)], [x, y]));
   });
 });

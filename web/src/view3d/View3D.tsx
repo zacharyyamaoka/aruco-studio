@@ -305,7 +305,12 @@ export function View3D() {
           gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));   // waits for the frame
           return performance.now() - t;
         },
-        top: (showMarks = true) => square(1, showMarks),
+        top: (showMarks = true, tilt = 0) => square(1, showMarks, tilt),
+        sheet: (showMarks = true) => {
+          fit();
+          marks.visible = showMarks;
+          for (const el of boxes.current.values()) el.style.visibility = showMarks ? "" : "hidden";
+        },
         bottom: (showMarks = true, tilt = 0, far?: number) => square(-1, showMarks, tilt, far),
       };
     };
@@ -348,9 +353,15 @@ export function View3D() {
       if (pr && !faces.has(key)) faces.set(key, { loops: pr.loops, cuts: [] });
       const cuts = (into: string) => plan.layers!.filter((L) => L.op === "cut" && L.into === into);
       faces.get(key)?.cuts.push(...cuts("face"));
+      // WHY the ink too (Zach, 2026-10-21: "you need to properly cut away the
+      // black shape from the white"): the black is always taken out of the
+      // white it sits in -- the cells, the corner mark, a label's ink -- over
+      // the depth they share, pocket layer or not, so nothing is drawn flush
+      const ink = plan.layers.filter((L) => L.op === "add" && L.colour === "black" && L.polygons.length);
       for (const L of plan.layers) {
         if (L.op !== "add" || L.colour === "none" || !L.polygons.length) continue;
-        const g = body(carved(L.polygons, L.z[0], L.z[1], cuts(L.name)), L.colour, f.id, solid(L.polygons, L.z[0], L.z[1]));
+        const own = L.colour === "white" ? [...cuts(L.name), ...ink] : cuts(L.name);
+        const g = body(carved(L.polygons, L.z[0], L.z[1], own), L.colour, f.id, solid(L.polygons, L.z[0], L.z[1]));
         g.userData.layer = L.name;
         st.root.add(g);
         zMin = Math.min(zMin, L.z[0]);
