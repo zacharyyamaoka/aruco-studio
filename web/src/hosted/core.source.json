@@ -1,0 +1,13 @@
+{
+  "from": "simple-hosted-files/client/src/core",
+  "commit": "8fce497",
+  "files": {
+    "api.ts": "40cedd9c65e825aaf98d33314900c1e4ab10d02882504db33421807b1f06b058",
+    "drafts.ts": "f5bdae48865d9902904545c4467431506cd081b33ce6be95bea009af279248a0",
+    "errors.ts": "5d6ef2ef27b73cb8f23ea8c8090f9bffda9bc27ed5955c1cb4ef71a87bc4b40f",
+    "format.ts": "98b4641ebcef2155d6a9ea6698a3c6439dda496108c625d9e20e642b7770c1e3",
+    "hosted-files.ts": "1e8102dd44db6c57c4eef695f956f3e0ba8f3bda2acfb9fb3fcf7c67056830f7",
+    "index.ts": "22d71047a2c0b1687b09a8f6d3ebcc84b4f3aad5b45589dcea03fa28a9972b80",
+    "types.ts": "e5a5a7173a1b24632ab90c010f90463e1e946d67666a3daa279307637280f503"
+  }
+}
