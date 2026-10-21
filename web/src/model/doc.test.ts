@@ -505,3 +505,48 @@ describe("validateDoc (review finding #4): every document the Studio makes itsel
     for (const fx of [v1Fixture, v2Fixture, v3Fixture]) expect(() => parseDoc(fx)).not.toThrow();
   });
 });
+
+describe("version 2 trim modes keep both the placement and the cut (review finding #3)", () => {
+  // the fixture's f2: rectId r2 (50 × 80) inscribed in the face plate (120 × 80, two holes)
+  const withTrim = (trim: string) => {
+    const raw = JSON.parse(v2Fixture);
+    raw.features[1].trim = trim;
+    return parseDoc(JSON.stringify(raw));
+  };
+  const r2 = { cx: 60, cy: 40, w: 50, h: 80, angle_deg: 0 };
+
+  it("trim profile: the face stays the profile (holes and all) and r2 the placement; the request carries both", () => {
+    const d = withTrim("profile");
+    const f = d.features[1];
+    expect(f.profile).toEqual({ outer: "plate", holes: ["plate-h1", "plate-h2"] });
+    expect(f.rect).toBe("r2");
+    const req = planRequest(d, f)!;
+    expect(req.trim).toBe("profile");
+    expect(req.rect).toEqual(r2);
+    expect(req.profile!.loops).toHaveLength(3);
+    expect(req.profile!.loops[0]).toEqual([[0, 0], [120, 0], [120, 80], [0, 80]]);
+    expect(parseDoc(serialise(d))).toEqual(d);
+  });
+
+  it("trim rectangle and trim marker: r2 on its own is the profile, no placement field (the cut never needed the face)", () => {
+    for (const [trim, want] of [["rectangle", "profile"], ["marker", "marker"]] as const) {
+      const f = withTrim(trim).features[1];
+      expect(f.profile, trim).toEqual({ outer: "r2", holes: [] });
+      expect(f, trim).not.toHaveProperty("rect");
+      expect(f.trim, trim).toBe(want);
+      const req = planRequest(withTrim(trim), f)!;
+      expect(req, trim).not.toHaveProperty("rect");
+      expect(req.profile!.loops, trim).toEqual([[[35, 0], [85, 0], [85, 80], [35, 80]]]);
+    }
+  });
+
+  it("deleting the placement rectangle keeps the feature, now placed in its profile; a missing one is refused on open", () => {
+    const d = withTrim("profile");
+    const g = deleteShape(d, "r2").features.find((x) => x.id === "f2")!;
+    expect(g).not.toHaveProperty("rect");
+    expect(g.profile!.outer).toBe("plate");
+    const raw = JSON.parse(serialise(d));
+    raw.shapes = raw.shapes.filter((x: { id: string }) => x.id !== "r2");
+    expect(() => parseDoc(JSON.stringify(raw))).toThrow(/feature 2 \("f2"\): its placement names rect "r2"/);
+  });
+});

@@ -35,6 +35,10 @@ export interface Feature {
   profile: ProfileRef | null;
   /** the profile's holes: the marker keeps off them ("avoid") or not */
   holes: Holes;
+  /** legacy (a version 2 file's `rectId` with trim profile): the rectangle
+   *  the marker is placed in while the sticker is cut to `profile`; absent for
+   *  every feature made since (the core places the marker in the profile) */
+  rect?: string;
   /** what the sticker is cut to (contract Trim): the profile by default,
    *  driven until set ("trim" in `set`) */
   trim: Trim;
@@ -124,11 +128,19 @@ export function setShape(doc: Doc, s: Shape): Doc {
  *  a profile it was a hole of loses that hole, and a dimension naming it goes. */
 export function deleteShape(doc: Doc, id: string): Doc {
   const features = doc.features.filter((f) => f.profile?.outer !== id).map((f) =>
-    f.profile?.holes.includes(id) ? { ...f, profile: { ...f.profile, holes: f.profile.holes.filter((h) => h !== id) } } : f);
+    f.profile?.holes.includes(id) ? { ...f, profile: { ...f.profile, holes: f.profile.holes.filter((h) => h !== id) } } : f)
+    // a legacy placement rectangle deleted: the core places the marker in the profile
+    .map((f) => (f.rect === id ? withoutRect(f) : f));
   return { ...doc, shapes: doc.shapes.filter((x) => x.id !== id), dims: doc.dims.filter((d) => !dimShapes(d).includes(id)), features };
 }
 
 // ------------------------------------------------------------ features
+
+/** A feature without its legacy placement rectangle (Feature.rect). */
+export function withoutRect(f: Feature): Feature {
+  const { rect: _gone, ...rest } = f;
+  return rest;
+}
 
 export function getFeature(doc: Doc, id: string | null | undefined): Feature | null {
   return (id && doc.features.find((f) => f.id === id)) || null;
@@ -339,13 +351,17 @@ export function fillPresets(doc: Doc, p: Preset | null): Doc {
 
 /** The feature's plan request: the profile's loops (the outer counter-
  *  clockwise, the holes clockwise), what to do with its holes, and its own
- *  preset. No `rect`: the core places the marker and answers MarkerPlan.fit_rect. */
+ *  preset. No `rect`: the core places the marker and answers MarkerPlan.fit_rect
+ *  -- except a legacy feature's placement rectangle (Feature.rect), sent as
+ *  the facade's `rect` beside the profile it is cut to. */
 export function planRequest(doc: Doc, f: Feature | null): PlanRequest | null {
   const profile = f?.profile ? profileLoops(doc.shapes, f.profile) : null;
   const preset = featurePreset(doc, f);
   if (!f || !profile || !preset) return null;
+  const place = f.rect ? doc.shapes.find((s): s is RectShape => s.id === f.rect && s.kind === "rect") : undefined;
   return {
     trim: f.trim, profile, holes: f.holes, marker: f.marker, label: f.label, preset,
+    ...(place ? { rect: { cx: place.cx, cy: place.cy, w: place.w, h: place.h, angle_deg: place.angle_deg } } : {}),
     reference_face: referenceFace(doc, f),
     // always, even {}: the core answers MarkerPlan.extrude (the driven heights the
     // Make tab and the 3D view show grey) only when the request asks
@@ -446,9 +462,15 @@ function readFeature(raw: Record<string, unknown>): Feature {
   if (!f.extrude || typeof f.extrude !== "object" || Array.isArray(f.extrude)) f.extrude = {};
   // version 2 (2026-10-18 .. 20): the marker filled the rectangle `rectId` (drawn,
   // or inscribed in the face `profile`); that rectangle on its own is the profile
-  // now, so the marker stays where it was
-  if (typeof rectId === "string" && rectId) f.profile = rectProfile(rectId);
-  else if ("rectId" in raw) f.profile = null;
+  // now, so the marker stays where it was. WHY not for trim profile with a face
+  // (review finding #3, 2026-10-21): that sticker was cut to the face, holes and
+  // all; the face stays the profile and rectId the placement (Feature.rect)
+  const face = rest.profile as ProfileRef | null | undefined;
+  if (typeof rectId === "string" && rectId) {
+    if (f.trim === "profile" && face && typeof face === "object" && face.outer !== rectId) f.rect = rectId;
+    else f.profile = rectProfile(rectId);
+  } else if ("rectId" in raw) f.profile = null;
+  if (f.rect !== undefined && typeof f.rect !== "string") delete f.rect;
   // "rectangle" (deprecated 2026-10-20 evening) is a rectangle profile cut to
   // the profile; a file from before trim (2026-10-18), or an unknown one: the
   // profile, driven
@@ -572,6 +594,9 @@ export function validateDoc(doc: Doc): void {
       for (const id of [pr.outer, ...pr.holes]) if (!shapeIds.has(id)) throw new Error(`${at}: its profile names shape "${id}", which is not in the sketch`);
     }
     if (f.holes !== "avoid" && f.holes !== "ignore") throw new Error(`${at}: holes must be "avoid" or "ignore"`);
+    if (f.rect !== undefined && !doc.shapes.some((x) => x.id === f.rect && x.kind === "rect")) {
+      throw new Error(`${at}: its placement names rect "${f.rect}", which is not in the sketch`);
+    }
     if (!TRIMS.includes(f.trim)) throw new Error(`${at}: unknown trim ${JSON.stringify(f.trim)}`);
     if (!Array.isArray(f.set) || !f.set.every((x) => typeof x === "string")) throw new Error(`${at}: set must be a list of field names`);
     const m = f.marker;

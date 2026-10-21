@@ -16,7 +16,7 @@ import type { CoreInfo, IdResult, Issue, LabelParams, MarkerPlan, Preset, Sugges
 import { core, coreStatus } from "./coreSource";
 import {
   addFeature, addShape, applyIds, deleteShape, emptyDoc, featureOfProfile, featureOfRect, fillPresets, getFeature, keyOwner, newFeature, newId, nextTurn, pickSuggestion,
-  rectProfile, removeFeature, resetField, setField, setShape, updateFeature, validateDoc, type Doc, type Feature, type Holes,
+  rectProfile, removeFeature, resetField, setField, setShape, updateFeature, validateDoc, withoutRect, type Doc, type Feature, type Holes,
 } from "./model/doc";
 import { applyBatch, resetBatch } from "./model/batch";
 import { boxOf, fitBox, rectCorners, type Camera } from "./model/geom";
@@ -476,8 +476,10 @@ export const useStudio = create<Studio>((set, get) => {
       // driven, it takes the next id after the highest in use (core autoid rule 3')
       const features = clip.features.map((f) => {
         const id = newId("f");
-        return { ...structuredClone(f), id, key: id, set: f.set.filter((p) => p !== "marker.first_id"),
+        const g = { ...structuredClone(f), id, key: id, set: f.set.filter((p) => p !== "marker.first_id"),
           profile: { outer: map[f.profile!.outer], holes: f.profile!.holes.map((h) => map[h]) } };
+        // a legacy placement rectangle comes along when it was copied (doc.ts Feature.rect)
+        return f.rect && map[f.rect] ? { ...g, rect: map[f.rect] } : withoutRect(g);
       });
       const dims = clip.dims.map((d) => renameDim(d, newId("d"), map));
       const allDims = [...doc.dims, ...dims];
