@@ -20,7 +20,7 @@ from aruco_studio.core import chamfer as CH
 from aruco_studio.core import sheet as SH
 from aruco_studio.plan import region as RG
 
-from test_web_cad import (D3, INK, area, assign, in_cells, in_polys, item, layer, poly_area, req,
+from test_web_cad import (D3, INK, INK_DOTS, area, assign, in_cells, in_polys, item, layer, poly_area, req,
                           round_tol, samples)
 
 PRESETS = {"inkjet": (INK, False), "3D free": (D3, False), "3D on a face": (D3, True)}
@@ -356,9 +356,10 @@ def test_bad_maps_are_answered_in_words():
 
 ROUND_TRIP = {             # name: (request, its cells on the 1e-6 grid)
     "single turned 21": (req(rect=RECT), False),
+    # on the 1e-6 grid: whole 600 dpi dots (the inkjet built-ins before cells rule 2)
     "grid turned 90, rotated -33, flipped": (req({"type": "grid", "cols": 3, "rows": 2, "turn": 90, "flip": True},
                                                  rect={"cx": 15.0, "cy": -8.0, "w": 60.0, "h": 40.0,
-                                                       "angle_deg": -33.0}), True),
+                                                       "angle_deg": -33.0}, pre=INK_DOTS), True),
     "charuco 5x4 turned 270, 3D, far from the origin": (req({"type": "charuco", "cols": 5, "rows": 4, "turn": 270},
                                                 rect={"cx": 401.0, "cy": 357.0, "w": 80.0, "h": 60.0,
                                                       "angle_deg": 12.5}, pre=D3), False),

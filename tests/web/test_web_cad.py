@@ -34,6 +34,7 @@ def preset(name="Inkjet · Letter vinyl", **kw):
 
 INK = preset()
 D3 = preset("Default")
+INK_DOTS = preset(cell_step_mm=0.042333)        # the inkjet built-ins before cells rule 2
 
 
 def req(marker=None, rect=None, label=None, pre=None, face=False):
@@ -235,7 +236,7 @@ def _up(angle_deg):
 
 def test_sans_lines_at_are_each_lines_centre():
     r = req(rect={"cx": 5.0, "cy": 2.0, "angle_deg": 30.0},
-            label={"on": True, "text": "#{id}\n{dict}\nthird", "side": "below"})
+            label={"on": True, "text": "#{id}\n{dict}\nthird", "side": "below"}, pre=INK_DOTS)
     lab = W.plan(r)["label"]
     la = lab["lines_at"]
     assert lab["font"] == "sans" and len(la) == len(lab["lines"]) == 3
@@ -424,7 +425,7 @@ def test_every_driven_value_a_shell_shows_is_in_the_plan():
 # ------------------------------------------------------------------ 8. the cell-multiple note
 
 def test_a_snapped_size_states_both_numbers():
-    p = W.plan(req({"auto": False, "marker_mm": 20.0}, rect={"w": 40.0, "h": 40.0}))
+    p = W.plan(req({"auto": False, "marker_mm": 20.0}, rect={"w": 40.0, "h": 40.0}, pre=INK_DOTS))
     note = next(w for w in p["warnings"] if w["text"].startswith("cell multiple:"))
     assert note["field"] == "marker.marker_mm" and note["level"] == "info"
     assert f"20.0 mm → {p['marker_mm']:.3f} mm" in note["text"], note

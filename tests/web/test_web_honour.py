@@ -22,6 +22,7 @@ def preset(name, **kw):
 
 INK = preset("Inkjet · Letter vinyl")
 INK_NO_SNAP = preset("Inkjet · Letter vinyl", cell_step_mm=0.0)
+INK_DOTS = preset("Inkjet · Letter vinyl", cell_step_mm=0.042333)   # before cells rule 2
 D3 = preset("Default")
 
 
@@ -70,10 +71,10 @@ def test_a_typed_checker_with_auto_on_the_dot_grid_is_snapped_and_said():
     contract's "cells snap to multiples of this"): a typed checker off that
     grid is drawn on it and SAID (a note on the checker's row), never dropped;
     one on the grid is drawn exactly."""
-    p = W.plan(req(dict(CHARUCO, checker_mm=20.0)))
+    p = W.plan(req(dict(CHARUCO, checker_mm=20.0), pre=INK_DOTS))
     assert abs(p["checker_mm"] - 20.0) < 0.05 and p["checker_mm"] != 15.41
     assert any(w["field"] == "marker.checker_mm" and "20.0 mm →" in w["text"] for w in p["warnings"])
-    on_grid = W.plan(req(dict(CHARUCO, checker_mm=p["checker_mm"])))
+    on_grid = W.plan(req(dict(CHARUCO, checker_mm=p["checker_mm"]), pre=INK_DOTS))
     assert on_grid["checker_mm"] == p["checker_mm"]
 
 
