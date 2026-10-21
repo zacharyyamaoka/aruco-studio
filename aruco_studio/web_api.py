@@ -66,7 +66,10 @@ from .scene import sheet as _SS
 from . import web_extrude as _EX
 
 API = ("info", "presets", "legacy_presets", "inscribe", "plan", "suggest", "svg", "sheet", "verify", "readable",
-       "assign_ids")
+       "assign_ids", "cameras", "reading_range", "range_start", "range_step", "range_cancel", "range_judge")
+# the reading range (V4, contract barrier 13): web_verify's, numpy + OpenCV but
+# for cameras / range_judge / range_cancel and reader "analytic" (stdlib)
+RANGE_CALLS = ("reading_range", "range_start", "range_step", "range_cancel")
 
 # core key path -> the contract's field (contract.ts Issue.field)
 FIELDS = {"numbers.size": "marker.marker_mm", "numbers.square": "marker.checker_mm",
@@ -1647,6 +1650,22 @@ def call(name: str, payload_json: str) -> str:
             from . import web_verify               # numpy + OpenCV: imported on first use only
             out = (web_verify.verify(p["req"], p["view"]) if name == "verify"
                    else web_verify.readable(p["req"], p["camera"]))
+        elif name == "cameras":
+            from .core import cameras as _CAMS
+            out = _CAMS.library()
+        elif name == "range_judge":
+            from .core import reading_range as _RR
+            out = _RR.judge(p["range"], p.get("need"))
+        elif name in RANGE_CALLS:
+            from . import web_verify
+            if name == "range_step":
+                out = web_verify.range_step(p["job"], p.get("budget_ms", web_verify.STEP_MS))
+            elif name == "range_cancel":
+                out = web_verify.range_cancel(p["job"])
+            else:
+                run = web_verify.reading_range if name == "reading_range" else web_verify.range_start
+                out = run(p["req"], p.get("camera") or "d435", p.get("budget"), p.get("cases"), p.get("seed"),
+                          p.get("reader"))
         elif name == "assign_ids":
             from . import web_ids
             out = web_ids.assign_ids(p)

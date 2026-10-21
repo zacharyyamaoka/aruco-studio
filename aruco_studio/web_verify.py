@@ -15,14 +15,28 @@ old core.markers.suggest's "5 px per module" is not used); `measured` true.
 Without numpy / OpenCV (inside a CAD's Python: Fusion) this module still
 imports, `readable` gives the analytic answer (readable_analytic, `measured`
 false) and `verify` refuses in words.
+
+`reading_range` (V4 "Range strip", 2026-10-21) is each marker's near - far on
+a camera from the camera library (core.cameras), through a budget of tilt,
+blur, grain and glare: core.reading_range's engine with this module's reader
+(the plan rendered, OpenCV's detector), or its pinhole model without OpenCV
+(`measured` false). `range_table` is the same for a list of markers (a
+script's table; `python -m aruco_studio.web_verify requests.json`), and
+range_start / range_step / range_cancel run one in time slices for the
+browser's worker (progress, cancel, the UI never waits on one call).
 """
 from __future__ import annotations
 
 import base64
+import json
 import math
+import sys
+import time
 
 from . import web_api as _W
+from .core import cameras as _CAMS
 from .core import dictionary as _D
+from .core import reading_range as _RR
 
 try:
     import cv2
@@ -278,3 +292,288 @@ def readable(req: dict, camera: dict) -> dict:
     on = _W.place_of(req.get("label") or {}) == "on_marker"
     lim = max_distance(d, _C.scene_of(d, _label(req, d) if on else None), cam)
     return _readability(_px_per_cell(d, cam), cam.distance_mm, lim, True)
+
+
+# ------------------------------------------------------------ the reading range (V4, 2026-10-21)
+#
+# WHY its own reader, not _view: the engine needs only "did every id read",
+# and _view also solves the pose (a second detectMarkers inside pnp.solve, and
+# solvePnP), draws its notes and could draw the picture -- about a third of a
+# far view's time for nothing. The ids are the same: detect.detect on the same
+# simulated image with the same parameters (tests/web/test_web_verify_range.py
+# holds the two to the same answer on every case).
+
+def _geometry(d: dict, bounds) -> dict:
+    return {"bounds_mm": [float(x) for x in bounds], "cell_mm": cell_mm(d),
+            "marker_mm": d["marker"]["marker_length_m"] * 1000.0, "ids": list(d["ids"])}
+
+
+def _bounds_stdlib(req: dict, d: dict) -> list:
+    """The board's box in its pattern frame, label included, without numpy
+    (scene_of's, near enough for the near end): the sticker, grown to the
+    label's band (PlacedLabel.box, mapped back through pattern_to_sketch, a
+    rotation or a reflection, so its inverse is its transpose)."""
+    u0, v0, u1, v1 = (float(x) for x in d["guides"]["sticker"])
+    if _W.flip_of(req):
+        return [u0, v0, u1, v1]
+    p = _W.plan(req)
+    lab = p.get("label")
+    if lab and lab.get("box"):
+        M = p["pattern_to_sketch"]
+        for x, y in lab["box"]:
+            q = (x - M[3], y - M[7], -M[11])
+            u = M[0] * q[0] + M[4] * q[1] + M[8] * q[2]
+            v = M[1] * q[0] + M[5] * q[1] + M[9] * q[2]
+            u0, v0, u1, v1 = min(u0, u), min(v0, v), max(u1, u), max(v1, v)
+    return [u0, v0, u1, v1]
+
+
+def _cv_reader(d: dict, scene, camera: dict):
+    """read(distance_mm, view) -> (every id read, the ids missed): the plan
+    rendered by verify.camera on this camera and read by OpenCV."""
+    w, h = (int(v) for v in camera["resolution"])
+    hfov = float(camera["hfov_deg"])
+    want = set(int(i) for i in d["ids"])
+    rasters = {}                                   # simulate's top views of this scene
+
+    def read(distance_mm, view):
+        v = _C.simulate(scene, _C.Cam(float(distance_mm), w, h, hfov), view, cache=rasters)
+        got = set(int(i) for i in _C._det.detect(v.img, d, params=_C.parameters_for(v))["ids"])
+        missing = sorted(want - got)
+        return (not missing and not (got - want)), missing
+    return read
+
+
+def _range_setup(req: dict, camera, reader=None):
+    """(geometry, camera, read, measured) for the engine. `reader`: "opencv",
+    "analytic", or None (OpenCV when this Python has it, as readable does)."""
+    if reader not in (None, "opencv", "analytic"):
+        raise ValueError(f"reader {reader!r}: one of opencv, analytic")
+    cam = _CAMS.camera_of(camera)
+    req = placed(req)
+    d = _plan(req)
+    if reader == "opencv":
+        _need_cv("the measured reading range")
+    if reader != "analytic" and cv2 is not None:
+        scene = _C.scene_of(d, _label(req, d))
+        return _geometry(d, scene.bounds), cam, _cv_reader(d, scene, cam), True
+    geo = _geometry(d, _bounds_stdlib(req, d))
+    return geo, cam, _RR.analytic_reader(geo, cam), False
+
+
+def _finish(out: dict, cam: dict, measured: bool) -> dict:
+    out["measured"] = measured
+    # WHY the version (measured 2026-10-21): the renderer's warps and blur
+    # differ between OpenCV releases (5.0 in the repo's .venv, 4.11 in Pyodide
+    # 314), and near the limits that moves a range up to 2x; with 4.11 in
+    # CPython the browser's four ranges came out identical. A table says
+    # which OpenCV drew it.
+    out["opencv"] = cv2.__version__ if measured else None
+    out["camera"]["id"] = cam["id"]
+    out["camera"]["name"] = cam["name"]
+    return out
+
+
+def reading_range(req: dict, camera="d435", budget=None, cases=None, seed=None, reader=None) -> dict:
+    """THE per-marker reading range (CPython or Pyodide, one call): `camera` a
+    library id (core.cameras: "d435", "oakd12", ...) or {resolution, hfov_deg,
+    focus_mm}; `budget` a name in reading_range.BUDGETS ("field"); `cases`
+    per distance (48); `seed` the cases' (reading_range.SEED). -> the engine's
+    answer (reading_range.result: near_mm, far_mm, band_mm, pm, near_by,
+    far_limit, weakest_id, rows, renders, ...) + `measured` (OpenCV, or the
+    pinhole model). The same bytes for the same inputs, every run."""
+    geo, cam, read, measured = _range_setup(req, camera, reader)
+    seed = _RR.SEED if seed is None else int(seed)
+    out = _RR.run(_RR.sweep(geo, cam, budget or _RR.DEFAULT_BUDGET, int(cases or _RR.N_CASES), seed), read)
+    return _finish(out, cam, measured)
+
+
+def range_table(items: list, camera="d435", need=None, also=None, **kw) -> list:
+    """The reading range of every marker in `items` -- PlanRequests, or
+    {name, req, need} -- on one camera, judged against its requirement
+    ({min_mm, max_mm}: the item's, else `need`): one row each, {name, ids,
+    near_mm, far_mm, band_mm, pm, verdict, hints, range}. table_text()
+    prints it.
+
+    `also`: another Python with another OpenCV (the browser's 4.11:
+    tools/requirements-browser-opencv.txt) -- the same table there too, and
+    each row then carries `by_opencv` {version: range}, `differs`, and the
+    WORSE of the two: its near / far / band are the nearer far end's, and its
+    verdict fails when either fails. WHY (the coordinator, 2026-10-21, from
+    the guides lane's 6 of 28 label placements): the two OpenCVs draw the same
+    view differently, and a marker must pass on the one a user runs."""
+    rows = []
+    for k, it in enumerate(items):
+        req = it["req"] if isinstance(it, dict) and "req" in it else it
+        name = (it.get("name") if isinstance(it, dict) and "req" in it else None) or f"Marker {k + 1}"
+        want = (it.get("need") if isinstance(it, dict) and "req" in it else None) or need
+        rr = reading_range(req, camera, **kw)
+        j = _RR.judge(rr, want)
+        rows.append({"name": name, "ids": rr["geometry"]["ids"], "near_mm": rr["near_mm"], "far_mm": rr["far_mm"],
+                     "band_mm": rr["band_mm"], "pm": rr["pm"], "need": want, "verdict": j["verdict"],
+                     "hints": j["hints"], "range": rr})
+    if also:
+        theirs = _rows_in(also, items, camera, need, kw)
+        rows = [_worse(a, b) for a, b in zip(rows, theirs)]
+    return rows
+
+
+def _rows_in(python: str, items: list, camera, need, kw: dict) -> list:
+    """range_table in another Python (its own OpenCV), this checkout's core."""
+    import os
+    import subprocess
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    code = ("import json, sys\nfrom aruco_studio import web_verify as V\na = json.load(sys.stdin)\n"
+            "sys.stdout.write(json.dumps(V.range_table(a['items'], a['camera'], a['need'], **a['kw'])))")
+    env = dict(os.environ, PYTHONPATH=root, PYTHONDONTWRITEBYTECODE="1")
+    p = subprocess.run([python, "-c", code], input=json.dumps({"items": items, "camera": camera, "need": need, "kw": kw}),
+                       capture_output=True, text=True, cwd=root, env=env)
+    if p.returncode:
+        raise RuntimeError(f"{python} could not run the range table: {p.stderr.strip()[-600:]}")
+    return json.loads(p.stdout)
+
+
+def _ends(r: dict):
+    return (r["near_mm"], r["far_mm"], r["band_mm"])
+
+
+def _worse(a: dict, b: dict) -> dict:
+    """Two OpenCVs' rows of one marker as one: both kept, the worse governs."""
+    ra, rb = a["range"], b["range"]
+    by = {ra.get("opencv") or "none": ra, rb.get("opencv") or "none": rb}
+    differs = _ends(ra) != _ends(rb)
+    # the worse range: one that reads nowhere, else the nearer far end
+    far = lambda r: -1.0 if r["far_mm"] is None else r["far_mm"]      # noqa: E731
+    worst = a if far(ra) <= far(rb) else b
+    verdicts = [x["verdict"] for x in (a, b)]
+    verdict = None if all(v is None for v in verdicts) else ("fail" if "fail" in verdicts else "pass")
+    # the governing row's words: the worse range's when it fails, else the one that does
+    says = worst if worst["verdict"] == "fail" else next((x for x in (a, b) if x["verdict"] == "fail"), worst)
+    return dict(worst, verdict=verdict, hints=list(says["hints"]), by_opencv=by, differs=differs)
+
+
+def _m(mm) -> str:
+    if mm is None:
+        return "—"
+    return f"{mm / 1000.0:.2f} m" if mm >= 1000.0 else f"{mm:.0f} mm"
+
+
+def table_text(rows: list) -> str:
+    """range_table's rows as a Markdown table."""
+    if not rows:
+        return "(no markers)"
+    cam = rows[0]["range"]["camera"]
+    cv = rows[0]["range"].get("opencv")
+    both = [v for v in (rows[0].get("by_opencv") or {})]
+    cvs = ("OpenCV " + " and ".join(sorted(both, reverse=True)) + ", the worse governs") if both else (
+        f"OpenCV {cv}" if cv else "the pinhole model (no OpenCV)")
+    lines = [f"Camera: {cam.get('name')} ({cam['resolution'][0]}×{cam['resolution'][1]}, {cam['hfov_deg']:g}°)"
+             f" · budget {rows[0]['range']['budget']['name']} · {rows[0]['range']['cases']} cases a distance"
+             f" · {_RR.VERSION} · {cvs}", "",
+             "| Marker | Ids | Reads from | Reads to (± 90 %) | Required | Verdict |", "|---|---|---|---|---|---|"]
+
+    def span(r):
+        pm = "" if r["pm"] is None else f" ± {r['pm'] * 100:.0f} %"
+        return _m(r["near_mm"]), _m(r["far_mm"]) + pm
+
+    for r in rows:
+        ids = r["ids"]
+        idw = f"#{ids[0]}" if len(ids) == 1 else f"#{ids[0]}–{ids[-1]}"
+        near, far = span(r)
+        if r.get("differs"):
+            # both, where they differ (the worse one first)
+            parts = sorted(r["by_opencv"].items(), key=lambda kv: kv[1]["far_mm"] is not None and kv[1]["far_mm"] or -1)
+            near = " / ".join(f"{span(x)[0]} ({v})" for v, x in parts)
+            far = " / ".join(f"{span(x)[1]} ({v})" for v, x in parts)
+        nd = r["need"] or {}
+        req = "—" if not nd else f"{_m(nd.get('min_mm'))} – {_m(nd.get('max_mm'))}"
+        verdict = (r["verdict"] or "—").upper() + ("" if not r["hints"] else ": " + " ".join(r["hints"]))
+        lines.append(f"| {r['name']} | {idw} | {near} | {far} | {req} | {verdict} |")
+    return "\n".join(lines)
+
+
+# the browser's worker runs a range in time slices: range_start, then
+# range_step until done (each returns after about budget_ms, so a plan call
+# waiting behind it waits one slice at most), or range_cancel
+_JOBS: dict = {}
+_SEQ = [0]
+JOB_MAX = 16                # jobs kept at once; the oldest is dropped past it
+STEP_MS = 250.0
+
+
+def range_start(req: dict, camera="d435", budget=None, cases=None, seed=None, reader=None) -> dict:
+    """A reading range to run in slices: -> {job, done false, phase, fraction, renders 0}."""
+    geo, cam, read, measured = _range_setup(req, camera, reader)
+    seed = _RR.SEED if seed is None else int(seed)
+    gen = _RR.sweep(geo, cam, budget or _RR.DEFAULT_BUDGET, int(cases or _RR.N_CASES), seed)
+    ask = next(gen)
+    _SEQ[0] += 1
+    job = f"range-{_SEQ[0]}"
+    while len(_JOBS) >= JOB_MAX:
+        _JOBS.pop(next(iter(_JOBS)))
+    _JOBS[job] = {"gen": gen, "ask": ask, "read": read, "cam": cam, "measured": measured, "renders": 0, "ms": 0.0}
+    return {"job": job, "done": False, "phase": ask["phase"], "fraction": round(ask["done"], 3), "renders": 0}
+
+
+def range_step(job: str, budget_ms=STEP_MS) -> dict:
+    """Read views for about `budget_ms` (one at least): -> {job, done, phase,
+    fraction, renders, ms} or, at the end, {job, done true, result, renders,
+    ms}. `ms` is this job's rendering time so far."""
+    j = _JOBS.get(job)
+    if j is None:
+        raise ValueError(f"no reading-range job {job!r}: finished, cancelled or dropped")
+    t0 = time.perf_counter()
+    stop = t0 + max(0.0, float(budget_ms)) / 1000.0
+    ask = j["ask"]
+    try:
+        while True:
+            got = j["read"](ask["distance_mm"], ask["view"])
+            j["renders"] += 1
+            ask = j["gen"].send(got)
+            if time.perf_counter() >= stop:
+                break
+    except StopIteration as fin:
+        _JOBS.pop(job, None)
+        ms = round(j["ms"] + (time.perf_counter() - t0) * 1000.0, 1)
+        return {"job": job, "done": True, "result": _finish(fin.value, j["cam"], j["measured"]),
+                "renders": j["renders"], "ms": ms}
+    except Exception:
+        _JOBS.pop(job, None)
+        raise
+    j["ask"] = ask
+    j["ms"] += (time.perf_counter() - t0) * 1000.0
+    return {"job": job, "done": False, "phase": ask["phase"], "fraction": round(ask["done"], 3),
+            "renders": j["renders"], "ms": round(j["ms"], 1)}
+
+
+def range_cancel(job: str) -> dict:
+    return {"job": job, "cancelled": _JOBS.pop(job, None) is not None}
+
+
+def main(argv=None) -> int:
+    """python -m aruco_studio.web_verify requests.json [--camera d435] [--need 300:2000] [--analytic] [--json]:
+    the reading range of each marker in the file (a list of PlanRequests, or of
+    {name, req, need}) as a table."""
+    import argparse
+    ap = argparse.ArgumentParser(prog="python -m aruco_studio.web_verify", description=main.__doc__.split("\n")[0])
+    ap.add_argument("requests", help="a JSON file: [PlanRequest, ...] or [{name, req, need}, ...]")
+    ap.add_argument("--camera", default=_CAMS.DEFAULT, help="a library id (" + ", ".join(c["id"] for c in _CAMS.CAMERAS) + ")")
+    ap.add_argument("--need", help="the required distance for every marker without its own, min:max in mm (either may be empty)")
+    ap.add_argument("--analytic", action="store_true", help="the pinhole model instead of OpenCV")
+    ap.add_argument("--also", metavar="PYTHON", help="another Python with another OpenCV (the browser's 4.11: "
+                    "tools/requirements-browser-opencv.txt): both shown where they differ, the worse governs")
+    ap.add_argument("--json", action="store_true", help="print the rows as JSON")
+    a = ap.parse_args(argv)
+    with open(a.requests, encoding="utf-8") as f:
+        items = json.load(f)
+    need = None
+    if a.need:
+        lo, _, hi = a.need.partition(":")
+        need = {"min_mm": float(lo) if lo else None, "max_mm": float(hi) if hi else None}
+    rows = range_table(items, a.camera, need, also=a.also, reader="analytic" if a.analytic else None)
+    sys.stdout.write((json.dumps(rows, indent=1) if a.json else table_text(rows)) + "\n")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
