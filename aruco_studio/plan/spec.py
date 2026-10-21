@@ -266,11 +266,11 @@ def check(spec: TagSpec) -> List[Issue]:
     # -- cells
     if "cells" in raw and raw["cells"] is not None:
         c = raw["cells"]
-        good = (isinstance(c, dict) and c.get("rule", _A.CELL_RULE) == _A.CELL_RULE
+        good = (isinstance(c, dict) and c.get("rule", _A.CELL_RULE) in _A.CELL_RULES
                 and _A.cells_of(c) is not None)
         lo, hi = _A.MIN_STEP_M * 1000, _A.MAX_STEP_M * 1000
         legacy = "read as the legacy 0.5 mm steps"
-        if not good and (isinstance(c, dict) and c.get("rule", _A.CELL_RULE) == _A.CELL_RULE
+        if not good and (isinstance(c, dict) and c.get("rule", _A.CELL_RULE) in _A.CELL_RULES
                          and c.get("of") in _A.CELL_OF):
             # the rule and its kind are known: the step is what is wrong (audit F8)
             mm = c.get("mm")
@@ -279,7 +279,7 @@ def check(spec: TagSpec) -> List[Issue]:
                 f"cell {shown} mm: {lo:g} to {hi:g} mm ({legacy})")
         elif not good:
             rule = c.get("rule") if isinstance(c, dict) else None
-            what = (f"rule {rule!r}" if isinstance(c, dict) and rule != _A.CELL_RULE else
+            what = (f"rule {rule!r}" if isinstance(c, dict) and rule not in _A.CELL_RULES else
                     f"kind {c.get('of')!r}" if isinstance(c, dict) else "not an object")
             add("settings.cells", "warn",
                 f"cells: {what} is not a size grid this version knows (rule {_A.CELL_RULE}, "
