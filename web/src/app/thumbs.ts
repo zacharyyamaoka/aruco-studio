@@ -1,3 +1,4 @@
+// WHY: pictures are drawn here from each file's bytes and kept by sha256 -- see docs/peps/0001-home-thumbnails-in-browser.md
 // The pictures on Home's cards (and File › Examples…'s): a document's shapes
 // and, as the core planned them, each marker's outline and its black.
 // WHY (Zach, 2026-10-21): "It would be nice if the aruco stickers showed up in
