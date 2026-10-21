@@ -56,6 +56,9 @@ export interface MarkerParams {
    *  board square [col, row] (0-based from OpenCV's origin corner) instead of
    *  OpenCV's board corner. null / absent = the corner. */
   origin_square?: [number, number] | null;
+  /** barrier 11: this marker's size step, overriding the preset's (absent /
+   *  null = the preset's, driven) */
+  size_step?: SizeStep | null;
 }
 
 export type LabelSide = "below" | "above" | "left" | "right";
@@ -83,6 +86,15 @@ export interface LabelParams {
   offset_mm: Vec2;           // x, y from the preset spot (typed, or a drag on the canvas)
 }
 
+/** What driven sizes (marker, checker, separation) round to (contract
+ *  barrier 11, Zach 2026-10-20 night: "maybe that's a preset you put in the
+ *  vinyl printer preset... how many significant figures you want... that
+ *  helps us cover all bases"). `dots`: whole printer dots per cell (exact
+ *  to the printer, e.g. 27.9398 mm = 6 cells x 110 dots at 600 dpi); `mm`:
+ *  a round step (0.1, 0.5, 1). Typed sizes are never rounded. The inkjet
+ *  built-ins default to {of: "mm", mm: 0.5}; 3D presets keep the line. */
+export type SizeStep = { of: "dots" } | { of: "mm"; mm: number } | { of: "line" };
+
 export type Method = "inkjet" | "print3d";
 
 /** How it is made (Zach: "the first thing you need to decide"). A flat record;
@@ -108,6 +120,9 @@ export interface Preset {
   // both
   min_cell_mm?: number;      // the smallest cell this machine makes well
   cell_step_mm?: number;     // cells snap to multiples of this (3D: the line width); 0 = no snap
+  /** barrier 11: what DRIVEN sizes round to (absent = derived from
+   *  cell_step_mm, as before) */
+  size_step?: SizeStep;
 }
 
 /** What the sticker is cut to (Zach, 2026-10-18): the whole profile, the
