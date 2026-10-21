@@ -71,11 +71,11 @@ export function describeStatus(state: State, signingIn = false, appName = "this 
       return { kind: "dirty", label: state.message ?? "Unsaved changes", detail: state.message ?? "Changes not saved yet.", tone: "quiet" }
   }
   if (file?.locked) {
-    const limit = state.me?.app?.limit ?? 3
+    const limit = state.me?.app?.limit ?? null
     return {
       kind: "view-only",
       label: "View-only",
-      detail: `View-only: the free plan edits your ${limit} most recent files per app. You can still open, download, rename or trash it.`,
+      detail: `View-only: the free plan edits your ${limit === null ? "" : `${limit} `}most recent files in ${state.me?.app?.name ?? appName}. You can still open, download, rename or trash it.`,
       tone: "quiet",
     }
   }

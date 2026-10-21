@@ -172,7 +172,7 @@ export async function getDraft(key: string): Promise<Draft | undefined> {
 // ---- the working copy (SPEC v2.4) --------------------------------------------------------
 
 // One per tab: what the editor showed at the last markDirty. Restored on the next load, never
-// uploaded (WHY: the free plan has 3 files; a reload must not create a file nobody asked for).
+// uploaded (WHY: the free plan has few files, 3 in most apps; a reload must not create a file nobody asked for).
 export function localKey(app: string, tab = tabId): string {
   return `${app}:local:${tab}`;
 }
@@ -195,8 +195,10 @@ async function ownerIsGone(draft: Draft): Promise<boolean> {
   return locks.request(`shf-tab:${draft.tab}`, { ifAvailable: true }, async (lock) => lock !== null);
 }
 
-function underAppLock<T>(app: string, run: () => Promise<T>): Promise<T> {
-  return locks ? locks.request(`shf-drafts:${app}`, run) : run();
+// WHY async + await: TS 5.9's lib types locks.request as Promise<Promise<T>> here, and the core is
+// copied verbatim into apps on TS 5.9 (ArUco Studio).
+async function underAppLock<T>(app: string, run: () => Promise<T>): Promise<T> {
+  return locks ? await locks.request(`shf-drafts:${app}`, run) : run();
 }
 
 // Adopts the newest working copy left by a tab that is gone (and accepted by `accept`):

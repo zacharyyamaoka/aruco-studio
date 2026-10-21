@@ -648,7 +648,7 @@ export class HostedFiles {
     else if (this.dirty) this.scheduleAutosave();
   }
 
-  // WHY only existing, unlocked files: the free plan has 3 files, so autosave never creates
+  // WHY only existing, unlocked files: the free plan has few files (3 in most apps), so autosave never creates
   // one the user didn't ask for; a view-only file would only be refused.
   private get canAutosave(): boolean {
     const file = this.current.file;

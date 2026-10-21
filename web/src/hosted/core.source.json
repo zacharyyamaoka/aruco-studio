@@ -1,14 +1,14 @@
 {
-  "commit": "7bd9aa5",
+  "commit": "44c75e0",
   "parts": {
     "core": {
       "from": "simple-hosted-files/client/src/core",
       "files": {
         "api.ts": "bf7f66f1ffde45e3a81618aefd3b95f8f447ddfe8812254139562c77115b49cd",
-        "drafts.ts": "f5bdae48865d9902904545c4467431506cd081b33ce6be95bea009af279248a0",
+        "drafts.ts": "7d11d560686fb0c2b5d7d73aae40152622e60bd1c09870490a401ee9abc1598a",
         "errors.ts": "5d6ef2ef27b73cb8f23ea8c8090f9bffda9bc27ed5955c1cb4ef71a87bc4b40f",
         "format.ts": "98b4641ebcef2155d6a9ea6698a3c6439dda496108c625d9e20e642b7770c1e3",
-        "hosted-files.ts": "52cc953b02fefc1a7c408782812b768e6b16dc81b0403682d2c78194cffc9ef3",
+        "hosted-files.ts": "2781a5f46204882a904de554a9285dda12252695e7a6ab44cbdc07585c312ab3",
         "index.ts": "ffed0ede69c63e742cb14e1ce9e97f0f92ba5fc8270f29f5c7c13b33c78259ea",
         "signin.ts": "d4c22ff7bce0ec04fad2020928f97303b9485ba521b320a22f0210ac24c39036",
         "types.ts": "c2153c56e60cff487888fc0c613da6ede9cbb33ecb85cd98f140ea1830b01a3b"
@@ -19,7 +19,7 @@
       "files": {
         "index.ts": "a9707f018207f6813bf7c25aa7c021d731a134a9fc5303ebca89ade589a67ca9",
         "provider.tsx": "0b0ff231a627ede2c72d1bc934cfb94b330e1b10f96b7fbc24ca94ba9e02cfff",
-        "status.tsx": "d3aedfe70a68ca1c61175e43679187aeb260c5dc000846fdbbf251214478fab2",
+        "status.tsx": "1a21861280ed2245475f9af85d2b6b077b63966e243376fe77ffb6913e7e6fa1",
         "use-files.ts": "b257f0496c1249d18a0b379f39d1041000a674ced3a35098679554e709bcd3b5"
       }
     }
