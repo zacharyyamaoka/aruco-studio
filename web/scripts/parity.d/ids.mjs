@@ -9,8 +9,10 @@ export default function cases() {
     item("lid", "single", "DICT_4X4_250", 1, 7), item("base", "grid", "DICT_4X4_250", 4)];
   const sixty = Array.from({ length: 60 }, (_, k) => item(`s${String(k).padStart(2, "0")}`));
   return [
-    ["assign_ids mixed document, no ledger", "assign_ids", { items: doc }],
-    ["assign_ids shuffled, same answer by key", "assign_ids", { items: [...doc].reverse() }],
+    // WHY mode "hash" on these two (2026-10-20 night): "next" is the default now
+    // and numbers in document order; the order-free answer is the hash's
+    ["assign_ids mixed document, no ledger", "assign_ids", { items: doc, mode: "hash" }],
+    ["assign_ids shuffled, same answer by key", "assign_ids", { items: [...doc].reverse(), mode: "hash" }],
     ["assign_ids with a ledger (kept, a new key routed round)", "assign_ids",
       { items: [item("plate-a"), item("new", "grid", "DICT_4X4_50", 4)], ledger: { "plate-a": 3, gone: 9 } }],
     ["assign_ids typed ranges that overlap (both flagged)", "assign_ids",

@@ -28,7 +28,7 @@ def page(n=40):
 
 def test_re_id_a_page_of_hashed_markers_numbers_them_in_document_order():
     items = page()
-    hashed = call({"items": items})["result"]
+    hashed = call({"items": items, "mode": "hash"})["result"]
     res = call({"items": items, "ledger": hashed["ledger"], "mode": "sequential", "fresh": True})["result"]
     assert res["warnings"] == []
     nxt = 0
@@ -37,7 +37,7 @@ def test_re_id_a_page_of_hashed_markers_numbers_them_in_document_order():
         nxt += it["count"]
     assert res["ledger"] == {a["key"]: a["first_id"] for a in res["items"]}
     # the new ledger keeps them there: a hash call with it moves nothing
-    again = call({"items": items, "ledger": res["ledger"]})["result"]
+    again = call({"items": items, "ledger": res["ledger"], "mode": "hash"})["result"]
     assert again["items"] == res["items"]
 
 
@@ -56,7 +56,7 @@ def test_without_fresh_the_ledger_is_honoured():
 def test_omitted_null_and_explicit_defaults_are_the_same_answer():
     base = {"items": page(12), "ledger": {"m03": 5}, "reserved": [0, 1]}
     want = call(base)
-    assert call({**base, "mode": "hash", "start": 0, "fresh": False}) == want
+    assert call({**base, "mode": "next", "start": 0, "fresh": False}) == want
     assert call({**base, "mode": None, "start": None, "fresh": None}) == want
 
 
@@ -99,4 +99,4 @@ def test_the_wrap_warning_starts_one_past_the_last_id(start, warned):
 
 
 def test_hash_mode_ignores_start_so_never_warns_of_a_wrap():
-    assert call({"items": [item("a"), item("b")], "start": 100})["result"]["warnings"] == []
+    assert call({"items": [item("a"), item("b")], "mode": "hash", "start": 100})["result"]["warnings"] == []
