@@ -1,4 +1,4 @@
-/* Edit › Re-ID all markers… (ReIdDialog.tsx): How / Start at / Keep typed
+/* Edit › ArUco Re-ID… (ReIdDialog.tsx): How / Start at / Keep typed
    ids on top, the preview table under them, Cancel / Apply in the foot. */
 .reid-dialog { max-height: calc(100vh - 48px); }
 .reid-dialog .kit-dialog-body { padding: 0; display: flex; flex-direction: column; }

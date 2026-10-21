@@ -156,7 +156,7 @@ export interface Studio {
   closePanel: () => void;
 
   setPreset: (p: Preset) => void;
-  /** Edit › Re-ID all markers…: a core.assign_ids answer for idItems(doc)
+  /** Edit › ArUco Re-ID…: a core.assign_ids answer for idItems(doc)
    *  (sequential or fresh hash) into the document's ids and ledger, as one undo step */
   reId: (res: IdResult) => void;
   openModal: (m: Modal) => void;

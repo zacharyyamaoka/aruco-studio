@@ -1,4 +1,4 @@
-// Edit › Re-ID all markers… (web/src/app/ReIdDialog.tsx) on the sticker
+// Edit › ArUco Re-ID… (web/src/app/ReIdDialog.tsx) on the sticker
 // sheet example (web/src/model/examples.ts): 12 markers whose auto ids the
 // hash scattered, numbered 0, 1, 2… in document order by the real core
 // (core.assign_ids mode "sequential", fresh), as one undo step. Numbers come
@@ -63,7 +63,7 @@ test.describe(`Re-ID (${CORE} core)`, () => {
     expect(unique(before)).toBe(true);
     await shot(page, "reid-before");
 
-    // (b) Edit › Re-ID…: Sequential from 0 is the default; the preview is the answer
+    // (b) Edit › ArUco Re-ID…: Sequential from 0 is the default; the preview is the answer
     await openReId(page);
     await expect(page.getByTestId("reid-mode")).toHaveAttribute("data-value", "sequential");
     await expect(page.locator('input[data-path="reid.start"]')).toHaveValue("0");

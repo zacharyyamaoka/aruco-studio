@@ -87,7 +87,7 @@ function SkinMenu() {
 }
 
 /** Edit: the document's history (store.undo / redo, the keys App.tsx binds)
- *  and Re-ID all markers… (ReIdDialog.tsx). */
+ *  and ArUco Re-ID… (ReIdDialog.tsx). */
 function EditMenu() {
   const canUndo = useStudio((s) => s.canUndo);
   const canRedo = useStudio((s) => s.canRedo);
@@ -98,7 +98,7 @@ function EditMenu() {
       <MenuItem label="Undo" hint="Ctrl+Z" testid="cmd-undo" disabled={!canUndo} onClick={() => st().undo()} />
       <MenuItem label="Redo" hint="Ctrl+Shift+Z" testid="cmd-redo" disabled={!canRedo} onClick={() => st().redo()} />
       <MenuSeparator />
-      <MenuItem icon="marker" label="Re-ID all markers…" testid="cmd-reid" disabled={!markers}
+      <MenuItem icon="marker" label="ArUco Re-ID…" testid="cmd-reid" disabled={!markers}
         title={markers ? undefined : "No markers yet: make an ArUco Extrude (A) first"} onClick={() => st().openModal("reid")} />
     </Menu>
   );
