@@ -242,8 +242,9 @@ def test_an_empty_extrude_only_adds_the_report():
 # sha256 of each case's call() JSON at main bef3fe6 (contract barrier 10, before this lane)
 MAIN = {
     # cells rule 2 (2026-10-20 night): the inkjet built-ins cell_step_mm 0.042333 -> 0, nothing
-    # else (dd7c0cf2... with that one field set back: tests/web/test_web_round.py)
-    "presets": "b29c4b30f8699fbc7d0b8b1d6ec60e63a94962e9a8ecc6a268e0c739e0e45e0c",
+    # else (dd7c0cf2... with that one field set back: tests/web/test_web_round.py); barrier 11
+    # added their size_step {"of": "mm", "mm": 0.5}, nothing else (the same test takes it off)
+    "presets": "2322da24a4ad861ed2374617f27bb49da3f7217493e7391a1e336970036a9428",
     "plan single auto": "2bee334b8e9a4e04df945c92a3aac4e470ba694d5404e65a4d37c17a0ab3acb4",
     "plan overflow": "ef0ecd16f4cdef3516ead2ddaa7efed0c221e2ebc9340a89a31e94f7a8386eee",
     "plan grid 3x2 auto": "20a2e38c51ab2595c2ef74e4ba2165aef0f933a471eb26e68303ffe139948074",

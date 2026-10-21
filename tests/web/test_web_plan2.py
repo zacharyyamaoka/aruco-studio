@@ -23,7 +23,7 @@ def preset(name):
 
 INK = preset("Inkjet · Letter vinyl")
 P3D = preset("Default")
-INK_DOTS = dict(INK, cell_step_mm=0.042333)     # the inkjet built-ins before cells rule 2
+INK_DOTS = {k: v for k, v in INK.items() if k != "size_step"} | {"cell_step_mm": 0.042333}   # before cells rule 2
 
 
 def req(marker=None, rect=None, label=None, pre=None, face=False):

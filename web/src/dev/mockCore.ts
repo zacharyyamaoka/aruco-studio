@@ -16,9 +16,9 @@ const DICTS = [
 
 const PRESETS: Preset[] = [
   { id: "builtin:inkjet-letter", name: "Inkjet · Letter vinyl", method: "inkjet", builtin: true, page: "Letter", page_mm: [215.9, 279.4],
-    margin_mm: 6.35, thickness_mm: 0.1, dpi: 600, min_cell_mm: 1, cell_step_mm: 0 },
+    margin_mm: 6.35, thickness_mm: 0.1, dpi: 600, min_cell_mm: 1, cell_step_mm: 0, size_step: { of: "mm", mm: 0.5 } },
   { id: "builtin:inkjet-a4", name: "Inkjet · A4 vinyl", method: "inkjet", builtin: true, page: "A4", page_mm: [210, 297],
-    margin_mm: 5, thickness_mm: 0.1, dpi: 600, min_cell_mm: 1, cell_step_mm: 0 },
+    margin_mm: 5, thickness_mm: 0.1, dpi: 600, min_cell_mm: 1, cell_step_mm: 0, size_step: { of: "mm", mm: 0.5 } },
   { id: "builtin:print3d-04", name: "3D print · 0.4 nozzle", method: "print3d", builtin: true, nozzle_mm: 0.4, line_mm: 0.45,
     first_line_mm: 0.5, layer_mm: 0.2, first_layer_mm: 0.2, bed_mm: [250, 210], min_cell_mm: 1.8, cell_step_mm: 0.45 },
   { id: "builtin:print3d-06", name: "3D print · 0.6 nozzle", method: "print3d", builtin: true, nozzle_mm: 0.6, line_mm: 0.675,

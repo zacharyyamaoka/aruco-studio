@@ -16,6 +16,8 @@ from aruco_studio import web_api as W
 
 def preset(name, **kw):
     p = copy.deepcopy(next(x for x in W.presets() if x["name"] == name))
+    if "cell_step_mm" in kw:
+        p.pop("size_step", None)            # made by its cell step (barrier 11)
     p.update(kw)
     return p
 

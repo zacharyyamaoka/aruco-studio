@@ -24,6 +24,10 @@ from aruco_studio.plan import TagSpec, Target, plan_tag
 
 def preset(name="Inkjet · Letter vinyl", **kw):
     p = copy.deepcopy(next(x for x in W.presets() if x["name"] == name))
+    if "cell_step_mm" in kw:
+        # a preset made by its cell step: no size step over it (barrier 11:
+        # the inkjet built-ins say 0.5 mm, which would win)
+        p.pop("size_step", None)
     p.update(kw)
     return p
 

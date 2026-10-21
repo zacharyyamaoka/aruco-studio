@@ -1,7 +1,7 @@
 // What the presets modal shows and filters, as data: the Info rows of each
 // method (every field of the contract's Preset that method uses), the left
 // bar's chips and the search. Pure, so the modal stays layout only.
-import type { Preset, Vec2 } from "../core/contract";
+import type { Preset, SizeStep, Vec2 } from "../core/contract";
 import { presetNumbers } from "./local";
 
 export const PAGES: Record<string, Vec2> = { Letter: [215.9, 279.4], A4: [210, 297], A3: [297, 420], A5: [148, 210], Legal: [215.9, 355.6] };
@@ -81,4 +81,38 @@ export function withField(p: Preset, key: keyof Preset, value: unknown): Preset 
     return { ...p, page_mm: value as Vec2, page: same ? p.page : "Custom" };
   }
   return { ...p, [key]: value };
+}
+
+// ------------------------------------------------------------ the size step
+
+/** What a preset's driven sizes round to (contract barrier 11): its own
+ *  size_step, else what the core derives from cell_step_mm (0: the marker in
+ *  0.5 mm steps; a step: the line, or an inkjet's dots of old). */
+export function presetStep(p: Preset): SizeStep {
+  return p.size_step ?? (p.cell_step_mm ? { of: "line" } : { of: "mm", mm: 0.5 });
+}
+
+/** A size step as one value for a choice row: "dots", "mm:0.5", "line". */
+export function stepKey(s: SizeStep): string {
+  return s.of === "mm" ? `mm:${s.mm}` : s.of;
+}
+
+export function stepOf(key: string): SizeStep {
+  return key.startsWith("mm:") ? { of: "mm", mm: Number(key.slice(3)) } : { of: key as "dots" | "line" };
+}
+
+/** A size step in words; "line" is the preset's cell step (3D: the line width). */
+export function stepLabel(s: SizeStep, p?: Preset | null): string {
+  if (s.of === "dots") return "Whole printer dots (exact)";
+  if (s.of === "mm") return `${s.mm} mm`;
+  if (p?.method === "inkjet") return p.cell_step_mm ? `Cell step ${p.cell_step_mm} mm` : "0.5 mm";
+  return p && !p.cell_step_mm ? "0.5 mm" : `Line width${p?.cell_step_mm ? ` (${p.cell_step_mm} mm)` : ""}`;
+}
+
+/** The inkjet choices (Zach, 2026-10-20 night: "round to the DPI of the
+ *  printer... or to use a normal number"), plus `current` when it is none of them. */
+export function stepOptions(current: SizeStep, p?: Preset | null): { value: string; label: string }[] {
+  const keys = ["dots", "mm:0.1", "mm:0.5", "mm:1"];
+  if (!keys.includes(stepKey(current))) keys.push(stepKey(current));
+  return keys.map((k) => ({ value: k, label: stepLabel(stepOf(k), p) }));
 }
