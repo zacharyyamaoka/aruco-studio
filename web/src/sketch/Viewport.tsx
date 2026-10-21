@@ -10,7 +10,11 @@
 // label are drawn as its plan() returned them: no marker geometry is made
 // here. The sticker's white is the plan's cut_shape (the trim: the profile
 // with its holes, or the quiet zone), under the marker. The turn arc belongs
-// to the feature in focus; the selected feature's dimensions (./Dims.tsx)
+// to the feature in focus: a click turns the marker 90°; on a rectangle
+// profile it is also Fusion's rotate manipulator -- a drag turns the
+// rectangle about its centre (15° steps, Shift free) and the marker follows,
+// its angle in a value box you can type into (one undo step per rotation).
+// The selected feature's dimensions (./Dims.tsx)
 // stand outside the box the core placed its marker in (MarkerPlan.fit_rect)
 // and are typed into in place, the marker following as you type. A drag
 // (move, resize, the label) is one undo step; moving or resizing a profile's
@@ -29,7 +33,7 @@ import { DimEditor, Dims, layoutDims, type LaidDim } from "./Dims";
 import { diameterLocked, dimFromPicks, refusal, resizable, typedValue, type DimRef, type SketchDim } from "./constraints";
 import {
   boxPick, circleFrom, hitTest, inShape, profileLoops, rectAt, rectOf, resizeShape, sameProfile, shapeLoop,
-  type Hit, type ProfileRef, type Shape,
+  type Hit, type ProfileRef, type RectShape, type Shape,
 } from "./model";
 import { pointer } from "./pointer";
 import { SketchDims, ValueBox, laySketchDim, type LaidSketchDim } from "./SketchDims";
@@ -45,7 +49,9 @@ type Drag =
   /** the right-button selection box, in view px */
   | { kind: "box"; a: Vec2; b: Vec2; add: boolean; moved: boolean }
   /** D: pressed on a pick; a drag from it places the dimension */
-  | { kind: "dim"; press: Vec2 };
+  | { kind: "dim"; press: Vec2 }
+  /** the turn arc of a rectangle profile: `orig` as it was, `a0` the pointer's angle about its centre at the press */
+  | { kind: "rotate"; fid: string; orig: RectShape; a0: number; press: Vec2; moved: boolean };
 
 /** The draw boxes' typed values (a key absent: it follows the pointer) and the one keys go to. */
 interface DrawVals { w?: string; h?: string; d?: string; active: "w" | "h" | "d" }
@@ -95,6 +101,13 @@ function placeBox(doc: Doc, f: Feature, plan: MarkerPlan): Rect {
   return { cx: (b.x0 + b.x1) / 2, cy: (b.y0 + b.y1) / 2, w: b.x1 - b.x0, h: b.y1 - b.y0, angle_deg: 0 };
 }
 
+/** The rotate manipulator's snap (Fusion's angle manipulators step by 15°). */
+const ROT_SNAP = 15;
+/** An angle into [0, 360). */
+const deg360 = (a: number) => +((((a % 360) + 360) % 360).toFixed(6));
+/** The pointer's angle (degrees, counter-clockwise, y up) about a rectangle's centre. */
+const angleAbout = (r: RectShape, p: Vec2) => (Math.atan2(p[1] - r.cy, p[0] - r.cx) * 180) / Math.PI;
+
 /** How long after a Profile-row pick a double-click still picks for the panel
  *  (its first click picked the region; the double-click means the rectangle). */
 const DBL_MS = 700;
@@ -124,6 +137,8 @@ export function Viewport() {
   /** the sketch dim being typed into */
   const [sdimEdit, setSdimEdit] = useState<string | null>(null);
   const [drawVals, setDrawVals] = useState<DrawVals>({ active: "w" });
+  /** the rotate manipulator's angle box: live while dragging, then open to type into (the rotation's gesture ends when it closes) */
+  const [rot, setRot] = useState<{ id: string; live: boolean } | null>(null);
   /** the last Profile-row pick: a double-click right after it re-picks for the same feature */
   const picked = useRef<{ fid: string; at: number } | null>(null);
   const space = useRef(false);
@@ -346,7 +361,14 @@ export function Viewport() {
       return;
     }
     const turnEl = target.closest("[data-turn]");
-    if (turnEl) { st.turn(turnEl.getAttribute("data-feature") ?? undefined); return; }
+    if (turnEl) {
+      const fid = turnEl.getAttribute("data-feature") ?? undefined;
+      const r = fid ? featureRect(st.doc, getFeature(st.doc, fid)) : null;
+      // WHY (Zach, 2026-10-20 night): "I like how previously there was the ability to rotate the marker on the page"
+      if (fid && r) { setDrag({ kind: "rotate", fid, orig: r, a0: angleAbout(r, p), press: local(e), moved: false }); return; }
+      st.turn(fid);
+      return;
+    }
     const labelEl = target.closest("[data-label]");
     const lf = labelEl ? getFeature(st.doc, labelEl.getAttribute("data-feature")) : null;
     const lp = lf ? st.plans[lf.id]?.label : null;
@@ -473,6 +495,24 @@ export function Viewport() {
     }
     if (drag.kind === "dim") return;
     const p = world(e);
+    if (drag.kind === "rotate") {
+      const q = local(e);
+      if (!drag.moved && Math.hypot(q[0] - drag.press[0], q[1] - drag.press[1]) <= DRAG_PX) return;
+      let d = drag;
+      if (!drag.moved) {
+        // the rectangle as it is now (a typed angle may have landed since the press), one undo step from here
+        const now = st.doc.shapes.find((x) => x.id === drag.orig.id);
+        d = { ...drag, orig: now?.kind === "rect" ? now : drag.orig, moved: true };
+        st.gesture(true);
+        setDrag(d);
+        setRot({ id: d.orig.id, live: true });
+      }
+      const raw = d.orig.angle_deg + angleAbout(d.orig, p) - d.a0;
+      const a = deg360(e.shiftKey ? Math.round(raw * 10) / 10 : Math.round(raw / ROT_SNAP) * ROT_SNAP);
+      const cur = st.doc.shapes.find((x) => x.id === d.orig.id);
+      if (cur?.kind === "rect" && Math.abs(cur.angle_deg - a) > 1e-9) st.updateShape({ ...cur, angle_deg: a });
+      return;
+    }
     if (drag.kind === "draw") setDrag({ ...drag, b: p });
     else if (drag.kind === "move") {
       const dx = p[0] - drag.from[0], dy = p[1] - drag.from[1];
@@ -524,6 +564,13 @@ export function Viewport() {
       const q = local(e);
       if (Math.hypot(q[0] - drag.press[0], q[1] - drag.press[1]) > DRAG_PX) placeDim(world(e));
       setDrag(null);
+      return;
+    }
+    if (drag?.kind === "rotate") {
+      setDrag(null);
+      // a click turns the marker 90°; after a drag the angle box stays open to type an exact angle
+      if (!drag.moved) st.turn(drag.fid);
+      else setRot({ id: drag.orig.id, live: false });
       return;
     }
     if (drag?.kind === "label") setLabelAt(null);
@@ -634,6 +681,8 @@ export function Viewport() {
   };
 
   let arc: ReactElement | null = null;
+  /** where the turn arc's knob is (view px): the rotate manipulator's angle box stands over it */
+  let knob: Vec2 | null = null;
   const triads: ReactElement[] = [];
   const labels: ReactElement[] = [];
   for (const { f, rect: fRect, plan } of drawn) {
@@ -651,14 +700,19 @@ export function Viewport() {
       const pt = (a: number) => scr([mc[0] + rr * Math.cos(a + ang), mc[1] + rr * Math.sin(a + ang)]);
       const a0 = pt((55 * Math.PI) / 180), a1 = pt((125 * Math.PI) / 180), hp = pt(Math.PI / 2);
       const R = rr * z;
+      // a rectangle profile's arc also rotates it (a drag): arrowheads at its ends, as Fusion's rotate manipulator
+      const rotates = !!featureRect(doc, f);
+      const grab = rotates ? { cursor: drag?.kind === "rotate" ? "grabbing" : "grab" } : undefined;
       if (R > 14) {
+        knob = hp;
         arc = (
-          <g className="turn" data-turn="1" data-feature={f.id} data-testid="turn-arc">
-            <title>Turn 90° (now {f.marker.turn}°)</title>
-            <path d={`M${a0[0]} ${a0[1]}A${R} ${R} 0 0 0 ${a1[0]} ${a1[1]}`} className="turn-path" />
-            <path d={`M${a0[0]} ${a0[1]}A${R} ${R} 0 0 0 ${a1[0]} ${a1[1]}`} className="turn-hit" />
-            <circle cx={hp[0]} cy={hp[1]} r={7} className="turn-knob" />
-            <circle cx={hp[0]} cy={hp[1]} r={2.5} className="turn-dot" />
+          <g className="turn" data-turn="1" data-feature={f.id} data-testid="turn-arc" data-rotate={rotates ? "1" : undefined}>
+            <title>{rotates ? `Drag to rotate the rectangle (${ROT_SNAP}° steps, Shift: free); click: turn the marker 90° (now ${f.marker.turn}°)` : `Turn 90° (now ${f.marker.turn}°)`}</title>
+            <path d={`M${a0[0]} ${a0[1]}A${R} ${R} 0 0 0 ${a1[0]} ${a1[1]}`} className="turn-path"
+              markerStart={rotates ? "url(#arr)" : undefined} markerEnd={rotates ? "url(#arr)" : undefined} />
+            <path d={`M${a0[0]} ${a0[1]}A${R} ${R} 0 0 0 ${a1[0]} ${a1[1]}`} className="turn-hit" style={grab} />
+            <circle cx={hp[0]} cy={hp[1]} r={7} className="turn-knob" style={grab} />
+            <circle cx={hp[0]} cy={hp[1]} r={2.5} className="turn-dot" style={grab} />
           </g>
         );
       }
@@ -791,6 +845,20 @@ export function Viewport() {
 
   const cursor = drag?.kind === "pan" ? "grabbing" : tool !== "select" ? "crosshair" : hover?.kind === "edge" ? "pointer" : "default";
 
+  // the rotate manipulator's angle box: over the knob (else the rectangle's centre); typing sets the angle
+  const rotShape = rot ? shapes.find((x): x is RectShape => x.id === rot.id && x.kind === "rect") ?? null : null;
+  const closeRot = () => { setRot(null); useStudio.getState().gesture(false); };
+  const commitRot = (text: string) => {
+    const st = useStudio.getState();
+    const r = st.doc.shapes.find((x) => x.id === rot?.id);
+    const t = text.trim().replace(",", ".");
+    const v = Number(t);
+    if (r?.kind === "rect" && t !== "" && Number.isFinite(v) && Math.abs(deg360(v) - r.angle_deg) > 1e-9) st.updateShape({ ...r, angle_deg: deg360(v) });
+    closeRot();
+  };
+  useEffect(() => { if (rot && !rotShape) closeRot(); });
+  const rotAt: Vec2 | null = rotShape ? (knob ? [knob[0], knob[1] - 26] : scr([rotShape.cx, rotShape.cy])) : null;
+
   return (
     <div ref={host} className="viewport" data-testid="viewport" data-tool={tool} style={{ cursor }}
       onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
@@ -870,6 +938,11 @@ export function Viewport() {
           onCommit={(t) => commitDim(dimFid, editDim.field, t)} onCancel={() => revertDim(dimFid, dimEdit.start)} />
       )}
       {drawBoxes.length > 0 && <div data-testid="draw-values">{drawBoxes}</div>}
+      {rot && rotShape && rotAt && (
+        <ValueBox key={rot.live ? `rot-live-${rotShape.angle_deg}` : "rot-edit"} testid="rotate-angle" label="Rotation (°)" at={rotAt}
+          value={fmt(rotShape.angle_deg)} focus={!rot.live}
+          onCommit={commitRot} onCancel={closeRot} />
+      )}
       {placing && previewDim && (
         <ValueBox key={placing.id} testid="sdim-input" label="Dimension (mm)" at={previewDim.at} value={previewDim.text.replace("Ø", "")}
           onCommit={(t) => commitSketchDim(placing, t, true)} onCancel={() => setPlacing(null)} />
