@@ -34,10 +34,14 @@ export async function exportSvg(): Promise<void> {
   }
 }
 
-/** Export › PDF: the preset's page with every feature, as Print lays it out. */
+/** Export › PDF: the page of the marker in focus's preset (its inkjet
+ *  markers, as Print lays them out); the first preset's when it is 3D printed. */
 export async function exportPdf(): Promise<void> {
-  const items = sheetItems(st().doc);
-  if (!items.length) { st().say("Nothing to export yet: make an ArUco Extrude (A) first."); return; }
+  const items = sheetItems(st().doc, activeFeatureId(st()));
+  if (!items.length) {
+    st().say(st().doc.features.length ? "Nothing on paper: 3D-print markers aren't printed on a sheet." : "Nothing to export yet: make an ArUco Extrude (A) first.");
+    return;
+  }
   try {
     const sheet = await core.sheet({ items, cut_lines: true });
     downloadBase64(`${slug(st().doc.name)}.pdf`, sheet.pdf_base64, "application/pdf");
@@ -51,7 +55,8 @@ export function openVerify(): void {
   st().openModal("verify");
 }
 
+/** Print: the sheet dialog, which says itself when nothing is on paper (3D-print markers only). */
 export function openPrint(): void {
-  if (!sheetItems(st().doc).length) { st().say("Nothing to print yet: make an ArUco Extrude (A) first."); return; }
+  if (!st().doc.features.length) { st().say("Nothing to print yet: make an ArUco Extrude (A) first."); return; }
   st().openModal("print");
 }

@@ -3,6 +3,7 @@
 // "Many features, driven vs set"), on the static build. Each
 // check measures: the probe's numbers, the drawn elements' boxes, the
 // computed colours. Screenshots go to E2E_SHOTS (default test-results/shots).
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { CORE, clickAt, coreReady, dragWorld, idle, labelOn, openStudio, panelTab, state } from "./helpers";
@@ -243,9 +244,11 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
     await expect(page.getByTestId("note")).toContainText("Opened v1-plate");
     await idle(page);
     const s = await state(page);
-    expect(s.doc).toMatchObject({ version: 3, name: "Old plate", id_ledger: {} });
+    expect(s.doc).toMatchObject({ version: 4, name: "Old plate", id_ledger: {} });
     expect(s.doc.features).toHaveLength(1);
     const f = s.doc.features[0];
+    // the file's one preset is the feature's own (version 4)
+    expect(f.preset).toEqual(JSON.parse(readFileSync(FIXTURE, "utf8")).preset);
     expect(f.key).toBe(f.id);
     // its rectangle on its own is its profile now (2026-10-20 evening)
     expect(f.profile).toEqual({ outer: "r1", holes: [] });

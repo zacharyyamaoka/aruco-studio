@@ -1,15 +1,18 @@
 // The online Studio's screen (docs/design/online_studio_v1.md, "The screen"):
-// the top bar, the sketch viewport with its toolbar (bottom centre), the
-// floating ArUco Extrude panel; the presets modal, Print, Examples and Re-ID.
+// the sketch viewport over the whole window, Figma's chrome floating on it
+// (V2, Zach's pick 2026-10-20 night; ./app/TopBar.tsx): the document pill top
+// left, Download for CAD and Verify | Print top right, the dock of tools with
+// 2D | 3D bottom centre, ? and GitHub bottom right; the floating ArUco
+// Extrude panel; the presets modal, Print, Verify, Examples and Re-ID.
 // WHY no timeline (Zach, 2026-10-18): "too specific to CAD … just clicking the
 // marker on the screen is what brings up the relevant inspector window".
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { TooltipProvider } from "@bam/ui";
 import { ExamplesDialog } from "./app/ExamplesDialog";
 import { openPrint, openVerify } from "./app/commands";
 import { ReIdDialog } from "./app/ReIdDialog";
 import { Toolbar } from "./app/Toolbar";
-import { TopBar } from "./app/TopBar";
+import { ActionsPill, DocPill, HelpCorner } from "./app/TopBar";
 import { onCoreStatus, coreStatus } from "./coreSource";
 import { ExtrudePanel } from "./panel/ExtrudePanel";
 import { startPlanner } from "./planner";
@@ -19,7 +22,6 @@ import { VerifyDialog } from "./verify/VerifyDialog";
 import { pointer } from "./sketch/pointer";
 import { Viewport } from "./sketch/Viewport";
 import { View3D } from "./view3d/View3D";
-import { ViewToggle } from "./view3d/ViewToggle";
 import { loadCoreFacts, useStudio } from "./store";
 
 /** A key the tool should not take: typing in a field, or a list / menu / dialog open. */
@@ -93,6 +95,7 @@ function onKey(e: KeyboardEvent) {
 export function App() {
   const note = useStudio((s) => s.note);
   const view3d = useStudio((s) => s.view3d);
+  const [help, setHelp] = useState(false);
   useEffect(() => {
     const stop = startPlanner();
     window.addEventListener("keydown", onKey);
@@ -119,13 +122,14 @@ export function App() {
   return (
     <TooltipProvider>
       <div className="app" data-testid="app">
-        <TopBar />
         <main className="stage">
           {/* WHY hidden, not unmounted: back in 2D the sketch keeps its camera */}
           <div className="vp-2d" style={{ display: view3d ? "none" : "contents" }}><Viewport /></div>
           {view3d && <View3D />}
-          <ViewToggle />
+          <DocPill onHelp={() => setHelp(true)} />
+          <ActionsPill />
           <Toolbar />
+          <HelpCorner help={help} setHelp={setHelp} />
           <ExtrudePanel />
           {note && <div className="toast" role="status" data-testid="note">{note}</div>}
         </main>

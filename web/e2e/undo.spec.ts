@@ -3,7 +3,7 @@
 // Each check measures the probe's numbers: the document, the plan the core
 // drew, and the history's canUndo / canRedo.
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, coreReady, dragWorld, idle, openStudio, panelTab, planOutline, state } from "./helpers";
+import { CORE, coreReady, dragWorld, idle, loadExample, openStudio, panelTab, planOutline, state } from "./helpers";
 
 async function blank(page: Page): Promise<void> {
   await openStudio(page);
@@ -196,5 +196,48 @@ test.describe(`undo / redo (${CORE} core)`, () => {
     expect(s.doc.id_ledger).toEqual(s0.doc.id_ledger);
     expect(s.plans[fid], "it is drawn again").toBeTruthy();
     await expect(page.locator(`[data-marker="${fid}"]`)).toHaveCount(1);
+  });
+
+  // WHY (2026-10-20 night, hosted files): opening a document starts a fresh
+  // history, as in Excalidraw and Figma -- Ctrl+Z after Open must not bring
+  // the previous document back (an autosave would write it into the opened file)
+  test("open an example, edit it, open another: Ctrl+Z undoes nothing into the first document; New too", async ({ page }) => {
+    await openStudio(page);
+    await coreReady(page);
+    await loadExample(page, "plate");
+    expect((await state(page)).canUndo, "a fresh history on open").toBe(false);
+    // an edit: a rectangle beside the plate
+    await page.keyboard.press("r");
+    await dragWorld(page, [20, 10], [40, 30]);
+    let s = await state(page);
+    expect(s.canUndo).toBe(true);
+    const first = s.doc;
+    // another example
+    await loadExample(page, "custom-placement");
+    s = await state(page);
+    const second = s.doc;
+    expect(second.shapes.map((x: any) => x.id)).not.toEqual(first.shapes.map((x: any) => x.id));
+    expect(s.canUndo, "nothing to undo after Open").toBe(false);
+    expect(s.canRedo).toBe(false);
+    await undo(page);
+    await undo(page);
+    s = await state(page);
+    expect(s.doc, "Ctrl+Z does not bring the first document back").toEqual(second);
+    expect(s.canUndo).toBe(false);
+    // the menu's Undo is greyed out too
+    await page.getByTestId("menu-edit").click();
+    await expect(page.getByTestId("cmd-undo")).toHaveAttribute("data-disabled", "");
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("cmd-undo")).toHaveCount(0);
+    // New: the same
+    await page.keyboard.press("r");
+    await dragWorld(page, [5, 5], [20, 20]);
+    expect((await state(page)).canUndo).toBe(true);
+    await page.getByTestId("menu-file").click();
+    await page.getByTestId("cmd-new").click();
+    s = await state(page);
+    expect(s.canUndo).toBe(false);
+    await undo(page);
+    expect((await state(page)).doc.shapes).toEqual([]);
   });
 });

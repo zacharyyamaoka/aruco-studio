@@ -49,7 +49,13 @@ test.describe(`Verify (${CORE} core)`, () => {
     single = (await state(page)).panel.featureId;
     await page.getByTestId("panel-ok").click();
     await idle(page);
-    // a rectangle beside the plate → A → Grid → OK
+    // a rectangle beside the plate → A → Grid → OK; the canvas has the whole
+    // window since the Figma layout (no top bar), so the fit is closer: zoom
+    // out at the plate's middle until the rectangle's spot is on screen
+    const [cx, cy] = await toClient(page, 60, 40);
+    await page.mouse.move(cx, cy);
+    await page.mouse.wheel(0, 300);
+    await expect.poll(async () => (await toClient(page, 144, 40))[0]).toBeLessThan(1200);
     const [x1] = await toClient(page, 144, 40);
     expect(x1, "the second rectangle is on screen").toBeLessThan(1270);
     await page.keyboard.press("r");

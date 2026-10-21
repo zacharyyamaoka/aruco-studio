@@ -1,19 +1,23 @@
-// Skins (web/src/skins/): the top bar's Skin menu switches Studio, Unstyled,
+// Skins (web/src/skins/): the document ⌄ menu's Skin row switches Studio, Unstyled,
 // Fusion 360 and Onshape. A skin changes the panel's look (its computed
 // background, accent and font), is remembered across a reload, pins the theme
 // of a one-theme CAD program, and never moves the layout beyond its own row
 // height. Numbers come from getComputedStyle and getBoundingClientRect.
 // SKINS_SHOTS=<dir> also writes a 1280x800 shot of the plate in every skin.
 import { expect, test, type Page } from "@playwright/test";
-import { clickAt, coreReady, idle, loadExample, openStudio } from "./helpers";
+import { clickAt, coreReady, idle, inDocMenu, loadExample, openStudio, pickSkin, toggleTheme } from "./helpers";
 
 type SkinId = "studio" | "unstyled" | "fusion" | "onshape";
 const SKINS: SkinId[] = ["studio", "unstyled", "fusion", "onshape"];
 
-async function pickSkin(page: Page, id: SkinId): Promise<void> {
-  await page.getByTestId("menu-skin").click();
-  await page.getByTestId(`skin-${id}`).click();
-  await expect(page.locator("html")).toHaveAttribute("data-skin", id);
+/** The ⌄ menu's Theme buttons: enabled (both themes) or greyed out (a one-theme skin). */
+async function themeEnabled(page: Page, on: boolean): Promise<void> {
+  await inDocMenu(page, async (m) => {
+    for (const t of ["theme-light", "theme-dark"]) {
+      if (on) await expect(m.getByTestId(t)).toBeEnabled();
+      else await expect(m.getByTestId(t)).toBeDisabled();
+    }
+  });
 }
 
 /** The plate with the ArUco Extrude panel open on its face (the profile). */
@@ -70,9 +74,9 @@ test.describe("skins", () => {
       expect(after.bg, `${id}: background`).not.toBe(before.bg);
       expect(after.accent, `${id}: accent`).not.toBe(before.accent);
       expect(after.font, `${id}: font`).not.toBe(before.font);
-      // the brand link: the top bar's own text colour, no underline
+      // the brand link: the document pill's own text colour, no underline
       const brand = await page.evaluate(() => {
-        const a = document.querySelector("[data-testid=brand]")!, bar = document.querySelector("[data-testid=topbar]")!;
+        const a = document.querySelector("[data-testid=brand]")!, bar = document.querySelector("[data-testid=doc-pill]")!;
         return { deco: getComputedStyle(a).textDecorationLine, color: getComputedStyle(a).color, bar: getComputedStyle(bar).color };
       });
       expect(brand.deco, `${id}: brand underline`).toBe("none");
@@ -109,19 +113,18 @@ test.describe("skins", () => {
   test("2 · the choice survives a reload; Fusion pins dark, Onshape light, Studio gets the viewer's theme back", async ({ page }) => {
     await openStudio(page);
     const html = page.locator("html");
-    const toggle = page.getByTestId("theme-toggle");
     // the viewer's own theme: dark
-    await toggle.click();
+    await toggleTheme(page);
     await expect(html).toHaveAttribute("data-theme", "dark");
 
     await pickSkin(page, "onshape");
     await expect(html).toHaveAttribute("data-theme", "light");
-    await expect(toggle).toBeDisabled();
+    await themeEnabled(page, false);
     await page.reload();
     await expect(page.getByTestId("app")).toBeVisible();
     await expect(html).toHaveAttribute("data-skin", "onshape");
     await expect(html).toHaveAttribute("data-theme", "light");
-    await expect(toggle).toBeDisabled();
+    await themeEnabled(page, false);
     // --panel as a colour (the build minifies the token's text)
     const panelBg = () => page.evaluate(() => {
       const probe = document.body.appendChild(document.createElement("i"));
@@ -142,9 +145,9 @@ test.describe("skins", () => {
     // Unstyled has both themes: the viewer's dark comes back, and the toggle works
     await pickSkin(page, "unstyled");
     await expect(html).toHaveAttribute("data-theme", "dark");
-    await expect(toggle).toBeEnabled();
+    await themeEnabled(page, true);
     expect(await panelBg()).toBe("rgb(30, 30, 30)");
-    await toggle.click();
+    await toggleTheme(page);
     await expect(html).toHaveAttribute("data-theme", "light");
     expect(await panelBg()).toBe("rgb(240, 240, 240)");
     await page.reload();
@@ -170,10 +173,13 @@ test.describe("skins", () => {
     for (const id of ["unstyled", "fusion", "onshape", "studio"] as SkinId[]) {
       await pickSkin(page, id);
       expect(await noScroll(), `${id}: no horizontal scroll`).toBe(true);
-      const top = (await page.getByTestId("topbar").boundingBox())!;
-      expect(top.width, `${id}: the top bar fits`).toBeLessThanOrEqual(390);
-      const gh = (await page.getByTestId("github").boundingBox())!;
-      expect(gh.x + gh.width, `${id}: the last top-bar button is on screen`).toBeLessThanOrEqual(390);
+      // the corner pills fit side by side (V2 at 390); GitHub and ? fold into the ⌄ menu
+      const left = (await page.getByTestId("doc-pill").boundingBox())!;
+      const right = (await page.getByTestId("actions-pill").boundingBox())!;
+      expect(left.x, `${id}: the document pill is on screen`).toBeGreaterThanOrEqual(0);
+      expect(left.x + left.width, `${id}: the pills do not meet`).toBeLessThan(right.x);
+      const print = (await page.getByTestId("act-print").boundingBox())!;
+      expect(print.x + print.width, `${id}: the last top button is on screen`).toBeLessThanOrEqual(390);
       const panel = (await page.getByTestId("extrude-panel").boundingBox())!;
       expect(panel.x).toBeLessThanOrEqual(1);
       expect(panel.width).toBeGreaterThanOrEqual(388);

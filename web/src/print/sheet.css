@@ -26,3 +26,11 @@
 .sheet-stats span { color: var(--muted); font-size: 10.5px; }
 .sheet-side .kit-msgs { padding: 0 10px 6px; }
 .sheet-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 10px 0; }
+/* one tab per preset when the inkjet markers use several (their pages can differ) */
+.sheet-groups { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 12px 0; background: var(--panel); }
+.sheet-groups button { display: inline-flex; align-items: center; gap: 6px; height: calc(var(--ctl) + 4px); padding: 0 10px; border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0; border-bottom: 0; background: var(--panel-2); color: var(--muted); font: inherit; cursor: pointer; }
+.sheet-groups button:hover { color: var(--text); }
+.sheet-groups button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.sheet-group-n { min-width: 16px; padding: 0 4px; border-radius: 8px; background: var(--panel); color: var(--muted); font-size: 10.5px; text-align: center; font-weight: 400; }
+.sheet-3d { padding: 6px 12px 0; background: var(--panel); font-size: 11px; }

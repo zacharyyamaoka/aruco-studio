@@ -7,6 +7,8 @@
 .wait-spin { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid currentColor; border-right-color: transparent;
   display: inline-block; margin-right: 6px; vertical-align: -1px; animation: spin 0.9s linear infinite; }
 .wait-block { padding: 10px 12px; }
-/* the top bar's chip on a core that failed: Reload beside its words */
-.chip-core .chip-reload { margin-left: 2px; padding: 0 6px; height: 18px; border-radius: 9px; border: 1px solid currentColor;
-  background: transparent; color: inherit; font: inherit; font-size: 11px; cursor: pointer; }
+/* the technical reason, one click away (Zach, 2026-10-20 night: "back end details") */
+.wait-details { flex-basis: 100%; font-size: 11px; color: var(--muted); }
+.wait-details > summary { cursor: pointer; width: max-content; user-select: none; }
+.wait-details > summary:hover { color: var(--text); }
+.wait-detail { display: block; margin-top: 2px; overflow-wrap: anywhere; user-select: text; }

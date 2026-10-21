@@ -7,7 +7,7 @@
 // go to E2E_SHOTS (default test-results/shots).
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, coreReady, dragWorld, idle, labelOn, openStudio, panelTab, state, toClient } from "./helpers";
+import { CORE, clickAt, coreReady, dragWorld, idle, labelOn, openPresets, openStudio, panelTab, state, toClient, toggleTheme } from "./helpers";
 
 const SHOTS = process.env.E2E_SHOTS ?? "test-results/shots";
 
@@ -155,7 +155,7 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
     expect((await dimOf(page, "marker.marker_mm")).fill).toBe(muted);
     expect((await dimOf(page, "marker.separation_mm")).fill).toBe(muted);
     await page.screenshot({ path: path.join(SHOTS, "dims-grid-light.png") });
-    await page.getByTestId("theme-toggle").click();
+    await toggleTheme(page);
     await page.screenshot({ path: path.join(SHOTS, "dims-grid-dark.png") });
   });
 
@@ -197,9 +197,9 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
     expect(Math.abs(tipLength(d) / s.camera.zoom - d.value)).toBeLessThan(0.3);
     const planned12 = d.value;
     await page.screenshot({ path: path.join(SHOTS, "dims-marker-set-light.png") });
-    await page.getByTestId("theme-toggle").click();
+    await toggleTheme(page);
     await page.screenshot({ path: path.join(SHOTS, "dims-marker-set-dark.png") });
-    await page.getByTestId("theme-toggle").click();
+    await toggleTheme(page);
 
     // resizing the rectangle keeps 12
     await dragWorld(page, [30, 30], [36, 36]);
@@ -286,7 +286,7 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
       expect(overlap(dims[i].label!, dims[j].label!), `${dims[i].field} ${JSON.stringify(dims[i].label)} vs ${dims[j].field} ${JSON.stringify(dims[j].label)}`).toBe(false);
     }
     await page.screenshot({ path: path.join(SHOTS, "dims-small-light.png") });
-    await page.getByTestId("theme-toggle").click();
+    await toggleTheme(page);
     await page.screenshot({ path: path.join(SHOTS, "dims-small-dark.png") });
   });
 
@@ -381,14 +381,18 @@ test.describe(`canvas dimensions (${CORE} core)`, () => {
     expect(Math.abs(b1.y - b0.y - want), `pitch ${b1.y - b0.y} px vs ${want}`).toBeLessThanOrEqual(1);
     await page.screenshot({ path: path.join(SHOTS, "label-two-lines-light.png") });
 
-    // a 3D-print preset: the core's pixel font, drawn as its ink (no text)
-    await page.getByTestId("preset-chip").click();
-    const modal = page.getByTestId("presets-modal");
+    // a 3D-print preset on this marker (a preset is per marker since 2026-10-20 night:
+    // its panel's Preset row): the core's pixel font, drawn as its ink (no text)
+    await clickAt(page, 0, 0);
+    await expect(page.getByTestId("extrude-panel")).toBeVisible();
+    const modal = await openPresets(page);
     await modal.locator('[data-coll="builtin"]').click();
     await modal.getByTestId("presets-nav").locator('[data-chip="3D print"]').click();
     await modal.locator(".card[data-card]").first().click();
     await page.getByTestId("presets-select").click();
     await expect(modal).toHaveCount(0);
+    await page.getByTestId("panel-ok").click();
+    await expect(page.getByTestId("extrude-panel")).toHaveCount(0);
     await idle(page);
     await expect.poll(async () => (await state(page)).plans.f1?.label?.font).toBe("pixel");
     s = await state(page);

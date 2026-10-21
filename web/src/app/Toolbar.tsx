@@ -1,13 +1,15 @@
-// The tools, each with its name and its key: Select V, Rectangle R, Circle
-// C, Dimension D (Fusion's Sketch Dimension), ArUco Extrude A, then Sheet P
-// (the print dialog) and Verify, then Fit F. WHY words beside the icons
-// (Zach, 2026-10-18: "I like the use of text instead of icons here"); a
-// phone keeps the icons only (styles.css).
-// The kit's ToolButton is icon-only, so this one is here, in its classes.
+// The dock: Figma's bottom toolbar (V2 "Figma · Corner pills", Zach's pick on
+// 2026-10-20 night: "For the design let's please follow Figma!"). The tools
+// Select V, Rectangle R, Circle C, Dimension D (Fusion's Sketch Dimension),
+// then ArUco Extrude A, Fit F, and the 2D | 3D switch at its end (Figma's
+// Dev Mode switch). Each tool is its icon; its name and key are in the
+// tooltip. Verify and Print are the top-right pill's (./TopBar.tsx).
+// The kit's ToolButton is icon-only with its own key badge, so this one is
+// here, in its classes.
 import { Glyph, cn, hasGlyph, registerGlyphs } from "@bam/ui";
 import type { ReactNode } from "react";
 import { useStudio } from "../store";
-import { openPrint, openVerify } from "./commands";
+import { ViewToggle } from "../view3d/ViewToggle";
 
 // a dimension: two extension lines and an arrowed line between them
 if (!hasGlyph("dimension")) {
@@ -20,9 +22,9 @@ function Tool({ icon, name, full, keys, active, onClick, testid }: {
   icon: ReactNode; name: string; full?: string; keys?: string; active?: boolean; onClick: () => void; testid: string;
 }) {
   return (
-    <button type="button" className={cn("tb-tool", active && "on")} title={keys ? `${full ?? name} (${keys})` : full ?? name} aria-label={full ?? name}
-      aria-pressed={!!active} data-testid={testid} data-active={active ? "1" : "0"} onClick={onClick}>
-      {icon}<span className="tb-name">{name}</span>{keys && <span className="tb-key" data-badge={keys}>{keys}</span>}
+    <button type="button" className={cn("tb-tool", active && "on")} title={keys ? `${full ?? name} (${keys})` : full ?? name} aria-label={name}
+      aria-pressed={!!active} data-testid={testid} data-active={active ? "1" : "0"} data-key={keys} onClick={onClick}>
+      {icon}
     </button>
   );
 }
@@ -41,10 +43,9 @@ export function Toolbar() {
       <span className="tb-sep" />
       <Tool icon={<Glyph name="extrude" />} name="ArUco Extrude" full="ArUco Extrude: the marker in the selected profile (click inside a region, or double-click a rectangle)" keys="A" active={panelOpen} onClick={() => void st().extrude()} testid="tool-extrude" />
       <span className="tb-sep" />
-      <Tool icon={<Glyph name="print" />} name="Sheet" full="Sheet: print the stickers" keys="S" onClick={openPrint} testid="tool-sheet" />
-      <Tool icon={<Glyph name="verify" />} name="Verify" full="Verify: a simulated camera reads the marker" keys="K" onClick={openVerify} testid="tool-verify" />
-      <span className="tb-sep" />
       <Tool icon={<Glyph name="fit" />} name="Fit" keys="F" onClick={() => st().fit()} testid="tool-fit" />
+      <span className="tb-sep" />
+      <ViewToggle />
     </div>
   );
 }
