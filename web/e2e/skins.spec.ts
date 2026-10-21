@@ -65,8 +65,8 @@ test.describe("skins", () => {
   test("1 · every switch changes the panel's background, accent and font; the layout keeps its boxes", async ({ page }) => {
     await platePanel(page);
     await expect(page.locator("html")).toHaveAttribute("data-skin", "studio");
-    // the landing page is Help › About ArUco Studio
-    expect(await (await openMenu(page, "help")).getByTestId("brand").getAttribute("href")).toMatch(/\/about\/$/);
+    // the landing page is Help and account › About ArUco Studio
+    expect(await (await openMenu(page, "account")).getByTestId("brand").getAttribute("href")).toMatch(/\/about\/$/);
     await page.keyboard.press("Escape");
     await page.keyboard.press("Escape");
     const looks = new Map<SkinId, Look>([["studio", await look(page)]]);

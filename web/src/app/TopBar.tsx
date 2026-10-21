@@ -4,16 +4,21 @@
 // help.figma.com draws it): two corner pills over the canvas and, in the
 // bottom corner, ? and GitHub.
 // - Top left, the document pill: the main menu (the logo with ⌄: Back to
-//   files, then File, Edit, Export, View, Preferences and Help as submenus),
-//   then the title bar of Simple Hosted Files (the registry's
+//   files, then File, Edit, Export, View, Preferences and Help and account as
+//   submenus), then the title bar of Simple Hosted Files (the registry's
 //   hosted-files-title-bar, in the kit): the document's name, which is its
 //   cloud file's name (click to rename), a quiet status dot (it opens
-//   History), and ⌄: the cloud file's menu and the account (on a phone also
-//   Download for CAD). Signed out, ⌄ offers "Sign in to save online" and the
-//   Studio works as before; File keeps Open from this computer and the Download.
+//   History), and ⌄: this file only (its status, Rename, Duplicate, Version
+//   history, Move to trash; on a phone also Download for CAD).
 // - Top right: Download for CAD, then Verify | Print (K, S: in the tooltips,
 //   no key badges).
 // - Bottom right: ? (the keys, and how the start went) and GitHub.
+// WHY one item in one menu (Zach, 2026-10-21: "Please unify these two file
+// menus, they are redundant... Copy how figma does it"; simple-hosted-files
+// SPEC "v2.9 Menus follow Figma's split"): the logo's menu is the app's (File
+// ▸ New, Open, Save, Download, Export, Trash, Autosave; Help and account ▸ the
+// person), the name's ⌄ is this file's, and nothing is in both. Signed out,
+// File keeps what needs no account and Help and account offers the sign-in.
 // WHY no preset in the pill (Zach): "Preset shouldn't be on the file because
 // it's applied on a per marker basis!" -- it is the panel's Make tab's, and
 // Edit › Presets… sets the one a new marker starts with.
@@ -28,9 +33,8 @@ import { Menu as M } from "@base-ui/react/menu";
 import { Popover } from "@base-ui/react/popover";
 import { Button, Dialog, Glyph, Kbd, Menu, MenuItem, MenuSeparator, cn, useTheme } from "@bam/ui";
 import { Check, ChevronRight, CircleHelp, Moon, RotateCcw, Sun } from "lucide-react";
-import { relativeTime } from "../hosted/core";
 import { newDocument, renameDocument } from "../hosted/hosted";
-import { useFiles, useHostedFiles, useHostedFilesActions, useStatus } from "../hosted/react";
+import { useHostedFiles, useHostedFilesActions, useHostedFilesUi, useStatus } from "../hosted/react";
 import { UsageLine, initials, usePlan } from "../hosted/ui/HostedDialogs";
 import { useCoreStatus } from "../coreSource";
 import { WaitLine, failedDetail, reload, startingText, useTick } from "../panel/Waiting";
@@ -135,17 +139,98 @@ function Pick({ on, label, testid, onClick, disabled, title }: { on: boolean; la
   );
 }
 
-/** An on / off row: a check when it is on. */
-function Toggle({ on, label, testid, onClick }: { on: boolean; label: ReactNode; testid: string; onClick: () => void }) {
+/** An on / off row: a check when it is on. `stay`: the menu stays open (it
+ *  says its new state where it was clicked, SPEC v2.4's Autosave). */
+function Toggle({ on, label, testid, onClick, stay }: { on: boolean; label: ReactNode; testid: string; onClick: () => void; stay?: boolean }) {
   return (
-    <M.Item className="kit-menu-item" data-testid={testid} aria-checked={on} role="menuitemcheckbox" onClick={onClick}>
+    <M.Item className="kit-menu-item" data-testid={testid} aria-checked={on} role="menuitemcheckbox" closeOnClick={!stay} onClick={onClick}>
       <span className="ic">{on && <Check size={14} />}</span><span className="kit-menu-label">{label}</span>
     </M.Item>
   );
 }
 
+/** File ▸ (the registry's HostedFileMenuItems, with the Studio's own: Open
+ *  from this computer, Examples): every file action that is not about the
+ *  open file. Signed out, what needs an account is not here (as the registry
+ *  does); Help and account ▸ has the sign-in. */
+function FileItems() {
+  const { state } = useHostedFiles();
+  const actions = useHostedFilesActions();
+  const file = state.file;
+  const st = useStudio.getState;
+  if (!state.user) {
+    return (
+      <>
+        <MenuItem icon="sketch" label="New" testid="cmd-new" onClick={newDocument} />
+        <MenuItem label="Open from this computer…" testid="cmd-open" onClick={() => void openDoc()} />
+        <MenuSeparator />
+        <MenuItem icon="download" label="Download" hint=".arucostudio-web.json" testid="cmd-save" onClick={saveDoc} />
+        <MenuSeparator />
+        <MenuItem icon="library" label="Examples…" testid="cmd-examples" onClick={() => st().openModal("examples")} />
+      </>
+    );
+  }
+  return (
+    <>
+      <MenuItem icon="sketch" label="New" testid="cmd-new" onClick={newDocument} />
+      <MenuItem label="Open…" hint="your files" testid="shf-action-files" onClick={actions.showFiles} />
+      <MenuItem label="Open from this computer…" testid="cmd-open" onClick={() => void openDoc()} />
+      <MenuSeparator />
+      <MenuItem label="Save" hint="Ctrl+S" testid="shf-action-save" disabled={!!file?.locked} onClick={() => void actions.save()} />
+      <MenuItem label="Save as…" testid="shf-action-saveas" onClick={() => void actions.saveAs()} />
+      {/* the bytes the server holds; a document not saved online yet is the Studio's own file */}
+      <MenuItem icon="download" label="Download" hint=".arucostudio-web.json" testid="shf-action-download" onClick={() => (file ? void actions.downloadCurrent() : saveDoc())} />
+      <MenuItem label="Export all files" hint=".zip" testid="shf-action-export" onClick={() => void actions.exportAll()} />
+      <MenuSeparator />
+      <MenuItem label="Trash…" hint="the files you trashed" testid="shf-action-trash-view" onClick={actions.showTrash} />
+      <MenuItem icon="library" label="Examples…" testid="cmd-examples" onClick={() => st().openModal("examples")} />
+      <MenuSeparator />
+      <Toggle on={state.autosave} label="Autosave" testid="shf-autosave-toggle" stay onClick={() => actions.setAutosave(!state.autosave)} />
+    </>
+  );
+}
+
+/** Help and account ▸ (Figma's; the registry's HostedAccountMenuItems after
+ *  the Studio's help): the keys, GitHub, About, then who is signed in, their
+ *  plan and usage, Your account, Sign out; signed out, the sign-in. */
+function AccountItems({ onHelp }: { onHelp: () => void }) {
+  const { state } = useHostedFiles();
+  const actions = useHostedFilesActions();
+  const { signingIn } = useHostedFilesUi();
+  const plan = usePlan();
+  const user = state.user;
+  return (
+    <>
+      <MenuItem label="Keyboard shortcuts" hint="?" testid="help-menu" onClick={onHelp} />
+      <M.LinkItem className="kit-menu-item" href={GITHUB} target="_blank" rel="noreferrer" data-testid="github-menu">
+        <span className="ic mm-gh"><GithubMark /></span><span className="kit-menu-label">GitHub</span><span className="hint">the source</span>
+      </M.LinkItem>
+      {/* the landing page (Zach, 2026-10-20); a real navigation, not a route */}
+      <M.LinkItem className="kit-menu-item" href="/about/" data-testid="brand">
+        <span className="ic"><BrandCube /></span><span className="kit-menu-label">About ArUco Studio</span>
+      </M.LinkItem>
+      <MenuSeparator />
+      {user ? (
+        <>
+          <div className="shf-account" data-testid="shf-account-card">
+            <span className="shf-avatar" aria-hidden="true">{initials(user.name, user.email)}</span>
+            <span className="shf-who">{user.name && <b>{user.name}</b>}<span className="shf-who-email">{user.email}</span></span>
+          </div>
+          <UsageLine />
+          {plan.canUpgrade && <MenuItem label={`Upgrade — ${plan.price}`} testid="shf-action-upgrade" onClick={() => void actions.upgrade()} />}
+          <MenuSeparator />
+          <MenuItem label="Your account ↗" testid="shf-action-account" onClick={() => void actions.account()} />
+          <MenuItem label="Sign out" testid="shf-action-signout" onClick={() => void actions.signOut()} />
+        </>
+      ) : (
+        <MenuItem label={signingIn ? "Signing in…" : "Sign in to save online"} testid="shf-action-signin" disabled={signingIn} onClick={() => void actions.signIn()} />
+      )}
+    </>
+  );
+}
+
 /** The main menu (Figma UI3's: the logo with ⌄, top left): Back to files, then
- *  File, Edit, Export, View, Preferences and Help, each a submenu.
+ *  File, Edit, Export, View, Preferences and Help and account, each a submenu.
  *  WHY no inline File / Edit / Export (Zach, 2026-10-20 night): "Figma doesn't
  *  have the file edit export etc there... it's in a drop down when you press
  *  the icon, and there is also the button there when you click the icon to go
@@ -156,8 +241,6 @@ function MainMenu({ onHelp }: { onHelp: () => void }) {
   const markers = useStudio((s) => s.doc.features.length);
   const view3d = useStudio((s) => s.view3d);
   const markerInfo = useStudio((s) => s.markerInfo);
-  const { state } = useHostedFiles();
-  const actions = useHostedFilesActions();
   const [theme, setTheme] = useTheme();
   const [skin, setSkin] = useSkin();
   const pinned = skin.theme ? `${skin.name} is ${skin.theme} only` : undefined;
@@ -175,14 +258,7 @@ function MainMenu({ onHelp }: { onHelp: () => void }) {
             <MenuItem label="Back to files" testid="cmd-home" onClick={openHome} />
             <MenuSeparator />
             <Sub label="File" testid="menu-file" inline={inline}>
-              <MenuItem icon="sketch" label="New" testid="cmd-new" onClick={newDocument} />
-              <MenuItem label="Open…" hint={state.user ? "your files online" : undefined} testid="cmd-open-cloud" onClick={() => (state.user ? actions.showFiles() : openHome())} />
-              <MenuItem label="Open from this computer…" testid="cmd-open" onClick={() => void openDoc()} />
-              <MenuSeparator />
-              <MenuItem label="Save…" hint={state.user ? "Ctrl+S" : "sign in to save online"} testid="cmd-save-cloud" disabled={!!state.file?.locked} onClick={() => void actions.save()} />
-              <MenuItem icon="download" label="Download" hint=".arucostudio-web.json" testid="cmd-save" onClick={saveDoc} />
-              <MenuSeparator />
-              <MenuItem icon="library" label="Examples…" testid="cmd-examples" onClick={() => st().openModal("examples")} />
+              <FileItems />
             </Sub>
             <Sub label="Edit" testid="menu-edit" inline={inline}>
               <MenuItem label="Undo" hint="Ctrl+Z" testid="cmd-undo" disabled={!canUndo} onClick={() => st().undo()} />
@@ -219,15 +295,8 @@ function MainMenu({ onHelp }: { onHelp: () => void }) {
                 <Pick key={k.id} on={k.id === skin.id} label={k.name} testid={`skin-${k.id}`} title={k.theme ? `${k.theme} only` : undefined} onClick={() => setSkin(k.id)} />
               ))}
             </Sub>
-            <Sub label="Help" testid="menu-help" inline={inline}>
-              <MenuItem label="Keyboard shortcuts" hint="?" testid="help-menu" onClick={onHelp} />
-              <M.LinkItem className="kit-menu-item" href={GITHUB} target="_blank" rel="noreferrer" data-testid="github-menu">
-                <span className="ic mm-gh"><GithubMark /></span><span className="kit-menu-label">GitHub</span><span className="hint">the source</span>
-              </M.LinkItem>
-              {/* the landing page (Zach, 2026-10-20); a real navigation, not a route */}
-              <M.LinkItem className="kit-menu-item" href="/about/" data-testid="brand">
-                <span className="ic"><BrandCube /></span><span className="kit-menu-label">About ArUco Studio</span>
-              </M.LinkItem>
+            <Sub label="Help and account" testid="menu-account" inline={inline}>
+              <AccountItems onHelp={onHelp} />
             </Sub>
           </M.Popup>
         </M.Positioner>
@@ -247,58 +316,28 @@ function Item({ icon, label, hint, onClick, testid, disabled, close }: {
   );
 }
 
-/** The cloud file's part of ⌄ (the registry title bar's menu): Recent, the
- *  file group, Autosave, the account with its plan and usage; signed out,
- *  "Sign in to save online". */
-function CloudItems({ close, onRename }: { close: () => void; onRename: () => void }) {
+/** ⌄'s items (the registry title bar's menu): the save status on top
+ *  ("Saved · 1 min ago", Figma shows it under the name), then what is about
+ *  THIS file: Rename, Duplicate, Version history, Move to trash. Signed out,
+ *  the status and Rename: the rest needs an account. */
+function ThisFileItems({ close, onRename }: { close: () => void; onRename: () => void }) {
   const { state } = useHostedFiles();
+  const status = useStatus();
   const actions = useHostedFilesActions();
-  const plan = usePlan();
-  const { data: files } = useFiles();
   const file = state.file;
-  const user = state.user;
-  if (!user) {
-    return (
-      <>
-        <Item close={close} label="Sign in to save online" testid="shf-signin" onClick={() => void actions.signIn()} />
-        <div className="dm-sep" />
-      </>
-    );
-  }
-  const recents = (files ?? []).filter((f) => f.id !== file?.id).slice(0, 3);
+  const label = status.label.startsWith("Saved ") ? `Saved · ${status.label.slice("Saved ".length)}` : status.label;
   return (
     <>
-      {recents.length > 0 && <div className="dm-h">Recent</div>}
-      {recents.map((f) => (
-        <Item key={f.id} close={close} label={f.name} hint={f.locked ? "View-only" : relativeTime(f.updatedAt)} testid="shf-recent" onClick={() => void actions.open(f.id)} />
-      ))}
-      <Item close={close} label="Open…" hint="your files online" testid="shf-action-files" onClick={actions.showFiles} />
-      <div className="dm-sep" />
-      <Item close={close} icon="sketch" label="New" testid="shf-action-new" onClick={() => void actions.newFile()} />
-      <Item close={close} label="Save" hint="Ctrl+S" testid="shf-action-save" disabled={!!file?.locked} onClick={() => void actions.save()} />
-      <Item close={close} label="Save as…" testid="shf-action-saveas" onClick={() => void actions.saveAs()} />
+      <div className={cn("dm-head shf-menu-status", `k-${status.kind}`)} data-testid="shf-menu-status" title={status.detail}>{label}</div>
       <Item close={close} label="Rename" testid="shf-action-rename" onClick={onRename} />
-      <Item close={close} label="Version history" testid="shf-action-history" disabled={!file} onClick={() => actions.showHistory()} />
-      <Item close={close} icon="download" label="Download" hint=".arucostudio-web.json" testid="shf-action-download" onClick={() => void actions.downloadCurrent()} />
-      <Item close={close} label="Move to trash" testid="shf-action-trash" disabled={!file} onClick={() => { if (file) void actions.trash(file); }} />
-      <Item close={close} label="Trash…" testid="shf-action-trashed" onClick={actions.showTrash} />
-      <div className="dm-sep" />
-      {/* a checkbox row: it stays open, and says its state (SPEC v2.4) */}
-      <button type="button" role="menuitemcheckbox" aria-checked={state.autosave} className="dm-item" data-testid="shf-autosave-toggle"
-        onClick={() => actions.setAutosave(!state.autosave)}>
-        <span className="ic">{state.autosave && <Check size={14} />}</span><span className="dm-label">Autosave</span>
-      </button>
-      <div className="dm-sep" />
-      <div className="shf-account" data-testid="shf-account">
-        <span className="shf-avatar" aria-hidden="true">{initials(user.name, user.email)}</span>
-        <span className="shf-who">{user.name && <b>{user.name}</b>}<span className="dm-hint">{user.email}</span></span>
-      </div>
-      <UsageLine />
-      {plan.canUpgrade && <Item close={close} label={`Upgrade — ${plan.price}`} testid="shf-action-upgrade" onClick={() => void actions.upgrade()} />}
-      <Item close={close} label="Export all files" hint=".zip" testid="shf-action-export" onClick={() => void actions.exportAll()} />
-      <Item close={close} label="Your account ↗" testid="shf-action-account" onClick={() => void actions.account()} />
-      <Item close={close} label="Sign out" testid="shf-action-signout" onClick={() => void actions.signOut()} />
-      <div className="dm-sep" />
+      {state.user && (
+        <>
+          <Item close={close} label="Duplicate" testid="shf-action-duplicate" disabled={!file} onClick={() => { if (file) void actions.duplicate(file); }} />
+          <Item close={close} label="Version history" testid="shf-action-history" disabled={!file} onClick={() => actions.showHistory()} />
+          <div className="dm-sep" />
+          <Item close={close} label="Move to trash" testid="shf-action-trash" disabled={!file} onClick={() => { if (file) void actions.trash(file); }} />
+        </>
+      )}
     </>
   );
 }
@@ -352,25 +391,24 @@ function StatusDot() {
   );
 }
 
-/** ⌄ (Figma's file-name menu): the cloud file and the account; on a phone
- *  also Download for CAD, which the top-right pill folds away. */
+/** ⌄ (Figma's file-name menu): this file only; on a phone also Download for
+ *  CAD, which the top-right pill folds away. */
 function DocMenu({ onRename }: { onRename: () => void }) {
-  const name = useStudio((s) => s.doc.name);
   const narrow = useNarrow();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger className="doc-name doc-chev" data-testid="menu-doc" title="The file: save, history, the account" aria-label="File menu">
+      <Popover.Trigger className="doc-name doc-chev" data-testid="menu-doc" title="This file: rename, duplicate, history, trash" aria-label="File menu">
         <svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true" className="chev"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner sideOffset={10} align="start" className="kit-menu-positioner">
           <Popover.Popup className="kit-menu-popup dm-popup" data-kit-popup="doc" data-testid="doc-menu">
-            <div className="dm-head"><b>{name}</b></div>
-            <CloudItems close={close} onRename={onRename} />
+            <ThisFileItems close={close} onRename={onRename} />
             {narrow && (
               <>
+                <div className="dm-sep" />
                 <div className="dm-h">Download for CAD</div>
                 <Item close={close} icon="cube" label="Fusion 360" hint="coming soon" testid="cad-fusion" disabled onClick={() => {}} />
                 <Item close={close} icon="cube" label="Onshape" hint="coming soon" testid="cad-onshape" disabled onClick={() => {}} />

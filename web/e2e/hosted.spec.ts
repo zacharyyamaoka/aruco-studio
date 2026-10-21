@@ -1,4 +1,5 @@
-// Simple Hosted Files in the Studio (the title bar in the document pill),
+// Simple Hosted Files in the Studio (the title bar in the document pill, the
+// file and account items in the main menu: Figma's split, SPEC v2.9),
 // against a LOCAL hosted-files server in dev mode: E2E_HOSTED_SERVER, which
 // playwright.config.ts also builds in as the Studio's cloud. Sign-in is the
 // real email-code flow, the code read from the server's dev mailbox. Bytes
@@ -6,7 +7,7 @@
 // page's own bearer.
 import fs from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
-import { dragWorld, idle, state } from "./helpers";
+import { dragWorld, idle, openMenu, state } from "./helpers";
 
 const HOSTED = process.env.E2E_HOSTED_SERVER ?? "";
 test.skip(!HOSTED, "needs a local Simple Hosted Files: E2E_HOSTED_SERVER=http://localhost:<port>");
@@ -24,7 +25,7 @@ async function open(page: Page): Promise<void> {
   await expect.poll(async () => (await state(page)).doc.default_preset).not.toBeNull();
 }
 
-/** The ⌄ menu (open it if it is not). */
+/** The name's ⌄ menu, this file's (open it if it is not). */
 async function docMenu(page: Page) {
   const menu = page.getByTestId("doc-menu");
   if (!(await menu.count())) await page.getByTestId("menu-doc").click();
@@ -33,7 +34,7 @@ async function docMenu(page: Page) {
 }
 
 async function signIn(page: Page, email: string): Promise<void> {
-  await (await docMenu(page)).getByTestId("shf-signin").click();
+  await (await openMenu(page, "account")).getByTestId("shf-action-signin").click();
   const dialog = page.getByTestId("shf-signin-dialog");
   await expect(dialog).toBeVisible();
   await dialog.getByTestId("shf-signin-email-input").fill(email);
@@ -52,9 +53,9 @@ async function saved(page: Page): Promise<void> {
   await expect(page.getByTestId("shf-status")).toHaveText(/^Saved/);
 }
 
-/** Save an untitled document: ⌄ › Save, the name prompt (the document's name), OK. */
+/** Save an untitled document: File › Save, the name prompt (the document's name), OK. */
 async function saveAs(page: Page, name: string): Promise<string> {
-  await (await docMenu(page)).getByTestId("shf-action-save").click();
+  await (await openMenu(page, "file")).getByTestId("shf-action-save").click();
   const input = page.getByTestId("shf-name-input");
   await expect(input).toBeVisible();
   await input.fill(name);
@@ -90,26 +91,32 @@ let n = 0;
 const newEmail = () => `studio-${Date.now()}-${n++}@example.com`;
 
 test.describe("Simple Hosted Files", () => {
-  test("a · sign in: the account, its plan and usage are in ⌄; signed out the Studio works as before", async ({ page }) => {
+  test("a · sign in: the account, its plan and usage are in Help and account ›, Autosave in File ›; signed out the Studio works as before", async ({ page }) => {
     await open(page);
-    // signed out: no status, the name is the document's, ⌄ offers sign-in
+    // signed out: no status, the name is the document's, Help and account › offers sign-in
     await expect(page.getByTestId("shf-status")).toHaveCount(0);
     await expect(page.getByTestId("doc-name")).toHaveText("Plate");
     const email = newEmail();
     await signIn(page, email);
+    const account = await openMenu(page, "account");
+    await expect(account.getByTestId("shf-account-card")).toContainText(email);
+    await expect(account.getByTestId("shf-usage")).toHaveText(/^\d+ of \d+ free files in /);
+    await expect(account.getByTestId("shf-action-signout")).toBeVisible();
+    await expect((await openMenu(page, "file")).getByTestId("shf-autosave-toggle")).toHaveAttribute("aria-checked", "true");
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
+    // ⌄ is this file's: its status and items, never the account, Theme or Skin (Preferences ›)
     const menu = await docMenu(page);
-    await expect(menu.getByTestId("shf-account")).toContainText(email);
-    await expect(menu.getByTestId("shf-usage")).toHaveText(/^\d+ of \d+ free files in /);
-    await expect(menu.getByTestId("shf-autosave-toggle")).toHaveAttribute("aria-checked", "true");
-    // Theme and Skin are the main menu's (Preferences ›), not the file's
-    await expect(menu.getByTestId("theme-dark")).toHaveCount(0);
+    await expect(menu.getByTestId("shf-menu-status")).toBeVisible();
+    await expect(menu.getByTestId("shf-action-rename")).toBeVisible();
+    for (const id of ["shf-account-card", "shf-action-signout", "shf-autosave-toggle", "shf-action-save", "theme-dark"]) await expect(menu.getByTestId(id), id).toHaveCount(0);
     await expect(page.getByTestId("doc-name")).toHaveText("Plate");
   });
 
   test("b · Save: the name prompt is the document's name, and the file is in Open…", async ({ page }) => {
     await open(page);
     await signIn(page, newEmail());
-    await (await docMenu(page)).getByTestId("shf-action-save").click();
+    await (await openMenu(page, "file")).getByTestId("shf-action-save").click();
     await expect(page.getByTestId("shf-name-input")).toHaveValue("Plate");
     await page.getByTestId("shf-name-input").fill("Forearm plate");
     await page.getByTestId("shf-name-ok").click();
@@ -117,7 +124,7 @@ test.describe("Simple Hosted Files", () => {
     // one name: the document took the file's
     await expect(page.getByTestId("doc-name")).toHaveText("Forearm plate");
     expect((await state(page)).doc.name).toBe("Forearm plate");
-    await (await docMenu(page)).getByTestId("shf-action-files").click();
+    await (await openMenu(page, "file")).getByTestId("shf-action-files").click();
     const dialog = page.getByTestId("shf-files-dialog");
     await expect(dialog.getByTestId("shf-file-row")).toHaveCount(1);
     await expect(dialog.getByTestId("shf-file-row")).toContainText("Forearm plate");
@@ -155,7 +162,7 @@ test.describe("Simple Hosted Files", () => {
     await page.reload();
     await expect(page.getByTestId("app")).toBeVisible();
     await expect(page.getByTestId("shf-status")).toBeVisible();
-    await (await docMenu(page)).getByTestId("shf-action-files").click();
+    await (await openMenu(page, "file")).getByTestId("shf-action-files").click();
     await page.getByTestId("shf-files-dialog").locator(`[data-file-id="${id}"]`).click();
     await saved(page);
     expect(fileText((await state(page)).doc)).toBe(fileText(undone));
@@ -198,7 +205,7 @@ test.describe("Simple Hosted Files", () => {
     await edit(page);
     await saved(page);
     const id = await openFileId(page);
-    const [download] = await Promise.all([page.waitForEvent("download"), (await docMenu(page)).getByTestId("shf-action-download").click()]);
+    const [download] = await Promise.all([page.waitForEvent("download"), (await openMenu(page, "file")).getByTestId("shf-action-download").click()]);
     expect(download.suggestedFilename()).toBe("Downloaded.arucostudio-web.json");
     const got = fs.readFileSync((await download.path())!);
     const held = Buffer.from(await (await api(page, `/v1/files/${id}/content`)).arrayBuffer());
@@ -215,7 +222,7 @@ test.describe("Simple Hosted Files", () => {
     const other = await context.newPage();
     await open(other);
     await expect(other.getByTestId("shf-status")).toBeVisible();
-    await (await docMenu(other)).getByTestId("shf-action-files").click();
+    await (await openMenu(other, "file")).getByTestId("shf-action-files").click();
     await other.getByTestId("shf-files-dialog").locator(`[data-file-id="${id}"]`).click();
     await saved(other);
     // this tab moves the file to version 2
@@ -234,5 +241,29 @@ test.describe("Simple Hosted Files", () => {
     expect(await (await api(page, `/v1/files/${id}/content?version=2`)).text()).toBe(fileText(ours));
     expect(await (await api(page, `/v1/files/${id}/content?version=3`)).text()).toBe(fileText(theirs));
     await other.close();
+  });
+
+  test("g · ⌄ is this file: its status line, Duplicate makes a copy on the server, Move to trash puts it in File › Trash…", async ({ page }) => {
+    await open(page);
+    await signIn(page, newEmail());
+    await saveAs(page, "Kept");
+    const id = await openFileId(page);
+    let menu = await docMenu(page);
+    await expect(menu.getByTestId("shf-menu-status")).toHaveText(/^Saved · /);
+    await page.screenshot({ path: test.info().outputPath("name-menu-saved.png") });
+    await menu.getByTestId("shf-action-duplicate").click();
+    await expect(menu).toHaveCount(0);
+    const names = async () => ((await (await api(page, "/v1/files?app=aruco-studio")).json()).files as { name: string }[]).map((f) => f.name).sort();
+    await expect.poll(names).toEqual(["Kept", "Kept (copy)"]);
+    // the open file is still the one it was
+    expect(await openFileId(page)).toBe(id);
+    menu = await docMenu(page);
+    await menu.getByTestId("shf-action-trash").click();
+    await expect.poll(names).toEqual(["Kept (copy)"]);
+    await (await openMenu(page, "file")).getByTestId("shf-action-trash-view").click();
+    const dialog = page.getByTestId("shf-files-dialog");
+    await expect(dialog.getByTestId("shf-file-row")).toHaveCount(1);
+    await expect(dialog.getByTestId("shf-file-row")).toContainText("Kept");
+    await expect(dialog.getByTestId("shf-file-row")).toHaveAttribute("data-file-id", id);
   });
 });

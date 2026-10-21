@@ -7,16 +7,20 @@
 // the browser's Back, and an audit of every chrome control at 1184, 1280, 1440
 // and 390 wide, both themes, all four skins: no content overflows its box, no
 // control is clipped by a box around it, no two controls meet.
+// The two menus are Figma's split (Zach, 2026-10-21: "Please unify these two
+// file menus, they are redundant... Copy how figma does it"; simple-hosted-
+// files SPEC "v2.9 Menus follow Figma's split"): the logo's is the app's, the
+// name's ⌄ is this file's, and no item is in both (f).
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, coreReady, openMenu, openStudio, state } from "./helpers";
+import { CORE, coreReady, openMenu, openStudio, state, type MainSub } from "./helpers";
 
 const SUBMENUS: [string, string, string[]][] = [
-  ["file", "File", ["cmd-new", "cmd-open-cloud", "cmd-open", "cmd-save-cloud", "cmd-save", "cmd-examples"]],
+  ["file", "File", ["cmd-new", "cmd-open", "cmd-save", "cmd-examples"]],
   ["edit", "Edit", ["cmd-undo", "cmd-redo", "cmd-reid", "cmd-presets"]],
   ["export", "Export", ["cmd-print", "cmd-svg", "cmd-pdf"]],
   ["view", "View", ["cmd-view-2d", "cmd-view-3d", "cmd-fit"]],
   ["prefs", "Preferences", ["theme-light", "theme-dark", "skin-studio", "skin-unstyled", "skin-fusion", "skin-onshape"]],
-  ["help", "Help", ["help-menu", "github-menu", "brand"]],
+  ["account", "Help and account", ["help-menu", "github-menu", "brand", "shf-action-signin"]],
 ];
 
 /** The chrome: its boxes, and every control in them. */
@@ -70,8 +74,90 @@ async function audit(page: Page): Promise<{ overflow: string[]; clipped: string[
   }, [CHROME, CONTROLS] as const);
 }
 
+/** Signed in, the hosted API answered here (GET /v1/me, /v1/files, a file's
+ *  content: `doc`). */
+async function signedIn(page: Page): Promise<{ doc: string }> {
+  const cloud = { doc: "" };
+  // WHY mocked: the cloud is another repo's server (hosted.spec.ts drives a real one under
+  // E2E_HOSTED_SERVER); Home's and the menus' part is what they draw from GET /v1/me and /v1/files
+  const now = Date.now(), iso = (minAgo: number) => new Date(now - minAgo * 60_000).toISOString();
+  const meta = (id: string, name: string, minAgo: number, trashed = false) => ({
+    id, app: "aruco-studio", name, contentType: "application/json", version: 1, size: 900, sha256: "x", createdAt: iso(minAgo + 60), updatedAt: iso(minAgo),
+    trashedAt: trashed ? iso(minAgo) : null, purgeAt: trashed ? new Date(now + 29 * 86_400_000).toISOString() : null, locked: false,
+  });
+  const files = [meta("f-bracket", "Bracket stickers", 5), meta("f-sheet", "Sheet for the arm", 60 * 26)];
+  const trash = [meta("f-old", "Old plate", 90, true)];
+  await page.addInitScript(() => localStorage.setItem("shf:aruco-studio:token", "e2e-token"));
+  await page.route(/\/v1\//, async (route) => {
+    const url = new URL(route.request().url());
+    const json = (body: unknown) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+    if (url.pathname === "/v1/me") {
+      return json({
+        user: { id: "u1", email: "zach@example.com", name: "Zach", image: null }, plan: "free",
+        limits: { filesPerApp: 100, maxFileBytes: 1e6, totalBytes: 1e8 }, usage: { totalBytes: 2000, apps: { "aruco-studio": { files: 2, trashed: 1 } } },
+        app: { id: "aruco-studio", name: "ArUco Studio", extension: ".arucostudio-web.json", files: 2, limit: 100, remaining: 98 },
+        billing: { provider: "dev", priceLabel: "$4/month", canUpgrade: false, canManage: false }, accountUrl: "", deletionScheduledAt: null,
+      });
+    }
+    if (url.pathname === "/v1/files") return json({ files: url.searchParams.get("trashed") ? trash : files });
+    const m = url.pathname.match(/^\/v1\/files\/([^/]+)(\/content)?$/);
+    if (m && m[2]) return route.fulfill({ status: 200, contentType: "application/json", body: cloud.doc, headers: { "x-version": "1" } });
+    if (m) return json(files.find((f) => f.id === m[1]) ?? trash[0]);
+    return route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "not_found" }) });
+  });
+  return cloud;
+}
+
+/** One row of a menu: its test id, its label (the words, not the hint), and
+ *  whether it is a pick (a radio row: a setting's value, Skin › Fusion 360). */
+type Row = { menu: string; id: string; label: string; pick: boolean };
+
+/** Every item of the name's ⌄ and of the main menu with each submenu open in
+ *  turn (on a phone the submenus are groups in the menu itself). */
+async function menuRows(page: Page): Promise<{ doc: Row[]; main: Row[] }> {
+  const rows = (menu: string, popup: string, item: string, label: string) => page.getByTestId(popup).evaluate((p, [menu, item, label]) =>
+    [...p.querySelectorAll(item)].map((e) => ({ menu, id: e.getAttribute("data-testid") ?? "", label: (e.querySelector(label) as HTMLElement | null)?.innerText.trim() ?? (e as HTMLElement).innerText.trim(),
+      pick: e.getAttribute("role") === "menuitemradio" })),
+  [menu, item, label] as const);
+  await page.getByTestId("menu-doc").click();
+  await expect(page.getByTestId("doc-menu")).toBeVisible();
+  const doc = await rows("⌄", "doc-menu", ".dm-item", ".dm-label");
+  await page.getByTestId("menu-doc").click();
+  await expect(page.getByTestId("doc-menu")).toHaveCount(0);
+  const ITEM = "[role^=menuitem]";
+  await page.getByTestId("menu-main").click();
+  const main = await rows("main", "main-menu", ITEM, ".kit-menu-label");
+  for (const [sub] of SUBMENUS) {
+    if (!(await page.getByTestId(`menu-${sub}`).count())) continue;
+    const popup = await openMenu(page, sub as MainSub);
+    await expect(popup.locator(ITEM).first()).toBeVisible();
+    main.push(...(await rows(sub, `menu-${sub}-popup`, ITEM, ".kit-menu-label")));
+  }
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("main-menu")).toHaveCount(0);
+  return { doc, main };
+}
+
+/** The rows that share a test id, or a command's label (empty: none).
+ *  WHY picks are out of the labels: a skin is named after the CAD program it
+ *  copies, so Preferences › Skin › "Fusion 360" is not the phone's ⌄ ›
+ *  Download for CAD › "Fusion 360"; their test ids are still compared. */
+function twice(rows: Row[]): string[] {
+  const out: string[] = [];
+  for (const key of ["id", "label"] as const) {
+    const seen = new Map<string, Row>();
+    for (const r of key === "label" ? rows.filter((x) => !x.pick) : rows) {
+      const was = seen.get(r[key]);
+      if (was) out.push(`${key} "${r[key]}": ${was.menu} and ${r.menu}`);
+      else seen.set(r[key], r);
+    }
+  }
+  return out;
+}
+
 test.describe("Figma UI3 chrome", () => {
-  test("a · the logo opens the main menu: Back to files, then File / Edit / Export / View / Preferences / Help; no inline File / Edit / Export", async ({ page }) => {
+  test("a · the logo opens the main menu: Back to files, then File / Edit / Export / View / Preferences / Help and account; no inline File / Edit / Export", async ({ page }) => {
     await openStudio(page);
     await coreReady(page);
     // no inline menus: the pill is the logo, the name, its ⌄
@@ -90,7 +176,7 @@ test.describe("Figma UI3 chrome", () => {
     expect(m.y).toBeGreaterThanOrEqual(logo.y + logo.height);
     // every submenu, beside the menu, with its items
     for (const [sub, , ids] of SUBMENUS) {
-      const popup = await openMenu(page, sub as "file");
+      const popup = await openMenu(page, sub as MainSub);
       for (const id of ids) await expect(popup.getByTestId(id), `${sub} › ${id}`).toBeVisible();
       const p = (await popup.boundingBox())!;
       expect(p.x, `${sub}: to the side`).toBeGreaterThanOrEqual(m.x + m.width - 2);
@@ -102,7 +188,7 @@ test.describe("Figma UI3 chrome", () => {
     await page.keyboard.press("r");
     expect((await state(page)).tool).toBe("select");
     await page.keyboard.press("Escape");
-    await expect(page.getByTestId("menu-help-popup")).toHaveCount(0);
+    await expect(page.getByTestId("menu-account-popup")).toHaveCount(0);
     await expect(menu).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(menu).toHaveCount(0);
@@ -124,8 +210,8 @@ test.describe("Figma UI3 chrome", () => {
     await expect.poll(async () => (await state(page)).view3d).toBe(true);
     await page.keyboard.press("3");
     await expect.poll(async () => (await state(page)).view3d).toBe(false);
-    // Help › Keyboard shortcuts opens the keys
-    await openMenu(page, "help");
+    // Help and account › Keyboard shortcuts opens the keys
+    await openMenu(page, "account");
     await page.getByTestId("help-menu").click();
     await expect(page.getByTestId("help-popover")).toBeVisible();
   });
@@ -175,37 +261,10 @@ test.describe("Figma UI3 chrome", () => {
   });
 
   test("c · signed in (the hosted API answered here): Home lists your files with their times, searches, has New and the Trash; a card opens its file in the editor", async ({ page }) => {
-    // WHY mocked: the cloud is another repo's server (hosted.spec.ts drives a real one under
-    // E2E_HOSTED_SERVER); Home's part is what it draws from GET /v1/me and /v1/files
-    const now = Date.now(), iso = (minAgo: number) => new Date(now - minAgo * 60_000).toISOString();
-    const meta = (id: string, name: string, minAgo: number, trashed = false) => ({
-      id, app: "aruco-studio", name, contentType: "application/json", version: 1, size: 900, sha256: "x", createdAt: iso(minAgo + 60), updatedAt: iso(minAgo),
-      trashedAt: trashed ? iso(minAgo) : null, purgeAt: trashed ? new Date(now + 29 * 86_400_000).toISOString() : null, locked: false,
-    });
-    const files = [meta("f-bracket", "Bracket stickers", 5), meta("f-sheet", "Sheet for the arm", 60 * 26)];
-    const trash = [meta("f-old", "Old plate", 90, true)];
-    await page.addInitScript(() => localStorage.setItem("shf:aruco-studio:token", "e2e-token"));
-    let doc = "";
-    await page.route(/\/v1\//, async (route) => {
-      const url = new URL(route.request().url());
-      const json = (body: unknown) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
-      if (url.pathname === "/v1/me") {
-        return json({
-          user: { id: "u1", email: "zach@example.com", name: "Zach", image: null }, plan: "free",
-          limits: { filesPerApp: 100, maxFileBytes: 1e6, totalBytes: 1e8 }, usage: { totalBytes: 2000, apps: { "aruco-studio": { files: 2, trashed: 1 } } },
-          app: { id: "aruco-studio", name: "ArUco Studio", extension: ".arucostudio-web.json", files: 2, limit: 100, remaining: 98 },
-          billing: { provider: "dev", priceLabel: "$4/month", canUpgrade: false, canManage: false }, accountUrl: "", deletionScheduledAt: null,
-        });
-      }
-      if (url.pathname === "/v1/files") return json({ files: url.searchParams.get("trashed") ? trash : files });
-      const m = url.pathname.match(/^\/v1\/files\/([^/]+)(\/content)?$/);
-      if (m && m[2]) return route.fulfill({ status: 200, contentType: "application/json", body: doc, headers: { "x-version": "1" } });
-      if (m) return json(files.find((f) => f.id === m[1]) ?? trash[0]);
-      return route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "not_found" }) });
-    });
+    const cloud = await signedIn(page);
     await openStudio(page);
     await coreReady(page);
-    doc = JSON.stringify({ ...(await state(page)).doc, name: "Bracket stickers" }, null, 2);
+    cloud.doc = JSON.stringify({ ...(await state(page)).doc, name: "Bracket stickers" }, null, 2);
     await page.getByTestId("menu-main").click();
     await page.getByTestId("cmd-home").click();
     const home = page.getByTestId("home");
@@ -289,5 +348,88 @@ test.describe("Figma UI3 chrome", () => {
       expect(d.track[0]).toBeGreaterThan(d.dock[0]);
       expect(d.track[1]).toBeLessThan(d.dock[1]);
     }
+  });
+
+  test("f · no item is in both menus: the name's ⌄ is this file (status, Rename, Duplicate, Version history, Move to trash), the logo's File ▸ and Help and account ▸ the rest; signed in and out, desk and phone", async ({ page }) => {
+    const shots = (name: string) => page.screenshot({ path: test.info().outputPath(`${name}.png`) });
+    const ids = (rows: Row[], menu: string) => rows.filter((r) => r.menu === menu).map((r) => r.id);
+    // signed out
+    await openStudio(page);
+    await coreReady(page);
+    let { doc, main } = await menuRows(page);
+    expect(twice([...doc, ...main]), "signed out: in two places").toEqual([]);
+    expect(ids(doc, "⌄")).toEqual(["shf-action-rename"]);
+    expect(ids(main, "file")).toEqual(["cmd-new", "cmd-open", "cmd-save", "cmd-examples"]);
+    expect(ids(main, "account")).toEqual(["help-menu", "github-menu", "brand", "shf-action-signin"]);
+    await page.getByTestId("menu-doc").click();
+    await expect(page.getByTestId("shf-menu-status")).toHaveText("Not saved online");
+    await page.getByTestId("menu-doc").click();
+    const account = await openMenu(page, "account");
+    await expect(account.getByTestId("shf-action-signin")).toHaveText("Sign in to save online");
+    await expect(account.getByTestId("shf-account-card")).toHaveCount(0);
+    await shots("account-signed-out");
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("main-menu")).toHaveCount(0);
+
+    // signed in (the API answered here)
+    const context = page.context();
+    const signed = await context.newPage();
+    await signedIn(signed);
+    await openStudio(signed);
+    await coreReady(signed);
+    await expect(signed.getByTestId("shf-status")).toBeVisible();
+    ({ doc, main } = await menuRows(signed));
+    expect(twice([...doc, ...main]), "signed in: in two places").toEqual([]);
+    expect(ids(doc, "⌄")).toEqual(["shf-action-rename", "shf-action-duplicate", "shf-action-history", "shf-action-trash"]);
+    expect(doc.map((r) => r.label)).toEqual(["Rename", "Duplicate", "Version history", "Move to trash"]);
+    expect(ids(main, "main")).toEqual(["cmd-home", ...SUBMENUS.map(([sub]) => `menu-${sub}`)]);
+    expect(ids(main, "file")).toEqual(["cmd-new", "shf-action-files", "cmd-open", "shf-action-save", "shf-action-saveas", "shf-action-download",
+      "shf-action-export", "shf-action-trash-view", "cmd-examples", "shf-autosave-toggle"]);
+    expect(main.filter((r) => r.menu === "file").map((r) => r.label)).toEqual(["New", "Open…", "Open from this computer…", "Save", "Save as…", "Download",
+      "Export all files", "Trash…", "Examples…", "Autosave"]);
+    expect(ids(main, "account")).toEqual(["help-menu", "github-menu", "brand", "shf-action-account", "shf-action-signout"]);
+    expect(main.find((r) => r.menu === "main" && r.id === "menu-account")?.label).toBe("Help and account");
+    // the status line, then this file's items; a new document is not saved online yet: Duplicate, History and Trash wait for it
+    await signed.getByTestId("menu-doc").click();
+    const menu = signed.getByTestId("doc-menu");
+    await expect(menu.getByTestId("shf-menu-status")).toHaveText("Not saved yet");
+    for (const id of ["shf-action-duplicate", "shf-action-history", "shf-action-trash"]) await expect(menu.getByTestId(id)).toBeDisabled();
+    await expect(menu.getByTestId("shf-action-rename")).toBeEnabled();
+    await signed.screenshot({ path: test.info().outputPath("name-menu-signed-in.png") });
+    await signed.getByTestId("menu-doc").click();
+    // File ▸: Save with its key, Download with the file's extension, Autosave checked, and it stays open when clicked
+    const file = await openMenu(signed, "file");
+    await expect(file.getByTestId("shf-action-save")).toContainText("Ctrl+S");
+    await expect(file.getByTestId("shf-action-download")).toContainText(".arucostudio-web.json");
+    await expect(file.getByTestId("shf-action-export")).toContainText(".zip");
+    await expect(file.getByTestId("shf-autosave-toggle")).toHaveAttribute("aria-checked", "true");
+    await signed.screenshot({ path: test.info().outputPath("file-signed-in.png") });
+    await file.getByTestId("shf-autosave-toggle").click();
+    await expect(file.getByTestId("shf-autosave-toggle")).toHaveAttribute("aria-checked", "false");
+    await file.getByTestId("shf-autosave-toggle").click();
+    await expect(file.getByTestId("shf-autosave-toggle")).toHaveAttribute("aria-checked", "true");
+    // Help and account ▸: the card, the usage, Your account, Sign out
+    const acct = await openMenu(signed, "account");
+    await expect(acct.getByTestId("shf-account-card")).toContainText("Zach");
+    await expect(acct.getByTestId("shf-account-card")).toContainText("zach@example.com");
+    await expect(acct.getByTestId("shf-usage")).toHaveText(/^2 of 100 free files in ArUco Studio/);
+    await signed.screenshot({ path: test.info().outputPath("account-signed-in.png") });
+    await signed.keyboard.press("Escape");
+    await signed.keyboard.press("Escape");
+    await expect(signed.getByTestId("main-menu")).toHaveCount(0);
+    // Open… is the files dialog
+    await (await openMenu(signed, "file")).getByTestId("shf-action-files").click();
+    await expect(signed.getByTestId("shf-files-dialog").getByTestId("shf-file-row")).toHaveCount(2);
+    await signed.keyboard.press("Escape");
+    await expect(signed.getByTestId("shf-files-dialog")).toHaveCount(0);
+
+    // a phone: the submenus are groups, Download for CAD folds into ⌄; still nothing twice
+    await signed.setViewportSize({ width: 390, height: 844 });
+    await expect(signed.getByTestId("menu-file")).toHaveCount(0);
+    ({ doc, main } = await menuRows(signed));
+    expect(twice([...doc, ...main]), "a phone: in two places").toEqual([]);
+    expect(ids(doc, "⌄")).toEqual(["shf-action-rename", "shf-action-duplicate", "shf-action-history", "shf-action-trash", "cad-fusion", "cad-onshape"]);
+    await signed.close();
   });
 });

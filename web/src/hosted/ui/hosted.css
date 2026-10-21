@@ -17,12 +17,18 @@
 .doc-name-input { height: 28px; width: 220px; max-width: 100%; font-weight: 600; font-size: 13px; }
 .shf-reload { flex: none; }
 
-/* the ⌄ menu's account part */
+/* ⌄'s first line: the save status (Figma's under the name), its tone the dot's */
+.shf-menu-status { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shf-menu-status.k-offline, .shf-menu-status.k-conflict { color: var(--warn); }
+.shf-menu-status.k-error { color: var(--bad); }
+
+/* Help and account ▸: the account card */
 .shf-account { display: flex; align-items: center; gap: 8px; padding: 6px 8px 2px; min-width: 0; }
 .shf-avatar { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%;
   background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 600; }
 .shf-who { min-width: 0; display: grid; }
 .shf-who > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shf-who-email { color: var(--muted); font-size: 11px; }
 .shf-usage { display: grid; gap: 5px; padding: 6px 8px; font-size: 11px; }
 .shf-usage-text { display: flex; justify-content: space-between; gap: 8px; }
 .shf-bar { height: 4px; border-radius: 2px; background: var(--line-soft); overflow: hidden; }

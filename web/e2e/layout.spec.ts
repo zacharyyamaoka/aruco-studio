@@ -190,7 +190,7 @@ test.describe(`the Figma layout (${CORE} core)`, () => {
     expect(text).not.toContain(s.doc.default_preset.name);
     expect(text).not.toMatch(/inkjet|vinyl|letter|a4|preset|print3d|3d print/i);
     await expect(pill.locator("[data-testid=preset-chip], .chip-preset")).toHaveCount(0);
-    await expect((await openMenu(page, "help")).getByTestId("brand")).toHaveAttribute("href", /\/about\/$/);
+    await expect((await openMenu(page, "account")).getByTestId("brand")).toHaveAttribute("href", /\/about\/$/);
     await page.keyboard.press("Escape");
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("main-menu")).toHaveCount(0);
@@ -360,7 +360,7 @@ test.describe(`the Figma layout (${CORE} core)`, () => {
     await shot(page, "h-390-menu");
     await page.getByTestId("menu-doc").click();
     await expect(menu).toHaveCount(0);
-    for (const [sub, ids] of [["file", ["cmd-examples"]], ["edit", ["cmd-reid", "cmd-presets"]], ["export", ["cmd-print"]], ["prefs", ["theme-dark", "skin-studio"]], ["help", ["github-menu", "help-menu"]]] as const) {
+    for (const [sub, ids] of [["file", ["cmd-examples"]], ["edit", ["cmd-reid", "cmd-presets"]], ["export", ["cmd-print"]], ["prefs", ["theme-dark", "skin-studio"]], ["account", ["github-menu", "help-menu"]]] as const) {
       const popup = await openMenu(page, sub);
       for (const id of ids) await expect(popup.getByTestId(id), id).toBeVisible();
       const r = await box(popup);
