@@ -288,9 +288,10 @@ export function BatchPanel() {
       }>
       <Tabs value={panel.tab} onChange={(t) => st.setTab(t as Tab)}
         tabs={[
-          { id: "marker", name: "Marker", icon: "tab-marker" },
-          { id: "label", name: "Label", icon: "tab-label" },
-          { id: "make", name: "Make", icon: `tab-${methodIcon}` },
+          { id: "marker", name: "Marker" },
+          { id: "label", name: "Label" },
+          // WHY "Manufacture", text only (Zach, 2026-10-21): "really clearly tells you what you do there"; quiet tabs like Fusion Extrude's "Feature | Configure"
+          { id: "make", name: "Manufacture" },
         ]} />
       <div className="tab-body">{body[panel.tab] ?? markerTab}</div>
     </FloatingPanel>

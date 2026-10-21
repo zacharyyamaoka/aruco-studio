@@ -20,7 +20,7 @@
 // person), the name's ⌄ is this file's, and nothing is in both. Signed out,
 // File keeps what needs no account and Help and account offers the sign-in.
 // WHY no preset in the pill (Zach): "Preset shouldn't be on the file because
-// it's applied on a per marker basis!" -- it is the panel's Make tab's, and
+// it's applied on a per marker basis!" -- it is the panel's Manufacture tab's, and
 // Edit › Presets… sets the one a new marker starts with.
 // WHY no core chip (Zach): "for me that's back end details ... maybe just in a
 // panel etc. you can show that status thing ... but it shouldn't clutter the

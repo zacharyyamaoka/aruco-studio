@@ -1,6 +1,6 @@
 // The size step (contract barrier 11, Zach 2026-10-20 night: "round to the
 // DPI of the printer... or to use a normal number? ... maybe that's a preset
-// you then put in the vinyl printer preset"): the Make tab's Size step row is
+// you then put in the vinyl printer preset"): the Manufacture tab's Size step row is
 // driven grey by the marker's preset (0.5 mm on the inkjet built-ins), set per
 // marker (Whole printer dots: the marker dot-exact, the Marker note says
 // "exact"), ↺ back to the preset's; the presets dialog's Size step drives the
@@ -46,7 +46,7 @@ const valueColour = (page: Page) => trigger(page).locator(".kit-select-label").e
 test.describe("the size step", () => {
   test.skip(CORE === "mock", "the size step is the real core's");
 
-  test("1 · Make: 0.5 mm driven grey on Letter vinyl; Whole printer dots sets it dot-exact; ↺ back", async ({ page }) => {
+  test("1 · Manufacture: 0.5 mm driven grey on Letter vinyl; Whole printer dots sets it dot-exact; ↺ back", async ({ page }) => {
     await blankMarker(page);
     let s = await state(page);
     expect(s.feature.preset?.id ?? s.doc.default_preset.id).toBe("builtin:inkjet-letter-vinyl");

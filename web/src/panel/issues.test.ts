@@ -18,12 +18,12 @@ describe("per-row issues", () => {
     const r = routeIssues([I("marker.rows"), I("marker.checker_mm")], shown);
     expect(r["marker.marker_mm"]).toHaveLength(2);
   });
-  it("Flip is a row of Make on every profile (barrier 10: it always applies)", () => {
+  it("Flip is a row of Manufacture on every profile (barrier 10: it always applies)", () => {
     const t = tabRows(DEFAULT_MARKER, DEFAULT_LABEL, "inkjet");
     expect(t.make).toContain("marker.flip");
     expect(routeIssues([I("marker.flip")], shownRows(DEFAULT_MARKER, DEFAULT_LABEL, "print3d"))["marker.flip"]).toHaveLength(1);
   });
-  it("Make: Size step, Trim, the method's heights, Flip, in that order (the skeleton)", () => {
+  it("Manufacture: Size step, Trim, the method's heights, Flip, in that order (the skeleton)", () => {
     expect(tabRows(DEFAULT_MARKER, DEFAULT_LABEL, "inkjet").make).toEqual(["marker.size_step", "trim", "extrude.paper_mm", "marker.flip"]);
     expect(tabRows(DEFAULT_MARKER, DEFAULT_LABEL, "print3d").make)
       .toEqual(["marker.size_step", "trim", "extrude.mode", "extrude.white_mm", "extrude.black_mm", "marker.flip"]);

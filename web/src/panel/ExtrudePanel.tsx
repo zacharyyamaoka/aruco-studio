@@ -5,8 +5,7 @@
 // (docs/design/panel_skeleton.md, one order for this panel and the Fusion
 // add-in): Marker (Where: Profile, Holes; How: the Preset with what it makes as a
 // grey line; Marker; Size, then Suggest; Orientation; Details: Quiet zone,
-// Key), Label (Label, Corner mark), Make -- its icon the preset's method,
-// an inkjet or a 3D printer (Size & cut: Size step, Trim; Heights; Outward
+// Key), Label (Label, Corner mark), Manufacture (id "make"; Size & cut: Size step, Trim; Heights; Outward
 // side: Flip). A new feature opens on Marker. Every row of a tab is in view, each
 // group under a small title and a thin rule; the footer is the summary line,
 // then OK / Cancel. Every row shows
@@ -94,7 +93,7 @@ export function ExtrudePanel() {
   // this marker's own preset (Zach, 2026-10-20 night: "applied on a per marker basis")
   const preset = featurePreset(doc, f);
   const method = preset?.method ?? "inkjet";
-  // the Make tab's icon, the Preset row and the presets dialog name and draw the method alike
+  // the Preset row and the presets dialog name and draw the method alike
   const methodName = method === "print3d" ? "3D print" : "Inkjet";
   const methodIcon = method === "print3d" ? "print3d" : "inkjet";
   const fusion = skin.id === "fusion";
@@ -418,10 +417,11 @@ export function ExtrudePanel() {
       }>
       <Tabs value={panel.tab} onChange={(t) => st.setTab(t as Tab)}
         tabs={[
-          { id: "marker", name: "Marker", icon: "tab-marker", level: tabLevel(routed, rows.marker) },
-          { id: "label", name: "Label", icon: "tab-label", level: tabLevel(routed, rows.label) },
-          // WHY always "Make", the method as its icon (Zach, 2026-10-21: "keep it just Make so we always know where we should go looking")
-          { id: "make", name: "Make", icon: `tab-${methodIcon}`, level: tabLevel(routed, rows.make) },
+          { id: "marker", name: "Marker", level: tabLevel(routed, rows.marker) },
+          { id: "label", name: "Label", level: tabLevel(routed, rows.label) },
+          // WHY "Manufacture", text only (Zach, 2026-10-21): "really clearly tells you what you do there"; quiet tabs like Fusion Extrude's "Feature | Configure"
+          // (the id stays "make": saved state and the specs key on it)
+          { id: "make", name: "Manufacture", level: tabLevel(routed, rows.make) },
         ]} />
       <div className="tab-body">{body[panel.tab] ?? markerTab}</div>
     </FloatingPanel>

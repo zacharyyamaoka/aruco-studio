@@ -159,7 +159,7 @@ test.describe(`profile-first (${CORE} core)`, () => {
 
   test("c · Trim offers exactly Profile | Marker; Profile cuts to the face with its holes, Marker to the quiet zone", async ({ page }) => {
     const fid = await plateFace(page);
-    // Trim is on Make (the skeleton: a new feature opens on Marker)
+    // Trim is on Manufacture (the skeleton: a new feature opens on Marker)
     await panelTab(page, "make");
     const btns = page.locator('[data-row="trim"] .kit-seg-btn');
     expect(await btns.evaluateAll((els) => els.map((e) => e.getAttribute("data-value")))).toEqual(["profile", "marker"]);

@@ -56,7 +56,7 @@ async function plateClip(page: Page, name: string): Promise<void> {
   await clip(page, name, [...(await page.locator("[data-shape]").all()), page.locator(`[data-marker="${fid}"]`), ...dims]);
 }
 
-/** Examples › Plate, click the face between the holes, A: the panel open (on Make). */
+/** Examples › Plate, click the face between the holes, A: the panel open (on Manufacture). */
 async function plateWithMarker(page: Page): Promise<void> {
   await openStudio(page);
   await coreReady(page);

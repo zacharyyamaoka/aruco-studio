@@ -30,9 +30,9 @@
     2.4
   ],
   "tabs": [
-    "Make",
     "Marker",
-    "Label"
+    "Label",
+    "Manufacture"
   ],
   "heights": {
     "preset": "Default",

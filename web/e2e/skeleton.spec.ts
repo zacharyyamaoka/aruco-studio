@@ -1,6 +1,6 @@
 // The ArUco Extrude panel's skeleton (docs/design/panel_skeleton.md, Zach
-// 2026-10-21): the tabs Marker | Label | Make in that order, a new feature
-// opening on Marker, Profile then Preset first on Marker, Make's rows in the
+// 2026-10-21): the tabs Marker | Label | Manufacture in that order, a new feature
+// opening on Marker, Profile then Preset first on Marker, Manufacture's rows in the
 // skeleton's order, the Key driven (grey) until typed, a driven segmented pick
 // that still reads as selected in every skin, two printer icons that tell an
 // inkjet preset from a 3D one, and the Fusion skin's uppercase title and green
@@ -66,10 +66,10 @@ async function segLook(page: Page, row: string): Promise<{ on: string; off: stri
 }
 
 test.describe(`the panel skeleton (${CORE} core)`, () => {
-  test("a · tabs Marker | Label | Make, a new feature opens on Marker; Make keeps its name, its icon is the method's printer", async ({ page }) => {
+  test("a · tabs Marker | Label | Manufacture, text only; a new feature opens on Marker; the third keeps its id \"make\"", async ({ page }) => {
     await platePanel(page);
     const panel = page.getByTestId("extrude-panel");
-    await expect(panel.locator("[role=tab]")).toHaveText(["Marker", "Label", "Make"]);
+    await expect(panel.locator("[role=tab]")).toHaveText(["Marker", "Label", "Manufacture"]);
     expect(await panel.locator("[role=tab]").evaluateAll((els) => els.map((e) => e.getAttribute("data-tab")))).toEqual(["marker", "label", "make"]);
     // the order is drawn left to right, too
     const xs = await panel.locator("[role=tab]").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().left));
@@ -78,16 +78,55 @@ test.describe(`the panel skeleton (${CORE} core)`, () => {
     expect((await state(page)).panel.tab).toBe("marker");
     await expect(panel.locator('[role=tab][data-tab="marker"]')).toHaveAttribute("aria-selected", "true");
     await expect(panel.locator('[data-tab-body="marker"]')).toBeVisible();
-    // Make: always "Make"; its icon is the preset's method (inkjet first, then a 3D print preset)
+    // text only, on all three, whatever the preset's method (inkjet first, then a 3D print preset)
     expect((await state(page)).feature.preset.method).toBe("inkjet");
-    expect(await icon(page, '[role=tab][data-tab="make"] svg')).toBe("tab-inkjet");
-    const inkjetTab = await svg(page, '[role=tab][data-tab="make"] svg');
+    await expect(panel.locator("[role=tab] svg")).toHaveCount(0);
     await usePreset(page, "print3d");
-    await expect(panel.locator('[role=tab][data-tab="make"]')).toHaveText("Make");
-    expect(await icon(page, '[role=tab][data-tab="make"] svg')).toBe("tab-print3d");
-    expect(await svg(page, '[role=tab][data-tab="make"] svg'), "a 3D printer, not the inkjet's drawing").not.toBe(inkjetTab);
-    expect(await icon(page, '[role=tab][data-tab="marker"] svg')).toBe("tab-marker");
-    expect(await icon(page, '[role=tab][data-tab="label"] svg')).toBe("tab-label");
+    await expect(panel.locator('[role=tab][data-tab="make"]')).toHaveText("Manufacture");
+    await expect(panel.locator("[role=tab] svg")).toHaveCount(0);
+  });
+
+  /** Each tab's drawn box, its label's box and whether the label is cut (by the box or an ellipsis). */
+  async function tabFit(page: Page): Promise<{ list: number; tabs: { name: string; w: number; labelW: number; lineH: number; labelH: number; cut: boolean; inside: boolean }[]; wrapped: boolean }> {
+    return page.locator('[data-testid="extrude-panel"] .kit-tab-list').evaluate((list) => {
+      const l = list.getBoundingClientRect();
+      const tabs = [...list.querySelectorAll("[role=tab]")].map((t) => {
+        const b = t.getBoundingClientRect(), span = t.querySelector("span")!, sb = span.getBoundingClientRect();
+        const lineH = parseFloat(getComputedStyle(span).lineHeight) || parseFloat(getComputedStyle(span).fontSize) * 1.3;
+        return { name: span.textContent!, w: b.width, labelW: sb.width, lineH, labelH: sb.height,
+          cut: span.scrollWidth > Math.ceil(span.clientWidth) || getComputedStyle(span).textOverflow === "ellipsis" && span.scrollWidth > span.clientWidth || sb.right > b.right + 0.5 || sb.left < b.left - 0.5,
+          inside: b.left >= l.left - 0.5 && b.right <= l.right + 0.5 };
+      });
+      return { list: l.width, tabs, wrapped: tabs.some((t) => t.labelH > t.lineH * 1.5) };
+    });
+  }
+
+  test("a2 · the three text tabs fit the panel at its narrowest (320 px, and a 320 px phone), Studio and Fusion skin: nothing wrapped or cut, \"Manufacture\" whole", async ({ page, browser }) => {
+    const check = async (p: Page, where: string): Promise<void> => {
+      const fit = await tabFit(p);
+      expect(fit.tabs.map((t) => t.name), where).toEqual(["Marker", "Label", "Manufacture"]);
+      expect(fit.wrapped, `${where}: a label on two lines`).toBe(false);
+      for (const t of fit.tabs) {
+        expect(t.cut, `${where}: "${t.name}" cut`).toBe(false);
+        expect(t.inside, `${where}: "${t.name}" outside the strip`).toBe(true);
+      }
+      // each tab is as wide as its text needs (at least)
+      for (const t of fit.tabs) expect(t.w, `${where}: "${t.name}" narrower than its text`).toBeGreaterThanOrEqual(t.labelW);
+    };
+    await platePanel(page);
+    expect((await page.getByTestId("extrude-panel").boundingBox())!.width, "the panel's narrowest").toBe(320);
+    await check(page, "studio desktop");
+    await pickSkin(page, "fusion");
+    await check(page, "fusion desktop");
+    for (const skin of ["studio", "fusion"] as const) {
+      const ctx = await browser.newContext({ viewport: { width: 320, height: 640 } });
+      const phone = await ctx.newPage();
+      await platePanel(phone);
+      if (skin === "fusion") await pickSkin(phone, "fusion");
+      expect((await phone.getByTestId("extrude-panel").boundingBox())!.width, "docked, full width").toBeLessThanOrEqual(320);
+      await check(phone, `${skin} phone 320`);
+      await ctx.close();
+    }
   });
 
   test("b · Marker: Profile then Preset first, then Type, Dictionary, ID, Marker size, (grid: Columns × Rows, Separation), Suggest, Turn, Quiet zone, Key", async ({ page }) => {
@@ -108,13 +147,13 @@ test.describe(`the panel skeleton (${CORE} core)`, () => {
     await page.locator('[data-path="marker.type"] [data-value="charuco"]').click();
     await idle(page);
     expect((await rowsByY(page, "marker")).slice(5, 10)).toEqual(["marker.marker_mm", "marker.cols", "marker.checker_mm", "marker.origin_square", "marker.suggest"]);
-    // nothing of Make's on Marker
+    // nothing of Manufacture's on Marker
     for (const r of ["trim", "marker.size_step", "extrude.paper_mm", "marker.flip"]) {
       await expect(page.locator(`[data-tab-body="marker"] [data-row="${r}"]`), r).toHaveCount(0);
     }
   });
 
-  test("c · Make: Size step, Trim, the heights, Flip, in that order (inkjet: Paper thickness; 3D print: Extrude, White, Black height)", async ({ page }) => {
+  test("c · Manufacture: Size step, Trim, the heights, Flip, in that order (inkjet: Paper thickness; 3D print: Extrude, White, Black height)", async ({ page }) => {
     await platePanel(page);
     await panelTab(page, "make");
     expect(await rowsByY(page, "make")).toEqual(["marker.size_step", "trim", "extrude.paper_mm", "marker.flip"]);
@@ -185,7 +224,7 @@ test.describe(`the panel skeleton (${CORE} core)`, () => {
     }
   });
 
-  test("f · inkjet and 3D presets show different printer icons: the Preset row, the presets dialog, the Make tab", async ({ page }) => {
+  test("f · inkjet and 3D presets show different printer icons: the Preset row and the presets dialog", async ({ page }) => {
     await platePanel(page);
     expect(await icon(page, '[data-testid="panel-preset"] svg')).toBe("inkjet");
     await page.getByTestId("panel-preset").click();
@@ -204,7 +243,6 @@ test.describe(`the panel skeleton (${CORE} core)`, () => {
     await usePreset(page, "print3d");
     expect(await icon(page, '[data-testid="panel-preset"] svg')).toBe("print3d");
     expect(await svg(page, '[data-testid="panel-preset"] svg')).not.toBe(inkjetRow);
-    expect(await icon(page, '[role=tab][data-tab="make"] svg')).toBe("tab-print3d");
     // each is drawn: one of its images is shown, and it has loaded
     const shown = await page.locator('[data-testid="panel-preset"] svg image').evaluateAll((els) =>
       els.filter((e) => getComputedStyle(e).display !== "none").map((e) => (e as SVGImageElement).getBBox().width));

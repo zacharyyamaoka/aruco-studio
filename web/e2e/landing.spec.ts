@@ -153,7 +153,7 @@ test.describe("landing page and crawling", () => {
     await expect(page.locator("section#heights p").first()).toContainText("measured from the white's outer face");
     await expect(page.locator("section#heights p").first()).toContainText("driven from the preset's layers");
     await expect(page.locator("section#canvas h3")).toHaveText("A marker maker on a canvas");
-    await expect(page.locator("section#profile p")).toContainText("3 tabs: Make, Marker and Label");
+    await expect(page.locator("section#profile p")).toContainText("3 tabs: Marker, Label and Manufacture");
     const stills = await page.locator("section#heights img").evaluateAll((is) => is.map((i) => i.getAttribute("src")!));
     expect(stills).toEqual(["/about/media/heights-driven.webp", "/about/media/heights-set.webp"]);
     const v = page.locator("section#canvas video");

@@ -213,7 +213,7 @@ test.describe(`the Figma layout (${CORE} core)`, () => {
     await expect(menu).toHaveCount(0);
   });
 
-  test("e · two markers, two presets: each plans with its own, the Make tab shows its own, a new marker starts with the last picked", async ({ page }) => {
+  test("e · two markers, two presets: each plans with its own, the Manufacture tab shows its own, a new marker starts with the last picked", async ({ page }) => {
     test.skip(CORE === "mock", "the method comes from the real core's MarkerPlan.extrude");
     await openStudio(page);
     await coreReady(page);
@@ -239,7 +239,7 @@ test.describe(`the Figma layout (${CORE} core)`, () => {
     s = await state(page);
     expect(s.plans[f1].extrude.method).toBe("inkjet");
     expect(s.plans[f2].extrude.method).toBe("print3d");
-    // the Preset row (Marker) and the Make tab show each one's own
+    // the Preset row (Marker) and the Manufacture tab show each one's own
     await inspect(page, f1);
     await panelTab(page, "marker");
     await expect(page.getByTestId("panel-preset")).toContainText(ink.name);

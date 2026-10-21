@@ -78,7 +78,7 @@ test("hero · plate → face → A (panel beside) → Grid → type the marker s
   mark("panel");
   await page.waitForTimeout(BEAT * 1.5);
 
-  // 3 · the Marker tab (a new feature opens on Make), then Type: the "Grid" word
+  // 3 · the Marker tab (a new feature opens on Marker), then Type: the "Grid" word
   await glideClick(page.locator('[role=tab][data-tab="marker"]'));
   await page.waitForTimeout(BEAT / 2);
   await glideClick(page.locator('[data-path="marker.type"] [data-value="grid"]'));
