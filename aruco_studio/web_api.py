@@ -22,6 +22,7 @@ Fusion composes a Joint Origin: core.geometry.jo_compose).
 | `marker.cols`, `rows` | `settings.force`: the counts along the rectangle's x / y, before the turn (a board turned 90 builds rows x cols, `MarkerPlan.outer_mm` is in its own frame) |
 | `marker.turn`, `quiet_modules`, `corner_mark` | `settings.turn` (+ `origin_v` 2), `settings.quiet_modules`, `settings.corner_mark` |
 | `preset` (method inkjet) | `settings.make` = core.make.new_make("sticker", profile): rule 2, its page, margins and paper thickness |
+| `preset.page_mm` (sheet) | the paper as given (2026-10-21): a named page portrait is that page byte for byte; any other size, or a named page wider than tall (landscape), is core.sheet's `custom_page_mm` (sheet_page) |
 | `preset` (method print3d) | `settings.make` = new_make("print3d") |
 | `preset.cell_step_mm`, `min_cell_mm` | `settings.cells` {"of": "cell", "mm": step} (0 = no snap: {"of": "marker", "mm": 0.5}, the legacy step; an inkjet's is rule 2, autosize.ROUND_RULE: its driven grid gap on 0.5 mm too) |
 | `marker.size_step`, else `preset.size_step` (barrier 11, 2026-10-20 night) | size_step_of -> cells_of: "dots" {"rule": 3, "of": "cell", "mm": 25.4 / dpi} (autosize.DOTS_RULE: whole printer dots per cell, typed sizes as typed); "mm" {"rule": 2, "of": "marker", "mm": step} (the built-ins' 0.5, rule 2 generalised); "line" or neither: from `cell_step_mm` as before, so a request without size_step is byte-identical |
@@ -164,9 +165,45 @@ def _page_key(preset: dict, issues: list) -> str:
         for k, (a, b) in _SH.PAGE_SIZES_MM.items():
             if {round(float(pm[0]), 1), round(float(pm[1]), 1)} == {round(a, 1), round(b, 1)}:
                 return k
+    custom = _page_size(preset)
+    if custom is not None:
+        # WHY said, not warned (2026-10-21): the sheet prints this size
+        # (sheet_page); only the Over the page check has no page of its size
+        issues.append({"field": "preset", "level": "info",
+                       "text": f"page {custom[0]:g} × {custom[1]:g} mm is not a named paper: "
+                               "the sheet prints it at that size; Over the page is checked against Letter"})
+        return "letter"
     issues.append({"field": "preset", "level": "warn",
                    "text": f"page {preset.get('page') or pm!r} is not one the sheet prints: Letter"})
     return "letter"
+
+
+def _page_size(preset: dict):
+    """A flat preset's `page_mm` as (w, h) mm, or None when it has none usable."""
+    pm = preset.get("page_mm")
+    if not isinstance(pm, (list, tuple)) or len(pm) != 2:
+        return None
+    try:
+        w, h = float(pm[0]), float(pm[1])
+    except (TypeError, ValueError):
+        return None
+    return (w, h) if math.isfinite(w) and math.isfinite(h) and w > 0 and h > 0 else None
+
+
+def sheet_page(preset: dict):
+    """(core.sheet's page name, custom_page_mm) for an inkjet preset's sheet.
+    WHY (review finding #9, 2026-10-21): a custom size printed as Letter and
+    a landscape A4 as portrait A4, without a word. `page_mm` is the paper as
+    given: the named page's own portrait size keeps it byte for byte (None),
+    any other size or order is custom_page_mm."""
+    page = _page_key(preset, [])
+    size = _page_size(preset)
+    if size is None:
+        return page, None
+    a, b = _SH.PAGE_SIZES_MM[page]
+    if (round(size[0], 1), round(size[1], 1)) == (round(a, 1), round(b, 1)):
+        return page, None
+    return page, size
 
 
 def make_of(preset: dict, issues: list, paper_mm=None) -> dict:
@@ -1549,12 +1586,12 @@ def sheet(req: dict, date=None) -> dict:
                              "text": f"item {i + 1} is packed by its bounding box: its outline "
                                      "is not a rectangle"})
     pr = (first or {}).get("preset") or {}
-    page = _page_key(pr, []) if pr.get("method") == "inkjet" else "letter"
+    page, custom = sheet_page(pr) if pr.get("method") == "inkjet" else ("letter", None)
     margin = float(pr["margin_mm"]) if pr.get("margin_mm") is not None else _MK.PAGE_MARGIN_MM
     mode = req.get("mode") or "spaced"
     gap = req.get("gap_mm")
     gap = _SH.SheetSettings.gap_mm if gap is None else float(gap)
-    st = _SH.SheetSettings(page=page, landscape=False, mode=mode, gap_mm=gap, margin_mm=margin,
+    st = _SH.SheetSettings(page=page, landscape=False, custom_page_mm=custom, mode=mode, gap_mm=gap, margin_mm=margin,
                            title="ArUco Studio", cut_marks=bool(req.get("cut_lines", True)),
                            packer="guillotine",
                            objective=req.get("objective") or "fewest_sheets",

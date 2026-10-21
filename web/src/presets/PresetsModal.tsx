@@ -18,7 +18,7 @@ import { downloadText } from "../io/files";
 import { CoreWait } from "../panel/Waiting";
 import { featureNumber, featurePreset, getFeature } from "../model/doc";
 import { useStudio } from "../store";
-import { chipValues, filterPresets, infoRows, methodName, NO_FILTERS, PAGES, presetStep, stepKey, stepLabel, stepOf, stepOptions, withField, type Filters, type InfoRow } from "./fields";
+import { chipValues, filterPresets, infoRows, methodName, NO_FILTERS, NOT_USED_YET, PAGES, presetStep, stepKey, stepLabel, stepOf, stepOptions, withField, type Filters, type InfoRow } from "./fields";
 import { blankPreset, exportJson, importJson, myPresets, presetNumbers, recentIds, saveMine } from "./local";
 import { Thumb } from "./Thumb";
 import "./presets.css";
@@ -54,22 +54,25 @@ function PresetInfo({ p, onChange, onDuplicate }: { p: Preset; onChange: (p: Pre
         </FieldRow>
       );
     }
+    const unused = r.unused ? <span className="muted pl-unused" data-testid={`preset-unused-${r.key}`}>{NOT_USED_YET}</span> : null;
     if (r.kind === "pair") {
       const v = p[r.key] ?? [0, 0];
       return (
-        <FieldRow key={r.key} path={`preset.${r.key}`} label={r.label}>
-          <NumberField path={`preset.${r.key}.0`} value={p[r.key]?.[0]} unit={r.unit} min={1} disabled={ro} placeholder="—"
+        <FieldRow key={r.key} path={`preset.${r.key}`} label={r.label} title={r.unused ? `${r.label}: ${NOT_USED_YET}` : undefined}>
+          <NumberField path={`preset.${r.key}.0`} value={p[r.key]?.[0]} unit={r.unit} min={1} disabled={ro || !!r.unused} placeholder="—"
             onCommit={(x) => onChange(withField(p, r.key, [x, v[1]]))} />
           <span className="times">×</span>
-          <NumberField path={`preset.${r.key}.1`} value={p[r.key]?.[1]} unit={r.unit} min={1} disabled={ro} placeholder="—"
+          <NumberField path={`preset.${r.key}.1`} value={p[r.key]?.[1]} unit={r.unit} min={1} disabled={ro || !!r.unused} placeholder="—"
             onCommit={(y) => onChange(withField(p, r.key, [v[0], y]))} />
+          {unused}
         </FieldRow>
       );
     }
     return (
-      <FieldRow key={r.key} path={`preset.${r.key}`} label={r.label} title={r.hint}>
-        <NumberField path={`preset.${r.key}`} value={p[r.key] ?? null} unit={r.unit} int={r.int} min={0} step={r.step} disabled={ro} placeholder="—"
+      <FieldRow key={r.key} path={`preset.${r.key}`} label={r.label} title={r.unused ? `${r.hint ?? r.label}: ${NOT_USED_YET}` : r.hint}>
+        <NumberField path={`preset.${r.key}`} value={p[r.key] ?? null} unit={r.unit} int={r.int} min={0} step={r.step} disabled={ro || !!r.unused} placeholder="—"
           onCommit={(v) => onChange(withField(p, r.key, v))} />
+        {unused}
       </FieldRow>
     );
   };

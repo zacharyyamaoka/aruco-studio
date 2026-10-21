@@ -23,6 +23,7 @@
 .pl-info-head .kit-btn { margin-left: auto; }
 .pl-info-note { padding: 8px 10px 0; font-size: 11px; }
 .pl-info .times { color: var(--muted); }
+.pl-info .pl-unused { flex: none; font-size: 11px; white-space: nowrap; }
 
 /* the middle: the presets listed by method (V1 Command Dialog's library), one
    row each -- a small thumb, the name over its numbers, where it lives, "current" */
