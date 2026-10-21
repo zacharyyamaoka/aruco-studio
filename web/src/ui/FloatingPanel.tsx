@@ -31,6 +31,19 @@ export function FloatingPanel({ title, icon, children, footer, collapsed, onColl
 
   useEffect(() => { setPos(null); }, [anchorKey]);
 
+  /** the space the top chrome takes in the container (the Figma layout's
+   *  pills, 2026-10-20 night): measured, so the panel never opens or is
+   *  dragged under them; 26 px (the ruler) when there is no pill */
+  const topClear = (host: HTMLElement): number => {
+    const hostTop = host.getBoundingClientRect().top;
+    let bottom = 26;
+    for (const pill of document.querySelectorAll<HTMLElement>(".pill.doc-pill, .pill.actions-pill")) {
+      const r = pill.getBoundingClientRect();
+      if (r.height) bottom = Math.max(bottom, r.bottom - hostTop + 8);
+    }
+    return bottom;
+  };
+
   // beside the anchor, measured after every render: the panel's own height
   // changes with its tab and rows (set only when it moved, so no loop)
   useLayoutEffect(() => {
@@ -38,7 +51,7 @@ export function FloatingPanel({ title, icon, children, footer, collapsed, onColl
     if (!el || !host || !anchor || pos || docked()) { if (auto) setAuto(null); return; }
     const body = el.querySelector<HTMLElement>(".fpanel-body");
     const natural = el.offsetHeight - (body?.clientHeight ?? 0) + (body?.scrollHeight ?? 0);
-    const p = placeBeside(anchor, { w: el.offsetWidth, h: natural }, { w: host.clientWidth, h: host.clientHeight }, {}, avoid);
+    const p = placeBeside(anchor, { w: el.offsetWidth, h: natural }, { w: host.clientWidth, h: host.clientHeight }, { top: topClear(host) }, avoid);
     const near = (a: number, b: number | undefined) => b !== undefined && Math.abs(a - b) < 0.5;
     if (!auto || !near(p.x, auto.x) || !near(p.y, auto.y) || !near(p.maxH, auto.maxH) || p.side !== auto.side) setAuto(p);
   });
@@ -55,7 +68,7 @@ export function FloatingPanel({ title, icon, children, footer, collapsed, onColl
     if (!el || !host) return { x, y };
     return {
       x: Math.max(0, Math.min(x, host.clientWidth - el.offsetWidth)),
-      y: Math.max(0, Math.min(y, host.clientHeight - 32)),
+      y: Math.max(topClear(host), Math.min(y, host.clientHeight - 32)),
     };
   };
 

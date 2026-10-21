@@ -5,7 +5,7 @@
 // 390 × 844) go to LAYOUT_SHOTS (default test-results/layout).
 import path from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, dragWorld, idle, openPresets, openStudio, panelTab, pickSkin, state, toggleTheme } from "./helpers";
+import { CORE, clickAt, coreReady, dragWorld, idle, openPresets, openStudio, panelTab, pickSkin, state, toClient, toggleTheme } from "./helpers";
 
 const SHOTS = process.env.LAYOUT_SHOTS ?? "test-results/layout";
 const FIXTURE_V3 = path.join(import.meta.dirname, "fixtures", "v3-a4.arucostudio-web.json");
@@ -380,5 +380,35 @@ test.describe(`the Figma layout (${CORE} core)`, () => {
     const pnl = await box(page.getByTestId("extrude-panel"));
     expect(meet(top, pnl), "the panel opens clear of the top-right pill").toBe(false);
     await toggleTheme(page);
+  });
+
+  // WHY (2026-10-20 night): the panel used to keep only the ruler's 26 px
+  // clear, so a marker at the very top opened its panel under the Figma pills
+  test("j · a marker at the very top opens its panel below the top pills, and a drag can't push it under them", async ({ page }) => {
+    await openStudio(page);
+    await coreReady(page);
+    await page.getByTestId("menu-file").click();
+    await page.getByTestId("cmd-new").click();
+    // the world y at client y 40 (just under the window's top edge): two samples of the linear map
+    const [, ya] = await toClient(page, 0, 0), [, yb] = await toClient(page, 0, 10);
+    const yTop = (40 - ya) / ((yb - ya) / 10);
+    await page.keyboard.press("r");
+    await dragWorld(page, [-15, yTop], [15, yTop - 20]);
+    await page.keyboard.press("a");
+    const panel = page.getByTestId("extrude-panel");
+    await expect(panel).toBeVisible();
+    await idle(page);
+    const box = async (l: Locator) => l.evaluate((e) => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }; });
+    const pills = [await box(page.getByTestId("doc-pill")), await box(page.getByTestId("actions-pill"))];
+    const lowest = Math.max(...pills.map((r) => r.bottom));
+    await expect.poll(async () => (await box(panel)).top, { message: "the panel's top clears both pills" }).toBeGreaterThanOrEqual(lowest);
+    // drag its title bar to the very top: it stops below the pills
+    const head = panel.locator(".fpanel-head").first();
+    const h = await box(head);
+    await page.mouse.move((h.left + h.right) / 2, (h.top + h.bottom) / 2);
+    await page.mouse.down();
+    await page.mouse.move((h.left + h.right) / 2, 2, { steps: 8 });
+    await page.mouse.up();
+    expect((await box(panel)).top).toBeGreaterThanOrEqual(lowest);
   });
 });
