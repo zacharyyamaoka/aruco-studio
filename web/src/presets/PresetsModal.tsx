@@ -20,20 +20,8 @@ import { featureNumber, featurePreset, getFeature } from "../model/doc";
 import { useStudio } from "../store";
 import { chipValues, filterPresets, infoRows, methodName, NO_FILTERS, PAGES, presetStep, stepKey, stepLabel, stepOf, stepOptions, withField, type Filters, type InfoRow } from "./fields";
 import { blankPreset, exportJson, importJson, myPresets, presetNumbers, recentIds, saveMine } from "./local";
+import { Thumb } from "./Thumb";
 import "./presets.css";
-
-function thumb(p: Preset): string {
-  const mk = `<path fill-rule="evenodd" fill="#111" d="M0 0h24v24H0zM4 4h5v5H4zM13 9h5v5h-5zM4 14h4v4H4z"/>`;
-  if (p.method === "inkjet") {
-    const [w, h] = p.page_mm ?? [216, 279];
-    const s = 76 / Math.max(w, h);
-    return `<svg viewBox="0 0 ${w * s + 4} ${h * s + 4}" width="${w * s + 4}" height="${h * s + 4}"><rect x="2" y="2" width="${w * s}" height="${h * s}" fill="#fff" stroke="#9aa3ae"/>`
-      + `<g transform="translate(${2 + (w * s) / 2 - 12} 12)">${mk}</g><text x="${2 + (w * s) / 2}" y="${h * s - 6}" font-size="8" text-anchor="middle" fill="#6b7480" font-family="sans-serif">${p.page ?? ""}</text></svg>`;
-  }
-  const lines = Array.from({ length: 6 }, (_, i) => `<path d="M${60 + i * 4} 14v52" stroke="#2f6fed" stroke-width="1.2"/>`).join("");
-  return `<svg viewBox="0 0 96 80" width="96" height="80"><rect x="6" y="14" width="44" height="52" fill="#fff"/><g transform="translate(10 22) scale(1.5)">${mk}</g>`
-    + `<rect x="58" y="14" width="26" height="52" fill="none" stroke="#9aa3ae"/>${lines}<text x="71" y="76" font-size="7" text-anchor="middle" fill="#6b7480" font-family="sans-serif">${p.line_mm ?? ""} mm</text></svg>`;
-}
 
 const METHODS: Preset["method"][] = ["inkjet", "print3d"];
 
@@ -223,7 +211,7 @@ function PresetsLibrary() {
                     <div key={p.id} className={`card pl-item${p.id === picked ? " on" : ""}`} role="option" aria-selected={p.id === picked}
                       data-card={p.id} data-mark={p.id === current?.id ? "current" : undefined}
                       onClick={() => setPicked(p.id)} onDoubleClick={() => choose(p.id)}>
-                      <div className="thumb" dangerouslySetInnerHTML={{ __html: thumb(p) }} />
+                      <div className="thumb"><Thumb p={p} /></div>
                       <div className="pl-text">
                         <div className="name"><Glyph name={p.method} size={12} className="pl-method" /><span className="pl-name">{p.name}</span></div>
                         <div className="sub">{presetNumbers(p)}</div>
