@@ -1,4 +1,4 @@
-// Edit › Re-ID all markers… (modal "reid"): give every driven marker new ids
+// Edit › ArUco Re-ID… (modal "reid"): give every driven marker new ids
 // at once, Sequential (document order from Start, each grid / board a
 // contiguous block) or a fresh hash. The table previews what the core would
 // give out -- core.assign_ids({items, mode, start, fresh: true}), not applied
@@ -71,7 +71,7 @@ export function ReIdDialog() {
   };
 
   return (
-    <Dialog open={open} onClose={close} title="Re-ID all markers" icon="marker" testid="reid-dialog" width={640} className="reid-dialog"
+    <Dialog open={open} onClose={close} title="ArUco Re-ID" icon="marker" testid="reid-dialog" width={640} className="reid-dialog"
       footer={<>
         <span className="reid-sum muted" data-testid="reid-summary">
           {res ? `${moved} of ${doc.features.length} marker${doc.features.length === 1 ? "" : "s"} change` : wait ? <WaitLine wait={wait} testid="reid-wait" /> : error ? "" : "Working it out…"}
