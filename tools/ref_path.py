@@ -30,6 +30,22 @@ def git(*args: str) -> str:
                           check=True).stdout.decode("utf-8")
 
 
+def head_reachable() -> bool:
+    """True when REF is a git checkout that holds REF_HEAD, the commit the port
+    is compared with. False on a machine whose REF is another clone, or none."""
+    if not (REF / ".git").exists():
+        return False
+    return subprocess.run(["git", "-C", str(REF), "cat-file", "-e", f"{REF_HEAD}^{{commit}}"],
+                          capture_output=True).returncode == 0
+
+
+def head_missing_note() -> str:
+    """Why the port-fidelity checks cannot run here ('' when they can)."""
+    if head_reachable():
+        return ""
+    return f"REF {REF_HEAD} not in {REF}: port fidelity unchecked on this machine"
+
+
 def show(path: str, commit: str = REF_COMMIT) -> bytes:
     """A file's bytes at the pinned commit."""
     return subprocess.run(["git", "-C", str(REF), "show", f"{commit}:{path}"],
