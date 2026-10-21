@@ -24,12 +24,27 @@ import {
 import { HostedFilesError } from "./errors.js";
 import { randomId, withExtension } from "./format.js";
 import { SignInFlow } from "./signin.js";
-import type { Draft, EventName, FileMeta, HostedFilesOptions, Me, SignInMethods, State, Status, User } from "./types.js";
+import type {
+  AgentLink,
+  AgentLinkMode,
+  CreatedAgentLink,
+  Draft,
+  EventName,
+  FileMeta,
+  HostedFilesOptions,
+  Me,
+  SignInMethods,
+  State,
+  Status,
+  User,
+} from "./types.js";
 
 export const MSG_OFFLINE = "Not saved online yet — kept on this device";
 export const MSG_CONFLICT = "Changed somewhere else — both versions are in History";
 export const MSG_EMPTY = "Didn't save an empty document over your file";
 export const MSG_UPDATED = "Updated elsewhere";
+export const MSG_UPDATED_BY_AGENT = "Updated by an agent";
+const MSG_STALE_DIRTY = `${MSG_UPDATED} — saving keeps both`;
 export const MSG_RESTORED = "Restored your unsaved text";
 
 // SPEC §7.2: retry after 2 s, 5 s, 15 s, 30 s, then every 60 s.
@@ -42,6 +57,14 @@ const AUTOSAVE_IDLE_MS = 1_500;
 const AUTOSAVE_MAX_INTERVAL_MS = 20_000;
 const LOCAL_DRAFT_MS = 500;
 const KEEPALIVE_MAX_BYTES = 60 * 1024;
+// SPEC v2.8: live updates poll the open file's head this often while the page is visible.
+const LIVE_INTERVAL_MS = 5_000;
+// WHY a confirming look before a newer head replaces the text: the person here may be about to
+// type into what they see (back from another tab, mid-thought). Swapping the text the instant a new
+// head appears races that keystroke and silently rebases it onto text they never read; waiting a
+// beat lets the keystroke win, and the edit then lands as "both versions kept" (SPEC §7.3). Only a
+// head still newer after this long, with nothing typed meanwhile, is loaded.
+const LIVE_CONFIRM_MS = 1_500;
 
 export const DISCARD = Symbol("discard");
 
@@ -95,6 +118,11 @@ export class HostedFiles {
   private signingIn: Promise<User> | null = null;
   private flow: SignInFlow | null = null;
   private methods: Promise<SignInMethods> | null = null;
+  private authOrigin: string | null = null; // SPEC v2.9: methods.authOrigin once loaded, when it is not the server's
+  private liveMs: number | null; // null: live updates off
+  private liveTimer: ReturnType<typeof setInterval> | null = null;
+  private confirmTimer: ReturnType<typeof setTimeout> | null = null;
+  private seenHead: { id: string; at: number } | null = null; // a newer head seen once, not loaded yet
   staleHead: FileMeta | null = null;
 
   constructor(options: HostedFilesOptions) {
@@ -110,6 +138,8 @@ export class HostedFiles {
       maxIntervalMs: (typeof autosave === "object" && autosave.maxIntervalMs) || AUTOSAVE_MAX_INTERVAL_MS,
     };
     this.current.autosave = this.storedAutosave() ?? autosave !== false;
+    const live = options.liveUpdates;
+    this.liveMs = live === false ? null : (typeof live === "object" && live.intervalMs) || LIVE_INTERVAL_MS;
     this.migrateLegacyToken();
 
     // WHY retry on `online`: an offline save sits in IndexedDB; the moment the network is
@@ -196,6 +226,7 @@ export class HostedFiles {
 
   private set(patch: Partial<State>): void {
     this.current = { ...this.current, ...patch };
+    this.syncLive();
     this.notify();
   }
 
@@ -337,6 +368,11 @@ export class HostedFiles {
   private signInMethods(): Promise<SignInMethods> {
     this.methods ??= this.api
       .json<SignInMethods>("GET", `/v1/session/methods?app=${encodeURIComponent(this.app)}`, { anonymous: true })
+      .then((methods) => {
+        const origin = methods.authOrigin ? new URL(methods.authOrigin).origin : null;
+        this.authOrigin = origin && origin !== new URL(this.server).origin ? origin : null;
+        return methods;
+      })
       .catch((err) => {
         this.methods = null;
         throw err;
@@ -346,9 +382,13 @@ export class HostedFiles {
 
   // The hosted /connect page in a pop-up: the Google path of the dialog (`provider`), and all of
   // sign-in when no UI is mounted. `close` abandons it (rejects `popup_closed`).
+  // SPEC v2.9: it opens on methods.authOrigin when the dialog has loaded it (an app's own sign-in host, so Google
+  // shows the app's brand); otherwise on the server, which still signs every app in.
   private connectSignIn(provider?: "google"): { done: Promise<User>; close: () => void } {
     const state = randomId();
-    const connect = `${this.server}/connect?app=${encodeURIComponent(this.app)}&origin=${encodeURIComponent(location.origin)}&state=${state}${provider ? `&provider=${provider}` : ""}`;
+    const signInBase = this.authOrigin ?? this.server;
+    const signInOrigin = new URL(signInBase).origin;
+    const connect = `${signInBase}/connect?app=${encodeURIComponent(this.app)}&origin=${encodeURIComponent(location.origin)}&state=${state}${provider ? `&provider=${provider}` : ""}`;
     const leave = () => ({ done: this.redirectSignIn(connect, state), close: () => {} });
     if (this.opts.signInMode === "redirect") return leave();
     const width = 440;
@@ -359,7 +399,6 @@ export class HostedFiles {
     // WHY the redirect fallback: a blocked popup must not leave the user unable to sign in.
     if (!popup) return leave();
 
-    const serverOrigin = new URL(this.server).origin;
     let close = () => {};
     const done = new Promise<User>((resolve, reject) => {
       let finished = false;
@@ -378,7 +417,7 @@ export class HostedFiles {
         reject(err);
       };
       const onMessage = async (event: MessageEvent) => {
-        if (event.origin !== serverOrigin) return;
+        if (event.origin !== signInOrigin) return;
         const data = event.data as { type?: string; token?: string; state?: string } | null;
         if (!data || data.type !== "shf:token" || data.state !== state || !data.token) return;
         cleanup();
@@ -585,6 +624,7 @@ export class HostedFiles {
     this.retryTimer = null;
     this.blocked = null;
     this.staleHead = null;
+    this.seenHead = null;
     this.untitled = null;
     this.lastFile = this.current.file ?? this.lastFile;
     this.nextDoc();
@@ -606,8 +646,11 @@ export class HostedFiles {
 
   markDirty(): void {
     this.dirty = true;
-    this.staleHead = null;
-    if (this.current.user && !this.saving) this.setStatus("dirty");
+    this.seenHead = null; // a keystroke wins over a newer head not loaded yet
+    // A newer head with live updates on stays announced while typing: saving keeps both (SPEC v2.8).
+    // Without them, typing over a stale copy is the pre-v2.8 conflict path and the banner goes.
+    if (this.liveMs === null) this.staleHead = null;
+    if (this.current.user && !this.saving) this.setStatus("dirty", this.staleHead ? MSG_STALE_DIRTY : null);
     this.scheduleLocal();
     this.scheduleAutosave();
   }
@@ -616,6 +659,7 @@ export class HostedFiles {
   // editor, and the previous document's autosave timers are void.
   private nextDoc(): void {
     this.docSeq++;
+    this.seenHead = null;
     this.clearAutosaveTimers();
   }
 
@@ -684,6 +728,7 @@ export class HostedFiles {
   // The page is being hidden or unloaded: keep the working copy now and send the autosave
   // with fetch keepalive so it can outlive the page (SPEC v2.4).
   private onHide(): void {
+    this.syncLive();
     if (this.localTimer) this.flushLocal();
     if (this.dirty && this.canAutosave) this.autosave(this.docSeq, true);
   }
@@ -866,6 +911,8 @@ export class HostedFiles {
     this.draftSeq.delete(draft.id!);
     if (this.blocked?.draftId === draft.id) this.blocked = null;
     const isCurrent = seq === this.docSeq && (draft.fileId === null || this.current.file?.id === draft.fileId);
+    // Ours is the head now ("ours on top" after a conflict): the newer head is in history, not pending.
+    if (isCurrent && this.staleHead?.id === meta.id && meta.version >= this.staleHead.version) this.staleHead = null;
     if (isCurrent) this.set({ file: meta });
     this.set({ lastSavedAt: new Date().toISOString() });
     if (conflicted) {
@@ -1023,9 +1070,10 @@ export class HostedFiles {
     });
   }
 
-  // Loads a file's head into the app via setContent and makes it the current file.
-  private async load(meta: FileMeta): Promise<void> {
-    const blob = await this.files.read(meta.id, { version: meta.version });
+  // Loads a file's head into the app via setContent and makes it the current file. `blob`: the
+  // bytes already read (a live update reads them before deciding to load).
+  private async load(meta: FileMeta, blob?: Blob, opts: { quiet?: boolean } = {}): Promise<void> {
+    blob ??= await this.files.read(meta.id, { version: meta.version });
     this.nextDoc();
     this.staleHead = null;
     await this.opts.setContent(blob, meta);
@@ -1033,7 +1081,7 @@ export class HostedFiles {
     this.flushLocal();
     this.set({ file: meta, lastSavedAt: meta.updatedAt });
     this.settledStatus();
-    this.emit("open", meta);
+    if (!opts.quiet) this.emit("open", meta);
   }
 
   openPicker(): void {
@@ -1112,12 +1160,33 @@ export class HostedFiles {
 
   private onFocus(): void {
     if (this.blocked || this.limitParked.size || this.checkoutTimer) void this.checkPlan();
+    this.syncLive();
     void this.checkHead();
   }
 
+  // ---- live updates (SPEC v2.8) ----------------------------------------------------------
+
+  // Polls only while it can matter: live updates on, signed in, a file open, the page visible.
+  private syncLive(): void {
+    const on = this.liveMs !== null && !!this.current.user && !!this.current.file && document.visibilityState !== "hidden";
+    if (on && !this.liveTimer) this.liveTimer = setInterval(() => void this.checkHead(), this.liveMs!);
+    if (!on && this.liveTimer) {
+      clearInterval(this.liveTimer);
+      this.liveTimer = null;
+    }
+    if (!on && this.confirmTimer) {
+      clearTimeout(this.confirmTimer);
+      this.confirmTimer = null;
+    }
+  }
+
+  // Has the open file's head moved past the version we loaded or saved? Nothing unsaved here: it
+  // loads (after a confirming look, LIVE_CONFIRM_MS). Unsaved changes: they are never touched; the
+  // stale banner says so, and saving keeps both. Live updates off: the pre-v2.8 Reload banner.
   private async checkHead(): Promise<void> {
     const file = this.current.file;
-    if (!file || this.dirty || this.saving || !this.current.user) return;
+    if (!file || this.saving || !this.current.user || document.visibilityState === "hidden") return;
+    if (this.liveMs === null && this.dirty) return;
     const seq = this.docSeq;
     let head: FileMeta;
     try {
@@ -1125,12 +1194,67 @@ export class HostedFiles {
     } catch {
       return;
     }
-    if (seq !== this.docSeq || this.dirty || this.saving || this.current.file?.id !== head.id) return;
+    const current = this.current.file;
+    if (seq !== this.docSeq || this.saving || current?.id !== head.id) return;
     this.patchFile(head);
-    if (head.version > file.version) {
+    if (head.version <= current.version) {
+      this.seenHead = null;
+      return;
+    }
+    if (this.liveMs === null) {
       this.staleHead = head;
       this.set({ message: `${MSG_UPDATED} — Reload` });
+      return;
     }
+    if (this.dirty) {
+      this.seenHead = null;
+      this.staleHead = head;
+      if (this.current.status === "dirty") this.setStatus("dirty", MSG_STALE_DIRTY);
+      return;
+    }
+    const seen = this.seenHead;
+    // WHY the 100 ms slack: a timer may fire a hair before Date.now() says the delay has passed.
+    if (seen?.id !== head.id || Date.now() - seen.at < LIVE_CONFIRM_MS - 100) {
+      if (seen?.id !== head.id) this.seenHead = { id: head.id, at: Date.now() };
+      this.confirmTimer ??= setTimeout(() => {
+        this.confirmTimer = null;
+        void this.checkHead();
+      }, LIVE_CONFIRM_MS);
+      return;
+    }
+    this.seenHead = null;
+    await this.liveLoad(head);
+  }
+
+  private liveLoad(head: FileMeta): Promise<void> {
+    // Still loadable: the same file, still behind this head, and not one keystroke typed since.
+    const loadable = () => !this.dirty && !this.saving && !!this.current.user && this.current.file?.id === head.id && head.version > this.current.file.version;
+    return this.enqueue(async () => {
+      if (!loadable()) return;
+      const blob = await this.files.read(head.id, { version: head.version });
+      if (!loadable()) return; // typed while the bytes were on their way: the next look shows the banner
+      await this.load(head, blob, { quiet: true });
+      this.setStatus("saved", head.headKind === "agent" ? MSG_UPDATED_BY_AGENT : MSG_UPDATED);
+    }).catch(() => {});
+  }
+
+  // ---- agent links (SPEC v2.8) ------------------------------------------------------------
+
+  // A link a local agent (Claude Code, Codex …) uses to pull this file and push it back. `prompt`
+  // is the line to paste into the agent; the token is shown only now.
+  createAgentLink(fileId: string, opts: { mode?: AgentLinkMode; ttlHours?: number } = {}): Promise<CreatedAgentLink> {
+    return this.api.json<CreatedAgentLink>("POST", `/v1/files/${fileId}/agent-links`, { body: opts });
+  }
+
+  async listAgentLinks(fileId: string): Promise<AgentLink[]> {
+    const { links } = await this.api.json<{ links: AgentLink[] }>("GET", `/v1/files/${fileId}/agent-links`);
+    return links;
+  }
+
+  // Revokes one link; the agent holding it gets 404 from then on. Idempotent.
+  async revokeAgentLink(fileId: string, linkId: string): Promise<number> {
+    const { revoked } = await this.api.json<{ revoked: number }>("DELETE", `/v1/files/${fileId}/agent-links/${encodeURIComponent(linkId)}`);
+    return revoked;
   }
 
   // ---- limit, checkout ------------------------------------------------------------------

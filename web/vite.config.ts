@@ -34,5 +34,5 @@ export default defineConfig({
   worker: { format: "es" },
   build: { outDir: "dist", emptyOutDir: true, chunkSizeWarningLimit: 1500 },
   // vitest: unit tests only; web/e2e is Playwright's (npm run e2e).
-  test: { include: ["src/**/*.test.ts"] },
+  test: { include: ["src/**/*.test.ts", "worker/**/*.test.ts"] },
 });

@@ -18,6 +18,7 @@ export type NameAnswer = string | null | typeof DISCARD
 export type Panel =
   | { kind: "browse"; tab: "files" | "trash"; query: string }
   | { kind: "history"; fileId: string }
+  | { kind: "agent"; fileId: string }
   | { kind: "limit"; variant: "files" | "locked"; waiting: boolean }
   | { kind: "name"; title: string; value: string; okLabel: string; discard: boolean; resolve: (answer: NameAnswer) => void }
 
@@ -317,6 +318,11 @@ export function useHostedFilesActions() {
       restoreVersion: (n: number) => {
         ui.close()
         return run(() => hostedFiles.restoreVersion(n), `Version ${n} is now the current version`)
+      },
+      // "Edit with an agent…" (SPEC v2.8): only a saved file the plan lets you edit.
+      showAgent: () => {
+        const file = hostedFiles.state.file
+        if (file && !file.locked) ui.open({ kind: "agent", fileId: file.id })
       },
       reload: () => run(() => hostedFiles.reload()),
       exportAll: () => run(() => hostedFiles.exportAll(), "Exported every file as a .zip"),

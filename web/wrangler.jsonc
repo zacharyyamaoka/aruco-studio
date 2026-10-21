@@ -1,15 +1,29 @@
 // Cloudflare deploy of the online Studio: a static-assets Worker serving dist/
-// (no server code; the Python core runs in the visitor's browser).
+// (the Python core runs in the visitor's browser), plus a tiny proxy for
+// sign-in (worker/index.ts).
 // `npm --prefix web run deploy` builds and uploads. The custom domains attach
 // automatically: arucostudio.com's zone is on the same Cloudflare account.
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "aruco-studio",
+  "main": "worker/index.ts",
   "compatibility_date": "2026-10-18",
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "404-page"
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    // WHY only these paths reach the Worker: ArUco Studio's sign-in runs on arucostudio.com
+    // (simple-hosted-files SPEC v2.9), so Google's consent screen can show "ArUco Studio" and its
+    // logo once the brand is verified. These are the paths the hosted /connect pop-up uses on its
+    // own origin (simple-hosted-files server/src/connect.ts); everything else stays a static file.
+    "run_worker_first": ["/api/auth/*", "/connect", "/connect/*", "/v1/me", "/v1/me/keep"]
   },
+  // The Simple Hosted Files Worker, same Cloudflare account. Locally, `wrangler dev` links it
+  // through the dev registry when that Worker also runs under `wrangler dev`. Pass
+  // `--local-upstream localhost:<port> --upstream-protocol http` there, or requests reach the
+  // Worker as https://arucostudio.com (the first route) and sign-in takes the real-domain path
+  // (e2e/authhost.spec.ts has the whole local setup).
+  "services": [{ "binding": "HOSTED_FILES", "service": "simple-hosted-files" }],
   // WHY workers_dev on: aruco-studio.<account>.workers.dev keeps working if DNS breaks.
   "workers_dev": true,
   "routes": [
