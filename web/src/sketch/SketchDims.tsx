@@ -6,8 +6,8 @@
 import { useRef } from "react";
 import type { Vec2 } from "../core/contract";
 import { ARROW, DIM_CSS, EXT_GAP, EXT_OVER, FONT_PX, TEXT_H, arrow, fmtDim, textWidth } from "./Dims";
-import { measure, refCoord, type DimRef, type SketchDim } from "./constraints";
-import type { Shape } from "./model";
+import { dimShapes, measure, refCoord, type DimRef, type SketchDim } from "./constraints";
+import type { ProfileRef, Shape } from "./model";
 
 export interface LaidSketchDim {
   dim: SketchDim;
@@ -79,6 +79,23 @@ export function laySketchDim(shapes: Shape[], d: SketchDim, scr: (p: Vec2) => Ve
   if (angle >= 90) angle -= 180;
   if (angle < -90) angle += 180;
   return { dim: d, value: Math.abs(v), text, a, b, p, q, inside, fits, at, angle, tw };
+}
+
+/** The sketch dims to draw while a feature is in focus and its own marker dims
+ *  show: those that measure only the feature's PROFILE shapes are left out, so
+ *  the two sets are not drawn on top of each other. Display only: the dims stay
+ *  in the document. WHY (Zach, 2026-10-21: "hide the exterior dimensions on the
+ *  profile if they are set; it's confusing seeing both sets"); `profile` is
+ *  null when the profile shape itself is being edited (an edge click, the D
+ *  tool), when its dims come back. A dim that names a shape outside the
+ *  profile stays. */
+export function visibleSketchDims(dims: LaidSketchDim[], profile: ProfileRef | null): LaidSketchDim[] {
+  if (!profile) return dims;
+  const own = new Set([profile.outer, ...profile.holes]);
+  return dims.filter((d) => {
+    const named = dimShapes(d.dim);
+    return !(named.length > 0 && named.every((id) => own.has(id)));
+  });
 }
 
 const CSS = `
