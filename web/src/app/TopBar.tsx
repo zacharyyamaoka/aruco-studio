@@ -1,15 +1,16 @@
 // The chrome around the canvas, Figma's (V2 "Figma · Corner pills" in
 // reports/media/studio-layout-proposals-2026-10-20.html, picked by Zach on
-// 2026-10-20 night: "For the design let's please follow Figma!"): two corner
-// pills over the canvas and, in the bottom corner, ? and GitHub.
-// - Top left, the document pill: the logo (the landing page), File, Edit,
-//   Export, then the title bar of Simple Hosted Files (the registry's
+// 2026-10-20 night: "For the design let's please follow Figma!"; UI3's as
+// help.figma.com draws it): two corner pills over the canvas and, in the
+// bottom corner, ? and GitHub.
+// - Top left, the document pill: the main menu (the logo with ⌄: Back to
+//   files, then File, Edit, Export, View, Preferences and Help as submenus),
+//   then the title bar of Simple Hosted Files (the registry's
 //   hosted-files-title-bar, in the kit): the document's name, which is its
 //   cloud file's name (click to rename), a quiet status dot (it opens
-//   History), and ⌄: the cloud file's menu, the account, Theme and Skin (on
-//   a phone also File, Edit, Export, Download for CAD, GitHub and the keys).
-//   Signed out, ⌄ offers "Sign in to save online" and the Studio works as
-//   before; File keeps Open from this computer and the Download.
+//   History), and ⌄: the cloud file's menu and the account (on a phone also
+//   Download for CAD). Signed out, ⌄ offers "Sign in to save online" and the
+//   Studio works as before; File keeps Open from this computer and the Download.
 // - Top right: Download for CAD, then Verify | Print (K, S: in the tooltips,
 //   no key badges).
 // - Bottom right: ? (the keys, and how the start went) and GitHub.
@@ -23,9 +24,10 @@
 // "No need for hot keys on those corner buttons. GitHub maybe better in the
 // bottom corner."
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Menu as M } from "@base-ui/react/menu";
 import { Popover } from "@base-ui/react/popover";
 import { Button, Dialog, Glyph, Kbd, Menu, MenuItem, MenuSeparator, cn, useTheme } from "@bam/ui";
-import { Check, CircleHelp, Moon, RotateCcw, Sun } from "lucide-react";
+import { Check, ChevronRight, CircleHelp, Moon, RotateCcw, Sun } from "lucide-react";
 import { relativeTime } from "../hosted/core";
 import { newDocument, renameDocument } from "../hosted/hosted";
 import { useFiles, useHostedFiles, useHostedFilesActions, useStatus } from "../hosted/react";
@@ -35,6 +37,7 @@ import { WaitLine, failedDetail, reload, startingText, useTick } from "../panel/
 import { useStudio } from "../store";
 import { SKINS, useSkin } from "../skins/skins";
 import { exportPdf, exportSvg, openDoc, openPrint, openVerify, saveDoc } from "./commands";
+import { openHome } from "./home";
 
 export const GITHUB = "https://github.com/zacharyyamaoka/aruco-studio";
 /** At or under this width the pills fold into the ⌄ menu (styles.css, the same number). */
@@ -95,47 +98,127 @@ function CadMenu() {
   );
 }
 
-function FileMenu() {
-  const st = useStudio.getState;
+/** A submenu of the main menu (Figma's File ›, Edit ›, …): it opens on hover
+ *  or a click, to the side. On a phone (`inline`) it is a group in the menu
+ *  itself: beside a 230 px menu there is no side, and a submenu laid over its
+ *  parent would hide the next one. */
+function Sub({ label, testid, inline, children }: { label: string; testid: string; inline?: boolean; children: ReactNode }) {
+  if (inline) {
+    return (
+      <M.Group className="mm-group" data-testid={`${testid}-popup`}>
+        <M.GroupLabel className="mm-h">{label}</M.GroupLabel>
+        {children}
+      </M.Group>
+    );
+  }
   return (
-    <Menu label="File" testid="menu-file">
-      <MenuItem icon="sketch" label="New" testid="cmd-new" onClick={newDocument} />
-      <MenuItem icon="library" label="Examples…" testid="cmd-examples" onClick={() => st().openModal("examples")} />
-      <MenuItem label="Open from this computer…" testid="cmd-open" onClick={() => void openDoc()} />
-      <MenuSeparator />
-      <MenuItem label="Download" hint=".arucostudio-web.json" testid="cmd-save" onClick={saveDoc} />
-    </Menu>
+    <M.SubmenuRoot>
+      <M.SubmenuTrigger className="kit-menu-item mm-sub" data-testid={testid}>
+        <span className="ic" /><span className="kit-menu-label">{label}</span><ChevronRight size={14} className="mm-chev" />
+      </M.SubmenuTrigger>
+      <M.Portal>
+        <M.Positioner side="right" align="start" sideOffset={4} alignOffset={-5} className="kit-menu-positioner">
+          <M.Popup className="kit-menu-popup mm-popup" data-kit-popup="menu" data-testid={`${testid}-popup`}>{children}</M.Popup>
+        </M.Positioner>
+      </M.Portal>
+    </M.SubmenuRoot>
   );
 }
 
-/** Edit: the document's history (store.undo / redo, the keys App.tsx binds),
- *  ArUco Re-ID… (ReIdDialog.tsx) and Presets… (the open marker's preset, or
- *  the one a new marker starts with). */
-function EditMenu() {
+/** A radio-like row: a check when it is the one. */
+function Pick({ on, label, testid, onClick, disabled, title }: { on: boolean; label: ReactNode; testid: string; onClick: () => void; disabled?: boolean; title?: string }) {
+  return (
+    <M.Item className={cn("kit-menu-item", disabled && "dis")} data-testid={testid} aria-checked={on} role="menuitemradio" disabled={disabled} title={title}
+      onClick={onClick}>
+      <span className="ic">{on && <Check size={14} />}</span><span className="kit-menu-label">{label}</span>
+    </M.Item>
+  );
+}
+
+/** The main menu (Figma UI3's: the logo with ⌄, top left): Back to files, then
+ *  File, Edit, Export, View, Preferences and Help, each a submenu.
+ *  WHY no inline File / Edit / Export (Zach, 2026-10-20 night): "Figma doesn't
+ *  have the file edit export etc there... it's in a drop down when you press
+ *  the icon, and there is also the button there when you click the icon to go
+ *  home". */
+function MainMenu({ onHelp }: { onHelp: () => void }) {
   const canUndo = useStudio((s) => s.canUndo);
   const canRedo = useStudio((s) => s.canRedo);
   const markers = useStudio((s) => s.doc.features.length);
+  const view3d = useStudio((s) => s.view3d);
+  const { state } = useHostedFiles();
+  const actions = useHostedFilesActions();
+  const [theme, setTheme] = useTheme();
+  const [skin, setSkin] = useSkin();
+  const pinned = skin.theme ? `${skin.name} is ${skin.theme} only` : undefined;
+  const inline = useNarrow();
   const st = useStudio.getState;
   return (
-    <Menu label="Edit" testid="menu-edit">
-      <MenuItem label="Undo" hint="Ctrl+Z" testid="cmd-undo" disabled={!canUndo} onClick={() => st().undo()} />
-      <MenuItem label="Redo" hint="Ctrl+Shift+Z" testid="cmd-redo" disabled={!canRedo} onClick={() => st().redo()} />
-      <MenuSeparator />
-      <MenuItem icon="marker" label="ArUco Re-ID…" testid="cmd-reid" disabled={!markers}
-        title={markers ? undefined : "No markers yet: make an ArUco Extrude (A) first"} onClick={() => st().openModal("reid")} />
-      <MenuItem icon="inkjet" label="Presets…" testid="cmd-presets" title="How a marker is made: the open marker's preset, or the one a new marker starts with"
-        onClick={() => st().openModal("presets")} />
-    </Menu>
-  );
-}
-
-function ExportMenu() {
-  return (
-    <Menu label="Export" testid="menu-export">
-      <MenuItem icon="print" label="Print…" hint="S" testid="cmd-print" onClick={openPrint} />
-      <MenuItem label="SVG" hint="the marker, true size" testid="cmd-svg" onClick={() => void exportSvg()} />
-      <MenuItem label="PDF" hint="the marker's preset's page" testid="cmd-pdf" onClick={() => void exportPdf()} />
-    </Menu>
+    <M.Root modal={false}>
+      <M.Trigger className="logo-btn" data-testid="menu-main" title="Main menu" aria-label="Main menu">
+        <BrandCube />
+        <svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true" className="chev"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>
+      </M.Trigger>
+      <M.Portal>
+        <M.Positioner side="bottom" align="start" sideOffset={8} className="kit-menu-positioner">
+          <M.Popup className="kit-menu-popup mm-popup" data-kit-popup="menu" data-testid="main-menu">
+            <MenuItem label="Back to files" testid="cmd-home" onClick={openHome} />
+            <MenuSeparator />
+            <Sub label="File" testid="menu-file" inline={inline}>
+              <MenuItem icon="sketch" label="New" testid="cmd-new" onClick={newDocument} />
+              <MenuItem label="Open…" hint={state.user ? "your files online" : undefined} testid="cmd-open-cloud" onClick={() => (state.user ? actions.showFiles() : openHome())} />
+              <MenuItem label="Open from this computer…" testid="cmd-open" onClick={() => void openDoc()} />
+              <MenuSeparator />
+              <MenuItem label="Save…" hint={state.user ? "Ctrl+S" : "sign in to save online"} testid="cmd-save-cloud" disabled={!!state.file?.locked} onClick={() => void actions.save()} />
+              <MenuItem icon="download" label="Download" hint=".arucostudio-web.json" testid="cmd-save" onClick={saveDoc} />
+              <MenuSeparator />
+              <MenuItem icon="library" label="Examples…" testid="cmd-examples" onClick={() => st().openModal("examples")} />
+            </Sub>
+            <Sub label="Edit" testid="menu-edit" inline={inline}>
+              <MenuItem label="Undo" hint="Ctrl+Z" testid="cmd-undo" disabled={!canUndo} onClick={() => st().undo()} />
+              <MenuItem label="Redo" hint="Ctrl+Shift+Z" testid="cmd-redo" disabled={!canRedo} onClick={() => st().redo()} />
+              <MenuSeparator />
+              <MenuItem icon="marker" label="ArUco Re-ID…" testid="cmd-reid" disabled={!markers}
+                title={markers ? undefined : "No markers yet: make an ArUco Extrude (A) first"} onClick={() => st().openModal("reid")} />
+              <MenuItem icon="inkjet" label="Presets…" testid="cmd-presets" title="How a marker is made: the open marker's preset, or the one a new marker starts with"
+                onClick={() => st().openModal("presets")} />
+            </Sub>
+            <Sub label="Export" testid="menu-export" inline={inline}>
+              <MenuItem icon="print" label="Print…" hint="S" testid="cmd-print" onClick={openPrint} />
+              <MenuItem label="SVG" hint="the marker, true size" testid="cmd-svg" onClick={() => void exportSvg()} />
+              <MenuItem label="PDF" hint="the marker's preset's page" testid="cmd-pdf" onClick={() => void exportPdf()} />
+            </Sub>
+            <Sub label="View" testid="menu-view" inline={inline}>
+              <Pick on={!view3d} label={<>2D <span className="hint">the sketch</span></>} testid="cmd-view-2d" onClick={() => st().setView3d(false)} />
+              <Pick on={view3d} label={<>3D <span className="hint">the model</span></>} testid="cmd-view-3d" onClick={() => st().setView3d(true)} />
+              <MenuSeparator />
+              <MenuItem icon="fit" label="Fit" hint="F" testid="cmd-fit" onClick={() => st().fit()} />
+            </Sub>
+            <Sub label="Preferences" testid="menu-prefs" inline={inline}>
+              <div className="mm-h">{theme === "dark" ? <Moon size={12} /> : <Sun size={12} />}Theme</div>
+              {(["light", "dark"] as const).map((t) => (
+                <Pick key={t} on={theme === t} label={t === "light" ? "Light" : "Dark"} testid={`theme-${t}`} disabled={!!skin.theme} title={pinned} onClick={() => setTheme(t)} />
+              ))}
+              <MenuSeparator />
+              <div className="mm-h"><Glyph name="skin" />Skin</div>
+              {SKINS.map((k) => (
+                <Pick key={k.id} on={k.id === skin.id} label={k.name} testid={`skin-${k.id}`} title={k.theme ? `${k.theme} only` : undefined} onClick={() => setSkin(k.id)} />
+              ))}
+            </Sub>
+            <Sub label="Help" testid="menu-help" inline={inline}>
+              <MenuItem label="Keyboard shortcuts" hint="?" testid="help-menu" onClick={onHelp} />
+              <M.LinkItem className="kit-menu-item" href={GITHUB} target="_blank" rel="noreferrer" data-testid="github-menu">
+                <span className="ic mm-gh"><GithubMark /></span><span className="kit-menu-label">GitHub</span><span className="hint">the source</span>
+              </M.LinkItem>
+              {/* the landing page (Zach, 2026-10-20); a real navigation, not a route */}
+              <M.LinkItem className="kit-menu-item" href="/about/" data-testid="brand">
+                <span className="ic"><BrandCube /></span><span className="kit-menu-label">About ArUco Studio</span>
+              </M.LinkItem>
+            </Sub>
+          </M.Popup>
+        </M.Positioner>
+      </M.Portal>
+    </M.Root>
   );
 }
 
@@ -147,38 +230,6 @@ function Item({ icon, label, hint, onClick, testid, disabled, close }: {
     <button type="button" className="dm-item" data-testid={testid} disabled={disabled} onClick={() => { close(); onClick(); }}>
       {icon ? <Glyph name={icon} /> : <span className="ic" />}<span className="dm-label">{label}</span>{hint && <span className="dm-hint">{hint}</span>}
     </button>
-  );
-}
-
-/** Theme (Light | Dark) and Skin, V2's Preferences: a one-theme skin (Fusion
- *  dark, Onshape light) greys the theme out. */
-function Preferences() {
-  const [theme, setTheme] = useTheme();
-  const [skin, setSkin] = useSkin();
-  const pinned = skin.theme ? `${skin.name} is ${skin.theme} only` : undefined;
-  return (
-    <div className="dm-prefs" data-testid="prefs">
-      <div className="dm-row">
-        <span className="dm-row-label">{theme === "dark" ? <Moon size={14} /> : <Sun size={14} />}Theme</span>
-        <span className="dm-sws" role="group" aria-label="Theme">
-          {(["light", "dark"] as const).map((t) => (
-            <button key={t} type="button" className={cn("dm-sw", theme === t && "on")} aria-pressed={theme === t} disabled={!!skin.theme}
-              data-testid={`theme-${t}`} title={pinned} onClick={() => setTheme(t)}>
-              {t === "light" ? <Sun size={13} /> : <Moon size={13} />}{t === "light" ? "Light" : "Dark"}
-            </button>
-          ))}
-        </span>
-      </div>
-      <div className="dm-row">
-        <span className="dm-row-label"><Glyph name="skin" />Skin</span>
-        <span className="dm-sws" role="group" aria-label="Skin">
-          {SKINS.map((s) => (
-            <button key={s.id} type="button" className={cn("dm-sw", s.id === skin.id && "on")} aria-pressed={s.id === skin.id}
-              data-testid={`skin-${s.id}`} title={s.theme ? `${s.theme} only` : undefined} onClick={() => setSkin(s.id)}>{s.name}</button>
-          ))}
-        </span>
-      </div>
-    </div>
   );
 }
 
@@ -287,55 +338,30 @@ function StatusDot() {
   );
 }
 
-/** ⌄ (Figma's file-name menu): the cloud file and the account, then Theme
- *  and Skin; on a phone also what the pills fold away. */
-function DocMenu({ onHelp, onRename }: { onHelp: () => void; onRename: () => void }) {
+/** ⌄ (Figma's file-name menu): the cloud file and the account; on a phone
+ *  also Download for CAD, which the top-right pill folds away. */
+function DocMenu({ onRename }: { onRename: () => void }) {
   const name = useStudio((s) => s.doc.name);
-  const canUndo = useStudio((s) => s.canUndo);
-  const canRedo = useStudio((s) => s.canRedo);
-  const markers = useStudio((s) => s.doc.features.length);
   const narrow = useNarrow();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
-  const st = useStudio.getState;
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger className="doc-name doc-chev" data-testid="menu-doc" title="The document: file, account, Theme and Skin" aria-label="Document menu">
+      <Popover.Trigger className="doc-name doc-chev" data-testid="menu-doc" title="The file: save, history, the account" aria-label="File menu">
         <svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true" className="chev"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner sideOffset={10} align="start" className="kit-menu-positioner">
           <Popover.Popup className="kit-menu-popup dm-popup" data-kit-popup="doc" data-testid="doc-menu">
             <div className="dm-head"><b>{name}</b></div>
+            <CloudItems close={close} onRename={onRename} />
             {narrow && (
               <>
-                <div className="dm-h">File</div>
-                <Item close={close} icon="sketch" label="New" testid="cmd-new" onClick={newDocument} />
-                <Item close={close} icon="library" label="Examples…" testid="cmd-examples" onClick={() => st().openModal("examples")} />
-                <Item close={close} label="Open from this computer…" testid="cmd-open" onClick={() => void openDoc()} />
-                <Item close={close} label="Download" hint=".arucostudio-web.json" testid="cmd-save" onClick={saveDoc} />
-                <div className="dm-h">Edit</div>
-                <Item close={close} label="Undo" testid="cmd-undo" disabled={!canUndo} onClick={() => st().undo()} />
-                <Item close={close} label="Redo" testid="cmd-redo" disabled={!canRedo} onClick={() => st().redo()} />
-                <Item close={close} icon="marker" label="ArUco Re-ID…" testid="cmd-reid" disabled={!markers} onClick={() => st().openModal("reid")} />
-                <Item close={close} icon="inkjet" label="Presets…" testid="cmd-presets" onClick={() => st().openModal("presets")} />
-                <div className="dm-h">Export</div>
-                <Item close={close} icon="print" label="Print…" testid="cmd-print" onClick={openPrint} />
-                <Item close={close} label="SVG" hint="the marker, true size" testid="cmd-svg" onClick={() => void exportSvg()} />
-                <Item close={close} label="PDF" hint="the marker's preset's page" testid="cmd-pdf" onClick={() => void exportPdf()} />
                 <div className="dm-h">Download for CAD</div>
                 <Item close={close} icon="cube" label="Fusion 360" hint="coming soon" testid="cad-fusion" disabled onClick={() => {}} />
                 <Item close={close} icon="cube" label="Onshape" hint="coming soon" testid="cad-onshape" disabled onClick={() => {}} />
-                <div className="dm-sep" />
-                <a className="dm-item" href={GITHUB} target="_blank" rel="noreferrer" data-testid="github-menu" onClick={close}>
-                  <span className="ic dm-gh"><GithubMark /></span><span className="dm-label">GitHub</span>
-                </a>
-                <Item close={close} label="Keyboard shortcuts and status" testid="help-menu" onClick={onHelp} />
-                <div className="dm-sep" />
               </>
             )}
-            <CloudItems close={close} onRename={onRename} />
-            <Preferences />
           </Popover.Popup>
         </Popover.Positioner>
       </Popover.Portal>
@@ -343,24 +369,18 @@ function DocMenu({ onHelp, onRename }: { onHelp: () => void; onRename: () => voi
   );
 }
 
-/** The top-left pill: the logo, File, Edit, Export, the title bar (the name,
- *  the status dot, ⌄). */
+/** The top-left pill: the main menu (the logo with ⌄), the title bar (the
+ *  name, the status dot, ⌄). */
 export function DocPill({ onHelp }: { onHelp: () => void }) {
   const [editing, setEditing] = useState(false);
   return (
     <div className="pill doc-pill" data-testid="doc-pill">
-      {/* the brand goes to the landing page (Zach, 2026-10-20); a real navigation, not a route */}
-      <a className="brand" href="/about/" title="About ArUco Studio" aria-label="About ArUco Studio" data-testid="brand"><BrandCube /></a>
-      <span className="pill-menus">
-        <FileMenu />
-        <EditMenu />
-        <ExportMenu />
-      </span>
+      <MainMenu onHelp={onHelp} />
       <span className="pill-sep" />
       <span className="doc-title">
         <DocTitle editing={editing} setEditing={setEditing} />
         <StatusDot />
-        <DocMenu onHelp={onHelp} onRename={() => setEditing(true)} />
+        <DocMenu onRename={() => setEditing(true)} />
       </span>
     </div>
   );

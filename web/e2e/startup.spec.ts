@@ -10,7 +10,7 @@
 // (1280 × 800) go to STARTUP_SHOTS (default test-results/startup).
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, openPresets, openStudio, state } from "./helpers";
+import { CORE, clickAt, coreReady, openPresets, openStudio, state, openMenu } from "./helpers";
 
 const SHOTS = process.env.STARTUP_SHOTS ?? "test-results/startup";
 const ZIP = "**/py/aruco_studio.zip";
@@ -173,7 +173,7 @@ test.describe(`startup waits (${CORE} core)`, () => {
     await expect(page.getByTestId("verify-wait")).toContainText("Starting up…");
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("verify-dialog")).toHaveCount(0);
-    await page.getByTestId("menu-edit").click();
+    await openMenu(page, "edit");
     await page.getByTestId("cmd-reid").click();
     await expect(page.getByTestId("reid-wait")).toHaveAttribute("data-wait", "core-loading");
     await page.getByTestId("reid-cancel").click();

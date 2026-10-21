@@ -10,7 +10,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, dragWorld, idle, labelOn, loadExample, openStudio, panelTab, state } from "./helpers";
+import { CORE, clickAt, coreReady, dragWorld, idle, labelOn, loadExample, openStudio, panelTab, state, openMenu } from "./helpers";
 
 const SHOTS = process.env.V1_SHOTS ?? "test-results/v1";
 
@@ -42,7 +42,7 @@ async function clickMarker(page: Page, fid: string): Promise<void> {
 async function blank(page: Page): Promise<void> {
   await openStudio(page);
   await coreReady(page);
-  await page.getByTestId("menu-file").click();
+  await openMenu(page, "file");
   await page.getByTestId("cmd-new").click();
 }
 
@@ -292,18 +292,18 @@ test.describe(`V1 click-to-inspect (${CORE} core)`, () => {
     await page.getByTestId("panel-ok").click();
 
     // save, start over, open it: the same ids, from the saved ledger
-    await page.getByTestId("menu-file").click();
+    await openMenu(page, "file");
     const [dl] = await Promise.all([page.waitForEvent("download"), page.getByTestId("cmd-save").click()]);
     const file = path.join(test.info().outputDir, "ids.arucostudio-web.json");
     await dl.saveAs(file);
     const saved = JSON.parse(readFileSync(file, "utf8"));
     expect(saved.id_ledger).toEqual({ [k1]: id1, [k2]: id2 });
-    await page.getByTestId("menu-file").click();
+    await openMenu(page, "file");
     await page.getByTestId("cmd-new").click();
     await idle(page);
     expect((await state(page)).doc.features).toHaveLength(0);
     const open = async (p: string) => {
-      await page.getByTestId("menu-file").click();
+      await openMenu(page, "file");
       const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByTestId("cmd-open").click()]);
       await chooser.setFiles(p);
       await idle(page);

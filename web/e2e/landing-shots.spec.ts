@@ -11,7 +11,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { clickAt, coreReady, dragWorld, idle, loadExample, openPresets, openStudio, panelTab, planOutline, state, toClient } from "./helpers";
+import { clickAt, coreReady, dragWorld, idle, loadExample, openPresets, openStudio, panelTab, planOutline, state, toClient, openMenu } from "./helpers";
 
 const SRC = process.env.LANDING_SRC ?? "";
 const SHOTS = path.join(SRC, "shots");
@@ -176,7 +176,7 @@ test("3 · the marker maker (video): typed rectangles, D, a window round them, A
 
   await openStudio(page);
   await coreReady(page);
-  await page.getByTestId("menu-file").click();
+  await openMenu(page, "file");
   await page.getByTestId("cmd-new").click();
   await pause(300);
   mark("start");

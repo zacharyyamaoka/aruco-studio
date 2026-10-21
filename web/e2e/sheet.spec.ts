@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, coreReady, dragWorld, idle, labelOn, openStudio, state } from "./helpers";
+import { CORE, coreReady, dragWorld, idle, labelOn, openStudio, state, openMenu } from "./helpers";
 
 const SHOTS = process.env.E2E_SHOTS ?? "test-results/shots";
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
@@ -27,7 +27,7 @@ const RECTS: [[number, number], [number, number]][] = [
 async function blank(page: Page): Promise<void> {
   await openStudio(page);
   await coreReady(page);
-  await page.getByTestId("menu-file").click();
+  await openMenu(page, "file");
   await page.getByTestId("cmd-new").click();
 }
 

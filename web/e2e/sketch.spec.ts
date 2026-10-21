@@ -9,14 +9,14 @@
 import { copyFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { coreReady, dragWorld, idle, openStudio, state, toClient, type Shape, panelTab } from "./helpers";
+import { coreReady, dragWorld, idle, openStudio, state, toClient, type Shape, panelTab, openMenu } from "./helpers";
 
 const MEDIA = process.env.SKETCH_MEDIA ?? "";
 
 async function blank(page: Page): Promise<void> {
   await openStudio(page);
   await coreReady(page);
-  await page.getByTestId("menu-file").click();
+  await openMenu(page, "file");
   await page.getByTestId("cmd-new").click();
 }
 

@@ -1,9 +1,10 @@
 // The online Studio's screen (docs/design/online_studio_v1.md, "The screen"):
 // the sketch viewport over the whole window, Figma's chrome floating on it
 // (V2, Zach's pick 2026-10-20 night; ./app/TopBar.tsx): the document pill top
-// left, Download for CAD and Verify | Print top right, the dock of tools with
-// 2D | 3D bottom centre, ? and GitHub bottom right; the floating ArUco
-// Extrude panel; the presets modal, Print, Verify, Examples and Re-ID.
+// left (the main menu behind the logo, the file's name), Download for CAD and
+// Verify | Print top right, the dock of tools with 2D | 3D bottom centre, ?
+// and GitHub bottom right; the floating ArUco Extrude panel; the presets
+// modal, Print, Verify, Examples and Re-ID; Home ("Back to files") over it all.
 // WHY no timeline (Zach, 2026-10-18): "too specific to CAD … just clicking the
 // marker on the screen is what brings up the relevant inspector window".
 import { useEffect, useState } from "react";
@@ -13,7 +14,9 @@ import { openPrint, openVerify } from "./app/commands";
 import { ReIdDialog } from "./app/ReIdDialog";
 import { Toolbar } from "./app/Toolbar";
 import { ActionsPill, BrandCube, DocPill, HelpCorner } from "./app/TopBar";
+import { isHome } from "./app/home";
 import { HostedDialogs, HostedProvider, HostedToast } from "./hosted/ui/HostedDialogs";
+import { HostedHome } from "./hosted/ui/HostedHome";
 import { onCoreStatus, coreStatus } from "./coreSource";
 import { ExtrudePanel } from "./panel/ExtrudePanel";
 import { startPlanner } from "./planner";
@@ -25,8 +28,10 @@ import { Viewport } from "./sketch/Viewport";
 import { View3D } from "./view3d/View3D";
 import { loadCoreFacts, useStudio } from "./store";
 
-/** A key the tool should not take: typing in a field, or a list / menu / dialog open. */
+/** A key the tool should not take: typing in a field, a list / menu / dialog
+ *  open, or Home in front. */
 function keyIsElsewhere(e: KeyboardEvent): boolean {
+  if (isHome()) return true;
   const t = e.target as HTMLElement | null;
   if (t?.closest?.("input,textarea,select,[contenteditable=true]")) return true;
   if (document.querySelector("[data-kit-popup][data-open]")) return true;
@@ -138,6 +143,7 @@ export function App() {
             <HostedToast />
           </main>
         </div>
+        <HostedHome />
         <HostedDialogs icon={<BrandCube />} />
         <PresetsModal />
         <PrintDialog />

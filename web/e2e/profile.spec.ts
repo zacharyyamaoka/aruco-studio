@@ -10,9 +10,7 @@
 // test-results/profile).
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import {
-  CORE, circleGap, clickAt, coreReady, dblClickAt, dragWorld, fitRect, idle, loadExample, openStudio, planOutline, state, toClient, type Rect,
-} from "./helpers";
+import { CORE, circleGap, clickAt, coreReady, dblClickAt, dragWorld, fitRect, idle, loadExample, openStudio, planOutline, state, toClient, type Rect, openMenu } from "./helpers";
 
 const SHOTS = process.env.PROFILE_SHOTS ?? "test-results/profile";
 const FIXTURE = path.join(import.meta.dirname, "fixtures", "v2-rect.arucostudio-web.json");
@@ -191,7 +189,7 @@ test.describe(`profile-first (${CORE} core)`, () => {
   test("d · an old file (rectId, trim rectangle) opens as a rectangle profile trimmed to profile, and plans identically", async ({ page }) => {
     await openStudio(page);
     await coreReady(page);
-    await page.getByTestId("menu-file").click();
+    await openMenu(page, "file");
     const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByTestId("cmd-open").click()]);
     await chooser.setFiles(FIXTURE);
     await expect(page.getByTestId("note")).toContainText("Opened v2-rect");
@@ -250,7 +248,7 @@ test.describe(`profile-first (${CORE} core)`, () => {
   test("f · A with nothing selected: the Profile row waits; a double-click on a rectangle with a circle in it picks the rectangle alone", async ({ page }) => {
     await openStudio(page);
     await coreReady(page);
-    await page.getByTestId("menu-file").click();
+    await openMenu(page, "file");
     await page.getByTestId("cmd-new").click();
     await page.keyboard.press("r");
     await dragWorld(page, [-40, -30], [40, 30]);

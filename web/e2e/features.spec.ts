@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, dragWorld, idle, labelOn, openStudio, panelTab, state } from "./helpers";
+import { CORE, clickAt, coreReady, dragWorld, idle, labelOn, openStudio, panelTab, state, openMenu } from "./helpers";
 
 const SHOTS = process.env.E2E_SHOTS ?? "test-results/shots";
 const FIXTURE = path.join(import.meta.dirname, "fixtures", "v1-plate.arucostudio-web.json");
@@ -14,7 +14,7 @@ const FIXTURE = path.join(import.meta.dirname, "fixtures", "v1-plate.arucostudio
 async function blank(page: Page): Promise<void> {
   await openStudio(page);
   await coreReady(page);
-  await page.getByTestId("menu-file").click();
+  await openMenu(page, "file");
   await page.getByTestId("cmd-new").click();
 }
 
@@ -238,7 +238,7 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
   test("d · an old one-feature file opens as one feature that plans", async ({ page }) => {
     await openStudio(page);
     await coreReady(page);
-    await page.getByTestId("menu-file").click();
+    await openMenu(page, "file");
     const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByTestId("cmd-open").click()]);
     await chooser.setFiles(FIXTURE);
     await expect(page.getByTestId("note")).toContainText("Opened v1-plate");

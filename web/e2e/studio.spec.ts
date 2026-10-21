@@ -3,7 +3,7 @@
 // the drawn elements' boxes in pixels.
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import { clickAt, CORE, coreReady, dragWorld, fitRect, idle, loadExample, openPresets, openStudio, overlaps, panelTab, planOutline, profileRect, state, toClient } from "./helpers";
+import { clickAt, CORE, coreReady, dragWorld, fitRect, idle, loadExample, openPresets, openStudio, overlaps, panelTab, planOutline, profileRect, state, toClient, openMenu } from "./helpers";
 
 test.describe(`online Studio (${CORE} core)`, () => {
   test("1 · the core reaches ready: ?'s status line says so (no chip in the chrome since the Figma layout)", async ({ page }) => {
@@ -145,7 +145,7 @@ test.describe(`online Studio (${CORE} core)`, () => {
     await clickAt(page, 60, 40);
     await page.keyboard.press("a");
     await idle(page);
-    await page.getByTestId("menu-export").click();
+    await openMenu(page, "export");
     const [dl] = await Promise.all([page.waitForEvent("download"), page.getByTestId("cmd-svg").click()]);
     expect(dl.suggestedFilename()).toMatch(/\.svg$/);
     const text = readFileSync((await dl.path())!, "utf8");
@@ -173,7 +173,7 @@ test.describe(`online Studio (${CORE} core)`, () => {
   test("8 · a circle inside a drawn rectangle: inside the ring, A: the marker's box keeps off the circle", async ({ page }) => {
     await openStudio(page);
     await coreReady(page);
-    await page.getByTestId("menu-file").click();
+    await openMenu(page, "file");
     await page.getByTestId("cmd-new").click();
     await page.keyboard.press("r");
     await dragWorld(page, [-40, -30], [40, 30]);

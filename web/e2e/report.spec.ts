@@ -15,7 +15,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { coreReady, clickAt, dragWorld, fitRect, idle, loadExample, openPresets, openStudio, panelTab, state, toggleTheme } from "./helpers";
+import { coreReady, clickAt, dragWorld, fitRect, idle, loadExample, openPresets, openStudio, panelTab, state, toggleTheme, openMenu } from "./helpers";
 
 const DIR = process.env.REPORT_SHOTS_DIR ?? "";
 const facts: Record<string, unknown> = {};
@@ -118,7 +118,7 @@ async function clickMarker(page: Page, fid: string): Promise<void> {
 async function blank(page: Page): Promise<void> {
   await openStudio(page);
   await coreReady(page);
-  await page.getByTestId("menu-file").click();
+  await openMenu(page, "file");
   await page.getByTestId("cmd-new").click();
 }
 

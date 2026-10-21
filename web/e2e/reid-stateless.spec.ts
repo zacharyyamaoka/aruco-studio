@@ -8,7 +8,7 @@
 // writes, and every Apply is one Ctrl+Z step. The core's own property test:
 // tests/web/test_web_reid_stateless.py.
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, idle, loadExample, openStudio, panelTab, state, toClient } from "./helpers";
+import { CORE, clickAt, coreReady, idle, loadExample, openStudio, panelTab, state, toClient, openMenu } from "./helpers";
 
 async function sheet(page: Page): Promise<void> {
   await openStudio(page);
@@ -29,7 +29,7 @@ const preview = (page: Page) => page.locator("[data-reid-row]").evaluateAll((row
 
 /** Edit › ArUco Re-ID…, Sequential from `start`, once the preview answers that request. */
 async function openReId(page: Page, start: number): Promise<void> {
-  await page.getByTestId("menu-edit").click();
+  await openMenu(page, "edit");
   await page.getByTestId("cmd-reid").click();
   await expect(page.getByTestId("reid-dialog")).toBeVisible();
   await expect(page.getByTestId("reid-mode")).toHaveAttribute("data-value", "sequential");

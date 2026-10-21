@@ -83,3 +83,59 @@
 .shf-toast.bad { background: var(--bad); }
 .shf-toast-note { opacity: 0.75; }
 .shf-toast-act { border: 0; background: none; color: inherit; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+
+/* Home ("Back to files", HostedHome.tsx): the registry's home dashboard in the kit */
+.home { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: var(--bg); color: var(--text); }
+.home-head { flex: none; display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 16px; border-bottom: 1px solid var(--line); background: var(--panel); min-width: 0; }
+.home-brand { flex: none; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+.home-back.kit-btn { flex: none; min-width: 0; max-width: 260px; }
+.home-back-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-search { width: 320px; min-width: 0; flex: 0 1 320px; height: 32px; }
+.home-grow { flex: 1; }
+.home-account { flex: none; display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 220px; }
+.home-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-body { flex: 1; display: flex; min-height: 0; }
+.home-nav { flex: none; width: 220px; display: flex; flex-direction: column; gap: 2px; padding: 12px; border-right: 1px solid var(--line); background: var(--panel); }
+.home-tab { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: none; color: var(--text);
+  font: inherit; text-align: left; cursor: pointer; }
+.home-tab:hover { background: var(--hover); }
+.home-tab.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.home-count { margin-left: auto; color: var(--muted); font-size: 11px; }
+.home-usage { border: 1px solid var(--line-soft); border-radius: 8px; }
+.home-main { flex: 1; min-width: 0; overflow-y: auto; padding: 20px 24px 40px; }
+.home-h1 { margin: 6px 0 12px; font-size: 15px; font-weight: 600; }
+.home-h1 ~ .home-h1 { margin-top: 28px; }
+.home-note { margin: -6px 0 12px; color: var(--muted); font-size: 11px; }
+.home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 14px; }
+.home-card { display: grid; align-content: start; gap: 8px; padding: 6px; border-radius: 10px; outline: 0; min-width: 0; }
+.home-card.open { cursor: pointer; }
+.home-card.open:hover, .home-card.open:focus-visible { background: var(--hover); }
+.home-pic { position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 16 / 10; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--canvas); color: var(--muted); }
+.home-pic.current { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
+.home-pic .ex-thumb { width: 82%; height: 82%; }
+.home-card-text { display: grid; gap: 2px; min-width: 0; padding: 0 2px; }
+.home-name { font-weight: 600; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--muted); font-size: 11px; min-width: 0; }
+.home-restore { justify-self: start; }
+.home-new { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; aspect-ratio: 16 / 10; margin: 6px; padding: 10px;
+  border: 1px dashed var(--line); border-radius: 8px; background: none; color: var(--muted); font: inherit; font-weight: 600; cursor: pointer; }
+.home-new:hover { background: var(--hover); color: var(--text); }
+.home-new.limit { align-items: flex-start; justify-content: center; cursor: default; color: var(--text); font-weight: 400; }
+.home-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.home-signin { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; margin-bottom: 22px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.home-signin > div { display: grid; gap: 3px; min-width: 0; }
+.home-empty { padding: 22px 8px; text-align: center; color: var(--muted); }
+.home-empty.bad { color: var(--bad); }
+@media (max-width: 640px) {
+  .home-head { gap: 6px; padding: 0 8px; }
+  .home-brand b, .home-who { display: none; }
+  .home-search { flex: 1 1 120px; width: auto; }
+  .home-body { flex-direction: column; }
+  .home-nav { width: auto; flex-direction: row; padding: 6px 8px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .home-nav .home-grow, .home-usage { display: none; }
+  .home-main { padding: 14px 12px 32px; }
+  .home-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .home-signin { flex-direction: column; align-items: stretch; }
+}
