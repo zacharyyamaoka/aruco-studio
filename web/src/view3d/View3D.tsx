@@ -261,11 +261,18 @@ export function View3D() {
     view3d.probe = () => {
       const st = useStudio.getState();
       const solids: Record<string, number> = {};
+      const whites: Record<string, [number, number, number, number]> = {};
       let faces = 0;
       root.traverse((o) => {
         if (!(o instanceof THREE.Mesh)) return;
         if (o.userData.feature) solids[o.userData.feature] = (solids[o.userData.feature] ?? 0) + 1;
         else if (o.userData.colour === "face") faces += 1;
+        if (o.userData.feature && o.userData.colour === "white") {
+          // the drawn white as three.js has it (its geometry's box, sketch frame mm), not the plan's polygons
+          const b = new THREE.Box3().setFromObject(o), w = whites[o.userData.feature];
+          whites[o.userData.feature] = w ? [Math.min(w[0], b.min.x), Math.min(w[1], b.min.y), Math.max(w[2], b.max.x), Math.max(w[3], b.max.y)]
+            : [b.min.x, b.min.y, b.max.x, b.max.y];
+        }
       });
       const arrows: Arrow3D[] = state.arrows.map(({ spec, obj }) => {
         const b = boxes.current.get(spec.key)?.getBoundingClientRect();
@@ -297,7 +304,7 @@ export function View3D() {
       return {
         feature: state.arrows.length ? activeFeatureId(st) : null,
         heights: plan && featurePreset(st.doc, f) ? heightsOf(plan, featurePreset(st.doc, f)!.method) : null,
-        arrows, solids, faces, buildMs: state.buildMs, project: (x: number, y: number, z: number) => client(new THREE.Vector3(x, y, z)),
+        arrows, solids, whites, faces, buildMs: state.buildMs, project: (x: number, y: number, z: number) => client(new THREE.Vector3(x, y, z)),
         frame: () => {
           const t = performance.now();
           renderer.render(scene, camera);

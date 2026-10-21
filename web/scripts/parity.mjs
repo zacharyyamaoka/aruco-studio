@@ -56,6 +56,9 @@ function cases(presets) {
     // outer the Studio shows is the cut the sheet prints, in both runtimes
     ["plan printdims: 123.5 x 40 profile, grid 3x1", "plan", printdims()],
     ["plan printdims: trim marker, turned 90", "plan", { ...printdims(), trim: "marker", marker: marker({ type: "grid", cols: 3, rows: 1, first_id: 19, turn: 90 }) }],
+    // trim3d (2026-10-21): a 3D-printed tile is the cut under either trim, an outside label's band too
+    ["plan trim3d: print3d tile, trim marker", "plan", { ...printdims(), trim: "marker", preset: d3 }],
+    ["plan trim3d: print3d tile, trim profile, label outside", "plan", { ...printdims(), preset: d3, label: label({ on: true, text: "#{ids}", place: "outside", side: "below" }) }],
     ["sheet printdims", "sheet", { items: [printdims()], cut_lines: true, date: "2026-10-21" }],
     ["bad request", "plan", {}],
   ];

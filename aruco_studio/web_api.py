@@ -35,6 +35,7 @@ Fusion composes a Joint Origin: core.geometry.jo_compose).
 | `profile` with no `rect`, `holes` (barrier 9, 2026-10-20 evening) -> `MarkerPlan.fit_rect` | placed_in / fit_box: the profile itself when it is a rectangle (rect_profile, rotated too), else inscribe's largest clear box; then planned as a rect is. A request with a rect is planned in it (fit_rect = rect) |
 | `trim` (2026-10-18; barrier 9) -> `MarkerPlan.cut`, `cut_shape` | not the core's: `profile`'s loops as given (default; a rect-only request's profile is its rect), or `outer` ("marker"); "rectangle" reads as "profile", said on "trim"; the plan is the same for both. svg, sheet and the inkjet paper layer (`sticker`) are cut to it, white inside |
 | a `profile` (2026-10-21, printdims) -> `dims` "outer", `summary`'s outer, the Marker row's "sticker W × H", the page lint | the sticker as the sheet cuts it: cut_box_of, the cut's box in the rectangle's frame (Trim Profile: the profile; Marker: the quiet zone), not the marker's outline (`outer`, `outer_mm`: the core's tile, its own frame); "Over the page" judged as sheet() places it (page_lint). A rect-only request keeps the outline there, byte for byte (Fusion and old callers) |
+| a `profile` (2026-10-21, trim3d) -> `layers`' white tile (print3d) | the cut too: `cut_shape`, the one geometry the canvas fills and the sheet cuts, is the tile's polygon (an inkjet's `sticker` already was), so the 3D white is the profile under Trim Profile and the quiet-zone box under Trim Marker; the core's tile (its rectangle, `trim`-blind, short of an outside label's band) is no longer drawn. A rect-only request keeps the core's tile, byte for byte |
 
 Issue fields: the core's key paths renamed (FIELDS); the page lint ("Over
 the page ...") and the cell / make rows -> "preset"; target -> "rect"; the
@@ -1163,13 +1164,17 @@ def knocked(polys: list, tools: list) -> list:
     return out
 
 
-def cad_layers(d: dict, M, paper=None, label=None, cutout=None) -> list:
+def cad_layers(d: dict, M, paper=None, label=None, cutout=None, cut_tile=False) -> list:
     """The contract's `layers`: the TagPlan's layers (plan/layers.py: REF's
     bodies in build order) placed in the sketch by M -- polygons as `black`,
     z along the sketch normal (Flip turns the marker over: [lo, hi] becomes
     [-hi, -lo]). `paper` (sketch frame): the inkjet paper's polygon (the
     `sticker` part), the plan's `cut_shape`, so CAD's white body is the
-    sticker as it is cut.
+    sticker as it is cut. `cut_tile` (a profile request, the web UI's;
+    trim3d, 2026-10-21): the 3D-printed white tile is the `paper` too, so
+    the 3D view's white is the sticker the canvas fills and the sheet cuts
+    under either trim, not the core's tile (its rectangle, which ignores
+    `trim` and stops short of an outside label's band).
 
     A cut / keep layer names the layer it cuts `into` (TagPlan.combines:
     the sticker's or the tile's own layer, "face" for the body under). A
@@ -1209,7 +1214,7 @@ def cad_layers(d: dict, M, paper=None, label=None, cutout=None) -> list:
             out.append({"name": L["name"], "part": L["part"], "colour": "none", "op": "cut",
                         "z": z, "polygons": placed(L["polygons"]), "into": first[L["part"]]})
             continue
-        if paper is not None and L["part"] == "sticker":
+        if paper is not None and (L["part"] == "sticker" or (cut_tile and L["part"] == "tile")):
             polys = [paper]
         else:
             polys = L["polygons"]
@@ -1434,7 +1439,8 @@ def plan(req: dict) -> dict:
            "origin": origin, "label": label,
            "dims": plan_dims(req, d, fl, L, lay, cb),
            "layers": cad_layers(d, M, cut, label, cutout=pattern_cutout(
-               req, d, fl, flip, white_only=ex["method"] == "print3d" and ex["mode"] == "white")),
+               req, d, fl, flip, white_only=ex["method"] == "print3d" and ex["mode"] == "white"),
+               cut_tile=bool((req.get("profile") or {}).get("loops"))),
            "cells": pattern_cells(d),
            # WHY full precision, the one field that is (every other number is
            # 1e-6, ND): a CAD shell composes this matrix with its own frames
