@@ -9,7 +9,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, dragWorld, idle, loadExample, openStudio, state, toClient } from "./helpers";
+import { CORE, clickAt, coreReady, dragWorld, idle, labelOn, loadExample, openStudio, panelTab, state, toClient } from "./helpers";
 
 const SHOTS = process.env.TRIM_SHOTS ?? "test-results/trim";
 type Box = { x0: number; y0: number; x1: number; y1: number };
@@ -138,11 +138,15 @@ test.describe(`trim (${CORE} core)`, () => {
   // text should be sized ... to fit inside that black cell row"), so a
   // marker-trimmed sticker keeps its label and nothing warns. The outside case
   // (warned) is covered in the core's tests (tests/web/test_web_trim.py) until
-  // the Label tab gets its Place row.
-  test("trim Marker with the label on the marker (the default): no warning, the label is on the sticker", async ({ page }) => {
+  // the Label tab gets its Place row. The label itself is off by default since
+  // 2026-10-20 night (Zach: "Label by default should be off"): turned on here.
+  test("trim Marker with the label on the marker (the default place): no warning, the label is on the sticker", async ({ page }) => {
     await plateFeature(page);
+    await labelOn(page);
+    await panelTab(page, "make");
     const s0 = await state(page);
     expect(s0.feature.label.on).toBe(true);
+    expect(s0.feature.label.place, "on the marker: the default place").toBeUndefined();
     await pickTrim(page, "marker");
     await page.locator('[role=tab][data-tab="label"]').click();
     await idle(page);

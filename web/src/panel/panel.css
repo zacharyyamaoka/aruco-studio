@@ -3,7 +3,7 @@
    dialog kept flat -- a label column, every row of a tab in view, thin rules
    between groups, the summary line and OK / Cancel at the foot. Layout only:
    every colour, size and font is a token, so each skin (../skins/) restyles it. */
-.xpanel { --xp-label: 96px; }
+.xpanel { --xp-label: 112px; }
 /* the label column: a fixed width, the label in the text's colour (not muted) */
 .xpanel .kit-row { grid-template-columns: var(--xp-label) minmax(0, 1fr); }
 .xpanel .kit-field:not(.has-error, .has-warn) .row-label { color: color-mix(in srgb, var(--text) 82%, transparent); }
@@ -14,8 +14,19 @@
 .xpanel .kit-tabs { position: sticky; top: 0; z-index: 2; margin-top: 0; }
 .xpanel .kit-tab { font-size: var(--font-size, 12px); }
 .xpanel .tab-body { padding: 6px 0 4px; }
-/* a thin rule between two groups of rows */
-.xpanel .xp-rule { border: 0; border-top: 1px solid var(--line-soft); margin: 5px 10px; }
+/* a group: its small title, then a thin rule to the right edge (Fusion's
+   command dialog); the first group of a tab sits right under the tabs */
+.xpanel .xp-group { display: flex; align-items: center; gap: 6px; margin: 7px 10px 2px; font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.02em; color: color-mix(in srgb, var(--text) 70%, transparent); user-select: none; }
+.xpanel .xp-group:first-child { margin-top: 2px; }
+.xpanel .xp-group::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+/* a faint rule between two parts of one group */
+.xpanel .xp-rule { border: 0; border-top: 1px solid var(--line-soft); margin: 3px 10px 3px calc(var(--xp-label) + var(--gap) + 10px); }
+/* the row icons: small and muted; a row without one keeps its name in line */
+.xpanel .row-label > .kit-glyph { flex: none; width: 13px; height: 13px; color: var(--muted); }
+.xpanel .row-label:not(:has(> .kit-glyph)) { padding-left: 18px; }
+/* a grey line in place of a control (the face's Rotation) */
+.xpanel .xp-grey { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* the foot: the summary line, then OK / Cancel on their own row */
 .xpanel .fpanel-foot { flex-direction: column; align-items: stretch; gap: 0; padding: 0; }
 .xpanel .fpanel-foot .summary { margin: 0; padding: 6px 10px 2px; border-top: 0; }

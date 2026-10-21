@@ -1,0 +1,22 @@
+/* The ↺ of a set value (./DrivenField.tsx), INSIDE its field at the right end:
+   a number field's before its unit, a segmented row's as its last cell, a
+   select's before the chevron, a switch's beside it. A driven value has none.
+   Layout only: colours are the kit's tokens, so each skin restyles it. */
+.drv-reset {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 16px; min-width: 16px; height: 16px;
+  margin: 0 1px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: var(--muted); cursor: pointer; font: inherit;
+}
+.drv-reset:hover { color: var(--accent); background: var(--hover); }
+.kit-num.drv .drv-reset + .unit { padding-left: 1px; }
+.kit-num.drv .drv-reset:last-child { margin-right: 3px; }
+
+/* a choice's box: the control, then its ↺ */
+.drv-box { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; }
+/* a segmented row: the box takes the row's border, the ↺ is its last cell */
+.drv-box:has(> .kit-seg) { gap: 0; height: var(--ctl); border: 1px solid var(--field-line); border-radius: var(--radius-sm); background: var(--field); overflow: hidden; }
+.drv-box > .kit-seg { height: 100%; border: 0; border-radius: 0; }
+.drv-box > .kit-seg + .drv-reset { width: 20px; height: 100%; margin: 0; border-left: 1px solid var(--line); border-radius: 0; }
+/* a select: the box fills the row, the ↺ sits in the trigger before its chevron */
+.drv-box:has(> .kit-select) { position: relative; flex: 1; }
+.drv-box > .kit-select { flex: 1; min-width: 0; }
+.drv-box > .kit-select + .drv-reset { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); }

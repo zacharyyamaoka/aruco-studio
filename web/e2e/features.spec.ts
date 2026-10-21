@@ -5,7 +5,7 @@
 // computed colours. Screenshots go to E2E_SHOTS (default test-results/shots).
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, dragWorld, idle, openStudio, panelTab, state } from "./helpers";
+import { CORE, clickAt, coreReady, dragWorld, idle, labelOn, openStudio, panelTab, state } from "./helpers";
 
 const SHOTS = process.env.E2E_SHOTS ?? "test-results/shots";
 const FIXTURE = path.join(import.meta.dirname, "fixtures", "v1-plate.arucostudio-web.json");
@@ -26,10 +26,11 @@ async function drawRect(page: Page, a: [number, number], b: [number, number]): P
   return s.sel.id;
 }
 
-/** A on the selected rectangle, then OK. Returns the feature's id. */
-async function extrudeOk(page: Page, firstId?: number): Promise<string> {
+/** A on the selected rectangle (its label on when `label`), then OK. Returns the feature's id. */
+async function extrudeOk(page: Page, firstId?: number, label = false): Promise<string> {
   await page.keyboard.press("a");
   await expect(page.getByTestId("extrude-panel")).toBeVisible();
+  if (label) await labelOn(page);
   if (firstId !== undefined) {
     await panelTab(page, "marker");
     const id = page.locator('input[data-path="marker.first_id"]');
@@ -62,9 +63,10 @@ test.describe(`multi-feature documents (${CORE} core)`, () => {
   test("a · two rectangles, A on each: two markers, each in its rectangle; a click on each opens its panel; Print has both", async ({ page }) => {
     await blank(page);
     const r1 = await drawRect(page, [-60, -20], [-20, 20]);
-    const f1 = await extrudeOk(page);
+    // the labels on (off by default since 2026-10-20 night): Print shows each id set on its sticker
+    const f1 = await extrudeOk(page, undefined, true);
     const r2 = await drawRect(page, [20, -20], [60, 20]);
-    const f2 = await extrudeOk(page, 5);
+    const f2 = await extrudeOk(page, 5, true);
     expect(f1).not.toBe(f2);
 
     const s = await state(page);
@@ -346,7 +348,7 @@ test("label keystrokes land on the marker they were typed into, even with an imm
   const f2 = await extrudeOk(page);
   await clickMarker(page, f1);                                   // marker 1's panel
   await expect.poll(async () => (await state(page)).panel.featureId).toBe(f1);
-  await panelTab(page, "label");
+  await labelOn(page);
   const before2 = (await state(page)).doc.features.find((f: any) => f.id === f2).label.text;
   await page.locator('textarea[data-path="label.text"]').fill("RACE");
   await clickMarker(page, f2);                                   // marker 2, inside the 120 ms window

@@ -8,7 +8,7 @@
 // flow into that folder.
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, idle, loadExample, openStudio, planOutline, state } from "./helpers";
+import { CORE, clickAt, coreReady, idle, labelOn, loadExample, openStudio, planOutline, state } from "./helpers";
 
 const SHOTS = process.env.VIEW3D_SHOTS ?? "test-results/view3d";
 
@@ -427,6 +427,7 @@ test.describe(`the 3D view (${CORE} core)`, () => {
 
   test("h · top view: the label's band reads as the plan has it -- glyphs knocked out light, the black round them dark, nothing mirrored", async ({ page }) => {
     await inspectTile(page);
+    await labelOn(page);   // off by default since 2026-10-20 night
     await to3d(page);
     const s = await state(page);
     const lab = s.plan.label;
