@@ -17,8 +17,10 @@ export async function openStudio(page: Page): Promise<void> {
 
 /** The core is up (the probe's status: the chrome has no core chip since the
  *  Figma layout, Zach 2026-10-20 night), and nothing is in flight. */
+// WHY ?.: after a page Reload the probe is installed a moment after the
+// document; polling must wait for it, not throw (seen on the live site)
 export async function coreReady(page: Page): Promise<void> {
-  await expect.poll(() => page.evaluate(() => (window as any).__aruco.state().core.state), { timeout: 60_000, message: "the core is ready" }).toBe("ready");
+  await expect.poll(() => page.evaluate(() => (window as any).__aruco?.state().core.state ?? null), { timeout: 60_000, message: "the core is ready" }).toBe("ready");
   await idle(page);
 }
 
