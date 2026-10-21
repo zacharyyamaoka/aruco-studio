@@ -143,14 +143,16 @@ test.describe(`the 3D white is the cut (${CORE} core)`, () => {
             if (!(await page.getByTestId("view3d").count())) await page.keyboard.press("3");
             await expect(page.getByTestId("view3d")).toBeVisible();
             const w3 = await white3d(page);
-            for (let k = 0; k < 4; k++) expect(Math.abs(w3[k] - cut[k]), `Trim ${trim}: 3D white ${w3.map((v) => v.toFixed(3))} vs the 2D cut ${cut.map((v) => v.toFixed(3))}`).toBeLessThanOrEqual(TOL_MM);
-            if (m.name.startsWith("grid") && label.name === "no label" && preset === PRINT3D) {
+            // the view top-down on the sticker, the arrows and boxes out: what Zach looks at
+            if (!label.label.on && (m.name.startsWith("grid") || m.name === "single") && preset === PRINT3D) {
+              await page.evaluate(() => (window as any).__aruco.top3d(false));
               await idle(page);
-              await page.screenshot({ path: `${SHOTS}/3d-${trim}.png` });
+              await page.screenshot({ path: `${SHOTS}/3d-${m.name.split(" ")[0]}-${trim}.png` });
             }
+            for (let k = 0; k < 4; k++) expect(Math.abs(w3[k] - cut[k]), `Trim ${trim}: 3D white ${w3.map((v) => v.toFixed(3))} vs the 2D cut ${cut.map((v) => v.toFixed(3))}`).toBeLessThanOrEqual(TOL_MM);
             // the PDF's cut (an inkjet sticker): the same size, the page may turn it
             if (preset === INKJET) {
-              await page.keyboard.press("2");
+              await page.keyboard.press("3");   // the 2D | 3D toggle: back to 2D, where Print is
               await expect(page.getByTestId("view3d")).toHaveCount(0);
               const pdf = pdfCutSizes(await downloadPdf(page));
               expect(pdf, "one sticker, one cut loop").toHaveLength(1);
