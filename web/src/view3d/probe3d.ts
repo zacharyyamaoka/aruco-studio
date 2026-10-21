@@ -24,6 +24,8 @@ export interface View3DProbe {
   arrows: Arrow3D[];
   /** solids drawn, by feature id */
   solids: Record<string, number>;
+  /** the drawn white's bounding box [x0, y0, x1, y1] (sketch frame, mm), by feature id: the union of its white solids' geometry */
+  whites: Record<string, [number, number, number, number]>;
   /** face bodies drawn under face profiles (context) */
   faces: number;
   /** how long the last rebuild of the solids (carved from the plans' layers) took, ms */
