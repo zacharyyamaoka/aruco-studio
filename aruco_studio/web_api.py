@@ -1389,7 +1389,13 @@ def sheet(req: dict, date=None) -> dict:
     request item landed (its index, page, box from the page's top-left in
     mm, y down, and its turn), in item order. The PDF asks the viewer to
     print at 100 % (core.sheet.render_sticker_pdf print_scaling), and with
-    `print_dialog` true to open the print dialog when it opens."""
+    `print_dialog` true to open the print dialog when it opens.
+
+    `scale_bar` (barrier 12, Zach 2026-10-20 night: "Hide, show on first
+    page, show on every page"): which pages draw the 100 mm / 4 in bar and
+    keep its band, "hide" | "first" (default: a printer's scale is the same
+    for a whole job, and a page without the bar gives its band to stickers) |
+    "every" (what every page had before). "hide" adds an info issue."""
     def is_box(cut) -> bool:
         # a sticker's cut outline is its own bounding box (no holes)
         pts = (cut or {}).get("outer") or []
@@ -1399,6 +1405,9 @@ def sheet(req: dict, date=None) -> dict:
         ys = {round(float(q[1]), ND) for q in pts}
         return not cut.get("holes") and len(pts) == 4 and len(xs) == 2 and len(ys) == 2
 
+    scale_bar = req.get("scale_bar") or "first"
+    if scale_bar not in _SH.SCALE_BARS:
+        raise ValueError(f"scale_bar is one of {', '.join(_SH.SCALE_BARS)} (got {scale_bar!r})")
     items, warnings = [], []
     index = {}                                     # a PrintItem's key -> its request item
     first = None
@@ -1449,8 +1458,12 @@ def sheet(req: dict, date=None) -> dict:
     st = _SH.SheetSettings(page=page, landscape=False, mode=mode, gap_mm=gap, margin_mm=margin,
                            title="ArUco Studio", cut_marks=bool(req.get("cut_lines", True)),
                            packer="guillotine",
-                           objective=req.get("objective") or "fewest_sheets")
+                           objective=req.get("objective") or "fewest_sheets",
+                           scale_bar=scale_bar)
     lay = _SH.layout_stickers(items, st)
+    if scale_bar == "hide":
+        warnings.append({"field": "tag", "level": "info",
+                         "text": "No scale bar: measure a marker to check the print is at 100 %"})
     date = date or datetime.date.today().isoformat()
     whole = _SH.render_sticker_svg(lay, date=date)
     pw, ph = (_f(v) for v in lay.page_mm)

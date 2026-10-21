@@ -194,17 +194,18 @@ def _split(f, w, h, rule):
 
 
 def guillotine(boxes: Sequence[Box], bin_w: float, bin_h: float, order: int = 0,
-               choice: str = "bssf", split: str = "rows") -> List[Optional[Place]]:
+               choice: str = "bssf", split: str = "rows",
+               first_h: Optional[float] = None) -> List[Optional[Place]]:
     """One guillotine variant (ORDERS[order], a CHOICES rule, a SPLITS rule),
     bins first-fit. Boxes that fit no empty bin get None. Sizes are as given
-    (pack grows them by the gap)."""
+    (pack grows them by the gap). `first_h`: the first bin's own height."""
     keyf = ORDERS[order][1]
     seq = sorted(range(len(boxes)), key=lambda i: (tuple(round(v, ND) for v in
                                                          keyf(boxes[i].w, boxes[i].h)), i))
-    return _run(boxes, bin_w, bin_h, seq, choice, split)
+    return _run(boxes, bin_w, bin_h, seq, choice, split, first_h)
 
 
-def _run(boxes, bin_w, bin_h, seq, choice, split):
+def _run(boxes, bin_w, bin_h, seq, choice, split, first_h=None):
     """guillotine() in the order `seq` (box indices)."""
     bins: List[list] = []
     out: List[Optional[Place]] = [None] * len(boxes)
@@ -217,10 +218,11 @@ def _run(boxes, bin_w, bin_h, seq, choice, split):
                 spot = (b, got)
                 break
         if spot is None:
-            got = _choose([(0.0, 0.0, float(bin_w), float(bin_h))], sizes, choice)
+            h = float(bin_h if first_h is None or bins else first_h)
+            got = _choose([(0.0, 0.0, float(bin_w), h)], sizes, choice)
             if got is None:
                 continue
-            bins.append([(0.0, 0.0, float(bin_w), float(bin_h))])
+            bins.append([(0.0, 0.0, float(bin_w), h)])
             spot = (len(bins) - 1, got)
         b, (_k, fi, w, h, turned) = spot
         f = bins[b].pop(fi)
@@ -337,8 +339,9 @@ def _size_key(b: Box):
 
 def _turned_all(boxes: Sequence[Box], flat: bool, bin_w: float, bin_h: float):
     """Every box that may turn turned the same way (its long side across
-    when `flat`, else along) where that way fits the bin, none left free to
-    turn: equal boxes line up. -> (boxes, turned flags)."""
+    when `flat`, else along) where that way fits the bin (bin_h: the smallest
+    bin's), none left free to turn: equal boxes line up. -> (boxes, turned
+    flags)."""
     out, flags = [], []
     for b in boxes:
         sizes = [s for s in _sizes(b) if s[0] <= bin_w + _EPS and s[1] <= bin_h + _EPS]
@@ -353,7 +356,8 @@ def _turned_all(boxes: Sequence[Box], flat: bool, bin_w: float, bin_h: float):
     return out, flags
 
 
-def _variants(boxes: Sequence[Box], bin_w: float, bin_h: float):
+def _variants(boxes: Sequence[Box], bin_w: float, bin_h: float,
+              first_h: Optional[float] = None):
     """(how, places) of every variant pack tries: ORDERS x CHOICES x SPLITS,
     then the ones that line cuts up -- every box turned the same way (the
     long side across, or along), and equal boxes packed together, the most
@@ -364,15 +368,16 @@ def _variants(boxes: Sequence[Box], bin_w: float, bin_h: float):
         for choice in CHOICES:
             for split in SPLITS:
                 yield ("%s, %s, %s" % (oname, choice, split),
-                       guillotine(boxes, bin_w, bin_h, oi, choice, split))
+                       guillotine(boxes, bin_w, bin_h, oi, choice, split, first_h))
     for flat in (True, False):
         if not any(b.turn for b in boxes):
             break                                   # nothing turns: the variants above
-        turned, flags = _turned_all(boxes, flat, bin_w, bin_h)
+        turned, flags = _turned_all(boxes, flat, bin_w,
+                                    bin_h if first_h is None else min(bin_h, first_h))
         for oi, (oname, _f) in enumerate(ORDERS):
             for choice in CHOICES:
                 for split in SPLITS:
-                    got = guillotine(turned, bin_w, bin_h, oi, choice, split)
+                    got = guillotine(turned, bin_w, bin_h, oi, choice, split, first_h)
                     yield ("%s turned %s, %s, %s" % ("flat" if flat else "upright", oname,
                                                      choice, split),
                            [p if p is None else p._replace(turned=flags[k])
@@ -388,7 +393,7 @@ def _variants(boxes: Sequence[Box], bin_w: float, bin_h: float):
     for choice in CHOICES:
         for split in SPLITS:
             yield ("same size, %s, %s" % (choice, split),
-                   _run(boxes, bin_w, bin_h, seq, choice, split))
+                   _run(boxes, bin_w, bin_h, seq, choice, split, first_h))
 
 
 OBJECTIVES = ("fewest_sheets", "fewest_cuts")
@@ -405,7 +410,7 @@ def _cut_rect(p: Place, cut):
 
 def pack(boxes: Sequence[Box], bin_w: float, bin_h: float, gap: float = 0.0,
          stock: Optional[Tuple[float, float, float, float]] = None,
-         objective: str = "fewest_sheets") -> Packing:
+         objective: str = "fewest_sheets", first_h: Optional[float] = None) -> Packing:
     """Every box on as few bins as possible, at least `gap` apart, never
     scaled: the best of the guillotine variants (ORDERS x CHOICES x SPLITS,
     see the module's docstring). A box no empty bin holds (either way
@@ -415,12 +420,19 @@ def pack(boxes: Sequence[Box], bin_w: float, bin_h: float, gap: float = 0.0,
     fewest cut lines, one is most compact (fewest number of sheets)"):
     "fewest_sheets" ranks the variants by bins, then cuts; "fewest_cuts" by
     cuts (on each box's `cut`), then bins. Both rank the same variants, so
-    fewest_cuts never cuts more and fewest_sheets never takes more bins."""
+    fewest_cuts never cuts more and fewest_sheets never takes more bins.
+
+    `first_h` (scale bar "first page", Zach 2026-10-20 night): the first bin
+    is only this high (< bin_h): a page 1 that keeps a band for its scale bar
+    while the others give it to stickers. A box must fit that first bin too."""
     if objective not in OBJECTIVES:
         raise ValueError("objective is one of %s (got %r)" % (", ".join(OBJECTIVES), objective))
     cuts_first = objective == "fewest_cuts"
     gap = float(gap)
-    if not (bin_w > 0 and bin_h > 0) or gap < 0:
+    if first_h is not None and first_h >= bin_h:
+        first_h = None
+    small = bin_h if first_h is None else float(first_h)
+    if not (bin_w > 0 and small > 0) or gap < 0:
         raise ValueError("a bin is a positive w x h and the gap >= 0 (got %r x %r, gap %r)"
                          % (bin_w, bin_h, gap))
     stock = tuple(map(float, stock)) if stock is not None else (0.0, 0.0, float(bin_w),
@@ -432,9 +444,9 @@ def pack(boxes: Sequence[Box], bin_w: float, bin_h: float, gap: float = 0.0,
         if not all(w > 0 and h > 0 for w, h, _t in sizes):
             rejected.append((b.key, "%r x %r is not a size" % (b.w, b.h)))
             continue
-        if not any(w <= bin_w + _EPS and h <= bin_h + _EPS for w, h, _t in sizes):
+        if not any(w <= bin_w + _EPS and h <= small + _EPS for w, h, _t in sizes):
             rejected.append((b.key, "%.1f x %.1f is bigger than the %.1f x %.1f bin%s"
-                             % (b.w, b.h, bin_w, bin_h,
+                             % (b.w, b.h, bin_w, small,
                                 " either way round" if b.turn else "")))
             continue
         t = None if b.turned is None else (b.turned[0] + gap, b.turned[1] + gap)
@@ -442,7 +454,8 @@ def pack(boxes: Sequence[Box], bin_w: float, bin_h: float, gap: float = 0.0,
     best = None
     seen: dict = {}                     # a bin's rects -> its cuts (variants often agree)
     k = 0
-    for how, got in _variants(grown, bin_w + gap, bin_h + gap):
+    for how, got in _variants(grown, bin_w + gap, bin_h + gap,
+                              None if first_h is None else small + gap):
         places = [p._replace(w=p.w - gap, h=p.h - gap) for p in got]
         nb = 1 + max((p.bin for p in places), default=-1)
         k += 1
@@ -481,5 +494,6 @@ def pack(boxes: Sequence[Box], bin_w: float, bin_h: float, gap: float = 0.0,
         nb, cuts = (b, a) if cuts_first else (a, b)
         places = [p._replace(key=boxes[p.key].key) for p in got]
     area = sum(p.w * p.h for p in places)
-    fill = area / (nb * bin_w * bin_h) if nb else 0.0
+    cap = nb * bin_w * bin_h - (bin_h - small) * bin_w if first_h is not None else nb * bin_w * bin_h
+    fill = area / cap if nb else 0.0
     return Packing(places=places, rejected=rejected, bins=nb, cuts=cuts, fill=fill, how=how)

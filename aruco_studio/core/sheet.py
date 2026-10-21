@@ -169,6 +169,13 @@ class SheetSettings:
     cut_marks: bool = True
     labels: bool = True
     ruler: bool = True
+    # Which pages carry the ruler AND keep its band (layout_stickers only):
+    # "every" (this core's own default: byte for byte what it always drew),
+    # "first" (page 1 only: one print scale for a whole job, the band of the
+    # other pages goes to stickers) or "hide". Zach, 2026-10-20 night: "Hide,
+    # show on first page, show on every page". The Studio's facade defaults
+    # to "first". `ruler` False is still none at all.
+    scale_bar: str = "every"
     title: str = ""
     custom_page_mm: Optional[Tuple[float, float]] = None   # (w, h), overrides page
     id_mark: str = "border"        # "border" | "off"
@@ -993,6 +1000,7 @@ CROP_MM = 2.0                  # a crop mark's length (spaced), outside the corn
 CROP_OFF_MM = 0.5              # its gap from the corner
 PUNCH_MM = 3.0                 # a hole under this gets a cross (a punch, not scissors)
 SHELF_FONT_PT = 5.0
+SCALE_BARS = ("hide", "first", "every")
 MODES = ("spaced", "tight")
 
 
@@ -1034,6 +1042,10 @@ class StickerLayout:
     ruler: Optional[dict]
     warnings: List[str]
     shelves: List[dict]             # tight and spaced: {page, y, h, x0, x1, keys}
+    # scale_bar "first": the sticker area's height on pages 2+ (the band of
+    # the ruler is theirs); 0: every page has printable_mm's
+    rest_h_mm: float = 0.0
+    scale_bar: str = "every"        # the pages that draw `ruler`: every | first
 
     @property
     def page_count(self) -> int:
@@ -1081,6 +1093,9 @@ class StickerLayout:
             o = outline_of(p.item)
             area += abs(_loop_area(o["outer"])) - sum(abs(_loop_area(h))
                                                        for h in o.get("holes", []))
+        if self.rest_h_mm:
+            return area / (self.printable_mm[2] * (self.printable_mm[3]
+                                                   + (len(self.pages) - 1) * self.rest_h_mm))
         return area / (len(self.pages) * self.printable_mm[2] * self.printable_mm[3])
 
 
@@ -1189,7 +1204,9 @@ def _caption_gap(item: PrintItem) -> float:
 
 
 def _area(settings: SheetSettings):
-    """(page w, h, x0, y0, area w, area h, ruler, warnings): layout_sheet's."""
+    """(page w, h, x0, y0, area w, area h, ruler, warnings): layout_sheet's.
+    The area is page 1's; with scale_bar "first" the others are taller by the
+    ruler's band (_rest_h)."""
     page_w, page_h = page_size_mm(settings)
     m = float(settings.margin_mm)
     gap = float(settings.gap_mm)
@@ -1201,7 +1218,7 @@ def _area(settings: SheetSettings):
     footer_top = page_h - m - FOOTER_H_MM
     ruler = None
     area_bottom = footer_top - BAND_GAP_MM
-    if settings.ruler:
+    if settings.ruler and settings.scale_bar != "hide":
         if area_w + _EPS >= RULER_W_MM:
             top = footer_top - RULER_H_MM
             ruler = {"top": top, "mm_bar": (x0, top + 10.5, 100.0, 1.2),
@@ -1216,6 +1233,14 @@ def _area(settings: SheetSettings):
         raise ValueError("margins and ruler leave no printable area on a %.1f x %.1f mm page"
                          % (page_w, page_h))
     return page_w, page_h, x0, y0, area_w, area_h, ruler, warnings
+
+
+def _rest_h(settings: SheetSettings, ruler: Optional[dict], area_h: float) -> float:
+    """The sticker area's height on pages 2+: the ruler's band is theirs when
+    scale_bar is "first" and page 1 has one; else every page's (area_h)."""
+    if ruler is None or settings.scale_bar != "first":
+        return area_h
+    return area_h + RULER_H_MM
 
 
 def printable_options(page: str = "letter", margin_mm: float = 10.0) -> dict:
@@ -1283,6 +1308,9 @@ def layout_stickers(items: List[PrintItem], settings: Optional[SheetSettings] = 
     (`sticker_margin_mm`) grows each sticker's cut outline first, so what is
     placed, drawn and written to sheet.json is the sticker as it is cut."""
     settings = settings or SheetSettings()
+    if settings.scale_bar not in SCALE_BARS:
+        raise ValueError("scale_bar is one of %s (got %r)" % (", ".join(SCALE_BARS),
+                                                              settings.scale_bar))
     sm = float(getattr(settings, "sticker_margin_mm", 0.0) or 0.0)
     if sm > 0:
         import dataclasses
@@ -1291,6 +1319,8 @@ def layout_stickers(items: List[PrintItem], settings: Optional[SheetSettings] = 
     mode = settings.mode if settings.mode in MODES else "spaced"
     tight = mode == "tight"
     page_w, page_h, x0, y0, area_w, area_h, ruler, warnings = _area(settings)
+    rest_h = _rest_h(settings, ruler, area_h)       # pages 2+ (scale_bar "first")
+    first_bar = rest_h > area_h
     if settings.mode not in MODES:
         warnings.append("sheet mode %r: spaced" % (settings.mode,))
     gap = 0.0 if tight else float(settings.gap_mm)
@@ -1326,15 +1356,18 @@ def layout_stickers(items: List[PrintItem], settings: Optional[SheetSettings] = 
                          "cell_h": bh + cap_h, "lines": lines, "font": font})
     if getattr(settings, "packer", "shelf") == "guillotine":
         pages = _guillotine_pages(prepared, settings, gap, x0, y0, area_w, area_h, page_w,
-                                  page_h)
+                                  page_h, rest_h)
         return StickerLayout(settings=settings, page_mm=(page_w, page_h),
                              printable_mm=(x0, y0, area_w, area_h), pages=pages,
-                             rejected=rejected, ruler=ruler, warnings=warnings, shelves=[])
+                             rejected=rejected, ruler=ruler, warnings=warnings, shelves=[],
+                             rest_h_mm=rest_h if first_bar else 0.0,
+                             scale_bar="first" if first_bar else "every")
     if tight:
         prepared.sort(key=lambda p: (-round(p["h"], 6), -round(p["w"], 6), p["index"]))
     else:
         prepared.sort(key=lambda p: (-p["h"], -p["w"], -p["cell_h"], p["index"]))
     x1, y1 = x0 + area_w, y0 + area_h
+    y1_rest = y0 + rest_h                           # pages 2+
     shelves: List[dict] = []
     next_y: List[float] = []
     pages: List[List[StickerPlace]] = []
@@ -1347,7 +1380,7 @@ def layout_stickers(items: List[PrintItem], settings: Optional[SheetSettings] = 
                 break
         if spot is None:
             for pi, y in enumerate(next_y):
-                if y + p["cell_h"] <= y1 + _EPS:
+                if y + p["cell_h"] <= (y1 if pi == 0 else y1_rest) + _EPS:
                     spot = (pi, x0, y, None)
                     break
             if spot is None:
@@ -1374,7 +1407,9 @@ def layout_stickers(items: List[PrintItem], settings: Optional[SheetSettings] = 
         sh["x1"] = sh["x1"] - gap if sh["keys"] else sh["x1"]
     return StickerLayout(settings=settings, page_mm=(page_w, page_h),
                          printable_mm=(x0, y0, area_w, area_h), pages=pages, rejected=rejected,
-                         ruler=ruler, warnings=warnings, shelves=shelves)
+                         ruler=ruler, warnings=warnings, shelves=shelves,
+                         rest_h_mm=rest_h if first_bar else 0.0,
+                         scale_bar="first" if first_bar else "every")
 
 
 def _cell(item: PrintItem, w: float, h: float, settings: SheetSettings):
@@ -1384,7 +1419,8 @@ def _cell(item: PrintItem, w: float, h: float, settings: SheetSettings):
     return max(w, tw), h + cap_h, lines, font
 
 
-def _guillotine_pages(prepared, settings, gap, x0, y0, area_w, area_h, page_w, page_h):
+def _guillotine_pages(prepared, settings, gap, x0, y0, area_w, area_h, page_w, page_h,
+                      rest_h=None):
     """packer "guillotine": every prepared sticker's cell (either way round
     that fits the printable area) through core.pack -> pages of StickerPlace.
     The sticker sits at the top of its cell, centred across it (the caption
@@ -1408,9 +1444,12 @@ def _guillotine_pages(prepared, settings, gap, x0, y0, area_w, area_h, page_w, p
         boxes.append(_pack.Box(k, first[3], first[4], turn=len(opts) > 1,
                                turned=(opts[1][3], opts[1][4]) if len(opts) > 1 else None,
                                cut=(cut[0], cut[-1])))
-    got = _pack.pack(boxes, area_w, area_h, gap=gap,
+    # scale_bar "first": pages 2+ are rest_h tall, page 1 (area_h) keeps its band
+    tall = area_h if rest_h is None else rest_h
+    got = _pack.pack(boxes, area_w, tall, gap=gap,
                      stock=(-x0, -y0, page_w - x0, page_h - y0),
-                     objective=getattr(settings, "objective", "fewest_sheets"))
+                     objective=getattr(settings, "objective", "fewest_sheets"),
+                     first_h=area_h if tall > area_h else None)
     pages: List[List[StickerPlace]] = [[] for _ in range(got.bins)]
     for pl in got.places:
         p = prepared[pl.key]
@@ -1448,6 +1487,9 @@ def sticker_summary(layout: StickerLayout) -> dict:
         extra["cut_lines"] = False
     if getattr(s, "packer", "shelf") != "shelf":
         extra["packer"] = s.packer
+    if layout.scale_bar != "every":
+        extra["scale_bar"] = layout.scale_bar
+        extra["rest_h_mm"] = _r4(layout.rest_h_mm)    # pages 2+ (the ruler is on page 1 only)
     return {
         **extra,
         "schema": "arucostudio.sheet/1", "mode": s.mode, "page": s.page,
@@ -1611,7 +1653,7 @@ def sticker_page_ops(layout: StickerLayout, page_index: int, date: str) -> _Ops:
             words = _fit_text(_shelf_words(layout, sh), SHELF_FONT_PT, max(sh["h"] - 1.0, 3.0))
             x = max(1.5, float(s.margin_mm) - 2.0)
             pg.text_up(x, sh["y"] + sh["h"] - 0.5, words, SHELF_FONT_PT, grey=0.3)
-    if layout.ruler is not None:
+    if layout.ruler is not None and (layout.scale_bar != "first" or page_index == 0):
         _draw_ruler(pg, layout.ruler)
     m = float(s.margin_mm)
     base = page_h - m - 1.0
