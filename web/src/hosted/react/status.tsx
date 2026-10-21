@@ -4,14 +4,14 @@
 
 import { CircleAlert, Cloud, CloudCheck, CloudOff, CloudUpload, GitCompareArrows, LoaderCircle, Lock, type LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { relativeTime, type State } from "@/lib/hosted-files/core"
+import { MSG_UPDATED, MSG_UPDATED_BY_AGENT, relativeTime, type State } from "@/lib/hosted-files/core"
 import { useHostedFiles, useHostedFilesContext, useHostedFilesUi } from "./provider"
 
 export type StatusKind = "signed-out" | "signing-in" | "idle" | "saved" | "dirty" | "saving" | "offline" | "conflict" | "view-only" | "error"
 
 export interface StatusView {
   kind: StatusKind
-  label: string // a few words, for chips and rows; starts with "Saved" exactly when saved
+  label: string // a few words, for chips and rows; starts with "Saved" when saved, unless a live update names who changed it
   detail: string // one sentence, for tooltips and headers
   tone: "quiet" | "attention" | "danger"
 }
@@ -81,6 +81,10 @@ export function describeStatus(state: State, signingIn = false, appName = "this 
   }
   if (!file) return { kind: "idle", label: state.message ?? "Not saved yet", detail: "This document isn't saved online yet. Save to keep it.", tone: "quiet" }
   const when = relativeTime(state.lastSavedAt ?? file.updatedAt)
+  // A live update (SPEC v2.8) says who changed the text under you, until the next edit.
+  if (state.message === MSG_UPDATED || state.message === MSG_UPDATED_BY_AGENT) {
+    return { kind: "saved", label: state.message, detail: `${state.message} ${when} · version ${file.version}`, tone: "quiet" }
+  }
   // The "Updated elsewhere — Reload" message is shown beside it by <StaleHeadButton>, never instead of it.
   return { kind: "saved", label: `Saved ${when}`, detail: `Saved online ${when} · version ${file.version}`, tone: "quiet" }
 }
