@@ -42,7 +42,8 @@ export interface Me {
   plan: "free" | "pro";
   limits: { filesPerApp: number | null; maxFileBytes: number; totalBytes: number };
   usage: { totalBytes: number; apps: Record<string, { files: number; trashed: number }> };
-  app?: { id: string; name: string; extension: string; files: number; limit: number | null; remaining: number | null };
+  // `autosave`: the app's policy from apps.json (SPEC "Autosave policy"); absent from an older server.
+  app?: { id: string; name: string; extension: string; files: number; limit: number | null; remaining: number | null; autosave?: AutosavePolicy };
   billing: { provider: "dev" | "stripe"; priceLabel: string; canUpgrade: boolean; canManage: boolean };
   accountUrl: string;
   deletionScheduledAt: string | null;
@@ -63,9 +64,15 @@ export interface State {
 
 export type Content = string | Blob | ArrayBuffer | Uint8Array | object;
 
+// SPEC "Autosave policy" (2026-10-21): "existing" (the default) updates files that already exist; "all" also
+// creates an untitled document's file on its first real edit; "off" starts with autosave off.
+export type AutosavePolicy = "all" | "existing" | "off";
+
 export interface AutosaveOptions {
   idleMs?: number;
   maxIntervalMs?: number;
+  // Overrides the app's policy from the server (apps.json "autosave").
+  policy?: AutosavePolicy;
 }
 
 export interface LiveUpdateOptions {
@@ -111,8 +118,11 @@ export interface HostedFilesOptions {
   newDocument?: () => void | Promise<void>;
   contentType?: string;
   untitledName?: string;
-  // Default on, { idleMs: 1500, maxIntervalMs: 20000 } (SPEC v2.4). The user's setAutosave()
-  // choice, kept in localStorage, overrides it.
+  // The name a file autosave creates (policy "all") is given: the app's own name for the document.
+  // Absent, empty or not a valid file name: `untitledName`.
+  documentName?: () => string | null | undefined;
+  // Default on, { idleMs: 1500, maxIntervalMs: 20000 } (SPEC v2.4), and off when the app's policy is "off".
+  // The user's setAutosave() choice, kept in localStorage, overrides it.
   autosave?: boolean | AutosaveOptions;
   // Default on, every 5000 ms while a file is open and the page visible, and on focus (SPEC v2.8):
   // a newer head written elsewhere (an agent, another device) loads when nothing is unsaved here.

@@ -56,6 +56,14 @@ describe("the hosted files adapter", () => {
     expect(JSON.parse(String(await adapter.options.getContent())).name).toBe("Untitled");
   });
 
+  it("the file autosave creates is named as the document is", () => {
+    const store = fakeStudio();
+    const adapter = studioAdapter(store);
+    expect(adapter.options.documentName?.()).toBe("Plate");
+    adapter.nameNext("Forearm plate");
+    expect(adapter.options.documentName?.()).toBe("Forearm plate");
+  });
+
   it("setContent refuses what is not a Studio file, and leaves the document", async () => {
     const store = fakeStudio();
     const before = store.getState().doc;

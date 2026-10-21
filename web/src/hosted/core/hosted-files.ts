@@ -27,6 +27,7 @@ import { SignInFlow } from "./signin.js";
 import type {
   AgentLink,
   AgentLinkMode,
+  AutosavePolicy,
   CreatedAgentLink,
   Draft,
   EventName,
@@ -46,6 +47,7 @@ export const MSG_UPDATED = "Updated elsewhere";
 export const MSG_UPDATED_BY_AGENT = "Updated by an agent";
 const MSG_STALE_DIRTY = `${MSG_UPDATED} — saving keeps both`;
 export const MSG_RESTORED = "Restored your unsaved text";
+export const MSG_FILE_LIMIT = "Not saved online — free file limit reached";
 
 // SPEC §7.2: retry after 2 s, 5 s, 15 s, 30 s, then every 60 s.
 const BACKOFF_MS = [2_000, 5_000, 15_000, 30_000, 60_000];
@@ -113,6 +115,9 @@ export class HostedFiles {
   private localTimer: ReturnType<typeof setTimeout> | null = null;
   private localChain: Promise<unknown> = Promise.resolve();
   private autosaveTiming: { idleMs: number; maxIntervalMs: number };
+  private autosaveOff: boolean; // the app passed autosave: false
+  private policyOption: AutosavePolicy | undefined; // the app's own policy, over the server's
+  private limitNoticeSeq = -1; // the document whose autosave last said the free files are used up
   private leaving = false;
   private _initialized = false;
   private signingIn: Promise<User> | null = null;
@@ -137,7 +142,9 @@ export class HostedFiles {
       idleMs: (typeof autosave === "object" && autosave.idleMs) || AUTOSAVE_IDLE_MS,
       maxIntervalMs: (typeof autosave === "object" && autosave.maxIntervalMs) || AUTOSAVE_MAX_INTERVAL_MS,
     };
-    this.current.autosave = this.storedAutosave() ?? autosave !== false;
+    this.autosaveOff = autosave === false;
+    this.policyOption = typeof autosave === "object" ? autosave.policy : undefined;
+    this.current.autosave = this.storedAutosave() ?? this.defaultAutosave();
     const live = options.liveUpdates;
     this.liveMs = live === false ? null : (typeof live === "object" && live.intervalMs) || LIVE_INTERVAL_MS;
     this.migrateLegacyToken();
@@ -308,7 +315,11 @@ export class HostedFiles {
     const me = await this.api.me();
     const wasSignedOut = !this.current.user;
     this.set({ user: me.user, me, plan: me.plan });
+    // The app's policy is known now: without the user's own choice, the toggle follows it.
+    if (this.storedAutosave() === null && this.defaultAutosave() !== this.current.autosave) this.applyAutosave(this.defaultAutosave());
     if (wasSignedOut) this.settledStatus();
+    // Edited while signed out: under "all" that untitled document is created now, as its next edit would.
+    if (wasSignedOut && this.dirty) this.scheduleAutosave();
     // Signed in some other way meanwhile (another tab): an open dialog has nothing left to do.
     if (wasSignedOut) this.flow?.succeed(me.user);
     return me;
@@ -686,17 +697,27 @@ export class HostedFiles {
     this.applyAutosave(on);
   }
 
+  // SPEC "Autosave policy": the app's own option, else the server's apps.json entry, else "existing".
+  private get policy(): AutosavePolicy {
+    return this.policyOption ?? this.current.me?.app?.autosave ?? "existing";
+  }
+
+  private defaultAutosave(): boolean {
+    return !this.autosaveOff && this.policy !== "off";
+  }
+
   private applyAutosave(on: boolean): void {
     this.set({ autosave: on });
     if (!on) this.clearAutosaveTimers();
     else if (this.dirty) this.scheduleAutosave();
   }
 
-  // WHY only existing, unlocked files: the free plan has few files (3 in most apps), so autosave never creates
-  // one the user didn't ask for; a view-only file would only be refused.
+  // WHY untitled documents only under "all": the free plan has few files (3 in most apps), so an app autosaves
+  // into a new file only when it says so (SPEC "Autosave policy"); a view-only file would only be refused.
   private get canAutosave(): boolean {
+    if (!this.current.autosave || !this.current.user || this.blocked) return false;
     const file = this.current.file;
-    return this.current.autosave && !!this.current.user && !!file && !file.locked && !file.trashedAt && !this.blocked;
+    return file ? !file.locked && !file.trashedAt : this.policy === "all";
   }
 
   // Fires idleMs after the last change, or maxIntervalMs after the first unsaved one while
@@ -721,16 +742,48 @@ export class HostedFiles {
     if (seq !== this.docSeq) return;
     this.enqueue(async () => {
       if (seq !== this.docSeq || !this.dirty || !this.canAutosave) return null;
+      if (!this.current.file) return this.autoCreate();
       return this.saveNow({ kind: "auto", keepalive });
     }).catch(() => {});
   }
 
+  // Policy "all": the untitled document's first real edit (the debounce has passed, it is not empty) creates
+  // its file, named as the app names the document; from then on it autosaves like any file.
+  // WHY a free slot first: at the limit the edit stays in the local working copy, and the limit wording shows
+  // once for this document, never the dialog (nobody pressed Save) and never again on every pause.
+  private async autoCreate(): Promise<FileMeta | null> {
+    const pending = this.untitled?.seq === this.docSeq ? this.untitled : null;
+    const content = await this.snapshot();
+    if (content.size === 0) return null;
+    if (!pending && !this.hasFreeSlot) {
+      if (this.limitNoticeSeq !== this.docSeq) {
+        this.limitNoticeSeq = this.docSeq;
+        this.setStatus("error", MSG_FILE_LIMIT);
+      }
+      return null;
+    }
+    return this.commit(null, null, pending?.name ?? this.documentName(), content, pending?.key, { kind: "auto" });
+  }
+
+  private get hasFreeSlot(): boolean {
+    const app = this.current.me?.app;
+    return !app || app.remaining === null || app.remaining > 0;
+  }
+
+  // The server's name rule (SPEC §5): 1–200 characters after trimming, no "/" or control characters.
+  private documentName(): string {
+    const name = this.opts.documentName?.()?.trim();
+    return name && name.length <= 200 && !/[/\u0000-\u001f\u007f]/.test(name) ? name : this.opts.untitledName;
+  }
+
   // The page is being hidden or unloaded: keep the working copy now and send the autosave
   // with fetch keepalive so it can outlive the page (SPEC v2.4).
+  // WHY never for an untitled document: a create the closing page never hears back about would leave its
+  // queued draft behind, and the next load would create the file a second time. The working copy covers it.
   private onHide(): void {
     this.syncLive();
     if (this.localTimer) this.flushLocal();
-    if (this.dirty && this.canAutosave) this.autosave(this.docSeq, true);
+    if (this.dirty && this.canAutosave && this.current.file) this.autosave(this.docSeq, true);
   }
 
   // ---- the local working copy (SPEC v2.4) ----------------------------------------------
@@ -951,8 +1004,9 @@ export class HostedFiles {
       const file = this.current.file;
       if (variant === "locked" && file && file.id === draft.fileId) this.set({ file: { ...file, locked: true } });
       this.limitParked.add(draft.id!);
-      this.setStatus("error", variant === "locked" ? "View-only on the free plan — not saved" : "Not saved online — free file limit reached");
-      this.ui?.showLimit(variant);
+      this.setStatus("error", variant === "locked" ? "View-only on the free plan — not saved" : MSG_FILE_LIMIT);
+      // An autosave that would have created a file opens no dialog: nobody pressed Save (SPEC "Autosave policy").
+      if (draft.fileId || draft.kind !== "auto") this.ui?.showLimit(variant);
       this.emit("limit", { variant, error: err });
       return;
     }
@@ -1032,6 +1086,15 @@ export class HostedFiles {
     }
     const content = await this.snapshot();
     if (content.size === 0) return true;
+    // Policy "all": leaving ends the debounce, so the document is created as its autosave would have been.
+    if (this.canAutosave && this.hasFreeSlot) {
+      try {
+        await this.commit(null, null, this.documentName(), content, undefined, { kind: "auto" });
+        return true;
+      } catch (err) {
+        return err instanceof HostedFilesError && err.retryable;
+      }
+    }
     const answer = this.ui
       ? await this.ui.promptName({ title: "Save this first?", value: this.opts.untitledName, okLabel: "Save", discard: true })
       : window.confirm("Save this document first?")
