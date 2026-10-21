@@ -80,6 +80,13 @@ async function dragArrow(page: Page, a: Arrow, dx: number, dy: number, steps = 1
   await idle(page);
 }
 
+/** Click a value box's input and let its focus settle: onFocus selects the
+ *  text in the next animation frame, which would swallow keys typed before it. */
+async function focusBox(page: Page, input: ReturnType<Page["locator"]>): Promise<void> {
+  await input.click();
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+}
+
 const layer = (plan: any, colour: string) => plan.layers.find((L: any) => L.op === "add" && L.colour === colour && L.part !== "label");
 
 /** The tile on a 3D-print preset, its marker clicked in 2D: selected, its panel open. */
@@ -258,7 +265,7 @@ test.describe(`the 3D view (${CORE} core)`, () => {
     expect(layer(s.plan, "white").z[1]).toBeCloseTo(W0, 6);
 
     // type 2.4 in the box, Enter
-    await box.locator("input").click();
+    await focusBox(page, box.locator("input"));
     await page.keyboard.press("Control+a");
     await page.keyboard.type("2.4");
     await page.keyboard.press("Enter");
@@ -270,7 +277,7 @@ test.describe(`the 3D view (${CORE} core)`, () => {
     await expect(box.locator("input")).toHaveValue("2.40 mm");
     await expect(box).toHaveAttribute("data-driven", "false");
     // Esc cancels a typed value
-    await box.locator("input").click();
+    await focusBox(page, box.locator("input"));
     await page.keyboard.press("Control+a");
     await page.keyboard.type("9");
     await page.keyboard.press("Escape");
@@ -316,7 +323,7 @@ test.describe(`the 3D view (${CORE} core)`, () => {
     // typed, with the white set too: the black still hangs from the white's outer face
     const typeIn = async (key: string, v: string) => {
       const input = page.locator(`[data-testid="v3-box"][data-key="${key}"] input`);
-      await input.click();
+      await focusBox(page, input);
       await page.keyboard.press("Control+a");
       await page.keyboard.type(v);
       await page.keyboard.press("Enter");
