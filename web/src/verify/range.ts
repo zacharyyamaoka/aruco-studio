@@ -90,6 +90,8 @@ class Runner {
   /** marker key -> the worker's job, while it is part done */
   private jobs = new Map<string, string>();
   private pumping = false;
+  /** the marker whose slice is out now (never cancelled under itself) */
+  private inFlight: string | null = null;
   private listeners = new Set<() => void>();
   private tick = 0;
   /** steps sent, for the e2e (a cached open sends none) */
@@ -111,8 +113,20 @@ class Runner {
     return c ? { state: "done", result: c.result, ms: c.ms, cached: true } : { state: "queued" };
   }
 
-  /** What to measure, in order (the first unfinished one runs next). [] pauses. */
+  /** What to measure, in order (the first unfinished one runs next). [] pauses
+   *  (the bench is one click away: part-done jobs wait in the worker); a new
+   *  list cancels the part-done jobs it no longer has (another camera, an
+   *  edited marker: they would only hold the worker's memory). */
   want(tasks: RangeTask[]): void {
+    if (tasks.length) {
+      const keep = new Set(tasks.map((t) => t.key));
+      for (const [key, job] of [...this.jobs]) {
+        if (keep.has(key) || this.inFlight === key) continue;
+        this.jobs.delete(key);
+        void core.range_cancel(job).catch(() => undefined);
+        if (this.states.get(key)?.state === "running") this.set(key, { state: "queued" });
+      }
+    }
     this.wanted = tasks;
     for (const t of tasks) {
       const s = this.states.get(t.key);
@@ -144,6 +158,13 @@ class Runner {
     for (const cb of this.listeners) cb();
   }
 
+  /** Every finished range this visit (the e2e compares them with CPython). */
+  finished(): { key: string; result: ReadingRange; ms: number | null }[] {
+    const out = [];
+    for (const [key, st] of this.states) if (st.state === "done") out.push({ key, result: st.result, ms: st.ms });
+    return out;
+  }
+
   busy(): boolean {
     return this.wanted.some((t) => { const s = this.state(t.key).state; return s === "queued" || s === "running"; });
   }
@@ -158,6 +179,7 @@ class Runner {
     try {
       for (let t = this.next(); t; t = this.next()) {
         const task = t;
+        this.inFlight = task.key;
         try {
           let job = this.jobs.get(task.key);
           if (!job) {
@@ -181,6 +203,15 @@ class Runner {
           // the worker dropped a job (too many part done): start it over
           if (/no reading-range job/.test(msg)) this.set(task.key, { state: "queued" });
           else this.set(task.key, { state: "error", error: msg });
+        } finally {
+          this.inFlight = null;
+        }
+        // a marker no longer wanted while its slice was out: free its job now
+        if (!this.wanted.some((w) => w.key === task.key) && this.wanted.length && this.jobs.has(task.key)) {
+          const job = this.jobs.get(task.key)!;
+          this.jobs.delete(task.key);
+          void core.range_cancel(job).catch(() => undefined);
+          if (this.states.get(task.key)?.state === "running") this.set(task.key, { state: "queued" });
         }
       }
     } finally {
@@ -345,6 +376,7 @@ if (typeof window !== "undefined") {
       }
     },
     steps: () => ranges.steps,
+    finished: () => ranges.finished(),
     forget: () => forgetRanges(),
     state: (key: string) => ranges.state(key),
   };

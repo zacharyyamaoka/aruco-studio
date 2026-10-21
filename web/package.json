@@ -13,7 +13,8 @@
     "test:parity": "node scripts/parity.mjs",
     "e2e": "playwright test",
     "deploy": "npm run build && wrangler deploy",
-    "bench:feature": "node scripts/bench-feature.mjs"
+    "bench:feature": "node scripts/bench-feature.mjs",
+    "bench:verify-range": "node scripts/bench-verify-range.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.8.0",

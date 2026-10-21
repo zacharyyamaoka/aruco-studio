@@ -105,6 +105,17 @@ describe("the runner", () => {
     expect(R.ranges.state("k20").state).toBe("queued");
   });
 
+  it("a new list (another camera) cancels the part-done job it no longer has", async () => {
+    R.ranges.want([task(50)]);
+    await until("step 50");
+    R.ranges.want([task(51)]);
+    await settle();
+    expect(log).toContain("cancel 50");
+    expect(log.filter((x) => x === "step 50").length).toBeLessThan(STEPS);
+    expect(R.ranges.state("k51").state).toBe("done");
+    expect(R.ranges.state("k50").state).toBe("queued");
+  });
+
   it("shows an error, and Retry measures again", async () => {
     failNextStart = "30";
     R.ranges.want([task(30)]);

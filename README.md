@@ -11,6 +11,7 @@ Public at https://github.com/zacharyyamaoka/aruco-studio (no licence chosen yet)
 | Dev (hot reload) | `npm --prefix web run dev`, open http://127.0.0.1:5380 (first time: `npm --prefix web ci`) |
 | Tests | `npm --prefix web test` (vitest); `npm --prefix web run test:parity` (Pyodide = CPython, byte for byte); `npm --prefix web run e2e` (Playwright on the static build); `.venv/bin/python -m pytest tests/web` |
 | Check the live site | `E2E_BASE_URL=https://arucostudio.com npm --prefix web run e2e -- --project=e2e` |
+| Reading ranges from a script (Verify's range strip) | `.venv/bin/python -m aruco_studio.web_verify requests.json --camera d435 --need 300:2000` (requests: PlanRequests or `{name, req, need}`); add `--also .venv-cv411/bin/python` for the browser's OpenCV too (both where they differ, the worse governs: `tools/requirements-browser-opencv.txt`); `npm --prefix web run bench:verify-range` times it (vt-kpi, `~/.local/share/aruco_studio_bench/verify_range`) |
 | Deploy | `npm --prefix web run deploy` (build + `wrangler deploy`; wrangler is logged in per machine) |
 | Run it locally, Stable + Preview | `sps open` (Stable, http://127.0.0.1:5382), `sps open --preview` (live `main`, http://127.0.0.1:5383), `sps promote` (Make Stable), `sps rollback`, `sps stop --all`; from a worktree `sps dev` (a lane on 5400-5499). Needs the main checkout on `main`. WHY and how: `docs/STABLE_PREVIEW.md` |
 

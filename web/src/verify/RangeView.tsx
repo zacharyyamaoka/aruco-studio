@@ -187,7 +187,7 @@ function Column({ it, task, state, lo, hi, scale, selected, onClick, onEnd }: {
   return (
     <div className={`vr-col${selected ? " on" : ""}`} data-testid="range-col" data-feature={it.f.id} data-state={state.state}
       data-near={r?.near_mm ?? ""} data-far={r?.far_mm ?? ""} data-verdict={v?.verdict ?? ""} data-selected={selected ? "1" : "0"}
-      data-renders={r?.renders ?? ""} onClick={onClick} role="button" aria-pressed={selected}
+      data-renders={r?.renders ?? ""} data-camera={r?.camera.id ?? ""} data-key={task?.key ?? ""} onClick={onClick} role="button" aria-pressed={selected}
       title="Click to select, Shift- or Ctrl-click to add: the required distance below sets the selection">
       <div className="vr-thumb">{it.plan ? <MarkerThumb f={it.f} plan={it.plan} scale={scale} /> : <span className="muted">Planning…</span>}</div>
       <div className="vr-name"><b>{markerName(it.f, it.plan)}</b>{it.plan ? ` · ${+it.plan.marker_mm.toFixed(2)} mm` : ""}</div>
