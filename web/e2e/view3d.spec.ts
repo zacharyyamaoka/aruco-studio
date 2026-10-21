@@ -6,9 +6,10 @@
 // never DOM presence alone. Screenshots (1280 × 800) go to VIEW3D_SHOTS
 // (default test-results/view3d); VIEW3D_VIDEO records the drag-then-type
 // flow into that folder; VIEW3D_BENCH times a 12-marker sheet.
+import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { CORE, clickAt, coreReady, idle, labelOn, loadExample, openPresets, openStudio, panelTab, planOutline, state } from "./helpers";
+import { CORE, clickAt, coreReady, idle, labelOn, loadExample, openMenu, openPresets, openStudio, panelTab, planOutline, state } from "./helpers";
 
 const SHOTS = process.env.VIEW3D_SHOTS ?? "test-results/view3d";
 /** below this luminance (0-255) a rendered pixel reads as ink, from above */
@@ -159,15 +160,15 @@ function gridPoints(outer: Pt[], black: Poly[], cell: number): Pt[] {
   return out;
 }
 
-/** The 3D view on the feature in focus (no arrows or boxes): straight from
- *  above (`top`) or from below (`bottom`: straight up, or `tilt` degrees off
- *  from `far` mm), then the luminance (0-255) of its rendered canvas at each
- *  sketch point, projected at height z (mm). */
+/** The 3D view on the feature in focus (no arrows or boxes): from above
+ *  (`top`: straight down, or `tilt` degrees off) or from below (`bottom`:
+ *  straight up, or `tilt` degrees off from `far` mm), then the luminance
+ *  (0-255) of its rendered canvas at each sketch point, projected at height z (mm). */
 async function pixels(page: Page, pts: Pt[], z: number, side: "top" | "bottom", tilt = 0, far?: number): Promise<number[]> {
   // (top3d is the probe's own; the bottom view rides on view3d(), which passes it through)
   await page.evaluate(([sd, t, f]) => {
     const a = (window as any).__aruco;
-    if (sd === "top") a.top3d(false); else a.view3d().bottom(false, t, f ?? undefined);
+    if (sd === "top") a.top3d(false, t); else a.view3d().bottom(false, t, f ?? undefined);
   }, [side, tilt, far ?? null] as const);
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   const client = await page.evaluate(([ps, zz]) => (ps as Pt[]).map(([x, y]) => (window as any).__aruco.project3d(x, y, zz)), [pts, z] as const);
@@ -582,6 +583,168 @@ test.describe(`the 3D view (${CORE} core)`, () => {
     expect((await state(page)).plan.extrude.mode).toBe("white");
     await noInkBelow(page, "White only", false);
     await shotBelow(page, "below-face-white.png");
+  });
+
+  /** Zach's sheet (2026-10-21: "white and black not rendering properly"):
+   *  eight inkjet singles with corner marks and a ChArUco whose edge squares
+   *  run to the sticker's edge. (An inkjet label is text the page prints, not
+   *  a layer.) */
+  const INKJET_SHEET = {
+    format: "arucostudio-web", version: 3, name: "Inkjet sheet", id_ledger: {}, preset: null,
+    shapes: [
+      ...Array.from({ length: 8 }, (_, i) => ({ kind: "rect", id: `s${i}`, cx: (i % 4) * 40, cy: i < 4 ? 40 : 0, w: 30, h: 30, angle_deg: 0 })),
+      { kind: "rect", id: "board", cx: 200, cy: 20, w: 50, h: 120, angle_deg: 0 },
+    ],
+    features: [
+      ...Array.from({ length: 8 }, (_, i) => ({
+        id: `f${i}`, key: `f${i}`, profile: { outer: `s${i}`, holes: [] }, holes: "avoid",
+        marker: { type: "single", first_id: i, corner_mark: "triangle" },
+        label: { on: false }, set: ["marker.first_id"],
+      })),
+      { id: "fb", key: "fb", profile: { outer: "board", holes: [] }, holes: "avoid", marker: { type: "charuco", first_id: 10, cols: 3, rows: 7 }, label: { on: false }, set: ["marker.first_id"] },
+    ],
+  };
+
+  /** The luminance at each sketch point at height z, as the 3D view draws it now,
+   *  and how many screen px a mm is there at the least (the smaller singular
+   *  value of the projection's Jacobian); NaN off the canvas. */
+  async function sample(page: Page, pts: Pt[], z: number): Promise<{ lum: number[]; pxPerMm: number[] }> {
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    return page.evaluate(([ps, zz]) => {
+      const P = (x: number, y: number) => (window as any).__aruco.project3d(x, y, zz) as [number, number];
+      const c = document.querySelector('[data-testid="view3d"] canvas') as HTMLCanvasElement;
+      const r = c.getBoundingClientRect();
+      const k = document.createElement("canvas");
+      k.width = c.width;
+      k.height = c.height;
+      const g = k.getContext("2d")!;
+      g.drawImage(c, 0, 0);
+      const d = g.getImageData(0, 0, k.width, k.height).data;
+      const lum: number[] = [], pxPerMm: number[] = [];
+      for (const [x, y] of ps as [number, number][]) {
+        const [cx, cy] = P(x, y), [ax, ay] = P(x + 0.01, y), [bx, by] = P(x, y + 0.01);
+        const a = [(ax - cx) / 0.01, (ay - cy) / 0.01], b = [(bx - cx) / 0.01, (by - cy) / 0.01];
+        const p = a[0] * a[0] + a[1] * a[1], q = a[0] * b[0] + a[1] * b[1], s = b[0] * b[0] + b[1] * b[1];
+        pxPerMm.push(Math.sqrt(Math.max(0, (p + s) / 2 - Math.sqrt(((p - s) / 2) ** 2 + q * q))) * (c.width / r.width));
+        const px = Math.round(((cx - r.left) * c.width) / r.width), py = Math.round(((cy - r.top) * c.height) / r.height);
+        if (px < 0 || py < 0 || px >= k.width || py >= k.height) { lum.push(NaN); continue; }
+        const i = (py * k.width + px) * 4;
+        lum.push(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+      }
+      return { lum, pxPerMm };
+    }, [pts, z] as const);
+  }
+
+  /** The 3D canvas alone as a PNG in SHOTS (no panel over it). */
+  async function canvasShot(page: Page, name: string): Promise<void> {
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const url = await page.evaluate(() => (document.querySelector('[data-testid="view3d"] canvas') as HTMLCanvasElement).toDataURL("image/png"));
+    fs.mkdirSync(SHOTS, { recursive: true });
+    fs.writeFileSync(path.join(SHOTS, name), Buffer.from(url.split(",")[1], "base64"));
+  }
+
+  /** Sample points over a plan's paper (step mm apart): whether each is ink
+   *  (any black layer) or paper (the white), how far it is from the nearest
+   *  edge of either and of the outline (mm), and the height of the top. */
+  function inkSamples(plan: any, step: number) {
+    const adds = plan.layers.filter((L: any) => L.op === "add");
+    const ink: Poly[] = adds.filter((L: any) => L.colour === "black").flatMap((L: any) => L.polygons);
+    const paper: Poly[] = adds.filter((L: any) => L.colour === "white").flatMap((L: any) => L.polygons);
+    const tri: Poly[] = adds.filter((L: any) => L.name === "mark_triangle").flatMap((L: any) => L.polygons);
+    const all = [...rings(paper), ...rings(ink)].flat();
+    const xs = all.map((p) => p[0]), ys = all.map((p) => p[1]);
+    const pts: Pt[] = [], dark: boolean[] = [], dist: number[] = [], rim: number[] = [];
+    for (let x = Math.min(...xs) + step / 2; x < Math.max(...xs); x += step) {
+      for (let y = Math.min(...ys) + step / 2; y < Math.max(...ys); y += step) {
+        const p: Pt = [x, y];
+        const d = inPolys(ink, p);
+        if (!d && !inPolys(paper, p)) continue;
+        pts.push(p);
+        dark.push(d);
+        rim.push(edgeDist(paper, p));
+        dist.push(Math.min(rim[rim.length - 1], edgeDist(ink, p)));
+      }
+    }
+    return { pts, dark, dist, rim, tri, zTop: Math.max(...adds.map((L: any) => L.z[1] as number)) };
+  }
+
+  /** The points drawn wrong: ink not dark or paper not light, of those at
+   *  least 1.5 px from every edge on screen. WHY 1.5: the sample rounds to a
+   *  pixel and an edge's pixels are antialiased. */
+  async function offPoints(page: Page, S: ReturnType<typeof inkSamples>) {
+    const { lum, pxPerMm } = await sample(page, S.pts, S.zTop);
+    const keep = S.pts.map((_, i) => Number.isFinite(lum[i]) && S.dist[i] * pxPerMm[i] >= 1.5);
+    const bad = S.pts.map((p, i) => ({ p: p.map((v) => +v.toFixed(2)), want: S.dark[i] ? "dark" : "light", got: Math.round(lum[i]) }))
+      .filter((x, i) => keep[i] && (x.want === "dark") !== (x.got < LIGHT));
+    return { keep, bad, n: keep.filter(Boolean).length };
+  }
+
+  test("m · an inkjet sheet, corner marks and a ChArUco: from above (the fitted sheet; each marker straight down and 50 degrees off) every ink point is dark and every paper point light, to a pixel from every edge", async ({ page }) => {
+    await openStudio(page);
+    await coreReady(page);
+    await openMenu(page, "file");
+    const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByTestId("cmd-open").click()]);
+    await chooser.setFiles({ name: "inkjet-sheet.arucostudio-web.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(INKJET_SHEET)) });
+    await idle(page);
+    let s = await state(page);
+    const fids = s.doc.features.map((f: any) => f.id as string);
+    expect(fids).toHaveLength(9);
+    for (const fid of fids) {
+      const L = s.plans[fid]?.layers ?? [];
+      expect(L.find((x: any) => x.colour === "white")?.z, `${fid} is inkjet paper`).toEqual([0, 0.1]);
+    }
+    expect(s.plans.f1.layers.some((L: any) => L.name === "mark_triangle" && L.colour === "black"), "a corner mark").toBe(true);
+    await page.keyboard.press("3");
+    await expect(page.getByTestId("view3d")).toBeVisible();
+    await expect.poll(async () => Object.keys((await v3(page))?.solids ?? {}).length).toBe(9);
+    await page.waitForTimeout(150);
+    await page.screenshot({ path: path.join(SHOTS, "inkjet-sheet.png") });
+
+    const off: string[] = [];
+    // Zach's view: the whole sheet as 3 fits it, tilted, from far off
+    await page.evaluate(() => (window as any).__aruco.view3d().sheet(false));
+    await canvasShot(page, "inkjet-sheet-fitted.png");
+    for (const fid of fids) {
+      const r = await offPoints(page, inkSamples(s.plans[fid], 0.5));
+      expect(r.n, `${fid} in the sheet: sample points`).toBeGreaterThan(200);
+      if (r.bad.length) off.push(`${fid}, the fitted sheet: ${r.bad.length} of ${r.n} points off, e.g. ${JSON.stringify(r.bad.slice(0, 3))}`);
+    }
+
+    let nearOutline = 0, inTriangles = 0, onEdgeSquares = 0;
+    for (const fid of fids) {
+      // focus it: a click on it in 2D inspects it, then back to 3D
+      const o = s.plans[fid].outer as Pt[];
+      await page.keyboard.press("3");
+      await expect(page.getByTestId("view3d")).toHaveCount(0);
+      await page.keyboard.press("Escape");
+      await clickAt(page, o.reduce((a, p) => a + p[0], 0) / o.length, o.reduce((a, p) => a + p[1], 0) / o.length);
+      await idle(page);
+      await to3d(page);
+      s = await state(page);
+      expect(s.feature.id, "the clicked marker is in focus").toBe(fid);
+      const S = inkSamples(s.plan, 0.25);
+      for (const tilt of [0, 50]) {
+        await page.evaluate((t) => (window as any).__aruco.top3d(false, t), tilt);
+        const r = await offPoints(page, S);
+        expect(r.n, `${fid}, ${tilt} degrees: sample points`).toBeGreaterThan(S.pts.length / 2);
+        if (tilt === 0) {
+          nearOutline += S.pts.filter((_, i) => r.keep[i] && !S.dark[i] && S.rim[i] < 0.5).length;
+          inTriangles += S.pts.filter((p, i) => r.keep[i] && inPolys(S.tri, p)).length;
+          onEdgeSquares += S.pts.filter((_, i) => r.keep[i] && S.dark[i] && S.rim[i] < 1).length;
+        }
+        if (fid === "f2" && tilt === 50) await canvasShot(page, "inkjet-sheet-f2-50.png");
+        if (r.bad.length) {
+          off.push(`${fid}, ${tilt} degrees off: ${r.bad.length} of ${r.n} points off, e.g. ${JSON.stringify(r.bad.slice(0, 3))}`);
+          await canvasShot(page, `inkjet-sheet-${fid}-${tilt}-bad.png`);
+        }
+      }
+    }
+    expect(off, "every marker, every view").toEqual([]);
+    expect(nearOutline, "paper points within 0.5 mm of the outline").toBeGreaterThan(500);
+    expect(inTriangles, "points inside the corner marks").toBeGreaterThan(50);
+    expect(onEdgeSquares, "ink points within 1 mm of the outline (the ChArUco's edge squares)").toBeGreaterThan(100);
+    await page.evaluate(() => (window as any).__aruco.top3d(false, 50));
+    await canvasShot(page, "inkjet-sheet-board-50.png");
   });
 
   test("l · a 12-marker sheet, its pockets carved: a frame renders in under 50 ms (VIEW3D_BENCH)", async ({ page }) => {

@@ -134,6 +134,22 @@ def test_inkjet_layers_are_rule_2_paper_with_the_ink_pocketed_into_its_top_half(
             assert area(poly["outer"]) > 0 and all(area(h) < 0 for h in poly["holes"])
 
 
+@pytest.mark.parametrize("pre", [INK, D3], ids=["inkjet", "3d"])
+@pytest.mark.parametrize("marker", [{"corner_mark": "triangle"}, {"type": "charuco", "cols": 3, "rows": 5}],
+                         ids=["corner-mark", "charuco"])
+def test_every_ink_polygon_has_its_pocket_in_the_white(pre, marker):
+    """The 3D view and CAD take the black out of the white it sits in
+    (2026-10-21, the inkjet sheet's slivers): every black add layer --
+    the cells, the corner triangle, a ChArUco's squares out to the
+    sticker's edge -- has a cut layer of the same polygons over the same z,
+    into the white body's layer."""
+    p = W.plan(req(marker, pre=pre, rect={"w": 40.0, "h": 60.0}))
+    white = next(L for L in p["layers"] if L["op"] == "add" and L["colour"] == "white")
+    cuts = [L for L in p["layers"] if L["op"] == "cut" and L.get("into") == white["name"]]
+    for ink in (L for L in p["layers"] if L["op"] == "add" and L["colour"] == "black"):
+        assert any(c["z"] == ink["z"] and c["polygons"] == ink["polygons"] for c in cuts), ink["name"]
+
+
 def test_3d_layers_free_and_on_a_face():
     free = W.plan(req(pre=D3))
     assert [(L["name"], L["op"], L["colour"]) for L in free["layers"]] == \

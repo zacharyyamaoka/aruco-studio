@@ -23,8 +23,8 @@ export interface Probe {
   view3d: () => Omit<View3DProbe, "project" | "top"> | null;
   /** a 3D scene point (mm, z along the face normal) as client pixels; null in 2D */
   project3d: (x: number, y: number, z: number) => [number, number] | null;
-  /** the 3D camera straight down on the feature in focus (marks false: no arrows / boxes) */
-  top3d: (marks?: boolean) => void;
+  /** the 3D camera straight down on the feature in focus, or `tilt` degrees off (marks false: no arrows / boxes) */
+  top3d: (marks?: boolean, tilt?: number) => void;
 }
 
 /** `feature` and `plan` are the feature in focus (the panel's, the selected
@@ -73,7 +73,7 @@ export function installProbe(): void {
     kind: coreKind, state: snapshot, toClient, idle, plan: (req) => core.plan(req), printHook: null,
     view3d: () => { const p = view3d.probe?.(); if (!p) return null; const { project: _p, top: _t, ...rest } = p; return rest; },
     project3d: (x, y, z) => view3d.probe?.().project(x, y, z) ?? null,
-    top3d: (marks) => view3d.probe?.().top(marks),
+    top3d: (marks, tilt) => view3d.probe?.().top(marks, tilt),
   };
   (window as unknown as { __aruco: Probe }).__aruco = probe;
 }
