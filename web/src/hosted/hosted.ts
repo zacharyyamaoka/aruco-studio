@@ -59,13 +59,26 @@ export function nameNextSave(name: string): void {
 }
 
 /** Before the app replaces the document itself (an example, a file from this
- *  computer): leave the cloud file first, its changes saved, so autosave never
- *  writes the other document into it. False when it could not be left. */
+ *  computer): leave the document through the SDK's New, its changes saved, so
+ *  autosave never writes the other document into its file. False when it could
+ *  not be left (a save that failed, "Save this first?" cancelled).
+ *  WHY untitled documents too (review finding #2, 2026-10-21): an untitled
+ *  document's first autosave can be creating its file; replaced behind the
+ *  SDK's back, that file then landed on the next document, which autosaved
+ *  into it. New waits for the save queue and starts a new document generation.
+ *  It left when it put a new document in (adapter.applying() during the change). */
 export async function leaveFile(): Promise<boolean> {
   const h = hostedFiles();
-  if (!h.state.file) return true;
-  await h.newFile().catch((err) => h.report(err));
-  return !h.state.file;
+  let left = false;
+  const un = useStudio.subscribe((s, prev) => { if (s.doc !== prev.doc && adapter?.applying()) left = true; });
+  try {
+    await h.newFile();
+  } catch (err) {
+    h.report(err);
+  } finally {
+    un();
+  }
+  return left;
 }
 
 /** File › New: the SDK's New (it saves or asks about the document left). */
