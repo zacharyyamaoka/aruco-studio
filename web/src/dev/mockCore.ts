@@ -397,6 +397,12 @@ export function createMockCore(onReady: () => void, delay = 900): CoreApi {
     // the dispatch of 2026-10-18 adds these; lanes give the mock real answers if they need them
     verify: () => Promise.reject(new Error("mock core: verify not mocked")),
     readable: () => Promise.reject(new Error("mock core: readable not mocked")),
+    cameras: () => Promise.reject(new Error("mock core: cameras not mocked")),
+    reading_range: () => Promise.reject(new Error("mock core: reading_range not mocked")),
+    range_start: () => Promise.reject(new Error("mock core: range_start not mocked")),
+    range_step: () => Promise.reject(new Error("mock core: range_step not mocked")),
+    range_cancel: (job: string) => Promise.resolve({ job, cancelled: false }),
+    range_judge: () => Promise.reject(new Error("mock core: range_judge not mocked")),
     assign_ids: () => Promise.reject(new Error("mock core: assign_ids not mocked")),
   };
 }

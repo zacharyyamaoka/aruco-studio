@@ -24,8 +24,9 @@ const ctx = self as unknown as DedicatedWorkerGlobalScope;
 const LIB = "/lib/aruco_studio";
 const url = (p: string) => new URL(`${import.meta.env.BASE_URL}${p}`, ctx.location.href).href;
 
-// numpy + OpenCV (opencv-python, with cv2.aruco) for verify / readable
-const NEEDS_OPENCV = new Set(["verify", "readable"]);
+// numpy + OpenCV (opencv-python, with cv2.aruco) for verify / readable and the
+// reading range (barrier 13; not its "analytic" reader, which is the pinhole model)
+const NEEDS_OPENCV = new Set(["verify", "readable", "reading_range", "range_start", "range_step"]);
 const OPENCV = ["numpy", "opencv-python"];
 let py: Pyodide | null = null;
 let opencv: Promise<unknown> | null = null;
@@ -59,7 +60,7 @@ ctx.onmessage = async (e: MessageEvent<{ id: number; name: string; payload: unkn
   const { id, name, payload } = e.data;
   try {
     const api = await ready;
-    if (NEEDS_OPENCV.has(name)) {
+    if (NEEDS_OPENCV.has(name) && (payload as { reader?: string } | null)?.reader !== "analytic") {
       opencv ??= py!.loadPackage(OPENCV).catch((err: unknown) => { opencv = null; throw err; });
       await opencv;
     }
