@@ -31,6 +31,7 @@ import { downloadBase64, downloadText, slug } from "../io/files";
 import { featurePreset, getFeature, presetKey, sheetGroups, withFeatures } from "../model/doc";
 import { printSelection } from "../app/commands";
 import { CoreWait, WaitLine, useCallWait, useCoreWait } from "../panel/Waiting";
+import { idLines, idsReady } from "../app/output";
 import { activeFeatureId, selectedMarkerIds, useStudio } from "../store";
 import "./sheet.css";
 
@@ -85,6 +86,12 @@ export function PrintDialog() {
   const doc = useStudio((s) => s.doc);
   const sel = useStudio((s) => s.sel);
   const multi = useStudio((s) => s.multi);
+  const idIssues = useStudio((s) => s.idIssues);
+  const refused = useStudio((s) => s.idRefused);
+  // WHY (review findings #6, #8, 2026-10-21): a sheet laid out before auto id
+  // answered printed a copy's borrowed id, and the last sheet stayed printable
+  // while the next was worked out under the new controls
+  const ready = useStudio(idsReady);
   // the sheets on screen, one per group (by its preset's key), and the request each was laid out from
   const [laidAll, setLaidAll] = useState<Record<string, { key: string; sheet: Sheet }>>({});
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +103,8 @@ export function PrintDialog() {
   const [scaleBar, setScaleBar] = useState<ScaleBarOption>("first");
   /** the page in view, in the group in focus */
   const [shown, setShown] = useState(0);
-  const [printing, setPrinting] = useState(false);
+  /** the exact sheet Print is printing (captured at the click) */
+  const [printing, setPrinting] = useState<Sheet | null>(null);
   /** the group in focus (its preset's key): the marker in focus's when it opens, then the one in view */
   const [groupKey, setGroupKey] = useState<string | null>(null);
   /** Markers: All | Selected, once chosen here; until then the selection decides (printSelection) */
@@ -110,9 +118,11 @@ export function PrintDialog() {
   // the markers selected on the canvas (the dialog is modal: they hold while it is open)
   const picked = open ? selectedMarkerIds(doc, sel, multi) : [];
   const choice: Which = picked.length ? which ?? (printSelection() ? "selected" : "all") : "all";
-  // the features that go into the requests: every one, or only the selected ones
+  // the features that go into the requests: every one, or only the selected ones (a refused one is left out of either)
   const source = choice === "selected" ? withFeatures(doc, picked) : doc;
-  const groups = open ? sheetGroups(source) : [];
+  const groups = open ? sheetGroups(source, refused) : [];
+  /** auto id's lines are for the markers on this sheet (all, or the selected ones) */
+  const inSource = (key: string) => source.features.some((f) => f.key === key);
   const group = groups.find((g) => g.key === groupKey) ?? groups[0] ?? null;
   const items = group?.items ?? [];
   // the features without a preset yet (the core's presets have not arrived), and the 3D-printed ones
@@ -144,6 +154,8 @@ export function PrintDialog() {
       setError(printed3d ? "Nothing on paper: every marker here is 3D printed." : "Nothing to print yet: make an ArUco Extrude (A) first.");
       return;
     }
+    // laid out only from settled ids: the effect runs again when they are
+    if (!ready) { setError(null); return; }
     let live = true;
     // the last layout stays on screen while the next one is worked out
     setError(null);
@@ -158,7 +170,7 @@ export function PrintDialog() {
         });
     }
     return () => { live = false; };
-  }, [open, allKey, tries]);
+  }, [open, allKey, tries, ready]);
 
   // Fit: the page and its scale bar inside the stage as it is now
   useEffect(() => {
@@ -204,9 +216,12 @@ export function PrintDialog() {
   const byHand = () => { aim.current = null; };
 
   const sheet = laid?.sheet ?? null;
-  const busy = !!laid && laid.key !== key && !error;
+  /** the sheet on screen is the one the controls and the settled ids ask for: only then can it be printed or saved */
+  const current = !!sheet && laid?.key === key && ready && !error;
+  const busy = !!laid && !current && !error;
   const coreWait = useCoreWait(open && unset > 0);
-  const callWait = useCallWait(open && !coreWait && !!items.length && laid?.key !== key, items.length ? error : null, "laying out the page", () => setTries((n) => n + 1));
+  const callWait = useCallWait(open && !coreWait && !!items.length && (laid?.key !== key || !ready), items.length ? error : null,
+    ready ? "laying out the page" : "numbering the markers", () => setTries((n) => n + 1));
 
   const pageIndex = sheet ? Math.min(shown, sheet.svg.length - 1) : 0;
   const page = sheet?.svg[pageIndex] ?? "";
@@ -218,14 +233,16 @@ export function PrintDialog() {
   const many = (sheet?.svg.length ?? 0) > 1;
 
   const doPrint = () => {
-    setPrinting(true);
+    if (!current || !sheet) return;
+    setPrinting(sheet);
     // the print-only page mounts first, then the browser's dialog opens
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const hook = (window as unknown as { __aruco?: { printHook?: (() => void) | null } }).__aruco?.printHook;
       if (hook) hook(); else window.print();
-      setPrinting(false);
+      setPrinting(null);
     }));
   };
+  const printed = printing ?? sheet;
 
   return (
     <>
@@ -322,26 +339,27 @@ export function PrintDialog() {
               <Stat testid="sheet-cuts" raw={sheet?.cuts} value={sheet?.cuts !== undefined ? String(sheet.cuts) : "–"} label="straight cuts" />
               <Stat testid="sheet-fill" raw={sheet?.fill} value={sheet?.fill !== undefined ? `${Math.round(sheet.fill * 100)}%` : "–"} label="fill" />
             </div>
+            <Messages path="sheet.ids" issues={idLines(doc, idIssues.filter((i) => !i.key || inSource(i.key)), refused.filter(inSource)).map((i) => ({ field: i.field, level: i.level, text: i.text }))} />
             {sheet && <Messages path="sheet" issues={sheet.warnings.map((i) => ({ field: i.field, level: i.level, text: i.text }))} />}
             <div className="sheet-note muted">Print at 100 % (Scale: Default / Actual size): “Fit to page” changes the marker’s size. The grey lines are the cuts.</div>
             {/* WHY one row (Zach, 2026-10-21: the third button wrapped to a line of
                 its own): Print, and one Download menu for the files, as Figma's and Canva's */}
             <div className="sheet-actions">
-              <Button variant="primary" icon="print" onClick={doPrint} disabled={!sheet} testid="print-go" className="sheet-print">Print</Button>
+              <Button variant="primary" icon="print" onClick={doPrint} disabled={!current} testid="print-go" className="sheet-print">Print</Button>
               <Menu icon="download" label="Download" testid="print-download" align="end">
                 <MenuItem icon="download" label="PDF" hint={sheet ? `${sheet.svg.length} page${sheet.svg.length === 1 ? "" : "s"}` : undefined} testid="print-pdf"
-                  onClick={() => sheet && downloadBase64(`${name}.pdf`, sheet.pdf_base64, "application/pdf")} disabled={!sheet?.pdf_base64} />
+                  onClick={() => current && sheet && downloadBase64(`${name}.pdf`, sheet.pdf_base64, "application/pdf")} disabled={!current || !sheet?.pdf_base64} />
                 <MenuItem icon="download" label="SVG" hint={many ? `page ${pageIndex + 1}` : undefined} testid="print-svg"
-                  onClick={() => sheet && downloadText(many ? `${name}-page-${pageIndex + 1}.svg` : `${name}-page.svg`, page, "image/svg+xml")} disabled={!sheet} />
+                  onClick={() => current && downloadText(many ? `${name}-page-${pageIndex + 1}.svg` : `${name}-page.svg`, page, "image/svg+xml")} disabled={!current} />
               </Menu>
             </div>
           </div>
         </div>
       </Dialog>
-      {open && sheet && createPortal(
+      {open && printed && createPortal(
         <div id="print-root" data-printing={printing ? "1" : "0"}>
           <style>{`@page { size: ${pw}mm ${ph}mm; margin: 0; }`}</style>
-          {sheet.svg.map((s, i) => (
+          {printed.svg.map((s, i) => (
             <div key={i} className="print-sheet" style={{ width: `${pw}mm`, height: `${ph}mm` }}>
               <div dangerouslySetInnerHTML={{ __html: s }} />
             </div>

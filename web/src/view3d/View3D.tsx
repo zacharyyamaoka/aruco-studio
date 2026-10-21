@@ -424,27 +424,37 @@ export function View3D() {
 const NAMES: Record<string, string> = { white_mm: "White height", black_mm: "Black height", paper_mm: "Paper thickness" };
 
 /** Fusion's value box at an arrow: the height, grey while driven. A click
- *  types into it; Enter sets, Esc puts it back; ↺ returns it to driven. */
+ *  types into it at the value's full precision; Enter or leaving it sets a
+ *  changed value, Esc puts it back; ↺ returns it to driven.
+ *  WHY (review finding #12, 2026-10-21): it opened at toFixed(2) and Enter
+ *  committed that, so focus + Enter rounded 0.123456 to 0.12; a blur dropped
+ *  what was typed. */
 function ValueBox({ spec, fid, bind }: { spec: ArrowSpec; fid: string; bind: (el: HTMLDivElement | null) => void }) {
   const [text, setText] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
-  const commit = () => {
-    const v = Number((text ?? "").replace(",", ".").replace(/mm\s*$/i, "").trim());
-    if (text !== null && Number.isFinite(v) && v > 0) useStudio.getState().setFieldFor(fid, spec.field, Math.round(v * 1e6) / 1e6);
+  /** the text the edit opened with: only a different one is set */
+  const seed = useRef<string | null>(null);
+  const finish = (keep: boolean) => {
+    const from = seed.current;
+    seed.current = null;
+    const typed = input.current?.value ?? "";
+    const v = Number(typed.replace(",", ".").replace(/mm\s*$/i, "").trim());
+    if (keep && from !== null && typed !== from && Number.isFinite(v) && v > 0) {
+      useStudio.getState().setFieldFor(fid, spec.field, Math.round(v * 1e6) / 1e6);
+    }
     setText(null);
-    input.current?.blur();
   };
   return (
     <div ref={bind} className={`v3-box${spec.driven ? " driven" : ""}`} data-testid="v3-box" data-key={spec.key} data-driven={spec.driven}
       title={`${NAMES[spec.key]}: ${spec.driven ? "driven by the preset. Type or drag the arrow to set it." : "set. ↺ back to driven."}`}>
       <input ref={input} className="v3-input" aria-label={NAMES[spec.key]} data-path={spec.field}
         value={text ?? fmtMm(spec.value)} spellCheck={false}
-        onFocus={() => { setText(spec.value.toFixed(2)); requestAnimationFrame(() => input.current?.select()); }}
+        onFocus={() => { seed.current = String(spec.value); setText(seed.current); requestAnimationFrame(() => input.current?.select()); }}
         onChange={(e) => setText(e.target.value)}
-        onBlur={() => setText(null)}
+        onBlur={() => finish(true)}
         onKeyDown={(e) => {
-          if (e.key === "Enter") { e.preventDefault(); commit(); }
-          else if (e.key === "Escape") { e.preventDefault(); setText(null); input.current?.blur(); }
+          if (e.key === "Enter") { e.preventDefault(); finish(true); input.current?.blur(); }
+          else if (e.key === "Escape") { e.preventDefault(); finish(false); input.current?.blur(); }
         }} />
       {!spec.driven && (
         <button type="button" className="v3-reset" data-reset={spec.field} aria-label={`Reset ${NAMES[spec.key]} to driven`}

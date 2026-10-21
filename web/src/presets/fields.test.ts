@@ -62,3 +62,11 @@ describe("the size step (barrier 11)", () => {
     expect(stepOptions({ of: "mm", mm: 0.25 }, ink).map((o) => o.value)).toEqual(["dots", "mm:0.1", "mm:0.5", "mm:1", "mm:0.25"]);
   });
 });
+
+describe("fields nothing reads yet (review finding #9)", () => {
+  it("3D first line and bed are shown as not used yet; every other row is live", () => {
+    const unused = (m: "inkjet" | "print3d") => infoRows(m).filter((r) => "unused" in r && r.unused).map((r) => r.key);
+    expect(unused("print3d")).toEqual(["first_line_mm", "bed_mm"]);
+    expect(unused("inkjet")).toEqual([]);
+  });
+});

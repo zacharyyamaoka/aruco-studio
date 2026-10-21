@@ -9,11 +9,16 @@ export const PAGES: Record<string, Vec2> = { Letter: [215.9, 279.4], A4: [210, 2
 export type NumKey = "margin_mm" | "thickness_mm" | "dpi" | "nozzle_mm" | "line_mm" | "first_line_mm" | "layer_mm"
   | "first_layer_mm" | "min_cell_mm" | "cell_step_mm";
 
-/** One Info row: a number, a width × height pair, or the paper's name. */
+/** One Info row: a number, a width × height pair, or the paper's name.
+ *  `unused`: a field of the contract nothing reads yet (shown, disabled, "not used yet"). */
 export type InfoRow =
-  | { kind: "num"; key: NumKey; label: string; unit: string; int?: boolean; step: number; hint?: string }
-  | { kind: "pair"; key: "page_mm" | "bed_mm"; label: string; unit: string }
+  | { kind: "num"; key: NumKey; label: string; unit: string; int?: boolean; step: number; hint?: string; unused?: true }
+  | { kind: "pair"; key: "page_mm" | "bed_mm"; label: string; unit: string; unused?: true }
   | { kind: "page"; key: "page"; label: string };
+
+/** WHY (review finding #9, 2026-10-21): first line and bed were editable but
+ *  no plan or sheet reads them (web_api.py), so a change did nothing. */
+export const NOT_USED_YET = "not used yet";
 
 const BOTH: InfoRow[] = [
   { kind: "num", key: "min_cell_mm", label: "Min cell", unit: "mm", step: 0.05, hint: "the smallest cell this machine makes well" },
@@ -34,10 +39,10 @@ export function infoRows(method: Preset["method"]): InfoRow[] {
     : [
       { kind: "num", key: "nozzle_mm", label: "Nozzle", unit: "mm", step: 0.05 },
       { kind: "num", key: "line_mm", label: "Line width", unit: "mm", step: 0.01, hint: "line (extrusion) width" },
-      { kind: "num", key: "first_line_mm", label: "First line", unit: "mm", step: 0.01, hint: "first-layer line width (sizes the cells when printed face down)" },
+      { kind: "num", key: "first_line_mm", label: "First line", unit: "mm", step: 0.01, hint: "first-layer line width (sizes the cells when printed face down)", unused: true },
       { kind: "num", key: "layer_mm", label: "Layer", unit: "mm", step: 0.01 },
       { kind: "num", key: "first_layer_mm", label: "First layer", unit: "mm", step: 0.01 },
-      { kind: "pair", key: "bed_mm", label: "Bed", unit: "mm" },
+      { kind: "pair", key: "bed_mm", label: "Bed", unit: "mm", unused: true },
       ...BOTH,
     ];
 }

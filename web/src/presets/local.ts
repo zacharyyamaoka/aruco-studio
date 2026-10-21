@@ -5,6 +5,11 @@ import type { Preset } from "../core/contract";
 
 const MINE = "aruco-web.presets.mine";
 const RECENT = "aruco-web.presets.recent";
+// cleanPreset's fields (declared before `mine` is read, below)
+const NUMS = ["margin_mm", "thickness_mm", "dpi", "nozzle_mm", "line_mm", "first_line_mm", "layer_mm", "first_layer_mm",
+  "min_cell_mm", "cell_step_mm"] as const;
+const PAIRS = ["page_mm", "bed_mm"] as const;
+const PAGE_NAME = /^[A-Za-z0-9 ._()-]{1,32}$/;
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -19,7 +24,17 @@ function write(key: string, v: unknown): void {
   try { window.localStorage.setItem(key, JSON.stringify(v)); } catch { /* storage blocked: kept for this visit only */ }
 }
 
-let mine: Preset[] = read<Preset[]>(MINE, []).filter((p) => p && typeof p.id === "string");
+// WHY cleaned on read too: a preset kept here before import was validated
+// (review finding #1, 2026-10-21) can hold anything; one that fails is dropped.
+const kept = read<unknown>(MINE, []);
+let mine: Preset[] = (Array.isArray(kept) ? kept : []).flatMap((p, i) => {
+  try {
+    const id = (p as Preset)?.id;
+    return typeof id === "string" ? [{ ...cleanPreset(p, `preset ${i + 1}`), id }] : [];
+  } catch {
+    return [];
+  }
+});
 let recent: string[] = read<string[]>(RECENT, []);
 
 export function myPresets(): Preset[] { return mine; }
@@ -40,14 +55,48 @@ export function exportJson(list: Preset[]): string {
   return JSON.stringify({ format: "arucostudio-web-presets", version: 1, presets: list }, null, 2);
 }
 
-/** Presets from a file (this format, or a bare list); new ids, never builtin. */
+/** Presets from a file (this format, or a bare list); new ids, never builtin.
+ *  Every field is checked (cleanPreset): one bad preset refuses the file. */
 export function importJson(text: string): Preset[] {
   const d = JSON.parse(text);
   const list: unknown[] = Array.isArray(d) ? d : Array.isArray(d?.presets) ? d.presets : [];
-  const ok = list.filter((p): p is Preset => !!p && typeof (p as Preset).name === "string"
-    && ((p as Preset).method === "inkjet" || (p as Preset).method === "print3d"));
-  if (!ok.length) throw new Error("no presets in this file");
-  return ok.map((p) => ({ ...p, id: `my:${Math.random().toString(36).slice(2, 10)}`, builtin: false }));
+  if (!list.length) throw new Error("no presets in this file");
+  return list.map((p, i) => ({ ...cleanPreset(p, `preset ${i + 1}`), id: `my:${Math.random().toString(36).slice(2, 10)}`, builtin: false }));
+}
+
+/** A preset from untrusted data (a file, this browser's storage): only the
+ *  contract's fields, each of its type, or an Error naming `where` and the
+ *  field. The id is "" (the caller gives one); null is an unset field. */
+export function cleanPreset(raw: unknown, where: string): Preset {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error(`${where} is not a preset`);
+  const r = raw as Record<string, unknown>;
+  const bad = (field: string, want: string) => new Error(`${where}${typeof r.name === "string" ? ` ("${r.name.slice(0, 40)}")` : ""}: ${field} must be ${want}`);
+  if (typeof r.name !== "string" || !r.name.trim() || r.name.length > 120) throw bad("name", "text of 1-120 characters");
+  if (r.method !== "inkjet" && r.method !== "print3d") throw bad("method", "\"inkjet\" or \"print3d\"");
+  const out: Preset = { id: "", name: r.name, method: r.method, builtin: false };
+  const num = (v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0 && v < 1e5;
+  if (r.page != null) {
+    if (typeof r.page !== "string" || !PAGE_NAME.test(r.page)) throw bad("page", "a paper name (letters, digits, spaces)");
+    out.page = r.page;
+  }
+  for (const k of NUMS) {
+    if (r[k] == null) continue;
+    if (!num(r[k])) throw bad(k, "a number of 0 or more");
+    out[k] = r[k] as number;
+  }
+  for (const k of PAIRS) {
+    if (r[k] == null) continue;
+    const v = r[k];
+    if (!Array.isArray(v) || v.length !== 2 || !v.every((x) => num(x) && x > 0)) throw bad(k, "two numbers above 0 (width, height)");
+    out[k] = [v[0], v[1]];
+  }
+  if (r.size_step != null) {
+    const st = r.size_step as Record<string, unknown>;
+    if (st?.of === "dots" || st?.of === "line") out.size_step = { of: st.of };
+    else if (st?.of === "mm" && num(st.mm) && (st.mm as number) > 0) out.size_step = { of: "mm", mm: st.mm as number };
+    else throw bad("size_step", "{of: \"dots\"}, {of: \"line\"} or {of: \"mm\", mm: a number above 0}");
+  }
+  return out;
 }
 
 /** A new preset of a method, from a built-in of that method when there is one. */
