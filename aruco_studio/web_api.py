@@ -41,6 +41,7 @@ deprecated trim -> "trim"; a profile with no room for the marker -> "tag".
 from __future__ import annotations
 
 import base64
+import copy
 import datetime
 import json
 import math
@@ -63,7 +64,8 @@ from .plan import mesh as _ME
 from .scene import sheet as _SS
 from . import web_extrude as _EX
 
-API = ("info", "presets", "inscribe", "plan", "suggest", "svg", "sheet", "verify", "readable", "assign_ids")
+API = ("info", "presets", "legacy_presets", "inscribe", "plan", "suggest", "svg", "sheet", "verify", "readable",
+       "assign_ids")
 
 # core key path -> the contract's field (contract.ts Issue.field)
 FIELDS = {"numbers.size": "marker.marker_mm", "numbers.square": "marker.checker_mm",
@@ -611,6 +613,28 @@ def presets() -> list:
             # from their cell_step_mm 0); a marker can override it
             p["size_step"] = {"of": "mm", "mm": 0.5}
     return out
+
+
+# The inkjet built-ins as main 03594f9's presets() gave them, before cells
+# rule 2 (0b134f4) set their cell_step_mm to 0: literals, never derived.
+LEGACY_PRESETS = (
+    {"id": "builtin:inkjet-letter-vinyl@1", "name": "Inkjet \u00b7 Letter vinyl", "builtin": True,
+     "min_cell_mm": 1.0, "cell_step_mm": 0.042333, "method": "inkjet", "page": "Letter",
+     "page_mm": [215.9, 279.4], "margin_mm": 10.0, "thickness_mm": 0.1, "dpi": 600},
+    {"id": "builtin:inkjet-a4-vinyl@1", "name": "Inkjet \u00b7 A4 vinyl", "builtin": True,
+     "min_cell_mm": 1.0, "cell_step_mm": 0.042333, "method": "inkjet", "page": "A4",
+     "page_mm": [210.0, 297.0], "margin_mm": 10.0, "thickness_mm": 0.1, "dpi": 600},
+)
+
+
+def legacy_presets() -> list:
+    """The pre-rule-2 inkjet built-ins, `@1` ids, no size_step: for shells
+    that pin an old record's preset (not offered in the UI's list).
+    WHY: old records pin the preset object they were made with; {of: "dots"}
+    is NOT the legacy path, because 25.4/dpi != 0.042333 -- a preset with no
+    size_step and cell_step_mm 0.042333 takes the old dot path (rule 1 on
+    0.042333), byte for byte."""
+    return copy.deepcopy(list(LEGACY_PRESETS))
 
 
 def _plain_rect(loops):
@@ -1563,6 +1587,8 @@ def call(name: str, payload_json: str) -> str:
             out = info()
         elif name == "presets":
             out = presets()
+        elif name == "legacy_presets":
+            out = legacy_presets()
         elif name == "inscribe":
             out = inscribe(p.get("profile") or {}, p.get("holes") or "avoid")
         elif name == "sheet":
