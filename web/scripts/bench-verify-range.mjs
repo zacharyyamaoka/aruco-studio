@@ -254,11 +254,11 @@ for (const host of hosts) {
 
 const fmt = (v) => (v == null ? "—" : `${(v / 1000).toFixed(1)} s`);
 const m = (v) => (v == null ? "—" : v >= 1000 ? `${(v / 1000).toFixed(2)} m` : `${Math.round(v)} mm`);
-console.log("\nboard                                  " + Object.keys(measured).map((h) => h.padEnd(30)).join(""));
+console.log("\nboard                                  " + Object.keys(measured).map((h) => h.padEnd(40)).join(""));
 list.forEach((b, i) => {
   console.log(b.name.padEnd(39) + Object.values(measured).map((x) => {
     const r = x.rows[i];
-    return `${fmt(r.ms)} · ${r.renders} views · ${m(r.result.near_mm)}–${m(r.result.far_mm)}`.padEnd(30);
+    return `${fmt(r.ms)} · ${r.renders} views · ${m(r.result.near_mm)}–${m(r.result.far_mm)}`.padEnd(40);
   }).join(""));
 });
 const out = emit(t, stamp, git, measured);
