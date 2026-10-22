@@ -199,11 +199,43 @@ describe("the camera", () => {
     expect(R.rangeCamera({ custom: { resolution: [800, 600], hfov_deg: 60, focus_mm: null } }))
       .toEqual({ id: "custom", name: "Custom camera", resolution: [800, 600], hfov_deg: 60, focus_mm: null });
   });
-  it("keys a range by the request, the camera and the core", () => {
-    const a = R.rangeKey(req(1), "d435", "0.1.0+abc");
-    expect(R.rangeKey(req(1), "d435", "0.1.0+abc")).toBe(a);
-    expect(R.rangeKey(req(1), "d455", "0.1.0+abc")).not.toBe(a);
-    expect(R.rangeKey(req(1), "d435", "0.1.0+def")).not.toBe(a);
-    expect(R.rangeKey(req(2), "d435", "0.1.0+abc")).not.toBe(a);
+  it("keys a range by the request, the camera, the core and the OpenCV", () => {
+    const a = R.rangeKey(req(1), "d435", "0.1.0+abc", "4.11.0");
+    expect(R.rangeKey(req(1), "d435", "0.1.0+abc", "4.11.0")).toBe(a);
+    expect(R.rangeKey(req(1), "d455", "0.1.0+abc", "4.11.0")).not.toBe(a);
+    expect(R.rangeKey(req(1), "d435", "0.1.0+def", "4.11.0")).not.toBe(a);
+    expect(R.rangeKey(req(2), "d435", "0.1.0+abc", "4.11.0")).not.toBe(a);
+    expect(R.rangeKey(req(1), "d435", "0.1.0+abc", "5.0.0")).not.toBe(a);
+    // [2] is still the camera and [3] the request (the e2e reads them back)
+    expect(JSON.parse(a).slice(2, 4)).toEqual(["d435", req(1)]);
+  });
+  it("never keeps an answer another OpenCV measured (a slice resent to a restarted worker) under this one's key", async () => {
+    const k50 = R.rangeKey(req(71), "d435", "0.1.0+abc", "5.0.0");
+    R.ranges.want([{ key: k50, req: req(71), camera: "d435", opencv: "5.0.0" }]);
+    await settle();
+    // the fake core's answers are 4.11's (result()): not 5.0's, so not kept, and said
+    expect(R.cached(k50)).toBeNull();
+    const s = R.ranges.state(k50);
+    expect(s.state).toBe("error");
+    expect(s.state === "error" && s.error).toMatch(/measured on OpenCV 4\.11\.0, not 5\.0\.0/);
+  });
+  it("never shows another OpenCV's range as this one's: kept under the OpenCV that measured it", async () => {
+    const k411 = R.rangeKey(req(70), "d435", "0.1.0+abc", "4.11.0");
+    const k50 = R.rangeKey(req(70), "d435", "0.1.0+abc", "5.0.0");
+    R.ranges.want([{ key: k411, req: req(70), camera: "d435" }]);
+    await settle();
+    expect(R.cached(k411)?.result.far_mm).toBe(1070);
+    expect(R.cached(k50)).toBeNull();
+    // asked on the other OpenCV it is measured again, not taken from the first
+    log.length = 0;
+    R.ranges.want([{ key: k50, req: req(70), camera: "d435" }]);
+    expect(R.ranges.state(k50).state).not.toBe("done");
+    await settle();
+    expect(log[0]).toBe("start 70");
+    // and back: the first is there at once
+    log.length = 0;
+    R.ranges.want([{ key: k411, req: req(70), camera: "d435" }]);
+    await settle();
+    expect(log).toEqual([]);
   });
 });

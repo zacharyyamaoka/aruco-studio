@@ -86,6 +86,10 @@
 .vf-wrap { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 .vf-views { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--line-soft); background: var(--panel); }
 .vf-wrap > .vf, .vf-wrap > .vr { flex: 1; min-height: 0; }
+/* the one OpenCV every view runs (docs/peps/0003): at the row's right end, the views' switch at its left */
+.vf-cv { margin-left: auto; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.vf-cv .lab { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.vf-cv .kit-select { min-width: 150px; }
 
 /* the range strip: markers along the top, a band under each on one axis */
 .vr { display: flex; flex-direction: column; min-width: 0; background: var(--bg); }

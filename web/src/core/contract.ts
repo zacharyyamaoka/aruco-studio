@@ -338,6 +338,8 @@ export interface VerifyResult {
   pose_error_deg: number | null;
   image_png_base64: string;  // the simulated view with the detections drawn
   notes: string[];
+  /** the OpenCV that drew and read it (cv2.__version__; docs/peps/0003 decision 3) */
+  opencv?: string;
 }
 
 /** The calculator: will this camera read this marker at this distance? */
@@ -349,6 +351,8 @@ export interface Readability {
   /** true: max_distance_mm measured with the OpenCV simulator; false: the
    *  analytic fallback (no OpenCV, e.g. inside a CAD's Python) */
   measured?: boolean;
+  /** the OpenCV that measured it; null for the analytic fallback */
+  opencv?: string | null;
 }
 
 // ---- the reading range (contract barrier 13, Zach 2026-10-21: V4 "Range strip") ----

@@ -11,7 +11,10 @@
 // stays in the worker and resumes when it is wanted again.
 // WHY cached by the request: the same marker on the same camera gives the
 // same answer (seeded), so a finished range is kept (this visit, and in this
-// browser under the core's version) and an edit re-runs only that marker.
+// browser under the core's version and the OpenCV that measured it) and an
+// edit re-runs only that marker. WHY the OpenCV in the key (docs/peps/0003
+// decision 3): two OpenCVs draw the same view differently, so another one's
+// range is never shown as this one's.
 import type { CameraPreset, PlanRequest, RangeCamera, RangeNeed, RangeVerdict, ReadingRange } from "../core/contract";
 import { core } from "../coreSource";
 
@@ -23,7 +26,11 @@ const STORE_KEY = "arucoStudio.verify.ranges";
 const STORE_MAX = 240;
 const CAMERA_KEY = "aruco-web.verify.rangeCamera";
 
-export interface RangeTask { key: string; req: PlanRequest; camera: RangeCamera }
+export interface RangeTask {
+  key: string; req: PlanRequest; camera: RangeCamera;
+  /** the OpenCV it is for (its key's): an answer another one measured is never kept as this one's */
+  opencv?: string;
+}
 
 export type RangeState =
   | { state: "queued" }
@@ -31,9 +38,10 @@ export type RangeState =
   | { state: "done"; result: ReadingRange; ms: number | null; cached: boolean }
   | { state: "error"; error: string };
 
-/** The cache key of a marker's range: the request, the camera and the core that answers. */
-export function rangeKey(req: PlanRequest, camera: RangeCamera, coreVersion: string): string {
-  return JSON.stringify([CACHE_TAG, coreVersion, camera, req]);
+/** The cache key of a marker's range: the request, the camera, the core that answers and the OpenCV it runs
+ *  (last, so a key's [2] is still the camera and [3] the request). */
+export function rangeKey(req: PlanRequest, camera: RangeCamera, coreVersion: string, opencv: string): string {
+  return JSON.stringify([CACHE_TAG, coreVersion, camera, req, opencv]);
 }
 
 /** A short stable hash (FNV-1a), for the stored copies' names. */
@@ -190,7 +198,12 @@ class Runner {
           }
           this.steps += 1;
           const st = await core.range_step(job, STEP_MS);
-          if (st.done && st.result) {
+          if (st.done && st.result && task.opencv && st.result.measured && st.result.opencv !== task.opencv) {
+            // WHY (docs/peps/0003): a slice sent before another OpenCV was chosen is answered by the new
+            // worker; that answer is the other OpenCV's, so it is not kept under this one's key
+            this.jobs.delete(task.key);
+            this.set(task.key, { state: "error", error: `measured on OpenCV ${st.result.opencv}, not ${task.opencv}: measure again` });
+          } else if (st.done && st.result) {
             this.jobs.delete(task.key);
             keep(task.key, st.result, st.ms ?? null);
             this.set(task.key, { state: "done", result: st.result, ms: st.ms ?? null, cached: false });

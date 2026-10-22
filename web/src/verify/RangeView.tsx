@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Badge, NumberField } from "@bam/ui";
 import type { Camera, CameraPreset, MarkerPlan, Polygon, RangeNeed, RangeVerdict, ReadingRange, Vec2 } from "../core/contract";
-import { core } from "../coreSource";
+import { core, useOpencv } from "../coreSource";
 import { MIXED, common } from "../model/batch";
 import type { Doc, Feature } from "../model/doc";
 import { labelInk } from "../sketch/Viewport";
@@ -65,6 +65,8 @@ export function RangeView({ all, doc, onBench }: {
   const [picker, setPicker] = useState(false);
   const [sel, setSel] = useState<string[]>([]);
   const coreVersion = useStudio((s) => s.info?.core_version ?? null);
+  // the one OpenCV the ranges run on (Verify's OpenCV choice): part of each range's key
+  const opencv = useOpencv().wanted;
   useSyncExternalStore(ranges.subscribe, ranges.version);
   const setPick = (p: CameraPick) => { setPickState(p); saveCamera(p); setPicker(false); };
 
@@ -72,9 +74,9 @@ export function RangeView({ all, doc, onBench }: {
   // the selected markers first (what he is looking at), then the document's order
   const tasks: (RangeTask & { item: Item })[] = useMemo(() => {
     if (!coreVersion) return [];
-    const rows = all.map((it) => ({ key: rangeKey(it.req, cam, coreVersion), req: it.req, camera: cam, item: it }));
+    const rows = all.map((it) => ({ key: rangeKey(it.req, cam, coreVersion, opencv), req: it.req, camera: cam, opencv, item: it }));
     return [...rows.filter((t) => sel.includes(t.item.f.id)), ...rows.filter((t) => !sel.includes(t.item.f.id))];
-  }, [all, JSON.stringify(cam), coreVersion, sel.join(",")]);
+  }, [all, JSON.stringify(cam), coreVersion, opencv, sel.join(",")]);
   useEffect(() => { ranges.want(tasks); }, [tasks]);
   // WHY pause, not cancel, on leaving the strip: the bench is one click away
   // and back; a part-done marker resumes where it was (the dialog's close cancels)
@@ -200,7 +202,7 @@ function Column({ it, task, state, lo, hi, scale, selected, onClick, onEnd }: {
   return (
     <div className={`vr-col${selected ? " on" : ""}`} data-testid="range-col" data-feature={it.f.id} data-state={state.state}
       data-near={r?.near_mm ?? ""} data-far={r?.far_mm ?? ""} data-verdict={v?.verdict ?? ""} data-selected={selected ? "1" : "0"}
-      data-renders={r?.renders ?? ""} data-camera={r?.camera.id ?? ""} data-key={task?.key ?? ""} onClick={onClick} role="button" aria-pressed={selected}
+      data-renders={r?.renders ?? ""} data-camera={r?.camera.id ?? ""} data-opencv={r?.opencv ?? ""} data-key={task?.key ?? ""} onClick={onClick} role="button" aria-pressed={selected}
       title="Click to select, Shift- or Ctrl-click to add: the required distance below sets the selection">
       <div className="vr-thumb">{it.plan ? <MarkerThumb f={it.f} plan={it.plan} scale={scale} /> : <span className="muted">Planning…</span>}</div>
       <div className="vr-name"><b>{markerName(it.f, it.plan)}</b>{it.plan ? ` · ${+it.plan.marker_mm.toFixed(2)} mm` : ""}</div>

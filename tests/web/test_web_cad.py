@@ -502,8 +502,9 @@ def test_the_analytic_answer_is_the_pinhole_at_the_measured_limits():
     from aruco_studio import web_verify as V
     a = V.readable_analytic(SINGLE, CAM)
     f = 960.0 / math.tan(math.radians(35.0))
+    # `opencv`: the OpenCV that measured it (docs/peps/0003 decision 3), none for the pinhole
     assert a["measured"] is False and set(a) == {"px_per_cell", "max_distance_mm", "verdict", "text",
-                                                 "measured"}
+                                                 "measured", "opencv"} and a["opencv"] is None
     assert a["px_per_cell"] == pytest.approx(5.0 * f / 300.0, abs=1e-3)
     lim = min(5.0 * f / V.READ_PX_PER_CELL, 4.0 * 30.0 * f / (V.PERIMETER_RATE * 1920))
     assert a["max_distance_mm"] == pytest.approx(lim, abs=0.05)

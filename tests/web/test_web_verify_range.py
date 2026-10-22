@@ -7,31 +7,30 @@ oracle: fresh cases, rendered by verify.camera and read by OpenCV's detector
 directly -- not through the engine -- must read inside the far end and stop
 reading past it (and the same check rejects a far end that is wrong). Then
 the slices the browser runs, the facade calls, the camera library, and the
-table a script prints (with the browser's OpenCV beside, when that Python is
-there: tools/requirements-browser-opencv.txt)."""
+table a script prints: on ONE OpenCV, the newest installed unless asked
+(the browser's 4.11 when that Python is there:
+tools/requirements-browser-opencv.txt; docs/peps/0003 decision 3)."""
 from __future__ import annotations
 
 import copy
 import json
 import math
-import os
-from pathlib import Path
 
 import pytest
 
 cv2 = pytest.importorskip("cv2")
 
+from aruco_studio import opencv_choice as OC              # noqa: E402
 from aruco_studio import web_api as W                      # noqa: E402
 from aruco_studio import web_verify as V                   # noqa: E402
 from aruco_studio.core import cameras as CAMS              # noqa: E402
 from aruco_studio.core import reading_range as RR          # noqa: E402
 from aruco_studio.verify import camera as C                # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[2]
 INK = dict(copy.deepcopy(next(p for p in W.presets() if p["name"] == "Inkjet · Letter vinyl")), cell_step_mm=0.0)
-# the browser's OpenCV, beside the main .venv (tools/requirements-browser-opencv.txt)
-CV411 = next((p for p in (ROOT / ".venv-cv411/bin/python", ROOT.parent / "aruco-studio/.venv-cv411/bin/python")
-              if p.exists()), None)
+# the browser's OpenCV, beside the main checkout's .venv (tools/requirements-browser-opencv.txt);
+# found as a run finds it (opencv_choice: this checkout's venvs, then the main one's)
+CV411 = next((c["python"] for c in OC.installed() if c["opencv"].startswith("4.11.")), None)
 
 
 def single(mm=30.0, first=0, label=None):
@@ -243,15 +242,37 @@ def test_the_range_table_and_the_command_line(tmp_path, capsys):
     assert "| Single #5 | #5 |" in capsys.readouterr().out
 
 
-@pytest.mark.skipif(CV411 is None, reason="no .venv-cv411 (the browser's OpenCV): tools/requirements-browser-opencv.txt")
-def test_both_opencvs_where_they_differ_the_worse_governs():
-    items = [{"name": "Grid B", "req": grid3()}, {"name": "Single", "req": single(30.0, first=3)}]
-    rows = V.range_table(items, "d435", need={"max_mm": 900.0}, also=str(CV411))
-    for r in rows:
-        assert set(r["by_opencv"]) == {cv2.__version__, "4.11.0"}
-        fars = [x["far_mm"] or -1.0 for x in r["by_opencv"].values()]
-        assert r["far_mm"] in (min(fars), None)
-        verdicts = {RR.judge(x, {"max_mm": 900.0})["verdict"] for x in r["by_opencv"].values()}
-        assert r["verdict"] == ("fail" if "fail" in verdicts else "pass")
+def test_a_table_is_one_opencv_the_newest_installed_by_default(tmp_path, capsys):
+    """Zach (2026-10-21): "Let's only run one, but you can choose, and by
+    default it should be the most recent one". Every row's views are drawn
+    and read by the one OpenCV the table names, the newest installed."""
+    newest = max((c["opencv"] for c in OC.installed()), key=OC.version_key)
+    items = [{"name": "Single", "req": single(30.0, first=3)}]
+    rows = V.range_table(items, "d435", need={"max_mm": 900.0})
+    assert {r["range"]["opencv"] for r in rows} == {newest} and rows[0]["range"]["measured"]
+    assert not any(k in r for r in rows for k in ("by_opencv", "differs"))        # no second OpenCV, no "worse of two"
     text = V.table_text(rows)
-    assert "the worse governs" in text
+    assert text.splitlines()[0].endswith(f"· OpenCV {newest}") and "worse" not in text
+    # the command line: the same, and --opencv for one that is not installed is refused in words
+    f = tmp_path / "reqs.json"
+    f.write_text(json.dumps(items))
+    assert V.main([str(f), "--camera", "d435", "--need", ":900", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)[0]["range"]["opencv"] == newest
+    assert V.main([str(f), "--opencv", "3.4"]) == 2
+    assert "--opencv 3.4: not installed here" in capsys.readouterr().err
+
+
+@pytest.mark.skipif(CV411 is None, reason="no .venv-cv411 (the browser's OpenCV): tools/requirements-browser-opencv.txt")
+def test_the_table_on_another_opencv_is_that_ones_alone(tmp_path, capsys):
+    """--opencv 4.11: the table is the browser's OpenCV's (run in its Python),
+    each range exactly what that Python's reading_range answers."""
+    items = [{"name": "Single", "req": single(30.0, first=3)}]
+    rows = V.range_table(items, "d435", opencv="4.11")
+    assert [r["range"]["opencv"] for r in rows] == ["4.11.0"]
+    theirs = OC.call(OC.choose("4.11"), "aruco_studio.web_verify", "reading_range", single(30.0, first=3), "d435")
+    assert json.dumps(rows[0]["range"], sort_keys=True) == json.dumps(theirs, sort_keys=True)
+    assert V.table_text(rows).splitlines()[0].endswith("· OpenCV 4.11.0")
+    f = tmp_path / "reqs.json"
+    f.write_text(json.dumps(items))
+    assert V.main([str(f), "--opencv", str(CV411), "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)[0]["range"]["opencv"] == "4.11.0"

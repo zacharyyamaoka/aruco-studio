@@ -4,8 +4,9 @@
 // shared axis, then a required distance batch-set on both: one PASS, one
 // FAIL with its fix. Each check measures: the bands' pixels against the
 // axis (getBoundingClientRect), the probe's document, the slices sent, and
-// the browser's ranges against a CPython with the browser's OpenCV
-// (.venv-cv411, tools/requirements-browser-opencv.txt) byte for byte.
+// the browser's ranges against a CPython on the OpenCV each range names
+// (found by aruco_studio/opencv_choice.py: for the browser's 4.11,
+// .venv-cv411, tools/requirements-browser-opencv.txt) byte for byte.
 // Screenshots go to E2E_SHOTS (default test-results/shots).
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -17,8 +18,7 @@ import { clickAt, CORE, coreReady, dragWorld, idle, loadExample, openStudio, pan
 const SHOTS = process.env.E2E_SHOTS ?? "test-results/shots";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(here, "..", "..");
-const CV411 = [path.join(ROOT, ".venv-cv411", "bin", "python"), path.join(ROOT, "..", "aruco-studio", ".venv-cv411", "bin", "python")]
-  .find((p) => fs.existsSync(p));
+const PY = [path.join(ROOT, ".venv", "bin", "python"), path.join(ROOT, ".venv", "Scripts", "python.exe")].find((p) => fs.existsSync(p));
 
 test.describe.configure({ mode: "serial" });
 
@@ -122,7 +122,13 @@ test.describe(`Verify · range strip (${CORE} core)`, () => {
     // ONE axis: both bands drawn on the same lo..hi
     const axes = await page.getByTestId("range-band").evaluateAll((els) => els.map((e) => `${e.getAttribute("data-lo")}..${e.getAttribute("data-hi")}`));
     expect(new Set(axes).size).toBe(1);
-    await expect(page.getByTestId("range-foot")).toContainText("OpenCV 4.11");
+    // one OpenCV: the strip names the one the choice names (the newest this browser loads), every band is it, its key says so
+    const wanted = await page.getByTestId("verify-opencv").getAttribute("data-wanted");
+    await expect(page.getByTestId("range-foot")).toContainText(`OpenCV ${wanted} reading the marker as planned, in this browser`);
+    for (const fid of [single, grid]) {
+      await expect(col(fid)).toHaveAttribute("data-opencv", wanted!);
+      expect(JSON.parse((await col(fid).getAttribute("data-key"))!)[4]).toBe(wanted);
+    }
   });
 
   test("b · a required distance set on both markers at once: one PASS, one FAIL with its fix", async () => {
@@ -237,18 +243,22 @@ test.describe(`Verify · range strip (${CORE} core)`, () => {
     await allDone("d435", 5_000);
   });
 
-  test("e · the browser's ranges are a CPython's with the browser's OpenCV, byte for byte", async () => {
-    test.skip(!CV411, "no .venv-cv411 (tools/requirements-browser-opencv.txt): the CPython oracle with the browser's OpenCV is not here");
+  test("e · the browser's ranges are a CPython's on the same OpenCV, byte for byte", async () => {
+    test.skip(!PY, "no .venv here: the CPython oracle cannot run");
     test.setTimeout(300_000);
     const done = await page.evaluate(() => (window as any).__arucoRange.finished()) as { key: string; result: any }[];
     const mine = done.filter((d) => d.result.camera.id === "d435");
     expect(mine.length).toBeGreaterThanOrEqual(2);
     for (const d of mine) {
-      const [, , camera, req] = JSON.parse(d.key);
-      const code = ["import json, sys", "from aruco_studio import web_verify as V", "a = json.load(sys.stdin)",
-        "sys.stdout.write(json.dumps(V.reading_range(a['req'], a['camera']), sort_keys=True))"].join("\n");
-      const r = spawnSync(CV411!, ["-c", code], { cwd: ROOT, input: JSON.stringify({ req, camera }), encoding: "utf8",
+      const [, , camera, req, opencv] = JSON.parse(d.key);
+      expect(d.result.opencv, "the range ran on the OpenCV its key names").toBe(opencv);
+      // the same call in the CPython that has that OpenCV (opencv_choice finds it: this checkout's venvs, the main one's)
+      const code = ["import json, sys", "from aruco_studio import opencv_choice as OC", "a = json.load(sys.stdin)",
+        "c = OC.choose(a['opencv'])",
+        "sys.stdout.write(json.dumps(OC.call(c, 'aruco_studio.web_verify', 'reading_range', a['req'], a['camera']), sort_keys=True))"].join("\n");
+      const r = spawnSync(PY!, ["-c", code], { cwd: ROOT, input: JSON.stringify({ req, camera, opencv }), encoding: "utf8",
         env: { ...process.env, PYTHONPATH: ROOT, PYTHONDONTWRITEBYTECODE: "1" }, maxBuffer: 1 << 26 });
+      test.skip(r.status !== 0 && /not installed here/.test(r.stderr), `OpenCV ${opencv} is not installed here (tools/requirements-browser-opencv.txt)`);
       expect(r.status, r.stderr).toBe(0);
       const sorted = (o: unknown): unknown => Array.isArray(o) ? o.map(sorted)
         : o && typeof o === "object" ? Object.fromEntries(Object.keys(o as object).sort().map((k) => [k, sorted((o as any)[k])])) : o;
