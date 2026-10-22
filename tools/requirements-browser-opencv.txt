@@ -7,8 +7,10 @@
 # test document came out byte-identical to the browser's. Make it with:
 #   uv venv /home/bam/aruco-studio/.venv-cv411 --python 3.11
 #   uv pip install --python /home/bam/aruco-studio/.venv-cv411/bin/python -r tools/requirements-browser-opencv.txt
-# Then: .venv-cv411/bin/python -m aruco_studio.web_verify requests.json, or
-# web_verify.range_table(..., also=<its python>) from the main .venv for both.
+# Then choose it for a run: `--opencv 4.11` (web_verify, docs/build_guides.py)
+# or range_table(..., opencv="4.11"); a run uses ONE OpenCV, the newest
+# installed unless asked (aruco_studio/opencv_choice.py finds this venv beside
+# the main checkout; docs/peps/0003 decision 3).
 numpy==2.3.5
 opencv-contrib-python-headless==4.11.0.86
 pytest==8.4.2

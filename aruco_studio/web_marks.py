@@ -25,10 +25,11 @@ head on / Verify's field tilt (web_verify.FIELD_VIEW: 45 deg, grain 0.1) x
 seeds. A marker reads in most of it and fails at its hard end (3 px per
 cell with 2.5 px of blur); a label that costs anything costs it there.
 
-The detector is whatever OpenCV this Python has, and it matters: on the
-board, OpenCV 4.11 (the Studio's own Verify, in Pyodide) loses 186 of 271
-reads with a label touching the black, OpenCV 5.0 none (2026-10-21). The
-guide runs this check under both and keeps the worse.
+The detector is whatever OpenCV this Python has (the result's `opencv`), and
+it matters near the limits: on the board, OpenCV 4.11 (the browser's, in
+Pyodide 314) lost 186 of 271 reads with a label touching the black, OpenCV
+5.0 none (2026-10-21). The guide runs this check on ONE OpenCV, the newest
+installed unless asked (docs/peps/0003 decision 3; opencv_choice).
 
 What it cannot see (the simulator's limits; the guide says them): ink
 spread (a printer's dots growing into the white: the REF study's "up to
@@ -242,7 +243,8 @@ def check(req: dict, grid: Optional[dict] = None) -> dict:
     if pv != "safe":
         text += (f"; where the bare pose is sharp, the pose came out worse in {worse} views and "
                  f"better in {better}: a mean error of {mean_m:.3f} mm against {mean_b:.3f} mm bare")
-    return {"version": VERSION, "views": k, "ids": ids, "label": lab is not None, "corner_mark": has_mark,
+    return {"version": VERSION, "opencv": _V.cv2.__version__, "views": k, "ids": ids, "label": lab is not None,
+            "corner_mark": has_mark,
             "reads": {"marked": reads_m, "bare": reads_b}, "lost": lost, "gained": gained,
             "cost_pts": round(cost, 2), "p": round(p, 6), "easy": easy, "wrong": wrong,
             "reads_verdict": reads_verdict, "verdict": verdict, "text": text,

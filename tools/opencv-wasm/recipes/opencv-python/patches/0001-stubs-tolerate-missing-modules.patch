@@ -1,0 +1,30 @@
+Tolerate refinement symbols from modules left out of BUILD_LIST
+
+The typing-stub generator refines cv.calibrateCamera (calib); a build without
+calib otherwise fails stub generation, so py.typed/typing are not produced and
+opencv-python setup.py aborts with "Not found: python/cv2/py.typed".
+
+--- a/opencv/modules/python/src2/typing_stubs_generation/api_refinement.py	2026-10-21 16:52:21.227981666 -0700
++++ b/opencv/modules/python/src2/typing_stubs_generation/api_refinement.py	2026-10-21 16:52:21.243982146 -0700
+@@ -10,7 +10,7 @@
+                     TupleTypeNode, UnionTypeNode, ProtocolClassNode,
+                     DictTypeNode, ClassTypeNode, AliasRefTypeNode)
+ from .ast_utils import (find_function_node, SymbolName,
+-                        for_each_function_overload)
++                        for_each_function_overload, SymbolNotFoundError)
+ from .types_conversion import create_type_node
+ 
+ 
+@@ -24,7 +24,11 @@
+     builtin_exception.is_exported = False
+     root.add_class("error", (builtin_exception, ), ERROR_CLASS_PROPERTIES)
+     for symbol_name, refine_symbol in NODES_TO_REFINE.items():
+-        refine_symbol(root, symbol_name)
++        try:
++            refine_symbol(root, symbol_name)
++        except SymbolNotFoundError:
++            # Pyodide build: a module left out of BUILD_LIST (calib: calibrateCamera)
++            pass
+     version_constant = root.add_constant("__version__", "<unused>")
+     version_constant._value_type = "str"
+ 

@@ -5,6 +5,7 @@
 // from here and nothing else of the core's.
 import { useSyncExternalStore } from "react";
 import type { CoreApi, CoreStatus } from "./core/contract";
+import { loadOpenCv, opencvBuild, saveOpenCv } from "./core/opencv";
 
 export const coreKind: "real" | "mock" =
   typeof location !== "undefined" && new URLSearchParams(location.search).get("core") === "mock" ? "mock" : "real";
@@ -24,6 +25,27 @@ const t0 = typeof performance !== "undefined" ? performance.now() : 0;
  *  waits the UI shows count from here. */
 export function coreElapsedMs(): number { return performance.now() - t0; }
 
+// The OpenCV Verify runs (./core/opencv.ts): the real core's worker's choice
+// (client.ts), mirrored here so the UI reads it at once; the mock never
+// verifies, so its choice is only remembered.
+export interface OpencvState { wanted: string; loaded: string | null }
+let opencv: OpencvState = { wanted: typeof window === "undefined" ? opencvBuild(null).version : loadOpenCv(), loaded: null };
+let chooseInCore: ((version: string) => void) | null = null;
+const opencvListeners = new Set<() => void>();
+function setOpencv(s: OpencvState) {
+  opencv = s;
+  for (const f of opencvListeners) f();
+}
+export function opencvState(): OpencvState { return opencv; }
+export function onOpencv(cb: () => void): () => void { opencvListeners.add(cb); return () => { opencvListeners.delete(cb); }; }
+export function useOpencv(): OpencvState { return useSyncExternalStore(onOpencv, opencvState); }
+/** Run another of the browser's OpenCV builds (remembered; the worker restarts if it loaded another). */
+export function chooseOpencv(version: string): void {
+  if (chooseInCore) { chooseInCore(version); return; }
+  saveOpenCv(version);
+  setOpencv({ ...opencv, wanted: opencvBuild(version).version });
+}
+
 // WHY a dynamic import per kind: the mock must not boot Pyodide, and the
 // real build must not ship the mock in its main chunk.
 const source: Promise<CoreApi> = coreKind === "mock"
@@ -32,6 +54,10 @@ const source: Promise<CoreApi> = coreKind === "mock"
     const sync = () => setStatus(m.coreStatus());
     m.onCoreStatus(sync);
     sync();
+    const syncCv = () => setOpencv(m.opencvState());
+    m.onOpencv(syncCv);
+    syncCv();
+    chooseInCore = m.chooseOpencv;
     return m.core;
   });
 
@@ -78,4 +104,5 @@ export const core: CoreApi = {
   verify: counted("verify"), readable: counted("readable"), assign_ids: counted("assign_ids"),
   cameras: counted("cameras"), reading_range: counted("reading_range"), range_start: counted("range_start"),
   range_step: counted("range_step"), range_cancel: counted("range_cancel"), range_judge: counted("range_judge"),
+  scene_keys: counted("scene_keys"),
 };

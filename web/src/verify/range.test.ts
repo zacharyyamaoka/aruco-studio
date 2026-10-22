@@ -11,6 +11,7 @@ const log: string[] = [];
 const jobs = new Map<string, { key: string; left: number }>();
 let seq = 0;
 let failNextStart: string | null = null;
+let failScenes = false;
 
 const result = (far: number): ReadingRange => ({ version: "reading-range/1", near_mm: 100, far_mm: far, band_mm: [far * 0.9, far * 1.1], pm: 0.1,
   near_by: "frame", near_checked: true, far_limit: "cells", far_px_per_cell: 3, far_outline_px: 80, min_outline_px: 57.6, weakest_id: null,
@@ -46,6 +47,13 @@ vi.mock("../coreSource", () => ({
     range_cancel: async (job: string) => { log.push(`cancel ${jobs.get(job)?.key}`); return { job, cancelled: jobs.delete(job) }; },
     range_judge: async (r: ReadingRange, need: { max_mm?: number }) =>
       ({ verdict: (r.far_mm ?? 0) >= (need.max_mm ?? 0) ? "pass" : "fail", checks: [], hints: [], size_mm: null }),
+    // the scene a marker shows the camera: its first id and size, never where it sits (a fake web_api.scene_key)
+    scene_keys: async (reqs: PlanRequest[]) => {
+      await trip();
+      log.push(`scenes ${reqs.length}`);
+      if (failScenes) { failScenes = false; throw new Error("core: not loaded"); }
+      return reqs.map((r) => (r.marker.first_id < 0 ? null : `scene-${r.marker.first_id}-${r.marker.marker_mm ?? 0}`));
+    },
   },
 }));
 
@@ -199,11 +207,75 @@ describe("the camera", () => {
     expect(R.rangeCamera({ custom: { resolution: [800, 600], hfov_deg: 60, focus_mm: null } }))
       .toEqual({ id: "custom", name: "Custom camera", resolution: [800, 600], hfov_deg: 60, focus_mm: null });
   });
-  it("keys a range by the request, the camera and the core", () => {
-    const a = R.rangeKey(req(1), "d435", "0.1.0+abc");
-    expect(R.rangeKey(req(1), "d435", "0.1.0+abc")).toBe(a);
-    expect(R.rangeKey(req(1), "d455", "0.1.0+abc")).not.toBe(a);
-    expect(R.rangeKey(req(1), "d435", "0.1.0+def")).not.toBe(a);
-    expect(R.rangeKey(req(2), "d435", "0.1.0+abc")).not.toBe(a);
+  it("keys a range by the scene, the camera, the core and the OpenCV", () => {
+    const a = R.rangeKey("scene-1", "d435", "0.1.0+abc", "4.11.0");
+    expect(R.rangeKey("scene-1", "d435", "0.1.0+abc", "4.11.0")).toBe(a);
+    expect(R.rangeKey("scene-1", "d455", "0.1.0+abc", "4.11.0")).not.toBe(a);
+    expect(R.rangeKey("scene-1", "d435", "0.1.0+def", "4.11.0")).not.toBe(a);
+    expect(R.rangeKey("scene-2", "d435", "0.1.0+abc", "4.11.0")).not.toBe(a);
+    expect(R.rangeKey("scene-1", "d435", "0.1.0+abc", "5.0.0")).not.toBe(a);
+    expect(JSON.parse(a).slice(2)).toEqual(["d435", "scene-1", "4.11.0"]);
+  });
+  it("asks the core for the scene keys it lacks, all in one call, and a moved marker finds its range", async () => {
+    // two markers; the second moved on the page: another request, the same scene
+    const moved = (id: number, cx: number) => ({ marker: { first_id: id, marker_mm: 30 }, rect: { cx } }) as unknown as PlanRequest;
+    const items = [{ key: "r81@0", req: moved(81, 0) }, { key: "r82@0", req: moved(82, 0) }];
+    expect(R.markerRangeKey("r81@0", "d435", "v", "5.0.0")).toBeNull();          // not known yet: no task
+    await R.askScenes(items);
+    expect(log.filter((x) => x.startsWith("scenes"))).toEqual(["scenes 2"]);
+    await R.askScenes(items);                                                    // known: no call
+    expect(log.filter((x) => x.startsWith("scenes"))).toEqual(["scenes 2"]);
+    const k = R.markerRangeKey("r81@0", "d435", "v", "5.0.0")!;
+    R.ranges.want([{ key: k, req: items[0].req, camera: "d435" }]);
+    await settle();
+    expect(R.cached(k)?.result.far_mm).toBe(1081);
+    // the marker moved 10 mm: a new request asks its scene once, and keys the same range
+    log.length = 0;
+    await R.askScenes([{ key: "r81@10", req: moved(81, 10) }]);
+    expect(log).toEqual(["scenes 1"]);
+    expect(R.markerRangeKey("r81@10", "d435", "v", "5.0.0")).toBe(k);
+    R.ranges.want([{ key: k, req: moved(81, 10), camera: "d435" }]);
+    await settle();
+    expect(log.filter((x) => !x.startsWith("scenes"))).toEqual([]);           // no range run
+    // a size change is another scene: measured again
+    await R.askScenes([{ key: "r81@10-25", req: { ...moved(81, 10), marker: { first_id: 81, marker_mm: 25 } } as unknown as PlanRequest }]);
+    expect(R.markerRangeKey("r81@10-25", "d435", "v", "5.0.0")).not.toBe(k);
+    // the core failing to say: each is keyed by its request, so the strip still measures
+    failScenes = true;
+    await R.askScenes([{ key: "fails", req: moved(83, 0) }]);
+    expect(JSON.parse(R.markerRangeKey("fails", "d435", "v", "5.0.0")!)[3]).toBe("request:fails");
+    // one that does not plan keys by its request (its error shows); finished() names the request a range was for
+    await R.askScenes([{ key: "bad", req: moved(-1, 0) }]);
+    expect(JSON.parse(R.markerRangeKey("bad", "d435", "v", "5.0.0")!)[3]).toBe("request:bad");
+    expect(R.ranges.finished().find((f) => f.key === k)?.req).toEqual(moved(81, 10));
+  });
+  it("never keeps an answer another OpenCV measured (a slice resent to a restarted worker) under this one's key", async () => {
+    const k50 = R.rangeKey("scene-71", "d435", "0.1.0+abc", "5.0.0");
+    R.ranges.want([{ key: k50, req: req(71), camera: "d435", opencv: "5.0.0" }]);
+    await settle();
+    // the fake core's answers are 4.11's (result()): not 5.0's, so not kept, and said
+    expect(R.cached(k50)).toBeNull();
+    const s = R.ranges.state(k50);
+    expect(s.state).toBe("error");
+    expect(s.state === "error" && s.error).toMatch(/measured on OpenCV 4\.11\.0, not 5\.0\.0/);
+  });
+  it("never shows another OpenCV's range as this one's: kept under the OpenCV that measured it", async () => {
+    const k411 = R.rangeKey("scene-70", "d435", "0.1.0+abc", "4.11.0");
+    const k50 = R.rangeKey("scene-70", "d435", "0.1.0+abc", "5.0.0");
+    R.ranges.want([{ key: k411, req: req(70), camera: "d435" }]);
+    await settle();
+    expect(R.cached(k411)?.result.far_mm).toBe(1070);
+    expect(R.cached(k50)).toBeNull();
+    // asked on the other OpenCV it is measured again, not taken from the first
+    log.length = 0;
+    R.ranges.want([{ key: k50, req: req(70), camera: "d435" }]);
+    expect(R.ranges.state(k50).state).not.toBe("done");
+    await settle();
+    expect(log[0]).toBe("start 70");
+    // and back: the first is there at once
+    log.length = 0;
+    R.ranges.want([{ key: k411, req: req(70), camera: "d435" }]);
+    await settle();
+    expect(log).toEqual([]);
   });
 });

@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
 """Build the site's guides, https://arucostudio.com/guides/ (2026-10-21).
 
-    .venv/bin/python docs/build_guides.py --detector <python with OpenCV 4.11> --detector .venv/bin/python
-                                                     # run Verify on the board under each OpenCV, then every page
-    .venv/bin/python docs/build_guides.py            # the same with this Python's OpenCV only
-    .venv/bin/python docs/build_guides.py --pages    # the pages only, from the last run (verify.json)
+    .venv/bin/python docs/build_guides.py                  # run Verify on the board on the newest OpenCV
+                                                           # installed, then every page
+    .venv/bin/python docs/build_guides.py --opencv 4.11    # the same on another OpenCV (a version, or a Python)
+    .venv/bin/python docs/build_guides.py --pages          # the pages only, from the last run (verify.json)
 
-WHY several detectors (measured 2026-10-21): the Studio's own Verify runs the
-OpenCV of the Pyodide lock (web/node_modules/pyodide/pyodide-lock.json:
-opencv-python 4.11.0.86), this repo's CPython OpenCV 5.0 (requirements.txt),
-and on this board they disagree: a label touching the black loses 186 of 271
-reads on 4.11 and none on 5.0. So the page runs both and keeps the worse;
-e2e/guides.spec.ts checks the browser's own sweep against the 4.11 run.
+WHY one OpenCV (Zach, 2026-10-21: "Let's only run one, but you can choose,
+and by default it should be the most recent one"; docs/peps/0003 decision 3):
+OpenCVs draw the same view differently and disagree near the limits (on this
+board 4.11 and 5.0 disagreed on 6 of the 28 markers: a label touching the
+black lost 186 of 271 reads on 4.11, none on 5.0). Until then the page ran
+both and kept the worse; now a run is one OpenCV's, the newest installed
+unless --opencv says (aruco_studio/opencv_choice.py finds them: the repo's
+.venv, .venv-cv411 beside it), and the page names it and says that others
+can differ (OLD_FINDING). verify.json is keyed on it: --pages refuses a run
+made on another OpenCV than the one asked for (the newest by default).
+e2e/guides.spec.ts checks the browser's own sweep against a run on the
+browser's OpenCV.
 
 Writes (all under web/public/, which Vite copies into the static site as it is):
 
@@ -34,8 +40,10 @@ same core (web_api, web_ids, core.presets) each build, so they move when the
 code does.
 
 The pages are standard library only. The Verify run imports the repo's core
-with numpy and OpenCV (aruco_studio.web_marks), so run it with the repo's
-.venv; --pages needs neither.
+with numpy and OpenCV (aruco_studio.web_marks) in the chosen OpenCV's Python
+(this one when it is that, else that Python with this checkout's code), so
+run it with the repo's .venv; --pages needs neither (it only asks the Pythons
+here which OpenCV they have).
 """
 from __future__ import annotations
 
@@ -56,6 +64,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from aruco_studio import opencv_choice as OC             # noqa: E402  (standard library only)
 from aruco_studio import web_api as W                    # noqa: E402  (standard library only)
 from aruco_studio import web_ids as IDS                  # noqa: E402
 from aruco_studio.core import presets as CP              # noqa: E402
@@ -77,6 +86,11 @@ SRC = f"{GITHUB}/blob/main"
 # WHY a cap per page: the guides are read on phones; the label page carries
 # 28 stickers drawn inline and a few small views
 PAGE_BUDGET = 400 * 1024
+# The finding the page links where it says other OpenCVs can differ: the last
+# run with two (4.11 and 5.0, both kept, the worse governing), on GitHub at
+# the commit that published it.
+OLD_FINDING = {"commit": "078f361", "versions": ("4.11", "5.0"), "disagree": ("B5", "B7", "B8", "C4", "D4", "E4"),
+               "url": f"{GITHUB}/blob/078f361/web/public/guides/label-placement/verify.json"}
 
 INK = next(p for p in W.presets() if p["name"] == "Inkjet · Letter vinyl")
 # the Studio's defaults for a new marker (web/src/model/doc.ts DEFAULT_MARKER / DEFAULT_LABEL)
@@ -190,7 +204,9 @@ HEADLINES = [
      ["D1", "D2", "D5", "D6", "D7"], {"safe"}),
     ("Safe: a ChArUco label in its black square; a grid's in its border row.", ["E1", "E2"], {"safe"}),
     ("Safe: the black triangle corner mark, and ChArUco's cut corner.", ["F1", "F2", "F3"], {"safe"}),
-    ("Not safe: letters taller than half a cell, or a longer text in the border row.", ["B5", "B6", "B7", "B8"],
+    # WHY not B7 (2026-10-21, one OpenCV): a longer text that still fits the row is safe on 5.0 and by the rules;
+    # only 4.11 lost reads there (the old finding), so it no longer stands under "not safe"
+    ("Not safe: letters taller than half a cell, or a text longer than the border row.", ["B5", "B6", "B8"],
      {"marginal", "unsafe"}),
     ("Not safe: any ink in the quiet zone, the white ring round the marker.", ["C1", "C2", "C3", "C4", "D3", "D4", "E3"],
      {"marginal", "unsafe"}),
@@ -376,20 +392,47 @@ def bench_sweep(V, C, d: dict, scene, camera: dict):
     return last
 
 
-def studio_opencv():
-    """The OpenCV the Studio's own Verify runs in the browser: the Pyodide lock's opencv-python
-    (web/src/core/worker.ts loads it), e.g. "4.11.0.86"; None when no lock is on disk."""
+def browser_opencvs() -> list:
+    """The OpenCVs the Studio's own Verify can load in the browser, newest first: the Pyodide lock's
+    opencv-python (from Pyodide's CDN) and the wheels the site serves (web/public/opencv/), as
+    cv2.__version__ ("4.11.0"). web/src/core/opencv.ts lists the same (its opencv.test.ts holds it to these)."""
+    out = []
     for lock in (ROOT / "web" / "public" / "pyodide" / "pyodide-lock.json",
                  ROOT / "web" / "node_modules" / "pyodide" / "pyodide-lock.json"):
         if lock.exists():
             pkg = json.loads(lock.read_text())["packages"].get("opencv-python")
-            return pkg["version"] if pkg else None
-    return None
+            if pkg:
+                out.append(pkg["version"])
+            break
+    out += [w.name.split("-")[1] for w in sorted((PUBLIC / "opencv").glob("*.whl"))]
+    return sorted({".".join(v.split(".")[:3]) for v in out}, key=OC.version_key, reverse=True)
+
+
+def studio_opencv():
+    """The OpenCV the Studio's own Verify runs in the browser by default: the newest it can load
+    (web/src/core/opencv.ts), e.g. "4.11.0"; None when nothing says (no lock on disk)."""
+    found = browser_opencvs()
+    return found[0] if found else None
 
 
 def same_opencv(a: str, b) -> bool:
     """cv2.__version__ "4.11.0" is opencv-python "4.11.0.86" (the wheel adds its own build number)."""
-    return bool(b) and a.split(".")[:3] == str(b).split(".")[:3]
+    return bool(b) and str(a).split(".")[:3] == str(b).split(".")[:3]
+
+
+def run_sweeps(doc: dict) -> dict:
+    """Verify's angle sweep of every marker on the board (as planned, label and all) under THIS Python's
+    OpenCV: {feature id: the last tilt read in full, or None}, and the OpenCV. What web/e2e/guides.spec.ts
+    holds the browser's own sweep to when the browser runs another OpenCV than the page's run."""
+    import cv2
+    from aruco_studio import web_verify as V
+    from aruco_studio.verify import camera as C
+    out = {}
+    for c in CASES:
+        req = V.placed(c.req)
+        d = V._plan(req)
+        out[c.fid] = bench_sweep(V, C, d, C.scene_of(d, V._label(req, d)), bench_camera(W.plan(c.req)))
+    return {"opencv": cv2.__version__, "sweeps": out}
 
 
 def run_detector(doc: dict) -> dict:
@@ -459,29 +502,29 @@ def worst(*verdicts: str) -> str:
     return max(verdicts, key=("safe", "marginal", "unsafe").index)
 
 
-def results_of(doc: dict, runs: list) -> dict:
-    """The run behind the page: each marker's plan and rules (the core, standard library) and each
-    detector's check; its verdict the worst of them all. The Studio's own OpenCV first."""
+def results_of(doc: dict, run: dict) -> dict:
+    """The run behind the page: each marker's plan and rules (the core, standard library) and the ONE
+    OpenCV's check; its verdict the worse of the two."""
     from aruco_studio import web_marks as M
     studio = studio_opencv()
-    runs = sorted(runs, key=lambda r: (not same_opencv(r["opencv"], studio), r["opencv"]))
-    assert len({r["opencv"] for r in runs}) == len(runs), "one run per OpenCV"
     cases = []
     for n, c in enumerate(CASES, start=1):
         plan = W.plan(c.req)
         assert plan["ok"], (c.key, plan.get("warnings"))
         rule, hits = rule_check(plan)
-        verify = {r["opencv"]: r["cases"][c.key] for r in runs}
+        verify = run["cases"][c.key]
         cases.append({"key": c.key, "group": c.group, "title": c.title, "feature": c.fid, "number": n,
                       "plan": {"ids": plan["ids"], "cell_mm": plan["cell_mm"], "outer_mm": plan["outer_mm"],
                                "marker_mm": plan["marker_mm"], "summary": plan["summary"],
                                "label_cap_mm": None if not plan.get("label") else plan["label"]["height_mm"]},
                       "where": where_of(c, plan), "rules": {"verdict": rule, "hits": hits}, "verify": verify,
-                      "verdict": worst(rule, *[v["marks"]["verdict"] for v in verify.values()])})
+                      "verdict": worst(rule, verify["marks"]["verdict"])})
     return {"generated": datetime.date.today().isoformat(), "core_version": W.core_version(), "commit": commit(),
-            "verify_version": M.VERSION, "grid": M.GRID, "studio_opencv": studio,
-            "detectors": [{"opencv": r["opencv"], "numpy": r["numpy"], "python": r["python"], "seconds": r["seconds"],
-                           "studio": same_opencv(r["opencv"], studio)} for r in runs],
+            "verify_version": M.VERSION, "grid": M.GRID,
+            # the one OpenCV of this run (the page's and every verdict's), and the browser's
+            "opencv": run["opencv"], "studio_opencv": studio,
+            "detector": {"opencv": run["opencv"], "numpy": run["numpy"], "python": run["python"],
+                         "seconds": run["seconds"], "studio": same_opencv(run["opencv"], studio)},
             "thresholds": {"marginal_pts": M.MARGINAL_PTS, "unsafe_pts": M.UNSAFE_PTS, "p_max": M.P_MAX,
                            "easy_px_per_cell": M.EASY_PX_PER_CELL, "easy_blur_px": M.EASY_BLUR_PX,
                            "easy_share": M.EASY_SHARE, "easy_min": M.EASY_MIN,
@@ -523,6 +566,24 @@ def check_sitemap() -> None:
     missing = [u for u in [f"{SITE}/guides/"] + [f"{SITE}/guides/{g.slug}/" for g in GUIDE_LIST] if f"<loc>{u}</loc>" not in text]
     if missing:
         raise SystemExit("add to web/public/sitemap.xml: " + ", ".join(missing))
+
+
+def check_old_finding() -> None:
+    """The page's OLD_FINDING is what that run says: the markers its two OpenCVs disagreed on (its
+    verify.json, read from git at that commit). Said and skipped when the commit is not here."""
+    import subprocess
+    path = f"{OLD_FINDING['commit']}:web/public/guides/label-placement/verify.json"
+    try:
+        text = subprocess.run(["git", "-C", str(ROOT), "show", path], capture_output=True, text=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        print(f"note: {OLD_FINDING['commit']} is not in this clone: the page's old finding is not re-checked", file=sys.stderr)
+        return
+    old = json.loads(text)
+    got = tuple(c["key"] for c in old["cases"] if len({v["marks"]["verdict"] for v in c["verify"].values()}) > 1)
+    versions = tuple(sorted(OC.short(d["opencv"]) for d in old["detectors"]))
+    if got != OLD_FINDING["disagree"] or versions != tuple(sorted(OLD_FINDING["versions"])):
+        raise SystemExit(f"OLD_FINDING cites {OLD_FINDING['disagree']} on OpenCV {OLD_FINDING['versions']}; "
+                         f"that run says {got} on {versions}")
 
 
 def check_headlines(results: dict) -> None:
@@ -811,10 +872,9 @@ def map_svg(m: list, grid: dict) -> str:
     return "".join(out)
 
 
-def det_name(opencv: str, studio) -> str:
-    """ "OpenCV 4.11 (the Studio's)" / "OpenCV 5.0" """
-    short = ".".join(opencv.split(".")[:2])
-    return f"OpenCV {short}" + (" (the Studio's)" if same_opencv(opencv, studio) else "")
+def det_name(opencv: str) -> str:
+    """ "OpenCV 5.0" """
+    return f"OpenCV {OC.short(opencv)}"
 
 
 def verify_text(v: dict) -> str:
@@ -843,20 +903,9 @@ def verify_text(v: dict) -> str:
     return f"{s} {dialog}"
 
 
-def pictures_of(r: dict, studio):
-    """The lost view to show: the Studio's detector's when it lost one, else the first that did."""
-    for opencv, v in r["verify"].items():
-        if v["pictures"] and same_opencv(opencv, studio):
-            return opencv, v
-    for opencv, v in r["verify"].items():
-        if v["pictures"]:
-            return opencv, v
-    return None, None
-
-
 def group_cards(cases: list, results: dict, grid: dict) -> str:
     by = {r["key"]: r for r in results["cases"]}
-    studio = results["studio_opencv"]
+    o = results["opencv"]
     per = len(grid["tilt_deg"]) * int(grid["seeds"])
     out = []
     for gid, (gtitle, gnote) in GROUPS.items():
@@ -865,19 +914,18 @@ def group_cards(cases: list, results: dict, grid: dict) -> str:
             r = by[c.key]
             rules = ("; ".join(esc(h) for h in r["rules"]["hits"]) + "." if r["rules"]["hits"]
                      else "No rule broken.")
-            lines = "".join(f'<p data-opencv="{esc(o)}"><span class="lbl">Verify · {esc(det_name(o, studio))}</span>'
-                            f'{esc(verify_text(v))} {verdict_badge(v["marks"]["verdict"])}</p>'
-                            for o, v in r["verify"].items())
+            v = r["verify"]
+            lines = (f'<p data-opencv="{esc(o)}"><span class="lbl">Verify · {esc(det_name(o))}</span>'
+                     f'{esc(verify_text(v))} {verdict_badge(v["marks"]["verdict"])}</p>')
             extra = ""
-            o, v = pictures_of(r, studio)
-            if v:
+            if v["pictures"]:
                 pv = v["pictures"]["view"]
                 figs = "".join(
                     f'<figure><img src="media/{im["file"]}" alt="{esc(c.key)} {im["kind"]} at {num(pv["px_per_cell"], 1)} px per cell" '
                     f'width="300"><figcaption>{"Bare" if im["kind"] == "bare" else "With the label"}: '
                     f'{"misses " + ", ".join(f"#{i}" for i in im["missing"]) if im["missing"] else "reads"}</figcaption></figure>'
                     for im in v["pictures"]["images"])
-                extra += (f'<p class="small muted">A view it lost with {esc(det_name(o, studio))}: '
+                extra += (f'<p class="small muted">A view it lost with {esc(det_name(o))}: '
                           f'{num(pv["px_per_cell"], 1)} px per cell, blur {num(pv["blur_px"], 1)} px, tilt '
                           f'{num(pv["tilt_deg"], 0)}°. Green: read; red: printed, not read.</p><div class="views">{figs}</div>'
                           f'<div class="map">{map_svg(v["marks"]["map"], grid)}</div><p class="small muted">Where it lost '
@@ -952,42 +1000,48 @@ def label_page(cases: list, results: dict) -> str:
     grid = results["grid"]
     th = results["thresholds"]
     studio = results["studio_opencv"]
-    dets = results["detectors"]
-    names = [det_name(d["opencv"], studio) for d in dets]
-    first = dets[0]["opencv"]                         # the Studio's own when it ran (results_of sorts it first)
-    n_views = rs[0]["verify"][first]["marks"]["views"]
+    o = results["opencv"]
+    det = results["detector"]
+    n_views = rs[0]["verify"]["marks"]["views"]
     answer = "".join(
         f'<li>{verdict_badge("safe" if ok == {"safe"} else "unsafe")}<span>{esc(text[text.index(":") + 2:])} '
         f'<span class="muted small">({links(keys)})</span></span></li>'
         for text, keys, ok in HEADLINES)
     flagged = [r["key"] for r in rs if r["verdict"] != "safe"]
-    # what the dialog shows, per detector: its sweep failing head on, reading less far than bare, or like bare
-    dialog = []
-    for d in dets:
-        o = d["opencv"]
-        sw = {r["key"]: r["verify"][o]["sweep_reads_to_deg"] for r in rs}
-        none = [k for k, v in sw.items() if v["marked"] is None and v["bare"] is not None]
-        short = [k for k, v in sw.items() if v["marked"] is not None and v["bare"] is not None and v["marked"] < v["bare"]]
-        like = [k for k in flagged if sw[k]["marked"] == sw[k]["bare"]]
-        bits = []
-        if none:
-            bits.append(f"{links(none)} not reading even head on")
-        if short:
-            bits.append(" and ".join(f"{link(k)} reading only to {sw[k]['marked']}° (its bare marker to {sw[k]['bare']}°)"
-                                     for k in short))
-        shows = ("shows " + "; ".join(bits) + ". The other " if bits else "shows nothing: ")
-        dialog.append(f"With {esc(det_name(o, studio))} the sweep {shows}{len(like)} of the {len(flagged)} markers this "
-                      f"page calls not safe or marginal sweep exactly like their bare marker ({links(like)}).")
-    found = {d["opencv"]: [r["key"] for r in rs if r["verify"][d["opencv"]]["marks"]["verdict"] != "safe"] for d in dets}
-    any_found = [r["key"] for r in rs if any(r["key"] in v for v in found.values())]
+    # what the dialog shows: its sweep failing head on, reading less far than bare, or like bare
+    sw = {r["key"]: r["verify"]["sweep_reads_to_deg"] for r in rs}
+    none = [k for k, v in sw.items() if v["marked"] is None and v["bare"] is not None]
+    short = [k for k, v in sw.items() if v["marked"] is not None and v["bare"] is not None and v["marked"] < v["bare"]]
+    like = [k for k in flagged if sw[k]["marked"] == sw[k]["bare"]]
+    bits = []
+    if none:
+        bits.append(f"{links(none)} not reading even head on")
+    if short:
+        bits.append(" and ".join(f"{link(k)} reading only to {sw[k]['marked']}° (its bare marker to {sw[k]['bare']}°)"
+                                 for k in short))
+    shows = ("shows " + "; ".join(bits) + ". The other " if bits else "shows nothing: ")
+    dialog = (f"Its sweep {shows}{len(like)} of the {len(flagged)} markers this page calls not safe or marginal sweep "
+              f"exactly like their bare marker ({links(like)}).")
+    any_found = [r["key"] for r in rs if r["verify"]["marks"]["verdict"] != "safe"]
     rules_say = [r["key"] for r in rs if r["rules"]["verdict"] != "safe"]
     only_rules = [k for k in rules_say if k not in any_found]
-    disagree = [r["key"] for r in rs if len({v["marks"]["verdict"] for v in r["verify"].values()}) > 1]
-    det_list = " and ".join(f"<b>{esc(n)}</b>" for n in names)
-    runs = "; ".join(f"OpenCV {esc(d['opencv'])} (Python {esc(d['python'])}, numpy {esc(d['numpy'])}, {d['seconds']} s)"
-                     for d in dets)
-    studio_note = (f"The Studio's own Verify runs OpenCV {esc(studio)} in your browser (Pyodide)."
-                   if studio else "")
+    run = f"OpenCV {esc(o)} (Python {esc(det['python'])}, numpy {esc(det['numpy'])}, {det['seconds']} s)"
+    old_a, old_b = OLD_FINDING["versions"]
+    others = (f'Other versions of OpenCV can read these markers differently near the limits: on this board OpenCV {old_a} '
+              f'and {old_b} disagreed on {len(OLD_FINDING["disagree"])} of the {len(cases)} '
+              f'({", ".join(OLD_FINDING["disagree"])}; <a href="{OLD_FINDING["url"]}">the run with both</a>, '
+              f'which kept the worse).')
+    # one OpenCV a run: the newest installed unless the build was told another (docs/peps/0003)
+    which = (", the newest" if same_opencv(o, det.get("newest") or o)
+             else f", as asked (the newest here was {esc(det_name(det['newest']))})")
+    others_here = [v for v in browser_opencvs() if not same_opencv(v, studio)]
+    offers = (f" (its OpenCV choice also offers {' and '.join(esc(OC.short(v)) for v in others_here)})" if others_here else "")
+    if not studio:
+        studio_note = ""
+    elif same_opencv(o, studio):
+        studio_note = f"The Studio's Verify runs this same OpenCV in your browser by default{offers}."
+    else:
+        studio_note = f"The Studio's Verify in your browser runs OpenCV {esc(OC.short(studio))} by default{offers}."
     body = f"""<article class="wide">
 <h1>Where to put a label, and a corner mark</h1>
 <p class="lead">Keep it short, in the black border row at the Studio's own size, or put it outside the white quiet
@@ -1009,11 +1063,11 @@ is an ArUco Extrude, numbered in this order.</p>
 {overview(cases)}
 
 <h2>Every marker, and what the Studio says</h2>
-<p>Each marker gets {len(dets) + 1} verdicts. <b>The Studio's rules</b> are the warnings it shows in the ArUco Extrude
+<p>Each marker gets two verdicts. <b>The Studio's rules</b> are the warnings it shows in the ArUco Extrude
 panel; they come from earlier, much larger studies (below). <b>Verify</b> is the Studio's simulated camera and OpenCV's
-own detector, reading the marker {n_views} times with its label and {n_views} times without, here with {det_list}.
-{studio_note} The detector matters: the two disagree on {len(disagree)} of these markers ({links(disagree)}), so a
-place is safe only if it is safe on both. The verdict is the worst of them all.</p>
+own detector, reading the marker {n_views} times with its label and {n_views} times without, here with
+<b data-opencv="{esc(o)}">{esc(det_name(o))}</b>{which}. {studio_note}
+{others} The verdict is the worse of the two.</p>
 {group_cards(cases, results, grid)}
 
 <h2>How Verify measured it</h2>
@@ -1035,12 +1089,12 @@ blur or less, where a bare marker never fails), {th["easy_min"]} at least; or th
 {num(th["pose_unsafe"] * 100, 0)} % worse.</li>
 </ul>
 <div class="callout"><p><b>Why not just Verify's dialog?</b> It shows one view at a time, a clean angle sweep and a
-head-on read limit. {" ".join(dialog)} The dialog catches the worst places; the paired check measures the rest. It is
+head-on read limit. {dialog} The dialog catches the worst places; the paired check measures the rest. It is
 <a href="{SRC}/aruco_studio/web_marks.py">aruco_studio/web_marks.py</a>, version {results["verify_version"]}.</p></div>
 
 <h2>What Verify cannot judge yet</h2>
 <p>Verify found a cost for {len(any_found)} of these markers ({links(any_found)}); the rules flag {len(rules_say)}.
-Where only the rules flag a marker ({links(only_rules)}), Verify saw no cost on either detector. Two things the
+Where only the rules flag a marker ({links(only_rules)}), Verify saw no cost. Two things the
 studies behind those rules measured, Verify does not draw, and one more it leaves out:</p>
 <ul class="plain">
 <li><b>Ink spread.</b> A printer's dots grow into the white round them, so ink in the quiet zone creeps toward the
@@ -1078,7 +1132,7 @@ slides along the cut.</li>
 <li>Print it from the Studio (Print, at 100 %), stick it where your markers will go, and read it with your camera.</li>
 </ol>
 <p class="small muted">Built {esc(results["generated"])} from core {esc(results["core_version"])}
-{f'(commit {esc(results["commit"])})' if results.get("commit") else ""}, with {runs}.
+{f'(commit {esc(results["commit"])})' if results.get("commit") else ""}, with {run}.
 The raw run: <a href="verify.json">verify.json</a>.</p>
 {related("label-placement")}
 </article>"""
@@ -1380,7 +1434,7 @@ class Guide:
 GUIDE_LIST = [
     Guide("label-placement", "Where to put a label, and a corner mark",
           "A short id on the black border row at the Studio's size, or outside the quiet zone; never in it. Measured "
-          "by Verify, on both OpenCV 4.11 and 5.0, on a test board you can open."),
+          "by Verify on a test board you can open."),
     Guide("profile-first", "Profile first",
           "Pick a profile like an extrude; the marker goes in its largest clear box. Draw a rectangle to place it exactly."),
     Guide("size-step", "Exact sizes, and the size step",
@@ -1430,41 +1484,60 @@ def write(path: Path, text: str) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--pages", action="store_true", help="write the pages from the last run (verify.json): no Verify")
-    ap.add_argument("--detector", action="append", metavar="PYTHON",
-                    help="run Verify under this Python's OpenCV (repeat for several; default: this Python). WHY: the "
-                         "Studio's Verify runs the Pyodide lock's OpenCV, the repo's CPython another, and they disagree")
+    ap.add_argument("--opencv", metavar="VERSION|PYTHON",
+                    help="the one OpenCV Verify runs on: a version (5.0, 4.11) or a Python; default: the newest "
+                         "installed (python -m aruco_studio.opencv_choice lists them). WHY one: docs/peps/0003")
     ap.add_argument("--detector-json", action="store_true", help=argparse.SUPPRESS)
+    ap.add_argument("--sweeps-json", action="store_true",
+                    help="print only Verify's angle sweep of every marker on --opencv's OpenCV, as JSON (the e2e's oracle "
+                         "for the browser's Verify); writes nothing")
     args = ap.parse_args()
     doc = board()
-    if args.detector_json:                       # one detector's run, as JSON on stdout (main's subprocess)
+    if args.detector_json:                       # the run on this Python's OpenCV, as JSON on stdout (main's child)
         sys.stdout.write(json.dumps(run_detector(doc)))
+        return 0
+    if args.sweeps_json:
+        choice = OC.choose(args.opencv)
+        sys.stdout.write(json.dumps(run_sweeps(doc)) if OC.is_here(choice) else
+                         OC.run_in(choice, [str(Path(__file__).resolve()), "--sweeps-json", "--opencv", choice["python"]]))
         return 0
     text = board_text(doc)
     write(BOARD, text)
     print(f"wrote {BOARD.relative_to(ROOT)} ({len(doc['features'])} markers)")
+    try:
+        choice = OC.choose(args.opencv)
+    except ValueError as e:
+        if not args.pages or args.opencv:
+            raise SystemExit(str(e))
+        choice = None                            # --pages with no OpenCV here: the run on disk, as it is
     if args.pages:
         results = json.loads(RESULTS.read_text())
         if results["board_sha256"] != hashlib.sha256(text.encode()).hexdigest():
             raise SystemExit("the board changed since verify.json was made: run without --pages")
+        # WHY keyed on the OpenCV: the pages never show one OpenCV's run as another's
+        if choice and not same_opencv(results.get("opencv", ""), choice["opencv"]):
+            raise SystemExit(f"verify.json is OpenCV {results.get('opencv')}'s, the run asked for is "
+                             f"{choice['opencv']}'s: run without --pages, or --pages --opencv {results.get('opencv')}")
+        # the browser's OpenCV is the site's, not the run's: kept current (the e2e picks its oracle by it)
+        studio = studio_opencv()
+        if (results.get("studio_opencv"), results["detector"].get("studio")) != (studio, same_opencv(results["opencv"], studio)):
+            results["studio_opencv"] = studio
+            results["detector"]["studio"] = same_opencv(results["opencv"], studio)
+            write(RESULTS, compact_json(results))
+            print(f"wrote {RESULTS.relative_to(ROOT)}: the browser's OpenCV is now {studio}")
     else:
-        import subprocess
-        runs = []
-        if not args.detector:
-            print(f"running Verify on every marker with this Python's OpenCV ...")
-            runs.append(run_detector(doc))
-        for py in args.detector or []:
-            print(f"running Verify on every marker with {py} ...")
-            got = subprocess.run([py, str(Path(__file__).resolve()), "--detector-json"], stdout=subprocess.PIPE,
-                                 text=True, check=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
-            runs.append(json.loads(got.stdout))
-        results = results_of(doc, runs)
-        if not any(d["studio"] for d in results["detectors"]):
-            print(f"note: no run used the Studio's OpenCV ({results['studio_opencv']}); the page says so",
-                  file=sys.stderr)
+        print(f"running Verify on every marker with OpenCV {choice['opencv']} ({choice['python']}) ...")
+        if OC.is_here(choice):
+            run = run_detector(doc)
+        else:
+            run = json.loads(OC.run_in(choice, [str(Path(__file__).resolve()), "--detector-json"], live=True))
+        assert same_opencv(run["opencv"], choice["opencv"]), (run["opencv"], choice)
+        results = results_of(doc, run)
+        results["detector"]["newest"] = OC.choose()["opencv"] if args.opencv else choice["opencv"]
         write(RESULTS, compact_json(results))
-        print(f"wrote {RESULTS.relative_to(ROOT)}: " + ", ".join(f"OpenCV {d['opencv']} {d['seconds']} s"
-                                                              for d in results["detectors"]))
+        print(f"wrote {RESULTS.relative_to(ROOT)}: OpenCV {run['opencv']}, {run['seconds']} s")
     check_headlines(results)
+    check_old_finding()
     check_cited()
     check_sitemap()
     sizes = {}
@@ -1472,9 +1545,8 @@ def main() -> int:
     for slug, fn in DECISIONS.items():
         sizes[f"guides/{slug}/index.html"] = write(GUIDES / slug / "index.html", fn())
     sizes["guides/index.html"] = write(GUIDES / "index.html", index_page())
-    used = {im["file"] for r in results["cases"] for v in r["verify"].values() if v["pictures"]
-            for im in v["pictures"]["images"]}
-    for stale in MEDIA.glob("*.webp"):          # a picture no run names any more (an older detector's)
+    used = {im["file"] for r in results["cases"] if r["verify"]["pictures"] for im in r["verify"]["pictures"]["images"]}
+    for stale in MEDIA.glob("*.webp"):          # a picture the run does not name (another OpenCV's: names carry it)
         if stale.name not in used:
             stale.unlink()
     media = sum(p.stat().st_size for p in MEDIA.glob("*")) if MEDIA.exists() else 0

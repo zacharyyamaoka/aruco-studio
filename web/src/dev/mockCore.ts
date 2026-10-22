@@ -403,6 +403,8 @@ export function createMockCore(onReady: () => void, delay = 900): CoreApi {
     range_step: () => Promise.reject(new Error("mock core: range_step not mocked")),
     range_cancel: (job: string) => Promise.resolve({ job, cancelled: false }),
     range_judge: () => Promise.reject(new Error("mock core: range_judge not mocked")),
+    // the mock never measures a range: every request is its own scene
+    scene_keys: (reqs: PlanRequest[]) => Promise.resolve(reqs.map((r) => JSON.stringify(r))),
     assign_ids: () => Promise.reject(new Error("mock core: assign_ids not mocked")),
   };
 }

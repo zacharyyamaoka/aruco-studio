@@ -4,8 +4,13 @@
 // The worker starts when this module loads; calls made before the core is
 // ready wait in a queue and go out in order once it is; if it fails to
 // load, they (and every later call) reject with the reason.
+// And the OpenCV Verify runs (./opencv.ts; docs/peps/0003 decision 3): ONE
+// a worker, the viewer's choice or the newest. The worker is told before any
+// call; choosing another once it has loaded one starts a new worker, and the
+// calls the old one had not answered go to the new one, in order.
 import { useSyncExternalStore } from "react";
 import type { CoreApi, CoreStatus } from "./contract";
+import { loadOpenCv, opencvBuild, saveOpenCv } from "./opencv";
 
 let status: CoreStatus = { state: "loading", detail: "loading the Python core" };
 const listeners = new Set<() => void>();
@@ -20,11 +25,43 @@ export function onCoreStatus(cb: () => void): () => void { listeners.add(cb); re
 export function useCoreStatus(): CoreStatus { return useSyncExternalStore(onCoreStatus, coreStatus); }
 
 interface Call { id: number; name: string; payload: unknown }
-const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
+const pending = new Map<number, { call: Call; resolve: (v: unknown) => void; reject: (e: Error) => void }>();
 const queue: Call[] = [];
 let nextId = 1;
 let worker: Worker | null = null;
-const t0 = performance.now();
+let t0 = performance.now();
+
+// ------------------------------------------------------------ the OpenCV this worker runs
+
+/** the build asked for (the viewer's, remembered; else the newest) */
+let opencvWanted: string = typeof window === "undefined" ? opencvBuild(null).version : loadOpenCv();
+/** what the worker loaded (its cv2.__version__), once it has */
+let opencvLoaded: string | null = null;
+const opencvListeners = new Set<() => void>();
+let opencvTick = 0;
+function opencvChanged() {
+  opencvTick += 1;
+  for (const cb of opencvListeners) cb();
+}
+
+/** The OpenCV Verify runs: the build chosen, and the one the worker has loaded (null until its first OpenCV call). */
+export function opencvState(): { wanted: string; loaded: string | null } { return { wanted: opencvWanted, loaded: opencvLoaded }; }
+export function onOpencv(cb: () => void): () => void { opencvListeners.add(cb); return () => opencvListeners.delete(cb); }
+export function opencvVersion(): number { return opencvTick; }
+
+/** Run another build (one this browser lists): remembered; a worker that
+ *  already loaded another is replaced (a compiled module cannot be swapped). */
+export function chooseOpencv(version: string): void {
+  const v = opencvBuild(version).version;
+  saveOpenCv(v);
+  if (v === opencvWanted) return;
+  opencvWanted = v;
+  if (opencvLoaded !== null && opencvLoaded !== v) restart(`starting the core again for OpenCV ${v}`);
+  else worker?.postMessage({ kind: "opencv", version: v });
+  opencvChanged();
+}
+
+// ------------------------------------------------------------ the worker
 
 function fail(detail: string) {
   setStatus({ state: "error", detail });
@@ -40,13 +77,20 @@ function start() {
   } catch (e) {
     return fail(e instanceof Error ? e.message : String(e));
   }
-  worker.onmessage = (e: MessageEvent) => {
-    const m = e.data as { kind?: string; ms?: number; detail?: string; id?: number; result?: unknown; error?: string };
+  const me = worker;
+  // before any call: the build its first OpenCV call loads
+  me.postMessage({ kind: "opencv", version: opencvWanted });
+  me.onmessage = (e: MessageEvent) => {
+    if (worker !== me) return;                 // a worker replaced by restart(): its last words are not ours
+    const m = e.data as { kind?: string; ms?: number; detail?: string; version?: string; id?: number; result?: unknown; error?: string };
     if (m.kind === "ready") {
       setStatus({ state: "ready", ms: Math.round(performance.now() - t0) });
-      for (const c of queue.splice(0)) worker!.postMessage(c);
+      for (const c of queue.splice(0)) me.postMessage(c);
     } else if (m.kind === "error") {
       fail(m.detail ?? "the core did not load");
+    } else if (m.kind === "opencv") {
+      opencvLoaded = m.version ?? null;
+      opencvChanged();
     } else if (m.id !== undefined) {
       const p = pending.get(m.id);
       if (!p) return;
@@ -55,14 +99,28 @@ function start() {
       else p.resolve(m.result);
     }
   };
-  worker.onerror = (e: ErrorEvent) => fail(e.message || "the core's worker failed");
+  me.onerror = (e: ErrorEvent) => { if (worker === me) fail(e.message || "the core's worker failed"); };
+}
+
+/** A new worker (another OpenCV): what the old one had not answered is sent
+ *  to the new one, in the order it was asked, then whatever was queued. */
+function restart(detail: string) {
+  const old = worker;
+  worker = null;
+  old?.terminate();
+  opencvLoaded = null;
+  const unanswered = [...pending.values()].map((p) => p.call).sort((a, b) => a.id - b.id);
+  queue.unshift(...unanswered);
+  t0 = performance.now();
+  setStatus({ state: "loading", detail });
+  start();
 }
 
 function send<T>(name: keyof CoreApi, payload: unknown): Promise<T> {
   if (status.state === "error") return Promise.reject(new Error(`core: ${status.detail ?? "not loaded"}`));
   return new Promise<T>((resolve, reject) => {
     const c: Call = { id: nextId++, name, payload };
-    pending.set(c.id, { resolve: resolve as (v: unknown) => void, reject });
+    pending.set(c.id, { call: c, resolve: resolve as (v: unknown) => void, reject });
     if (status.state === "ready" && worker) worker.postMessage(c);
     else queue.push(c);
   });
@@ -87,4 +145,5 @@ export const core: CoreApi = {
   range_step: (job, budget_ms) => send("range_step", { job, ...(budget_ms === undefined ? {} : { budget_ms }) }),
   range_cancel: (job) => send("range_cancel", { job }),
   range_judge: (range, need) => send("range_judge", { range, need }),
+  scene_keys: (reqs) => send("scene_keys", { reqs }),
 };

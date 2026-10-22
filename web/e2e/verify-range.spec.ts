@@ -4,8 +4,12 @@
 // shared axis, then a required distance batch-set on both: one PASS, one
 // FAIL with its fix. Each check measures: the bands' pixels against the
 // axis (getBoundingClientRect), the probe's document, the slices sent, and
-// the browser's ranges against a CPython with the browser's OpenCV
-// (.venv-cv411, tools/requirements-browser-opencv.txt) byte for byte.
+// the browser's ranges against a CPython on the OpenCV each range names
+// (found by aruco_studio/opencv_choice.py: for the browser's 4.11,
+// .venv-cv411, tools/requirements-browser-opencv.txt) byte for byte. Then
+// the cache keyed on what the camera sees (core scene_keys): a moved and
+// turned marker keeps its range, no slice sent; its size, id or label
+// measure it again, and the other marker keeps its own.
 // Screenshots go to E2E_SHOTS (default test-results/shots).
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -17,8 +21,7 @@ import { clickAt, CORE, coreReady, dragWorld, idle, loadExample, openStudio, pan
 const SHOTS = process.env.E2E_SHOTS ?? "test-results/shots";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(here, "..", "..");
-const CV411 = [path.join(ROOT, ".venv-cv411", "bin", "python"), path.join(ROOT, "..", "aruco-studio", ".venv-cv411", "bin", "python")]
-  .find((p) => fs.existsSync(p));
+const PY = [path.join(ROOT, ".venv", "bin", "python"), path.join(ROOT, ".venv", "Scripts", "python.exe")].find((p) => fs.existsSync(p));
 
 test.describe.configure({ mode: "serial" });
 
@@ -122,7 +125,13 @@ test.describe(`Verify · range strip (${CORE} core)`, () => {
     // ONE axis: both bands drawn on the same lo..hi
     const axes = await page.getByTestId("range-band").evaluateAll((els) => els.map((e) => `${e.getAttribute("data-lo")}..${e.getAttribute("data-hi")}`));
     expect(new Set(axes).size).toBe(1);
-    await expect(page.getByTestId("range-foot")).toContainText("OpenCV 4.11");
+    // one OpenCV: the strip names the one the choice names (the newest this browser loads), every band is it, its key says so
+    const wanted = await page.getByTestId("verify-opencv").getAttribute("data-wanted");
+    await expect(page.getByTestId("range-foot")).toContainText(`OpenCV ${wanted} reading the marker as planned, in this browser`);
+    for (const fid of [single, grid]) {
+      await expect(col(fid)).toHaveAttribute("data-opencv", wanted!);
+      expect(JSON.parse((await col(fid).getAttribute("data-key"))!)[4]).toBe(wanted);
+    }
   });
 
   test("b · a required distance set on both markers at once: one PASS, one FAIL with its fix", async () => {
@@ -208,7 +217,7 @@ test.describe(`Verify · range strip (${CORE} core)`, () => {
     await page.getByTestId("camera-search").fill("d455");
     await page.locator('[data-testid="camera-row"][data-camera="d455"]').click();
     await expect(page.getByTestId("range-progress").first()).toBeVisible({ timeout: 60_000 });
-    const req = await page.evaluate(() => JSON.parse((window as any).__arucoRange.finished()[0].key)[3]);
+    const req = await page.evaluate(() => (window as any).__arucoRange.finished()[0].req);
     const got = await page.evaluate(async (r) => {
       const long: number[] = [];
       const obs = new PerformanceObserver((l) => { for (const e of l.getEntries()) long.push(e.duration); });
@@ -237,22 +246,103 @@ test.describe(`Verify · range strip (${CORE} core)`, () => {
     await allDone("d435", 5_000);
   });
 
-  test("e · the browser's ranges are a CPython's with the browser's OpenCV, byte for byte", async () => {
-    test.skip(!CV411, "no .venv-cv411 (tools/requirements-browser-opencv.txt): the CPython oracle with the browser's OpenCV is not here");
+  test("e · the browser's ranges are a CPython's on the same OpenCV, byte for byte", async () => {
+    test.skip(!PY, "no .venv here: the CPython oracle cannot run");
     test.setTimeout(300_000);
-    const done = await page.evaluate(() => (window as any).__arucoRange.finished()) as { key: string; result: any }[];
+    const done = await page.evaluate(() => (window as any).__arucoRange.finished()) as { key: string; req: any; camera: any; result: any }[];
     const mine = done.filter((d) => d.result.camera.id === "d435");
     expect(mine.length).toBeGreaterThanOrEqual(2);
     for (const d of mine) {
-      const [, , camera, req] = JSON.parse(d.key);
-      const code = ["import json, sys", "from aruco_studio import web_verify as V", "a = json.load(sys.stdin)",
-        "sys.stdout.write(json.dumps(V.reading_range(a['req'], a['camera']), sort_keys=True))"].join("\n");
-      const r = spawnSync(CV411!, ["-c", code], { cwd: ROOT, input: JSON.stringify({ req, camera }), encoding: "utf8",
+      const { req, camera } = d;
+      const opencv = JSON.parse(d.key)[4];
+      expect(d.result.opencv, "the range ran on the OpenCV its key names").toBe(opencv);
+      // the same call in the CPython that has that OpenCV (opencv_choice finds it: this checkout's venvs, the main one's)
+      const code = ["import json, sys", "from aruco_studio import opencv_choice as OC", "a = json.load(sys.stdin)",
+        "c = OC.choose(a['opencv'])",
+        "sys.stdout.write(json.dumps(OC.call(c, 'aruco_studio.web_verify', 'reading_range', a['req'], a['camera']), sort_keys=True))"].join("\n");
+      const r = spawnSync(PY!, ["-c", code], { cwd: ROOT, input: JSON.stringify({ req, camera, opencv }), encoding: "utf8",
         env: { ...process.env, PYTHONPATH: ROOT, PYTHONDONTWRITEBYTECODE: "1" }, maxBuffer: 1 << 26 });
+      test.skip(r.status !== 0 && /not installed here/.test(r.stderr), `OpenCV ${opencv} is not installed here (tools/requirements-browser-opencv.txt)`);
       expect(r.status, r.stderr).toBe(0);
       const sorted = (o: unknown): unknown => Array.isArray(o) ? o.map(sorted)
         : o && typeof o === "object" ? Object.fromEntries(Object.keys(o as object).sort().map((k) => [k, sorted((o as any)[k])])) : o;
       expect(JSON.stringify(sorted(JSON.parse(r.stdout)))).toBe(JSON.stringify(sorted(d.result)));
+    }
+  });
+
+  test("g · a move and a turn keep each marker's range (no slice sent); a size, an id or a label measures it again", async () => {
+    test.setTimeout(420_000);
+    const verifyOpen = async () => {
+      await page.getByTestId("act-verify").click();
+      await expect(page.getByTestId("range-view")).toBeVisible();
+    };
+    const close = async () => {
+      await page.keyboard.press("Escape");
+      await expect(page.getByTestId("verify-dialog")).toHaveCount(0);
+    };
+    const steps = () => page.evaluate(() => (window as any).__arucoRange.steps()) as Promise<number>;
+    const shape = async () => {
+      const s = await state(page);
+      return s.doc.shapes.find((x: any) => x.id === s.doc.features.find((f: any) => f.id === grid).profile.outer);
+    };
+    const panel = async () => {
+      await page.locator(`[data-marker="${grid}"]`).click();
+      await expect(page.getByTestId("extrude-panel")).toBeVisible();
+      await idle(page);
+    };
+    const type = async (path: string, v: string) => {
+      const i = page.locator(`input[data-path="${path}"]`);
+      await i.fill(v);
+      await i.press("Enter");
+      await idle(page);
+    };
+    await allDone("d435");
+    const [keyS, keyG, farG] = [await col(single).getAttribute("data-key"), await col(grid).getAttribute("data-key"), await num(grid, "far")];
+    await close();
+    // turn the grid's rectangle 30° (its panel's Rotation row) and move it 10 mm right (Shift+Arrow nudges the selection)
+    const before = await shape();
+    await panel();
+    await panelTab(page, "marker");
+    await type("profile.angle_deg", "30");
+    await page.getByTestId("panel-ok").click();
+    await idle(page);
+    await page.keyboard.press("Shift+ArrowRight");
+    await idle(page);
+    const after = await shape();
+    expect(after.angle_deg).toBe(30);
+    expect(after.cx).toBeCloseTo(before.cx + 10, 6);
+    // reopened: every range is there, from the cache: no slice sent, the same scene keys
+    const s0 = await steps();
+    await verifyOpen();
+    await allDone("d435", 15_000);
+    expect(await steps(), "no range was measured again").toBe(s0);
+    await expect(col(grid)).toHaveAttribute("data-key", keyG!);
+    await expect(col(single)).toHaveAttribute("data-key", keyS!);
+    expect(await num(grid, "far")).toBe(farG);
+    await page.screenshot({ path: path.join(SHOTS, "verify-range-moved-turned-cached.png") });
+    await close();
+    // each edit that changes what the camera reads measures the grid again, and only the grid
+    const edits: [string, () => Promise<void>][] = [
+      ["size", async () => { await panelTab(page, "marker"); await type("marker.marker_mm", "9"); }],
+      ["id", async () => { await panelTab(page, "marker"); await type("marker.first_id", "31"); }],
+      ["label", async () => { await panelTab(page, "label"); await page.locator('[data-path="label.on"]').click(); await idle(page); }],
+    ];
+    const seen = new Set([keyG]);
+    for (const [what, edit] of edits) {
+      await panel();
+      await edit();
+      await page.getByTestId("panel-ok").click();
+      await idle(page);
+      const s1 = await steps();
+      await verifyOpen();
+      await expect.poll(async () => col(grid).getAttribute("data-key"), { message: `${what}: a new scene` }).not.toBe([...seen].pop());
+      const k = (await col(grid).getAttribute("data-key"))!;
+      expect(seen.has(k), `${what}: never an earlier scene's range`).toBe(false);
+      seen.add(k);
+      await allDone("d435");
+      expect(await steps(), `${what}: measured again`).toBeGreaterThan(s1);
+      await expect(col(single)).toHaveAttribute("data-key", keyS!);
+      await close();
     }
   });
 });

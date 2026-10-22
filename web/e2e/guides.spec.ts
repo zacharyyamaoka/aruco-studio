@@ -5,8 +5,15 @@
 // what the server sends and what the probe (window.__aruco) and the page draw, never DOM presence alone.
 //
 //   E2E_PORT=5464 npx playwright test --project=e2e e2e/guides.spec.ts
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
 import { CORE, coreReady, openMenu, state } from "./helpers";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const PY = [path.join(ROOT, ".venv", "bin", "python"), path.join(ROOT, ".venv", "Scripts", "python.exe")].find((p) => fs.existsSync(p));
 
 const GUIDES = ["label-placement", "profile-first", "size-step", "heights", "trim", "auto-id"];
 const BOARD = "/examples/label-placement.arucostudio-web.json";
@@ -111,17 +118,35 @@ test.describe("guides", () => {
     expect(drawn).toBe(run.cases.length);
     const imgs = page.locator(".views img");
     const n = await imgs.count();
-    // one pair per marker a detector lost a view of (the Studio's detector's when it did)
-    expect(n).toBe(2 * run.cases.filter((c: any) => Object.values(c.verify).some((v: any) => v.pictures)).length);
+    // one pair per marker the run's OpenCV lost a view of
+    expect(n).toBe(2 * run.cases.filter((c: any) => c.verify.pictures).length);
+    // ONE OpenCV (docs/peps/0003): every Verify line names the run's, and nothing else is named
+    const named = await page.locator(".mk [data-opencv]").evaluateAll((els) => [...new Set(els.map((e) => e.getAttribute("data-opencv")))]);
+    expect(named).toEqual([run.opencv]);
+    expect(run.detector.opencv).toBe(run.opencv);
     for (let i = 0; i < n; i++) expect(await imgs.nth(i).evaluate((im: HTMLImageElement) => im.complete && im.naturalWidth > 0)).toBe(true);
   });
 
-  test("7 · the Studio's own Verify agrees with the run made with its OpenCV: every marker's angle sweep reads to the same tilt", async ({ page, request }) => {
+  test("7 · the Studio's own Verify agrees with CPython on its OpenCV: every marker's angle sweep reads to the same tilt", async ({ page, request }) => {
     test.skip(CORE === "mock", "the browser's OpenCV is the real core's");
     test.setTimeout(600_000);
     const run = await (await request.get("/guides/label-placement/verify.json")).json();
-    const studio = run.detectors.find((d: any) => d.studio);
-    test.skip(!studio, "the run did not use the Studio's OpenCV");
+    // the oracle: the run's own sweeps when it was made on the browser's OpenCV; else the same sweep in
+    // CPython on the browser's OpenCV (docs/build_guides.py --sweeps-json, in the Python that has it)
+    const browserCv = String(run.studio_opencv).split(".").slice(0, 3).join(".");
+    let want: Record<string, string>;
+    if (run.detector.studio) {
+      want = Object.fromEntries(run.cases.map((c: any) => [c.feature, String(c.verify.sweep_reads_to_deg.marked ?? "")]));
+    } else {
+      test.skip(!PY, "no .venv here: the CPython oracle cannot run");
+      const r = spawnSync(PY!, [path.join(ROOT, "docs", "build_guides.py"), "--sweeps-json", "--opencv", browserCv],
+        { cwd: ROOT, encoding: "utf8", env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" }, maxBuffer: 1 << 26 });
+      test.skip(r.status !== 0 && /not installed here/.test(r.stderr), `OpenCV ${browserCv} is not installed here (tools/requirements-browser-opencv.txt)`);
+      expect(r.status, r.stderr).toBe(0);
+      const got = JSON.parse(r.stdout);
+      expect(got.opencv).toBe(browserCv);
+      want = Object.fromEntries(Object.entries(got.sweeps).map(([k, v]) => [k, String(v ?? "")]));
+    }
     await page.goto("/?example=label-placement");
     await expect.poll(async () => (await page.evaluate(() => (window as any).__aruco?.state().doc.name)) ?? null, { timeout: 30_000 }).toBe(NAME);
     await coreReady(page);
@@ -133,8 +158,10 @@ test.describe("guides", () => {
     await expect.poll(async () => (await legend.allInnerTexts()).filter((t) => t.includes("sweeping")).length,
       { timeout: 540_000, intervals: [2000], message: "every marker swept" }).toBe(0);
     const got = Object.fromEntries(await legend.evaluateAll((els) => els.map((e) => [e.getAttribute("data-feature"), e.getAttribute("data-reads-to")])));
-    const want = Object.fromEntries(run.cases.map((c: any) => [c.feature, String(c.verify[studio.opencv].sweep_reads_to_deg.marked ?? "")]));
-    expect(got, `the browser's sweep (OpenCV ${studio.opencv} in Pyodide) = the run's`).toEqual(want);
+    // the browser ran the OpenCV the oracle did: the one its Verify names
+    await expect(page.getByTestId("verify-opencv")).toHaveAttribute("data-loaded", browserCv);
+    await expect(page.getByTestId("sweep-head")).toHaveAttribute("data-opencv", browserCv);
+    expect(got, `the browser's sweep (OpenCV ${browserCv} in Pyodide) = CPython's on it`).toEqual(want);
   });
 
   test("6 · Help and account ▸ Guides, and the landing's top bar and footer, link to /guides/", async ({ page }) => {

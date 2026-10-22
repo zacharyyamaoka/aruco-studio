@@ -11,9 +11,13 @@ import pytest
 
 cv2 = pytest.importorskip("cv2")
 
+from aruco_studio import opencv_choice as OC              # noqa: E402
 from aruco_studio import web_api as W                      # noqa: E402
 from aruco_studio import web_marks as M                    # noqa: E402
 from aruco_studio import web_verify as V                   # noqa: E402
+
+# the default detector (docs/peps/0003 decision 3): the newest OpenCV installed here
+DEFAULT_CV = OC.choose()
 
 INK = copy.deepcopy(next(p for p in W.presets() if p["name"] == "Inkjet · Letter vinyl"))
 CELL = 22.0 / 6.0                    # the 4x4 single's module in a 30 mm square (22 mm marker)
@@ -115,8 +119,15 @@ def test_the_corner_triangle_costs_nothing():
 
 def test_a_label_run_into_the_corner_cells_moves_the_pose():
     """Knocked out of the black past the border row's end, the letters move
-    the marker's corners: the pose is worse wherever it was sharp."""
-    o = M.check(req(label=dict(ON_BLACK, text="#{ids} {dict} {type}")))
+    the marker's corners: the pose is worse wherever it was sharp.
+
+    VERSION-SPECIFIC, so it runs on the default detector (DEFAULT_CV): on
+    OpenCV 5.0 the pose is worse in 13 of 14 sharp views (unsafe); on 4.11
+    (the browser's) worse in 9 and better in 5 of 15, which a sign test cannot
+    tell from chance, so it calls the label safe (measured 2026-10-21; the
+    two disagree near the limits, docs/peps/0003)."""
+    o = OC.call(DEFAULT_CV, "aruco_studio.web_marks", "check", req(label=dict(ON_BLACK, text="#{ids} {dict} {type}")))
+    assert o["opencv"] == DEFAULT_CV["opencv"]
     assert o["pose"]["judged"] and o["pose"]["worse"] > o["pose"]["better"]
     assert o["verdict"] in ("marginal", "unsafe")
 

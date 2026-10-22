@@ -328,8 +328,9 @@ def page(facts: dict) -> str:
          "ids than it has. Every OpenCV predefined dictionary is listed with its id count, AprilTag 36h11 included."),
         ("Does anything leave my browser?",
          "No. There is no server: the Python core runs on your machine through Pyodide (WebAssembly). The network "
-         "loads the Studio, Pyodide and the core from arucostudio.com, plus numpy and OpenCV (about 13 MB) from the "
-         "jsDelivr CDN the first time you open Verify. Your design stays in the page until you Save it to a file; "
+         "loads the Studio, Pyodide and the core from arucostudio.com; the first time you open Verify, OpenCV 5.0 "
+         "(about 4.5 MB) from arucostudio.com too and numpy (about 3 MB) from the jsDelivr CDN, which also serves "
+         "OpenCV 4.11 if you pick it in Verify. Your design stays in the page until you Save it to a file; "
          "your own presets and camera settings are kept in this browser’s local storage."),
         ("Will a camera read it?",
          "Open Verify: OpenCV’s detector reads a simulated camera view of the marker exactly as planned, through tilt, "

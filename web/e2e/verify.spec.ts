@@ -3,13 +3,31 @@
 // marker (single) and a grid beside it, then the dialog's image, its ids,
 // the Tilt drag, the angle sweep and the camera calculator. Each check
 // measures: the image's data URL and natural size, the ids drawn, the
-// calculator's numbers against core.readable and the pinhole formula.
+// calculator's numbers against core.readable and the pinhole formula. Then
+// the one OpenCV (docs/peps/0003 decision 3): the choice lists only what
+// this browser can load (the oracle: the Pyodide lock and the wheels the site
+// serves), the newest by default, and every answer names the one that ran.
 // Screenshots go to E2E_SHOTS (default test-results/shots).
+import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
 import { clickAt, CORE, coreReady, dragWorld, idle, loadExample, openStudio, panelTab, state, toClient } from "./helpers";
 
 const SHOTS = process.env.E2E_SHOTS ?? "test-results/shots";
+const WEB = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+/** what this browser can load, by version (cv2's three parts), newest first: the lock's opencv-python and the site's wheels */
+const LOADABLE = (() => {
+  const lock = JSON.parse(fs.readFileSync(path.join(WEB, "node_modules", "pyodide", "pyodide-lock.json"), "utf8"));
+  const dir = path.join(WEB, "public", "opencv");
+  const wheels = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".whl")) : [];
+  const vs = [lock.packages["opencv-python"]?.version, ...wheels.map((f) => f.split("-")[1])].filter(Boolean)
+    .map((v: string) => v.split(".").slice(0, 3).join("."));
+  const key = (v: string) => v.split(".").map(Number);
+  return [...new Set(vs)].sort((a, b) => { const x = key(a), y = key(b); return y[0] - x[0] || y[1] - x[1] || y[2] - x[2]; });
+})();
+const NEWEST = LOADABLE[0];
+const short = (v: string) => v.split(".").slice(0, 2).join(".");
 
 test.describe.configure({ mode: "serial" });
 
@@ -85,8 +103,8 @@ test.describe(`Verify (${CORE} core)`, () => {
     await page.evaluate((id) => (window as any).__arucoVerify.open(id), single);
     await expect(page.getByTestId("verify-dialog")).toBeVisible();
     await expect(page.getByTestId("verify-dialog")).toContainText("Verify · Marker #");
-    // OpenCV's first load says so while it is pending
-    await expect(page.getByTestId("verify-loading")).toHaveText("Loading OpenCV (13 MB)…");
+    // OpenCV's first load says so while it is pending, and which one
+    await expect(page.getByTestId("verify-loading")).toHaveText(new RegExp(`^Loading OpenCV ${short(NEWEST).replace(".", "\\.")} \\(\\d+ MB\\)…$`));
     await expect(image()).toBeVisible({ timeout: 60_000 });
     timing.first_verify_incl_opencv = Date.now() - opened;
     expect(await src()).toMatch(/^data:image\/png;base64,/);
@@ -96,6 +114,11 @@ test.describe(`Verify (${CORE} core)`, () => {
     await expect(page.locator(`[data-testid="verify-ids"] [data-id="${id}"]`)).toHaveAttribute("data-state", "found");
     await expect(page.getByTestId("verify-verdict")).toContainText(`Reads #${id}`);
     await expect(page.locator('[data-testid="verify-ids"] [data-state="missing"], [data-testid="verify-ids"] [data-state="wrong"]')).toHaveCount(0);
+    // the one OpenCV: the newest this browser loads, chosen, loaded, and named by the answer itself
+    await expect(page.getByTestId("verify-opencv")).toHaveAttribute("data-wanted", NEWEST);
+    await expect(page.getByTestId("verify-opencv")).toHaveAttribute("data-loaded", NEWEST);
+    await expect(page.getByTestId("verify-verdict")).toHaveAttribute("data-opencv", NEWEST);
+    await expect(page.getByTestId("verify-opencv-badge")).toHaveText(`OpenCV ${short(NEWEST)}`);
     // one verify, OpenCV warm: Yaw 10° and back to the drawn image
     await settled();
     const before = await src();
@@ -214,6 +237,10 @@ test.describe(`Verify (${CORE} core)`, () => {
     expect(Math.abs(shown - (cell * f) / 300)).toBeLessThanOrEqual(0.1);
     // remembered for this viewer
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem("aruco-web.verify.camera")!))).toEqual({ distance_mm: 300, width_px: 1920, hfov_deg: 70 });
+    // the answer names the OpenCV that measured it
+    await expect(page.getByTestId("calc-text")).toHaveAttribute("data-opencv", NEWEST);
+    await expect(page.getByTestId("calc-text")).toContainText(`· OpenCV ${short(NEWEST)}`);
+    expect(oracle.opencv).toBe(NEWEST);
     await type("distance_mm", "10000");
     await expect(out).toHaveCount(1, { timeout: 120_000 });
     await expect(page.getByTestId("calc-verdict")).toHaveText("poor");
@@ -233,3 +260,39 @@ test.describe(`Verify (${CORE} core)`, () => {
     await page.screenshot({ path: path.join(SHOTS, "verify-dialog-1280x800.png") });
   });
 });
+
+test.describe(`Verify · one OpenCV (${CORE} core)`, () => {
+  test.skip(CORE === "mock", "the mock core has no OpenCV");
+
+  test("the choice lists only what this browser loads, newest first and chosen; a remembered one it cannot load falls back", async ({ page }) => {
+    test.setTimeout(240_000);
+    // a choice from a build this browser no longer lists (say an older site's)
+    await page.addInitScript(() => { if (!sessionStorage.getItem("seeded")) { localStorage.setItem("aruco-web.verify.opencv", "3.4.0"); sessionStorage.setItem("seeded", "1"); } });
+    await page.goto("/?example=label-placement");
+    await expect.poll(async () => (await page.evaluate(() => (window as any).__aruco?.state().doc.name)) ?? null, { timeout: 60_000 })
+      .toBe("Label placement test board");
+    await coreReady(page);
+    await page.evaluate(() => (window as any).__arucoVerify.open("lp-A1"));
+    const pick = page.getByTestId("verify-opencv");
+    await expect(pick).toHaveAttribute("data-wanted", NEWEST);
+    await page.getByTestId("dd:verify.opencv").click();
+    const listed = await page.locator('.kit-select-popup[data-for="verify.opencv"] [data-value]')
+      .evaluateAll((els) => els.map((e) => e.getAttribute("data-value")));
+    expect(listed, "only the builds this browser can load, newest first").toEqual(LOADABLE);
+    await page.keyboard.press("Escape");
+    // the bench, the sweep and the strip all run it, and say so
+    await expect(page.getByTestId("verify-verdict")).toHaveAttribute("data-opencv", NEWEST, { timeout: 90_000 });
+    await expect(pick).toHaveAttribute("data-loaded", NEWEST);
+    await expect(page.getByTestId("sweep-head")).toContainText(`OpenCV ${short(NEWEST)}`);
+    // every other build this browser lists: chosen, the worker starts again on it, its answers name it, and it is remembered
+    for (const v of LOADABLE.slice(1)) {
+      await page.getByTestId("dd:verify.opencv").click();
+      await page.locator(`.kit-select-popup[data-for="verify.opencv"] [data-value="${v}"]`).click();
+      await expect(pick).toHaveAttribute("data-wanted", v);
+      await expect(page.getByTestId("verify-verdict")).toHaveAttribute("data-opencv", v, { timeout: 120_000 });
+      await expect(pick).toHaveAttribute("data-loaded", v);
+      expect(await page.evaluate(() => localStorage.getItem("aruco-web.verify.opencv"))).toBe(v);
+    }
+  });
+});
+

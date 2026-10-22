@@ -6,10 +6,16 @@
 // I can sweep the verify marker myself… Of course it should automatically
 // calculate it … but it's nice being able to look at it myself." So Tilt
 // re-renders while it is dragged, and the chart's columns drive it too.
+// WHY one OpenCV, chosen at the top (Zach, 2026-10-21: "Let's only run one,
+// but you can choose, and by default it should be the most recent one";
+// docs/peps/0003 decision 3): every view here is drawn and read by the build
+// the OpenCV choice names, each answer says which (its own `opencv`), and
+// what is kept (the sweeps, the ranges) is kept per OpenCV.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Dialog, NumberField, SegmentedRow, Select, registerGlyphs, type Opt } from "@bam/ui";
 import type { Camera, PlanRequest, Readability, VerifyResult } from "../core/contract";
-import { core } from "../coreSource";
+import { chooseOpencv, core, useOpencv } from "../coreSource";
+import { byNewest, opencvBuild, shortVersion } from "../core/opencv";
 import { featureNumber, featurePreset, getFeature, planRequest, type Doc } from "../model/doc";
 import { CoreWait, WaitLine, useCallWait, useCoreWait } from "../panel/Waiting";
 import { activeFeatureId, useStudio } from "../store";
@@ -26,12 +32,15 @@ registerGlyphs({
   eye: '<path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="8" r="2.2" fill="currentColor"/>',
 });
 
-/** OpenCV has answered once (the worker keeps it loaded for the visit). */
-let warm = false;
-/** The sweep of a request, by its JSON: reopening the dialog does not redo it. */
+/** The sweep of a request on an OpenCV, by "<opencv>|<request JSON>": reopening the dialog does not redo it,
+ *  and another OpenCV's never shows. */
 const sweeps = new Map<string, (number | null)[]>();
-/** sweep points in flight ("<request>|<tilt index>"), so a restarted sweep does not ask twice */
+/** sweep points in flight ("<opencv>|<request>|<tilt index>"), so a restarted sweep does not ask twice */
 const pending = new Set<string>();
+const sweepKey = (opencv: string, req: string) => `${opencv}|${req}`;
+
+/** "OpenCV 4.11" */
+export const opencvName = (v: string | null | undefined) => (v ? `OpenCV ${shortVersion(v)}` : "OpenCV");
 
 const KNOB_ROWS: { key: keyof Knobs; label: string; min: number; max: number; step: number; fmt: (v: number) => string }[] = [
   { key: "tilt_deg", label: "Tilt", min: 0, max: 85, step: 1, fmt: (v) => `${v}°` },
@@ -80,6 +89,7 @@ export function VerifyDialog() {
           <div className="vf-wrap">
             <div className="vf-views">
               <SegmentedRow value={view} options={VIEWS} onChange={(v) => setView(v as VerifyView)} testid="verify-view" />
+              <OpencvPick />
             </div>
             {view === "range"
               ? <RangeView all={all} doc={doc} onBench={(fid, camera, words) => { setPick(fid); setAt({ fid, camera, words }); setView("bench"); }} />
@@ -93,12 +103,33 @@ export function VerifyDialog() {
   );
 }
 
+/** The one OpenCV every view here runs: the builds this browser can load, newest first (./core/opencv.ts). */
+function OpencvPick() {
+  const cv = useOpencv();
+  const builds = byNewest();
+  const options: Opt[] = builds.map((b, k) => ({
+    value: b.version, label: `${shortVersion(b.version)}${k === 0 ? " · newest" : ""}`,
+    hint: `${b.source} (${b.mb} MB)${builds.length === 1 ? ": the only OpenCV this browser can load" : ""}`,
+  }));
+  return (
+    <div className="vf-cv" data-testid="verify-opencv" data-wanted={cv.wanted} data-loaded={cv.loaded ?? ""}
+      title="The OpenCV that draws and reads every view here (one at a time): the newest this browser can load, unless you pick another">
+      <span className="lab">OpenCV</span>
+      <Select value={cv.wanted} options={options} onChange={(v) => chooseOpencv(String(v))} path="verify.opencv" testid="verify-opencv-select" />
+    </div>
+  );
+}
+
 function Bench({ all, it, onPick, doc, at, onBenchCamera }: {
   all: Item[]; it: Item; onPick: (id: string) => void; doc: Doc;
   /** a band's end: the strip's camera at that distance instead of the bench camera */
   at: { camera: Camera; words: string } | null; onBenchCamera: () => void;
 }) {
   const [knobs, setKnobs] = useState<Knobs>(KNOBS0);
+  const cvState = useOpencv();
+  const cv = cvState.wanted;
+  /** the worker has the chosen OpenCV loaded (it keeps it for the visit) */
+  const warm = cvState.loaded === cv;
   const [shot, setShot] = useState<{ r: VerifyResult; key: string; n: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,7 +148,6 @@ function Bench({ all, it, onPick, doc, at, onBenchCamera }: {
       const w = want.current;
       try {
         const r = await core.verify(w.req, w.view);
-        warm = true;
         if (alive.current) { setShot((s) => ({ r, key: w.key, n: (s?.n ?? 0) + 1 })); setError(null); }
       } catch (e) {
         if (alive.current) setError(errText(e));
@@ -131,13 +161,14 @@ function Bench({ all, it, onPick, doc, at, onBenchCamera }: {
   useEffect(() => {
     if (!cam) return;
     const view = viewOf(cam, knobs);
-    const job = JSON.stringify([it.key, view]);
+    // the OpenCV too: another one redraws the view
+    const job = JSON.stringify([it.key, view, cv]);
     // WHY 30 ms, not more: Tilt is dragged to watch it change, so the next
     // render starts as soon as the last one is back (pump), the debounce
     // only folds the burst of one drag step's events
     const t = setTimeout(() => { want.current = { req: it.req, key: it.key, view, job }; void pump(); }, 30);
     return () => clearTimeout(t);
-  }, [it.key, JSON.stringify(cam), knobs]);
+  }, [it.key, JSON.stringify(cam), knobs, cv]);
 
   // ---- the automatic sweep: every marker, tilt 0 → 85°, one call at a time
   const [sweepTick, setSweepTick] = useState(0);
@@ -147,17 +178,18 @@ function Bench({ all, it, onPick, doc, at, onBenchCamera }: {
     (async () => {
       for (const x of order) {
         if (!x.plan) continue;
-        const row = sweeps.get(x.key) ?? SWEEP_TILTS.map(() => null);
-        sweeps.set(x.key, row);
+        const row = sweeps.get(sweepKey(cv, x.key)) ?? SWEEP_TILTS.map(() => null);
+        sweeps.set(sweepKey(cv, x.key), row);
         const camX = benchCamera(x.plan);
         for (let k = 0; k < SWEEP_TILTS.length; k++) {
-          const slot = `${x.key}|${k}`;
+          const slot = `${sweepKey(cv, x.key)}|${k}`;
           if (row[k] !== null || pending.has(slot)) continue;
           if (stop || !alive.current) return;
           pending.add(slot);
           try {
             const r = await core.verify(x.req, viewOf(camX, { ...KNOBS0, tilt_deg: SWEEP_TILTS[k] }));
-            warm = true;
+            // a point asked before another OpenCV was chosen comes back from the new one: not this row's
+            if (r.opencv && r.opencv !== cv) { pending.delete(slot); return; }
             row[k] = share(r.found.length, r.missing.length);
           } catch {
             row[k] = 0;
@@ -168,9 +200,9 @@ function Bench({ all, it, onPick, doc, at, onBenchCamera }: {
       }
     })();
     return () => { stop = true; };
-  }, [order]);
+  }, [order, cv]);
   const series: Series[] = all.map((x) => {
-    const shares = sweeps.get(x.key) ?? SWEEP_TILTS.map(() => null);
+    const shares = sweeps.get(sweepKey(cv, x.key)) ?? SWEEP_TILTS.map(() => null);
     return { id: x.f.id, name: markerName(x.f, x.plan), slot: x.slot, shares, readsTo: readsTo(SWEEP_TILTS, shares) };
   });
   void sweepTick;
@@ -192,7 +224,7 @@ function Bench({ all, it, onPick, doc, at, onBenchCamera }: {
           {r?.image_png_base64 && fresh
             ? <img data-testid="verify-image" data-renders={shot!.n} src={`data:image/png;base64,${r.image_png_base64}`} alt="The bench camera's view, with OpenCV's detections drawn" />
             : <div className="vf-empty muted">{coreWait ? <WaitLine wait={coreWait} testid="verify-wait" /> : it.plan ? "" : "Planning the marker…"}</div>}
-          {loading && <div className="vf-loading" data-testid="verify-loading"><span className="vf-spin" />Loading OpenCV (13 MB)…</div>}
+          {loading && <div className="vf-loading" data-testid="verify-loading"><span className="vf-spin" />Loading {opencvName(cv)} ({opencvBuild(cv).mb} MB)…</div>}
           {busy && !loading && <div className="vf-busy">Rendering…</div>}
         </div>
         {callWait && <div className="vf-error" data-testid="verify-error"><WaitLine wait={callWait} testid="verify-retry" /></div>}
@@ -217,11 +249,11 @@ function Bench({ all, it, onPick, doc, at, onBenchCamera }: {
           </div>
         </section>
         <section className="vf-sec">
-          <div className="vf-h">Angle sweep · every marker</div>
+          <div className="vf-h" data-testid="sweep-head" data-opencv={cv}>Angle sweep · every marker · {opencvName(cv)}</div>
           <SweepChart tilts={SWEEP_TILTS} series={series} tilt={knobs.tilt_deg} active={it.f.id}
             onTilt={(t) => set("tilt_deg", t)} onPick={(id, t) => { onPick(id); set("tilt_deg", t); }} />
         </section>
-        <Calculator it={it} />
+        <Calculator it={it} cv={cv} warm={warm} />
       </div>
     </div>
   );
@@ -239,8 +271,8 @@ function Verdict({ r }: { r: VerifyResult }) {
   ];
   const pose = r.pose_error_mm !== null && r.pose_error_deg !== null ? `pose off by ${r.pose_error_mm.toFixed(2)} mm, ${r.pose_error_deg.toFixed(2)}°` : null;
   return (
-    <div className="vf-verdict" data-testid="verify-verdict" data-ok={r.ok ? "1" : "0"}>
-      <div className="vf-head"><span className={`dot ${r.ok ? "ok" : "bad"}`} />{head}<Badge tone={r.ok ? "ok" : "bad"}>OpenCV</Badge></div>
+    <div className="vf-verdict" data-testid="verify-verdict" data-ok={r.ok ? "1" : "0"} data-opencv={r.opencv ?? ""}>
+      <div className="vf-head"><span className={`dot ${r.ok ? "ok" : "bad"}`} />{head}<Badge tone={r.ok ? "ok" : "bad"} testid="verify-opencv-badge">{opencvName(r.opencv)}</Badge></div>
       <div className="vf-ids" data-testid="verify-ids">
         {ids.map(({ id, st }) => (
           <span key={`${st}${id}`} className={`vf-id ${st}`} data-id={id} data-state={st}
@@ -254,19 +286,20 @@ function Verdict({ r }: { r: VerifyResult }) {
   );
 }
 
-function Calculator({ it }: { it: Item }) {
+function Calculator({ it, cv, warm }: { it: Item; cv: string; warm: boolean }) {
   const [c, setC] = useState<CalcCamera>(loadCalc);
   const [out, setOut] = useState<{ r: Readability; job: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const seq = useRef(0);
-  const job = JSON.stringify([it.key, c]);
+  // the OpenCV too: another one measures again
+  const job = JSON.stringify([it.key, c, cv]);
   useEffect(() => {
     const n = ++seq.current;
     const t = setTimeout(() => {
       setBusy(true);
       core.readable(it.req, calcCamera(c)).then(
-        (r) => { warm = true; if (n === seq.current) { setOut({ r, job }); setError(null); } },
+        (r) => { if (n === seq.current) { setOut({ r, job }); setError(null); } },
         (e) => { if (n === seq.current) setError(errText(e)); },
       ).finally(() => { if (n === seq.current) setBusy(false); });
     }, 250);
@@ -292,9 +325,9 @@ function Calculator({ it }: { it: Item }) {
               <b data-testid="calc-ppc" data-value={r.px_per_cell}>{r.px_per_cell.toFixed(1)} px per cell</b>
               {busy && <span className="muted">measuring…</span>}
             </div>
-            <div className="muted" data-testid="calc-text">{r.text}</div>
+            <div className="muted" data-testid="calc-text" data-opencv={r.opencv ?? ""}>{r.text}{r.measured && r.opencv ? ` · ${opencvName(r.opencv)}` : ""}</div>
           </>
-        ) : <div className="muted">{error ?? (warm ? "Measuring…" : "Measuring (OpenCV loads first)…")}</div>}
+        ) : <div className="muted">{error ?? (warm ? "Measuring…" : `Measuring (${opencvName(cv)} loads first)…`)}</div>}
         {r && error && <div className="vf-error">{error}</div>}
       </div>
     </section>

@@ -15,8 +15,14 @@ import pytest
 
 cv2 = pytest.importorskip("cv2")
 
+from aruco_studio import opencv_choice as OC              # noqa: E402
 from aruco_studio import web_api as W                      # noqa: E402
 from aruco_studio import web_verify as V                   # noqa: E402
+
+# The default detector (docs/peps/0003 decision 3): the newest OpenCV installed
+# here, what a run uses unless asked. A test whose answer is one OpenCV's runs
+# on it (opencv_choice.call: here, or in its Python) and says so.
+DEFAULT_CV = OC.choose()
 
 # the inkjet preset without the cell snap: typed sizes exactly as typed
 INK_NO_SNAP = dict(copy.deepcopy(next(p for p in W.presets()
@@ -92,11 +98,21 @@ def test_a_charuco_5x4_reads_its_markers_and_poses():
 
 @pytest.mark.parametrize("side", ["below", "above", "left", "right"])
 def test_label_and_corner_mark_do_not_read_as_markers(side):
-    """The label beside the marker and the corner triangle (Zach's 'where
-    should the label / black corner go') never read as an id."""
+    """The label and the corner triangle (Zach's 'where should the label /
+    black corner go') never read as an id. The label is on the marker (the
+    default since 2026-10-20; written for one beside it, 2026-10-18) and a
+    whole cell tall.
+
+    VERSION-SPECIFIC, so it runs on the default detector (DEFAULT_CV): on
+    OpenCV 5.0 the marker still reads at 20° / -15° past that cell-tall
+    label; on 4.11 (the browser's) it reads nothing on the above, left and
+    right sides (2026-10-21), which would leave `wrong == []` proving
+    nothing. The two disagree near the limits (docs/peps/0003); the guide's
+    B6 calls a cell-tall label not safe on either."""
     r = single(corner_mark="triangle")
     r["label"].update(on=True, text="{type} #{id}", side=side, height_mm=5.0)
-    out = V.verify(r, view(tilt_deg=20.0, yaw_deg=-15.0))
+    out = OC.call(DEFAULT_CV, "aruco_studio.web_verify", "verify", r, view(tilt_deg=20.0, yaw_deg=-15.0))
+    assert out["opencv"] == DEFAULT_CV["opencv"]
     assert out["found"] == [0] and out["wrong"] == [], out
 
 
@@ -146,9 +162,11 @@ def test_too_far_says_why():
 def test_through_the_worker_entry():
     got = json.loads(W.call("verify", json.dumps({"req": single(), "view": view()})))
     assert got["result"]["found"] == [0]
+    # every answer names the OpenCV that drew and read it (docs/peps/0003 decision 3)
+    assert got["result"]["opencv"] == cv2.__version__
     got = json.loads(W.call("readable", json.dumps({"req": single(), "camera": CAM})))
-    assert set(got["result"]) == {"px_per_cell", "max_distance_mm", "verdict", "text", "measured"}
-    assert got["result"]["measured"] is True
+    assert set(got["result"]) == {"px_per_cell", "max_distance_mm", "verdict", "text", "measured", "opencv"}
+    assert got["result"]["measured"] is True and got["result"]["opencv"] == cv2.__version__
     assert "error" in json.loads(W.call("verify", json.dumps({"req": {}, "view": view()})))
 
 

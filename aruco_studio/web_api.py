@@ -46,6 +46,7 @@ from __future__ import annotations
 import base64
 import copy
 import datetime
+import hashlib
 import json
 import math
 import platform
@@ -68,7 +69,8 @@ from .scene import sheet as _SS
 from . import web_extrude as _EX
 
 API = ("info", "presets", "legacy_presets", "inscribe", "plan", "suggest", "svg", "sheet", "verify", "readable",
-       "assign_ids", "cameras", "reading_range", "range_start", "range_step", "range_cancel", "range_judge")
+       "assign_ids", "cameras", "reading_range", "range_start", "range_step", "range_cancel", "range_judge",
+       "scene_keys")
 # the reading range (V4, contract barrier 13): web_verify's, numpy + OpenCV but
 # for cameras / range_judge / range_cancel and reader "analytic" (stdlib)
 RANGE_CALLS = ("reading_range", "range_start", "range_step", "range_cancel")
@@ -1362,6 +1364,62 @@ def flip_of(req: dict) -> bool:
     return bool((req.get("marker") or {}).get("flip"))
 
 
+# ------------------------------------------------------------------ what a camera sees, as a key
+
+SCENE_KEY = "scene/1"           # bump when what scene_key digests changes
+
+
+def _canon(x):
+    """Numbers to 0.1 um, so float noise is not an edit; -0.0 as 0.0."""
+    if isinstance(x, float):
+        v = round(x, 4)
+        return 0.0 if v == 0 else v
+    if isinstance(x, dict):
+        return {k: _canon(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [_canon(v) for v in x]
+    return x
+
+
+def scene_key(req: dict):
+    """What a camera sees of a marker, in the marker's own frame, as a digest
+    (Verify's caches key on it, web/src/verify/range.ts): the core's plan of
+    it -- cells, black, layout, dictionary, ids, sizes, none of which depend
+    on where the marker sits -- its label as drawn, and the marker and label
+    settings, all with the box the marker goes in at the origin, square to
+    the page. Moving or turning a marker keeps it; its size, ids, label,
+    corner mark or preset change it. None when nothing plans.
+    WHY (the canvas proposals' measurement, 2026-10-21: 8 real edits on the
+    label placement board, docs/build_verify_canvas_proposals.py): keyed on
+    the whole request, a move or a turn re-ran a 6-26 s reading range;
+    keyed on this, only the edits that change what the camera sees do.
+    Standard library: it never waits on OpenCV."""
+    rq, _pre = placed_in(req)
+    if rq.get("rect") is None:
+        return None
+    rq0 = dict(rq, rect=dict(rq["rect"], cx=0.0, cy=0.0, angle_deg=0.0))
+    d, _issues, fl = _planned(rq0)
+    if not d["ok"]:
+        return None
+    flip = flip_of(rq0)
+    lab = None if flip else placed_label(rq0, d["layout"]["kind"], d["marker"]["dictionary"], d["ids"], fl)
+    body = {"v": SCENE_KEY, "plan": d, "label": lab, "flip": flip, "marker": rq0.get("marker"),
+            "label_set": rq0.get("label"), "box": [rq0["rect"]["w"], rq0["rect"]["h"]]}
+    text = json.dumps(_canon(body), sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:32]
+
+
+def scene_keys(reqs: list) -> list:
+    """scene_key of each request; None for one that does not plan or is malformed."""
+    out = []
+    for r in reqs:
+        try:
+            out.append(scene_key(r))
+        except Exception:                           # noqa: BLE001 -- one bad request is its own None
+            out.append(None)
+    return out
+
+
 def plan(req: dict) -> dict:
     """The MarkerPlan of a PlanRequest: in its rect, or (no rect) in the box
     fitted in its profile (placed_in), returned as `fit_rect`; refused, never
@@ -1782,6 +1840,8 @@ def call(name: str, payload_json: str) -> str:
         elif name == "assign_ids":
             from . import web_ids
             out = web_ids.assign_ids(p)
+        elif name == "scene_keys":
+            out = scene_keys(p.get("reqs") or [])
         else:
             out = {"plan": plan, "suggest": suggest, "svg": svg}[name](p)
         return json.dumps({"result": out}, sort_keys=True, separators=(",", ":"),
