@@ -104,4 +104,5 @@ export const core: CoreApi = {
   verify: counted("verify"), readable: counted("readable"), assign_ids: counted("assign_ids"),
   cameras: counted("cameras"), reading_range: counted("reading_range"), range_start: counted("range_start"),
   range_step: counted("range_step"), range_cancel: counted("range_cancel"), range_judge: counted("range_judge"),
+  scene_keys: counted("scene_keys"),
 };

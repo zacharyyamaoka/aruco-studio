@@ -18,8 +18,8 @@ import type { Doc, Feature } from "../model/doc";
 import { labelInk } from "../sketch/Viewport";
 import { useStudio } from "../store";
 import {
-  CUSTOM0, axisOf, fmtMm, judge, knownVerdict, loadCamera, needless, rangeCamera, rangeKey, ranges, saveCamera, searchCameras,
-  tickText, ticksOf, verdictKey, xOf, type CameraPick, type RangeState, type RangeTask,
+  CUSTOM0, askScenes, axisOf, fmtMm, judge, knownVerdict, loadCamera, markerRangeKey, needless, onScenes, rangeCamera, ranges,
+  saveCamera, scenesVersion, searchCameras, tickText, ticksOf, verdictKey, xOf, type CameraPick, type RangeState, type RangeTask,
 } from "./range";
 import { markerName, type Item } from "./items";
 
@@ -68,15 +68,23 @@ export function RangeView({ all, doc, onBench }: {
   // the one OpenCV the ranges run on (Verify's OpenCV choice): part of each range's key
   const opencv = useOpencv().wanted;
   useSyncExternalStore(ranges.subscribe, ranges.version);
+  // each marker's scene key (what the camera sees of it, in its own frame): asked once per request, so a moved
+  // or turned marker finds the range it already has
+  const sceneTick = useSyncExternalStore(onScenes, scenesVersion);
+  useEffect(() => { void askScenes(all.map((it) => ({ key: it.key, req: it.req }))).catch(() => undefined); }, [all]);
   const setPick = (p: CameraPick) => { setPickState(p); saveCamera(p); setPicker(false); };
 
   const cam = rangeCamera(pick);
-  // the selected markers first (what he is looking at), then the document's order
+  // the selected markers first (what he is looking at), then the document's order; a marker whose scene key
+  // is not in yet waits (no task)
   const tasks: (RangeTask & { item: Item })[] = useMemo(() => {
     if (!coreVersion) return [];
-    const rows = all.map((it) => ({ key: rangeKey(it.req, cam, coreVersion, opencv), req: it.req, camera: cam, opencv, item: it }));
+    const rows = all.flatMap((it) => {
+      const key = markerRangeKey(it.key, cam, coreVersion, opencv);
+      return key ? [{ key, req: it.req, camera: cam, opencv, item: it }] : [];
+    });
     return [...rows.filter((t) => sel.includes(t.item.f.id)), ...rows.filter((t) => !sel.includes(t.item.f.id))];
-  }, [all, JSON.stringify(cam), coreVersion, opencv, sel.join(",")]);
+  }, [all, JSON.stringify(cam), coreVersion, opencv, sel.join(","), sceneTick]);
   useEffect(() => { ranges.want(tasks); }, [tasks]);
   // WHY pause, not cancel, on leaving the strip: the bench is one click away
   // and back; a part-done marker resumes where it was (the dialog's close cancels)

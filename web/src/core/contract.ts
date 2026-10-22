@@ -539,6 +539,9 @@ export interface CoreApi {
   range_cancel(job: string): Promise<{ job: string; cancelled: boolean }>;
   /** a reading range against a required viewing distance */
   range_judge(range: ReadingRange, need: RangeNeed): Promise<RangeVerdict>;
+  /** what a camera sees of each marker, in its own frame, as a digest (web_api.scene_key; null: it does not
+   *  plan): Verify's range cache keys on it, so moving or turning a marker keeps its range. No OpenCV needed. */
+  scene_keys(reqs: PlanRequest[]): Promise<(string | null)[]>;
 }
 
 export type CoreState = "loading" | "ready" | "error";

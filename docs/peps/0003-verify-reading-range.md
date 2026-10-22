@@ -15,8 +15,12 @@ of reports/media/verify-unit-test-proposals-2026-10-21.html.
    distance is stored on the feature (`Feature.verify`), never in the plan request, so planning and
    its pins are untouched; with one set, the band reads PASS/FAIL with the fix.
 2. **One worker, sliced.** Ranges run in the core's single Pyodide worker in ~250 ms slices,
-   cached per plan hash, so planning stays responsive (measured: no main-thread long tasks). More
-   workers would cut ~90 s per 4-board document at ~300 MB each — not taken yet.
+   so planning stays responsive (measured: no main-thread long tasks). More workers would cut
+   ~90 s per 4-board document at ~300 MB each — not taken yet. A finished range is cached by
+   what the camera sees, not by the request (2026-10-21, from the canvas proposals' 8 measured
+   edits): `web_api.scene_key` digests the marker's plan and label in its own frame, so moving or
+   turning a marker on the page keeps its range, while its size, ids, label, corner mark,
+   dictionary or preset measure it again; plus the camera, the core's version and the OpenCV.
 3. **OpenCV policy: one detector a run, the newest by default, selectable** (accepted 2026-10-21).
    Zach: "Let's only run one, but you can choose, and by default it should be the most recent
    one." OpenCVs draw the same view differently (warpPerspective, warpAffine, GaussianBlur) and
@@ -40,7 +44,7 @@ of reports/media/verify-unit-test-proposals-2026-10-21.html.
      CPython's 5.0. So the browser's default is 5.0, the scripts' too; 4.11 stays one click
      away. A worker loads one OpenCV; choosing another restarts it and resends what it had not
      answered (`web/src/core/client.ts`).
-   - **Caches key on the OpenCV**: the strip's ranges (`range.ts rangeKey`), the bench's sweeps,
+   - **Caches key on the OpenCV**: the strip's ranges (`range.ts rangeKey`, with the scene key of 2), the bench's sweeps,
      the calculator's job; the guide's `verify.json` records its OpenCV and `--pages` refuses a
      run made on another than the one asked for.
    - **Tests whose answer is one OpenCV's** run on the default detector and say so

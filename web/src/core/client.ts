@@ -145,4 +145,5 @@ export const core: CoreApi = {
   range_step: (job, budget_ms) => send("range_step", { job, ...(budget_ms === undefined ? {} : { budget_ms }) }),
   range_cancel: (job) => send("range_cancel", { job }),
   range_judge: (range, need) => send("range_judge", { range, need }),
+  scene_keys: (reqs) => send("scene_keys", { reqs }),
 };

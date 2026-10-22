@@ -9,19 +9,24 @@
 // whole range; between slices the runner checks what is still wanted, so a
 // closed dialog or a new camera stops it at once. A marker's partial job
 // stays in the worker and resumes when it is wanted again.
-// WHY cached by the request: the same marker on the same camera gives the
-// same answer (seeded), so a finished range is kept (this visit, and in this
-// browser under the core's version and the OpenCV that measured it) and an
-// edit re-runs only that marker. WHY the OpenCV in the key (docs/peps/0003
-// decision 3): two OpenCVs draw the same view differently, so another one's
-// range is never shown as this one's.
+// WHY cached by what the camera sees: the same marker on the same camera
+// gives the same answer (seeded), so a finished range is kept (this visit,
+// and in this browser under the core's version and the OpenCV that measured
+// it) and an edit re-runs only that marker. The marker is its scene key
+// (core scene_keys, web_api.scene_key: its plan and label in its own frame),
+// not its request: moving or turning it on the page keeps its range (the
+// canvas proposals measured a move and a turn re-running 6-26 s ranges when
+// the key was the request, 2026-10-21); its size, ids, label or corner mark
+// do not. WHY the OpenCV in the key (docs/peps/0003 decision 3): two OpenCVs
+// draw the same view differently, so another one's range is never shown as
+// this one's.
 import type { CameraPreset, PlanRequest, RangeCamera, RangeNeed, RangeVerdict, ReadingRange } from "../core/contract";
 import { core } from "../coreSource";
 
 /** one slice: what a plan call waits at most behind a range */
 export const STEP_MS = 250;
-/** bump to drop every kept answer (the core's version is in the key too) */
-const CACHE_TAG = "range-ui/1";
+/** bump to drop every kept answer (the core's version is in the key too); /2: keyed on the scene, not the request */
+const CACHE_TAG = "range-ui/2";
 const STORE_KEY = "arucoStudio.verify.ranges";
 const STORE_MAX = 240;
 const CAMERA_KEY = "aruco-web.verify.rangeCamera";
@@ -38,10 +43,49 @@ export type RangeState =
   | { state: "done"; result: ReadingRange; ms: number | null; cached: boolean }
   | { state: "error"; error: string };
 
-/** The cache key of a marker's range: the request, the camera, the core that answers and the OpenCV it runs
- *  (last, so a key's [2] is still the camera and [3] the request). */
-export function rangeKey(req: PlanRequest, camera: RangeCamera, coreVersion: string, opencv: string): string {
-  return JSON.stringify([CACHE_TAG, coreVersion, camera, req, opencv]);
+/** The cache key of a marker's range: what the camera sees of it (its scene key), the camera, the core that
+ *  answers and the OpenCV it runs. The range options beyond the camera (budget, cases, seed) are the core's
+ *  defaults, so the core's version stands for them. */
+export function rangeKey(scene: string, camera: RangeCamera, coreVersion: string, opencv: string): string {
+  return JSON.stringify([CACHE_TAG, coreVersion, camera, scene, opencv]);
+}
+
+// ------------------------------------------------------------ the scene keys (what the camera sees of each marker)
+
+/** request JSON -> its scene key (null: it does not plan); this visit's */
+const scenes = new Map<string, string | null>();
+const asking = new Set<string>();
+const sceneListeners = new Set<() => void>();
+let sceneTick = 0;
+
+export function onScenes(cb: () => void): () => void { sceneListeners.add(cb); return () => { sceneListeners.delete(cb); }; }
+export function scenesVersion(): number { return sceneTick; }
+
+/** The scene key of a request, if known: undefined until the core answers, null when it does not plan. */
+export function sceneOf(reqKey: string): string | null | undefined {
+  return scenes.has(reqKey) ? scenes.get(reqKey)! : undefined;
+}
+
+/** Ask the core for the scene keys it does not have yet, all in one call (the strip's markers). */
+export async function askScenes(items: { key: string; req: PlanRequest }[]): Promise<void> {
+  const missing = items.filter((it) => !scenes.has(it.key) && !asking.has(it.key));
+  if (!missing.length) return;
+  for (const it of missing) asking.add(it.key);
+  try {
+    const keys = await core.scene_keys(missing.map((it) => it.req));
+    missing.forEach((it, i) => scenes.set(it.key, keys[i] ?? null));
+  } finally {
+    for (const it of missing) asking.delete(it.key);
+    sceneTick += 1;
+    for (const cb of sceneListeners) cb();
+  }
+}
+
+/** The range key of a marker: by its scene once known; one that does not plan by its request (its error shows). */
+export function markerRangeKey(reqKey: string, camera: RangeCamera, coreVersion: string, opencv: string): string | null {
+  const sc = sceneOf(reqKey);
+  if (sc === undefined) return null;
+  return rangeKey(sc ?? `request:${reqKey}`, camera, coreVersion, opencv);
 }
 
 /** A short stable hash (FNV-1a), for the stored copies' names. */
@@ -95,6 +139,8 @@ const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 class Runner {
   private states = new Map<string, RangeState>();
   private wanted: RangeTask[] = [];
+  /** every task asked for, by key: what finished() reports a range was measured for */
+  private tasks = new Map<string, RangeTask>();
   /** marker key -> the worker's job, while it is part done */
   private jobs = new Map<string, string>();
   private pumping = false;
@@ -136,6 +182,7 @@ class Runner {
       }
     }
     this.wanted = tasks;
+    for (const t of tasks) this.tasks.set(t.key, t);
     for (const t of tasks) {
       const s = this.states.get(t.key);
       if (!s || s.state === "error") {
@@ -166,10 +213,14 @@ class Runner {
     for (const cb of this.listeners) cb();
   }
 
-  /** Every finished range this visit (the e2e compares them with CPython). */
-  finished(): { key: string; result: ReadingRange; ms: number | null }[] {
+  /** Every finished range this visit, with the request and camera it was measured for (the e2e compares them with CPython). */
+  finished(): { key: string; req: PlanRequest | null; camera: RangeCamera | null; result: ReadingRange; ms: number | null }[] {
     const out = [];
-    for (const [key, st] of this.states) if (st.state === "done") out.push({ key, result: st.result, ms: st.ms });
+    for (const [key, st] of this.states) {
+      if (st.state !== "done") continue;
+      const t = this.tasks.get(key);
+      out.push({ key, req: t?.req ?? null, camera: t?.camera ?? null, result: st.result, ms: st.ms });
+    }
     return out;
   }
 
