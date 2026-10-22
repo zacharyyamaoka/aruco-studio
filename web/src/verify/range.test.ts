@@ -11,6 +11,7 @@ const log: string[] = [];
 const jobs = new Map<string, { key: string; left: number }>();
 let seq = 0;
 let failNextStart: string | null = null;
+let failScenes = false;
 
 const result = (far: number): ReadingRange => ({ version: "reading-range/1", near_mm: 100, far_mm: far, band_mm: [far * 0.9, far * 1.1], pm: 0.1,
   near_by: "frame", near_checked: true, far_limit: "cells", far_px_per_cell: 3, far_outline_px: 80, min_outline_px: 57.6, weakest_id: null,
@@ -50,6 +51,7 @@ vi.mock("../coreSource", () => ({
     scene_keys: async (reqs: PlanRequest[]) => {
       await trip();
       log.push(`scenes ${reqs.length}`);
+      if (failScenes) { failScenes = false; throw new Error("core: not loaded"); }
       return reqs.map((r) => (r.marker.first_id < 0 ? null : `scene-${r.marker.first_id}-${r.marker.marker_mm ?? 0}`));
     },
   },
@@ -238,6 +240,10 @@ describe("the camera", () => {
     // a size change is another scene: measured again
     await R.askScenes([{ key: "r81@10-25", req: { ...moved(81, 10), marker: { first_id: 81, marker_mm: 25 } } as unknown as PlanRequest }]);
     expect(R.markerRangeKey("r81@10-25", "d435", "v", "5.0.0")).not.toBe(k);
+    // the core failing to say: each is keyed by its request, so the strip still measures
+    failScenes = true;
+    await R.askScenes([{ key: "fails", req: moved(83, 0) }]);
+    expect(JSON.parse(R.markerRangeKey("fails", "d435", "v", "5.0.0")!)[3]).toBe("request:fails");
     // one that does not plan keys by its request (its error shows); finished() names the request a range was for
     await R.askScenes([{ key: "bad", req: moved(-1, 0) }]);
     expect(JSON.parse(R.markerRangeKey("bad", "d435", "v", "5.0.0")!)[3]).toBe("request:bad");

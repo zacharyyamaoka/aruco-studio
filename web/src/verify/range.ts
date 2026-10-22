@@ -74,6 +74,9 @@ export async function askScenes(items: { key: string; req: PlanRequest }[]): Pro
   try {
     const keys = await core.scene_keys(missing.map((it) => it.req));
     missing.forEach((it, i) => scenes.set(it.key, keys[i] ?? null));
+  } catch {
+    // WHY: a core that cannot say still measures: each marker is then keyed by its request (today's key)
+    for (const it of missing) scenes.set(it.key, null);
   } finally {
     for (const it of missing) asking.delete(it.key);
     sceneTick += 1;
