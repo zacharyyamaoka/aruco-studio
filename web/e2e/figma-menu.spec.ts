@@ -23,10 +23,11 @@ const SUBMENUS: [string, string, string[]][] = [
   ["account", "Help and account", ["help-menu", "github-menu", "guides-menu", "brand", "shf-action-signin"]],
 ];
 
-/** The chrome: its boxes, and every control in them. */
-const CHROME = ["doc-pill", "actions-pill", "toolbar", "corner", "zoom-indicator"];
+/** The chrome: its boxes, and every control in them. The zoom is in the
+ *  corner's pill with ? since 2026-10-21 (Miro's), and Layers in the dock. */
+const CHROME = ["doc-pill", "actions-pill", "toolbar", "corner"];
 const CONTROLS = ["menu-main", "doc-name", "menu-doc", "menu-cad", "act-verify", "act-print",
-  "tool-select", "tool-rect", "tool-circle", "tool-dim", "tool-extrude", "tool-fit", "view-toggle", "help", "github", "zoom-menu"];
+  "tool-select", "tool-rect", "tool-circle", "tool-dim", "tool-extrude", "tool-fit", "tool-layers", "view-toggle", "help", "github", "zoom-menu"];
 
 /** Every element in the chrome whose content runs out of its box, or that a
  *  box around it (overflow not visible) cuts; and every pair of chrome boxes

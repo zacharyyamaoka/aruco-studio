@@ -11,10 +11,11 @@ const SHOTS = process.env.LAYOUT_SHOTS ?? "test-results/layout";
 const FIXTURE_V3 = path.join(import.meta.dirname, "fixtures", "v3-a4.arucostudio-web.json");
 const GITHUB = "https://github.com/zacharyyamaoka/aruco-studio";
 const ZIP = "**/py/aruco_studio.zip";
-/** the chrome's own boxes, and the controls in them */
-const CHROME = ["doc-pill", "actions-pill", "toolbar", "corner", "zoom-indicator"];
+/** the chrome's own boxes, and the controls in them (the zoom is in the corner's pill with ? since
+ *  2026-10-21, Miro's; Layers is in the dock) */
+const CHROME = ["doc-pill", "actions-pill", "toolbar", "corner"];
 const CONTROLS = ["menu-main", "menu-doc", "menu-cad", "act-verify", "act-print",
-  "tool-select", "tool-rect", "tool-circle", "tool-dim", "tool-extrude", "tool-fit", "view-toggle", "help", "github", "zoom-menu"];
+  "tool-select", "tool-rect", "tool-circle", "tool-dim", "tool-extrude", "tool-fit", "tool-layers", "view-toggle", "help", "github", "zoom-menu"];
 
 type R = { x: number; y: number; w: number; h: number };
 const box = async (l: Locator): Promise<R> => l.evaluate((e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
@@ -160,7 +161,8 @@ test.describe(`the Figma layout (${CORE} core)`, () => {
       expect(H - (r.y + r.h), `${name}: at the bottom`).toBeLessThanOrEqual(24);
       expect(Math.min(r.x, W - (r.x + r.w)), `${name}: in a corner`).toBeLessThanOrEqual(64);
     }
-    expect(Math.abs(help.y - gh.y), "side by side").toBeLessThanOrEqual(1);
+    // side by side: ? sits in the zoom pill (Miro's), GitHub beside it, on one centre line
+    expect(Math.abs(help.y + help.h / 2 - (gh.y + gh.h / 2)), "side by side").toBeLessThanOrEqual(1);
     expect(meet(help, gh)).toBe(false);
     // clear of the dock
     expect(meet(help, await box(page.getByTestId("toolbar")))).toBe(false);
