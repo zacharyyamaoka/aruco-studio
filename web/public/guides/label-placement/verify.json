@@ -1,7 +1,7 @@
 {
  "generated": "2026-10-21",
  "core_version": "0.1.0",
- "commit": "e34648f-dirty",
+ "commit": "ada29b2",
  "verify_version": 1,
  "grid": {
   "camera": {
@@ -20,7 +20,7 @@
   "opencv": "5.0.0",
   "numpy": "2.3.5",
   "python": "3.11.15",
-  "seconds": 400,
+  "seconds": 185,
   "studio": true,
   "newest": "5.0.0"
  },
