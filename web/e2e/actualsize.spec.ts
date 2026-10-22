@@ -258,7 +258,7 @@ test.describe("Actual size", () => {
     expect(await zoom(page)).toBeCloseTo(CSS_MM, 12);
     b = await black(page, fid);
     expect(Math.abs(b.width - 30 * CSS_MM)).toBeLessThanOrEqual(1);
-    await expect(indicator(page)).toHaveText("100 %");
+    await expect(indicator(page)).toHaveText("100%");
 
     // the keys: Shift+0 Actual size, Shift+1 the fit (F's), Shift+2 the selection (the marker, framed in the middle)
     await page.keyboard.press("Shift+Digit0");
@@ -285,13 +285,13 @@ test.describe("Actual size", () => {
     expect(await zoom(page)).toBeGreaterThan(fitted.zoom);
   });
 
-  test("d · uncalibrated it says so: Actual size (estimated — calibrate), in the menu too", async ({ page }) => {
+  test("d · uncalibrated it says so: Actual size estimated, in the zoom pill and in the menu", async ({ page }) => {
     await fresh(page);
     const sc = (await state(page)).scale;
     expect(sc.calibrated).toBe(false);
     await page.keyboard.press("Shift+Digit0");
     expect(await zoom(page)).toBe(sc.pxPerMm);
-    await expect(indicator(page)).toHaveText("Actual size (estimated — calibrate)");
+    await expect(indicator(page)).toHaveText("Actual size estimated");
     await expect(indicator(page)).toHaveAttribute("data-calibrated", "0");
     const [ex, ey] = await toClient(page, 70, -40);
     await rightClick(page, ex, ey);
@@ -300,14 +300,16 @@ test.describe("Actual size", () => {
     // any other zoom: a percent (of 96 px/in)
     await page.keyboard.press("Shift+Digit1");
     const z = await zoom(page);
-    await expect(indicator(page)).toHaveText(`${Math.round((z / CSS_MM) * 100)} %`);
+    await expect(indicator(page)).toHaveText(`${Math.round((z / CSS_MM) * 100)}%`);
   });
 
   test("e · calibrate: the card's edge, the slider, −/+ and a ruler set the scale; Save keeps it for this screen, across a reload; Reset forgets it", async ({ page }) => {
     await fresh(page);
     const est = (await state(page)).scale.pxPerMm;
     await page.keyboard.press("Shift+Digit0");
-    await page.getByTestId("zoom-calibrate").click();
+    // the zoom pill's menu (Miro's, 2026-10-21): its Calibrate row (the pill's inline "calibrate" link is gone)
+    await page.getByTestId("zoom-menu").click();
+    await page.getByTestId("zm-calibrate").click();
     const dlg = page.getByTestId("calibrate-dialog");
     await expect(dlg).toBeVisible();
     const card = page.getByTestId("cal-card");
@@ -365,7 +367,7 @@ test.describe("Actual size", () => {
     await page.getByTestId("cal-forget").click();
     expect((await state(page)).scale).toMatchObject({ calibrated: false, pxPerMm: est });
     expect(await zoom(page)).toBe(est);
-    await expect(indicator(page)).toHaveText("Actual size (estimated — calibrate)");
+    await expect(indicator(page)).toHaveText("Actual size estimated");
     expect(JSON.parse((await page.evaluate((k) => localStorage.getItem(k), KEY))!).screens[key]).toBeUndefined();
   });
 
@@ -389,14 +391,14 @@ test.describe("Actual size", () => {
     const est = (await state(page)).scale;
     expect(est.calibrated).toBe(false);
     await expect.poll(() => zoom(page), { timeout: 5000 }).toBe(est.pxPerMm);
-    await expect(indicator(page)).toHaveText("Actual size (estimated — calibrate)");
+    await expect(indicator(page)).toHaveText("Actual size estimated");
     // back at x1, then a bigger screen at the same x1 (an X11 monitor: no DPR event): a 4K's estimate
     await metrics(1);
     await expect.poll(() => zoom(page), { timeout: 5000 }).toBe(4.37);
     await metrics(1, 3840, 2160);
     await expect.poll(async () => (await state(page)).scale.key, { timeout: 5000 }).toBe("3840x2160@1");
     await expect.poll(() => zoom(page), { timeout: 5000 }).toBeCloseTo(150 / 25.4, 9);
-    await expect(indicator(page)).toHaveText("Actual size (estimated — calibrate)");
+    await expect(indicator(page)).toHaveText("Actual size estimated");
     // not at Actual size: a change of screen leaves the zoom alone
     await page.keyboard.press("Shift+Digit1");
     const fitted = await zoom(page);
@@ -408,8 +410,9 @@ test.describe("Actual size", () => {
 });
 
 test.describe("the zoom indicator", () => {
-  test("g · its longest words (Actual size, estimated) meet no other chrome: 1184, 1280, 768 wide; on a phone it shows only at Actual size, under the document pill", async ({ page }) => {
-    const ids = ["zoom-indicator", "toolbar", "corner", "doc-pill", "actions-pill"];
+  test("g · the zoom pill (bottom right with ?, Miro's) with its longest words (Actual size estimated) meets no other chrome: 1184, 1280, 768 wide; on a phone it shows only at Actual size, under the document pill", async ({ page }) => {
+    // the zoom is in the corner pill with ? (Miro's): the pill against the rest of the chrome
+    const ids = ["corner-pill", "github", "toolbar", "doc-pill", "actions-pill"];
     const boxes = () => page.evaluate((list) => list.flatMap((id) => {
       const e = document.querySelector(`[data-testid="${id}"]`);
       const r = e?.getBoundingClientRect();
@@ -422,9 +425,9 @@ test.describe("the zoom indicator", () => {
       await page.keyboard.press("Shift+Digit1");
       if (w === 390) await expect(indicator(page), "a phone, not at Actual size: hidden").toBeHidden();
       await page.keyboard.press("Shift+Digit0");
-      await expect(indicator(page)).toHaveText("Actual size (estimated — calibrate)");
+      await expect(indicator(page)).toHaveText("Actual size estimated");
       const all = await boxes();
-      const zi = all.find((b) => b.id === "zoom-indicator")!;
+      const zi = all.find((b) => b.id === "corner-pill")!;
       expect(zi, `${w}: shown`).toBeTruthy();
       for (const b of all) {
         if (b === zi) continue;

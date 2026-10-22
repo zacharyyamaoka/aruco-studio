@@ -70,8 +70,11 @@ a.kit-menu-item, a.kit-menu-item:visited { color: inherit; text-decoration: none
 .actions-pill .kit-menu-trigger { height: 34px; border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); color: var(--accent); font-weight: 600; }
 .actions-pill .kit-menu-trigger .kit-glyph { --accent: currentColor; }
 .act-btn.kit-btn { height: 34px; padding: 0 12px; gap: 7px; font-weight: 600; border-radius: 8px; }
-/* the bottom corner: ? and GitHub, round */
+/* the bottom corner (Miro's): the pill with the zoom and ? (zoom/zoom.css), then GitHub, round */
 .corner { position: absolute; right: 12px; bottom: 14px; z-index: 10; display: flex; align-items: center; gap: 8px; }
+/* WHY lifted under 940 px: the dock (423 px, centred) and the corner (up to 230 px with "Actual
+   size estimated") no longer fit side by side; the corner stands just above the dock's row */
+@media (min-width: 641px) and (max-width: 940px) { .corner { bottom: 76px; } }
 .corner-btn { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; padding: 0; border-radius: 50%;
   background: var(--panel); border: 1px solid var(--line); color: var(--text); box-shadow: var(--shadow-sm); cursor: pointer; text-decoration: none; }
 .corner-btn:hover, .corner-btn[data-popup-open] { background: var(--hover); }
@@ -163,6 +166,20 @@ a.kit-ib { text-decoration: none; }
 .vp-svg .triad .ax-y { stroke: #2f9e5a; }
 .vp-svg .triad .ax-o { fill: var(--panel); stroke: var(--text); stroke-width: 1.2; }
 .vp-svg .triad.on .ax-o { stroke: var(--pick); stroke-width: 2.5; }
+/* the calm canvas (V1 "Turn it down", Zach's pick 2026-10-21, sketch/Viewport.tsx): at rest a
+   marker's chrome is thin and grey; the selected marker and the one pointed at keep the rules above.
+   WHY nothing hidden (Zach: "it's important for me to still see things at a glance like the axes
+   location etc."): the axes keep their red and green, thinner and fainter. The two greys are mixed
+   from the skin's own tokens, so every skin and both themes get theirs. */
+.vp-svg { --quiet-line: color-mix(in srgb, var(--muted) 55%, var(--canvas)); --quiet-text: color-mix(in srgb, var(--muted) 78%, var(--canvas)); }
+.vp-svg .triad.quiet line { stroke-width: 1.3; stroke-opacity: 0.6; }
+.vp-svg .triad.quiet .ax-o { r: 2.5px; stroke: var(--muted); stroke-width: 1; }
+.vp-svg .edge.quiet { stroke: color-mix(in srgb, var(--accent) 50%, transparent); stroke-width: 1; }
+/* Layers › Profile edges off: the path stays (the shape's place), unpainted */
+.vp-svg .edge.off { stroke: none; }
+/* Layers › Grid › Dots: a dot at each grid point, a bigger one at each major step */
+.vp-svg .grid .dot { fill: color-mix(in srgb, var(--muted) 45%, transparent); }
+.vp-svg .grid .dot.major { fill: color-mix(in srgb, var(--muted) 65%, transparent); }
 .vp-svg .turn { cursor: pointer; }
 .vp-svg .turn-path { fill: none; stroke: var(--muted); stroke-width: 1.2; }
 .vp-svg .turn-hit { fill: none; stroke: transparent; stroke-width: 14; cursor: pointer; }
@@ -324,7 +341,13 @@ a.kit-ib { text-decoration: none; }
      rest is in the ⌄ menu (app/TopBar.tsx), ? and GitHub too */
   .pill { height: 48px; }
   .doc-pill { left: 8px; padding: 4px 8px 4px 4px; max-width: calc(100% - 120px); }
-  .act-cad, .corner { display: none; }
+  .act-cad { display: none; }
+  /* the corner: ? and GitHub are in the ⌄ menu; the zoom shows only while at Actual size (its
+     words matter), under the document pill, as the actualsize lane put it on a phone */
+  .corner { display: contents; }
+  .corner > .corner-btn, .corner .cp-btn, .corner .cp-sep { display: none; }
+  .corner-pill { position: absolute; top: 82px; left: 8px; z-index: 10; max-width: calc(100% - 16px); }
+  .corner-pill:not(:has(.zoom-pill[data-actual="1"])) { display: none; }
   .actions-pill { right: 8px; padding: 4px 6px; }
   .act-btn.kit-btn { width: 36px; height: 36px; padding: 0; }
   .act-text { display: none; }
@@ -334,7 +357,10 @@ a.kit-ib { text-decoration: none; }
     border-radius: 10px 10px 0 0; }
   .fpanel-head { cursor: default; }
   /* above the docked panel (45 vh open, its 31 px head collapsed) */
-  .toolbar { bottom: 8px; padding: 4px; }
+  /* WHY the tighter gaps (2026-10-21): with Layers in the dock its eight tools and the 2D | 3D switch
+     still fit a 390 px phone without scrolling (figma-menu.spec's audit) */
+  .toolbar { bottom: 8px; padding: 4px; gap: 2px; }
+  .toolbar .tb-sep { margin: 0 2px; }
   .tb-tool { width: 36px; height: 36px; }
   .stage:has(.fpanel) .toolbar { bottom: calc(var(--head-h) + 1px + 8px); }
   .stage:has(.fpanel:not(.collapsed)) .toolbar { bottom: calc(45vh + 8px); }

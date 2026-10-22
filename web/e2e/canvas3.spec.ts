@@ -211,7 +211,10 @@ test.describe("canvas3 (real core)", () => {
       expect(t.y, `${f.id} under the outline`).toBeGreaterThanOrEqual(o.y + o.height - 0.5);
       expect(t.y - (o.y + o.height), `${f.id} just under it`).toBeLessThanOrEqual(12);
     }
-    expect(await infos.first().evaluate((e) => getComputedStyle(e).fill)).toBe(await resolved(page, "var(--muted)"));
+    // V1 "Turn it down" (Zach's pick, 2026-10-21; calmcanvas.spec): at rest the line is thin and grey,
+    // and a bit more bold on the selected marker and the one pointed at
+    await expect(page.locator('[data-testid="marker-info"][data-hot="1"]')).toHaveCount(0);
+    expect(await infos.first().evaluate((e) => getComputedStyle(e).fill)).toBe(await resolved(page, "var(--quiet-text)"));
     // never in the document
     expect(JSON.stringify((await state(page)).doc)).not.toContain("markerInfo");
     await toggleTheme(page);
