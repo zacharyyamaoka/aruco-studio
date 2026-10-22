@@ -5,3 +5,4 @@
 *.pdf binary
 *.3mf binary
 *.stl binary
+*.whl binary
