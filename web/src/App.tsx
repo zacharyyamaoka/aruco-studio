@@ -5,8 +5,10 @@
 // Verify | Print top right, the dock of tools with 2D | 3D bottom centre, ?
 // and GitHub bottom right; the floating ArUco Extrude panel; the presets
 // modal, Print, Verify, Examples and Re-ID; Home ("Back to files") over it all;
-// the zoom indicator bottom left and the canvas's right-click menu, Actual size
-// among its zooms (./zoom/: the screen's millimetre, calibrated per screen).
+// the zoom in the bottom-right pill with ? (Miro's, 2026-10-21) and the
+// canvas's right-click menu, Actual size among their zooms (./zoom/: the
+// screen's millimetre, calibrated per screen); the dock's Layers menu
+// (./overlays/: what the canvas shows, Dots | Grid | Blank behind it).
 // WHY no timeline (Zach, 2026-10-18): "too specific to CAD … just clicking the
 // marker on the screen is what brings up the relevant inspector window".
 import { useEffect, useState } from "react";
@@ -30,7 +32,6 @@ import { Viewport } from "./sketch/Viewport";
 import { View3D } from "./view3d/View3D";
 import { loadCoreFacts, useStudio } from "./store";
 import { CalibrateDialog } from "./zoom/CalibrateDialog";
-import { ZoomIndicator } from "./zoom/ZoomIndicator";
 import { watchScreen } from "./zoom/scale";
 import { actualSize, followScale, zoomToSelection } from "./zoom/zoom";
 
@@ -157,8 +158,8 @@ export function App() {
             <DocPill onHelp={() => setHelp(true)} />
             <ActionsPill />
             <Toolbar />
+            {/* ? and GitHub, and the zoom pill (Miro's: in one pill with ?) */}
             <HelpCorner help={help} setHelp={setHelp} />
-            <ZoomIndicator />
             <ExtrudePanel />
             {note && <div className="toast" role="status" data-testid="note">{note}</div>}
             <HostedToast />

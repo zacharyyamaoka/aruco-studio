@@ -1,13 +1,16 @@
 // The dock: Figma's bottom toolbar (V2 "Figma · Corner pills", Zach's pick on
 // 2026-10-20 night: "For the design let's please follow Figma!"). The tools
 // Select V, Rectangle R, Circle C, Dimension D (Fusion's Sketch Dimension),
-// then ArUco Extrude A, Fit F, and the 2D | 3D switch at its end (Figma's
-// Dev Mode switch). Each tool is its icon; its name and key are in the
-// tooltip. Verify and Print are the top-right pill's (./TopBar.tsx).
+// then ArUco Extrude A, Fit F with Layers beside it (what the canvas shows,
+// ../overlays/LayersMenu.tsx; Zach 2026-10-21: in the dock, not a group of
+// its own), and the 2D | 3D switch at its end (Figma's Dev Mode switch). Each
+// tool is its icon; its name and key are in the tooltip. Verify and Print are
+// the top-right pill's (./TopBar.tsx).
 // The kit's ToolButton is icon-only with its own key badge, so this one is
 // here, in its classes.
 import { Glyph, cn, hasGlyph, registerGlyphs } from "@bam/ui";
 import type { ReactNode } from "react";
+import { LayersMenu } from "../overlays/LayersMenu";
 import { useStudio } from "../store";
 import { ViewToggle } from "../view3d/ViewToggle";
 
@@ -44,6 +47,7 @@ export function Toolbar() {
       <Tool icon={<Glyph name="extrude" />} name="ArUco Extrude" full="ArUco Extrude: the marker in the selected profile (click inside a region, or double-click a rectangle)" keys="A" active={panelOpen} onClick={() => void st().extrude()} testid="tool-extrude" />
       <span className="tb-sep" />
       <Tool icon={<Glyph name="fit" />} name="Fit" keys="F" onClick={() => st().fit()} testid="tool-fit" />
+      <LayersMenu />
       <span className="tb-sep" />
       <ViewToggle />
     </div>

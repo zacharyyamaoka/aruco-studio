@@ -98,16 +98,28 @@ export function visibleSketchDims(dims: LaidSketchDim[], profile: ProfileRef | n
   });
 }
 
+// WHY quiet (V1 "Turn it down", Zach's pick 2026-10-21: "dim the labels to be
+// thin and grey, and only when selected would they become a bit more bold"):
+// a dim at rest is a 0.6 px grey line and a 9.5 px regular grey value with no
+// box around it (the chip keeps the canvas's colour so the line stops at the
+// value); the dims of what is selected or pointed at are today's (Viewport.tsx
+// decides which). --quiet-line and --quiet-text are styles.css's (.vp-svg).
 const CSS = `
 .sk-dims .cad-dim.sel line { stroke: var(--pick); }
 .sk-dims .cad-dim.sel path.arw { fill: var(--pick); }
 .sk-dims .cad-dim.sel .chip { stroke: var(--pick); stroke-width: 1.5; }
 .sk-dims .cad-dim.preview { opacity: 0.6; }
 .sk-dims .cad-dim.preview .val { pointer-events: none; }
+.sk-dims .cad-dim.quiet line, .sk-dims .cad-dim.quiet line.ext { stroke: var(--quiet-line); stroke-width: 0.6; }
+.sk-dims .cad-dim.quiet path.arw { fill: var(--quiet-line); }
+.sk-dims .cad-dim.quiet .chip { fill: var(--canvas); stroke: none; }
+.sk-dims .cad-dim.quiet text { fill: var(--quiet-text); font-weight: 400; font-size: 9.5px; }
 `;
 
-export function SketchDims({ dims, selected, editing, preview, onSelect, onEdit }: {
+export function SketchDims({ dims, quiet, selected, editing, preview, onSelect, onEdit }: {
   dims: LaidSketchDim[];
+  /** the dims drawn thin and grey (at rest); the others are drawn as today */
+  quiet?: Set<string>;
   selected: string | null;
   /** the dim being typed into (and the D tool's new one): its value is hidden under the box */
   editing: string | null;
@@ -124,7 +136,7 @@ export function SketchDims({ dims, selected, editing, preview, onSelect, onEdit 
     const l0 = d.inside ? d.p : add(d.p, dir, -(ARROW + 6));
     const l1 = d.fits || d.dim.kind === "d" ? d.q : add(d.at, dir, -d.tw / 2);
     const id = d.dim.id;
-    const cls = ["cad-dim", "set", faint && "preview", !faint && selected === id && "sel"].filter(Boolean).join(" ");
+    const cls = ["cad-dim", "set", faint && "preview", !faint && selected === id && "sel", !faint && quiet?.has(id) && "quiet"].filter(Boolean).join(" ");
     return (
       <g key={faint ? "preview" : id} className={cls} data-sketch-dim={faint ? undefined : id} data-preview={faint ? "1" : undefined}
         data-kind={d.dim.kind} data-value={d.value}>

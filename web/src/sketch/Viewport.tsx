@@ -30,6 +30,12 @@
 // and are typed into in place, the marker following as you type. A drag
 // (move, resize, the label) is one undo step; moving or resizing a profile's
 // shapes re-plans its marker (a rectangle profile: the marker follows it).
+// The calm canvas (V1 "Turn it down", Zach's pick 2026-10-21): every layer is
+// still drawn, but at rest a marker's chrome is thin and grey -- its sketch
+// dims, its info line, its Joint Origin, its profile edge -- and the marker
+// that is selected, or that the pointer is on (what a click there opens), has
+// today's. The dock's Layers menu (../overlays/) turns each layer off, and
+// sets the background: Dots | Grid | Blank.
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import type { MarkerPlan, Polygon, Rect, Vec2 } from "../core/contract";
 import {
@@ -39,9 +45,10 @@ import {
   boxOf, fromLocal, handlePoint, HANDLES, loopD, niceStep, rectCorners, rectFromCorners, toLocal, toScreen, toWorld, zoomAt,
   type Handle,
 } from "../model/geom";
+import { useOverlays } from "../overlays/overlays";
 import { selectedFeatureId, useStudio } from "../store";
 import { DimEditor, Dims, layoutDims, type LaidDim } from "./Dims";
-import { diameterLocked, dimFromPicks, refusal, resizable, typedValue, type DimRef, type SketchDim } from "./constraints";
+import { diameterLocked, dimFromPicks, dimShapes, refusal, resizable, typedValue, type DimRef, type SketchDim } from "./constraints";
 import {
   boxPick, circleFrom, hitTest, inShape, profileLoops, rectAt, rectOf, resizeShape, sameProfile, shapeLoop, shapeUnder, sketchBox,
   type Hit, type ProfileRef, type RectShape, type Selection, type Shape,
@@ -103,7 +110,15 @@ const OUTLINE = { fill: "transparent" };
 // as a guide (dashed, faint: the fit box's construction look) and the
 // selection outlines the cut, the edge that prints. Overflow keeps its red.
 const OUTLINE_GUIDE = { fill: "transparent", stroke: "var(--muted)", strokeWidth: 1, strokeDasharray: "5 4", opacity: 0.7 };
+/** Layers › Quiet-zone guides off: the guide is not drawn, its path still takes a click. */
+const OUTLINE_GUIDE_OFF = { ...OUTLINE_GUIDE, stroke: "none" };
 const CUT_SEL = { fill: "none", stroke: "var(--pick)", strokeWidth: 2.5, strokeLinejoin: "round" as const };
+// View › Marker info's line, V1 "Turn it down": thin and grey at rest; on the
+// marker that is selected or pointed at, a bit more bold (Zach, 2026-10-21:
+// "dim the labels to be thin and grey, and only when selected would they
+// become a bit more bold"). --quiet-text is styles.css's (.vp-svg).
+const INFO_QUIET = { fill: "var(--quiet-text)", font: "400 9px var(--font)", pointerEvents: "none" as const };
+const INFO_HOT = { fill: "var(--muted)", font: "600 10px var(--font)", pointerEvents: "none" as const };
 /** Two loops with the same bounding box (to 1e-6 mm): the cut IS the outline. */
 const sameBox = (a: Vec2[], b: Vec2[]) => {
   const p = boxOf(a), q = boxOf(b);
@@ -169,7 +184,10 @@ export function Viewport() {
   const plans = useStudio((s) => s.plans);
   const panel = useStudio((s) => s.panel);
   const markerInfo = useStudio((s) => s.markerInfo);
+  const overlays = useOverlays((s) => s.overlays);
   const [hover, setHover] = useState<Hit>(null);
+  /** the marker the pointer is on: what a click there would open; its chrome is drawn as a selected one's */
+  const [hoverFid, setHoverFid] = useState<string | null>(null);
   const [drag, setDragState] = useState<Drag | null>(null);
   // WHY a ref beside the state (Zach, 2026-10-20 night: "multi select by right
   // click drag doesn't work"; scripts/real-input-check.mjs reproduced it under
@@ -271,10 +289,11 @@ export function Viewport() {
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
   }, []);
-  // leaving D drops its picks; leaving a draw tool drops its draft
+  // leaving D drops its picks; leaving a draw tool drops its draft; another tool points at no marker
   useEffect(() => {
     if (tool !== "dim") { setPicks([]); setPlacing(null); }
     if (tool !== "rect" && tool !== "circle") setDrag((d) => (d?.kind === "draw" ? null : d));
+    if (tool !== "select") setHoverFid(null);
   }, [tool]);
 
   const local = (e: { clientX: number; clientY: number }): Vec2 => {
@@ -293,6 +312,23 @@ export function Viewport() {
     if (s?.kind === "shape") return st.doc.shapes.find((x) => x.id === s.id);
     if (s?.kind === "feature" || s?.kind === "origin" || s?.kind === "text") return featureRect(st.doc, getFeature(st.doc, s.id)) ?? undefined;
     return undefined;
+  };
+
+  /** The marker a click at p (on `target`) would open, as onPointerDown
+   *  picks it: what is drawn for a marker (its ink, its outline, its label,
+   *  its Joint Origin), its rectangle's edge, or a region its profile is.
+   *  None while the Profile row waits for a pick (a click there picks a
+   *  region). WHY the click's own targeting: a hover that lights another
+   *  marker than the click opens would say something false. */
+  const markerAt = (target: Element | null, p: Vec2): string | null => {
+    const st = useStudio.getState();
+    if (st.panel.selector) return null;
+    const el = target?.closest?.("[data-marker],[data-feature]");
+    const fid = el?.getAttribute("data-marker") ?? el?.getAttribute("data-feature");
+    if (fid && st.plans[fid] && getFeature(st.doc, fid)) return fid;
+    const hit = hitTest(st.doc.shapes, p, EDGE_PX / z);
+    const owner = hit?.kind === "edge" ? featureOfRect(st.doc, hit.id) : hit?.kind === "region" ? featureOfProfile(st.doc, hit.ref) : null;
+    return owner && st.plans[owner.id] ? owner.id : null;
   };
 
   /** D's pick at p: a centre, else an edge (a rectangle's side, a circle's
@@ -403,6 +439,8 @@ export function Viewport() {
     const drag = dragRef.current;
     const target = e.target as Element;
     (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+    // a press starts a gesture (a pan, a box, a drag): no marker is pointed at until the pointer moves free again
+    setHoverFid(null);
     if (drag?.kind === "draw" && drag.clicked && e.button === 0) {
       // the second click of a clicked rectangle or circle
       commitDraw({ ...drag, b: world(e) }, drawVals);
@@ -618,8 +656,14 @@ export function Viewport() {
     pointer.at = world(e);
     if (tool === "dim") setCursorAt(world(e));
     if (!drag) {
-      if (tool === "select") setHover(hitTest(st.doc.shapes, world(e), EDGE_PX / z));
-      else if (hover) setHover(null);
+      if (tool === "select") {
+        const p = world(e);
+        setHover(hitTest(st.doc.shapes, p, EDGE_PX / z));
+        setHoverFid(markerAt(e.target as Element, p));
+      } else {
+        if (hover) setHover(null);
+        if (hoverFid) setHoverFid(null);
+      }
       return;
     }
     if (drag.kind === "pan") {
@@ -729,17 +773,43 @@ export function Viewport() {
   const minor = step / 5;
   const [wx0, wy1] = toWorld(camera, w, h, [0, 0]);
   const [wx1, wy0] = toWorld(camera, w, h, [w, h]);
+  // the background (Layers › Grid: Dots | Grid | Blank, Miro's View › Grid):
+  // the grid's lines, or a dot at each of its points; the sketch's two axes
+  // are lines in both (the origin dims measure from); Blank draws nothing
+  const bg = overlays.background;
   const grid: ReactElement[] = [];
-  if (minor * z >= 6) {
+  let dots: ReactElement | null = null;
+  if (bg !== "blank" && minor * z >= 6) {
     for (let x = Math.ceil(wx0 / minor) * minor; x <= wx1; x += minor) {
+      const axis = Math.abs(x) < 1e-9;
+      if (bg !== "grid" && !axis) continue;
       const sx = scr([x, 0])[0];
       const major = Math.abs(x / step - Math.round(x / step)) < 1e-6;
-      grid.push(<line key={`gx${x.toFixed(3)}`} x1={sx} x2={sx} y1={0} y2={h} className={Math.abs(x) < 1e-9 ? "g axis" : major ? "g major" : "g"} />);
+      grid.push(<line key={`gx${x.toFixed(3)}`} x1={sx} x2={sx} y1={0} y2={h} className={axis ? "g axis" : major ? "g major" : "g"} />);
     }
     for (let y = Math.ceil(wy0 / minor) * minor; y <= wy1; y += minor) {
+      const axis = Math.abs(y) < 1e-9;
+      if (bg !== "grid" && !axis) continue;
       const sy = scr([0, y])[1];
       const major = Math.abs(y / step - Math.round(y / step)) < 1e-6;
-      grid.push(<line key={`gy${y.toFixed(3)}`} y1={sy} y2={sy} x1={0} x2={w} className={Math.abs(y) < 1e-9 ? "g axis" : major ? "g major" : "g"} />);
+      grid.push(<line key={`gy${y.toFixed(3)}`} y1={sy} y2={sy} x1={0} x2={w} className={axis ? "g axis" : major ? "g major" : "g"} />);
+    }
+    if (bg === "dots") {
+      // one tile per major step, its dots at the minor points; the tile starts
+      // half a minor step before the origin so no dot sits on a tile's edge
+      const m = minor * z, o = scr([0, 0]);
+      const pts: ReactElement[] = [];
+      for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) {
+        pts.push(<circle key={`${i}-${j}`} cx={m / 2 + i * m} cy={m / 2 + j * m} r={i || j ? 0.9 : 1.3} className={i || j ? "dot" : "dot major"} />);
+      }
+      dots = (
+        <>
+          <defs>
+            <pattern id="vp-grid-dots" x={o[0] - m / 2} y={o[1] - m / 2} width={5 * m} height={5 * m} patternUnits="userSpaceOnUse">{pts}</pattern>
+          </defs>
+          <rect width={w} height={h} fill="url(#vp-grid-dots)" data-testid="grid-dots" />
+        </>
+      );
     }
   }
   const ticks: ReactElement[] = [];
@@ -793,6 +863,35 @@ export function Viewport() {
   const editDim = dimEdit && dimEdit.fid === dimFid
     ? laid.find((d) => d.field === dimEdit.field) ?? (lastDim.current?.field === dimEdit.field ? lastDim.current : null) : null;
   lastDim.current = editDim;
+
+  // ------------------------------------------------------------ at rest, hot, or off (V1 "Turn it down", the Layers menu)
+  // WHY every layer still drawn (Zach, 2026-10-21: "it's important for me to
+  // still see things at a glance like the axes location etc."): at rest a
+  // marker's chrome is thin and grey; the marker in focus, the selected ones
+  // and the one the pointer is on (V1's hover) are "hot" and keep today's.
+  /** every planned marker's profile shapes */
+  const profileShapes = new Set<string>();
+  for (const { f } of drawn) if (f.profile) [f.profile.outer, ...f.profile.holes].forEach((id) => profileShapes.add(id));
+  /** the markers drawn as today */
+  const hotFids = new Set<string>();
+  if (dimOf) hotFids.add(dimOf.f.id);
+  if (hoverFid && drawn.some((d) => d.f.id === hoverFid)) hotFids.add(hoverFid);
+  for (const { f } of drawn) if (f.profile && selIds.has(f.profile.outer)) hotFids.add(f.id);
+  /** the profile of the marker in focus: its own, drawn whatever the Layers say (V8: "Its own edit chrome ignores the toggles") */
+  const ownShapes = new Set(dimOf?.f.profile ? [dimOf.f.profile.outer, ...dimOf.f.profile.holes] : []);
+  /** the shapes whose edges and sketch dims are today's: the selection, the hot markers' profiles, what the pointer is on */
+  const hotShapes = new Set<string>(selIds);
+  if (selRef) [selRef.outer, ...selRef.holes].forEach((id) => hotShapes.add(id));
+  for (const { f } of drawn) if (f.profile && hotFids.has(f.id)) [f.profile.outer, ...f.profile.holes].forEach((id) => hotShapes.add(id));
+  if (hover?.kind === "edge") hotShapes.add(hover.id);
+  if (hoverRef) [hoverRef.outer, ...hoverRef.holes].forEach((id) => hotShapes.add(id));
+  /** a marker profile's edge: thin at rest ("quiet"), as today when hot (null), not drawn when Layers › Profile edges is off ("off");
+   *  plain sketch geometry (no marker on it yet) is the sketch being drawn: always as today */
+  const edgeLook = (id: string): "quiet" | "off" | null => {
+    if (!profileShapes.has(id)) return null;
+    if (!overlays.edges && !selIds.has(id) && !ownShapes.has(id)) return "off";
+    return hotShapes.has(id) ? null : "quiet";
+  };
 
   /** A value typed into a dimension: the marker's sizes through the same
    *  setField / resetField as the panel's rows (the panel's feature through the
@@ -866,14 +965,18 @@ export function Viewport() {
       }
     }
     const fr = plan.origin.length === 16 ? { o: [plan.origin[3], plan.origin[7]] as Vec2, x: [plan.origin[0], plan.origin[4]] as Vec2, y: [plan.origin[1], plan.origin[5]] as Vec2 } : null;
-    if (fr) {
+    // Layers › Joint Origins off: only the marker in focus keeps its own
+    if (fr && (overlays.origins || f.id === dimFid)) {
       const L = Math.max(14, Math.min(60, Math.min(dw, dh) * 0.3 * z));
+      const originOn = sel?.kind === "origin" && sel.id === f.id;
+      // V1: at rest thinner and fainter, the red and the green still told apart; hot, today's
+      const quiet = !hotFids.has(f.id) && !originOn;
       const o = scr(fr.o);
       const nx = Math.hypot(fr.x[0], fr.x[1]) || 1, ny = Math.hypot(fr.y[0], fr.y[1]) || 1;
       const X: Vec2 = [o[0] + (fr.x[0] / nx) * L, o[1] - (fr.x[1] / nx) * L];
       const Y: Vec2 = [o[0] + (fr.y[0] / ny) * L, o[1] - (fr.y[1] / ny) * L];
       triads.push(
-        <g key={f.id} className={`triad${sel?.kind === "origin" && sel.id === f.id ? " on" : ""}`} data-origin={`${fr.o[0]},${fr.o[1]}`} data-feature={f.id}>
+        <g key={f.id} className={`triad${originOn ? " on" : ""}${quiet ? " quiet" : ""}`} data-origin={`${fr.o[0]},${fr.o[1]}`} data-feature={f.id}>
           <line x1={o[0]} y1={o[1]} x2={X[0]} y2={X[1]} className="ax-x" />
           <line x1={o[0]} y1={o[1]} x2={Y[0]} y2={Y[1]} className="ax-y" />
           <circle cx={o[0]} cy={o[1]} r={3.5} className="ax-o" />
@@ -929,7 +1032,8 @@ export function Viewport() {
   }
 
   // View › Marker info: the sheet's caption, small and grey, centred under
-  // each marker's outline (as it stands on screen, turned or not)
+  // each marker's outline (as it stands on screen, turned or not); thin at
+  // rest, a bit more bold on a hot marker (INFO_QUIET, INFO_HOT)
   // WHY (Zach, 2026-10-21): "give me the option to add a lable under neatht
   // he aruco markers ... look just like this one that appears if it has the
   // spaced layout ... a different label to the actual label"
@@ -940,9 +1044,10 @@ export function Viewport() {
       if (!pts.length) continue;
       const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
       const cx = (Math.min(...xs) + Math.max(...xs)) / 2, y = Math.max(...ys) + 12;
+      const hot = hotFids.has(f.id);
       infos.push(
-        <text key={f.id} x={cx} y={y} textAnchor="middle" data-testid="marker-info" data-feature={f.id}
-          style={{ fill: "var(--muted)", font: "400 10px var(--font)", pointerEvents: "none" }}>{markerInfoText(f, plan)}</text>,
+        <text key={f.id} x={cx} y={y} textAnchor="middle" data-testid="marker-info" data-feature={f.id} data-hot={hot ? "1" : "0"}
+          style={hot ? INFO_HOT : INFO_QUIET}>{markerInfoText(f, plan)}</text>,
       );
     }
   }
@@ -980,6 +1085,17 @@ export function Viewport() {
   })() : null);
   const previewDim = pendingDim ? laySketchDim(shapes, pendingDim, scr, z) : null;
   const editSketchDim = sdimEdit ? sketchDims.find((d) => d.dim.id === sdimEdit) ?? null : null;
+  // which are drawn: the dimhide lane's rule (a focused marker's own dims
+  // stand for its profile's), then Layers › Sketch dimensions -- off, only the
+  // selection's (and the one selected or typed into) stay; the D tool shows
+  // them all. Then V1: thin and grey, but those of what is hot.
+  const named = (d: LaidSketchDim, set: Set<string>) => dimShapes(d.dim).some((id) => set.has(id));
+  const ownDims = new Set<string>(selIds);
+  if (selRef) [selRef.outer, ...selRef.holes].forEach((id) => ownDims.add(id));
+  const dimhidden = visibleSketchDims(sketchDims, laid.length > 0 && sel?.kind !== "shape" && tool !== "dim" ? dimOf?.f.profile ?? null : null);
+  const shownDims = overlays.dims || tool === "dim" ? dimhidden
+    : dimhidden.filter((d) => d.dim.id === dimSel || d.dim.id === sdimEdit || named(d, ownDims));
+  const quietDims = new Set(shownDims.filter((d) => d.dim.id !== dimSel && d.dim.id !== sdimEdit && !named(d, hotShapes)).map((d) => d.dim.id));
   const hoverPick = tool === "dim" && cursorAt && !drag && !placing ? pickAt(cursorAt) : null;
   const refMark = (ref: DimRef, cls: string): ReactElement | null => {
     if ("axis" in ref) {
@@ -1052,7 +1168,7 @@ export function Viewport() {
     <>
     <div ref={host} className="viewport" data-testid="viewport" data-tool={tool} style={{ cursor }}
       onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
-      onPointerLeave={() => { pointer.at = null; if (!drag) setHover(null); }} onDoubleClick={onDoubleClick}
+      onPointerLeave={() => { pointer.at = null; if (!drag) { setHover(null); setHoverFid(null); } }} onDoubleClick={onDoubleClick}
       onContextMenu={(e) => e.preventDefault()}>
       <svg ref={svg} width={w} height={h} className="vp-svg" data-zoom={z}>
         <defs>
@@ -1060,7 +1176,7 @@ export function Viewport() {
             <path d="M0 1L7 4L0 7z" className="arrow" />
           </marker>
         </defs>
-        <g className="grid">{grid}</g>
+        <g className="grid" data-testid="grid" data-background={bg}>{dots}{grid}</g>
         <g className="sketch">
           <path d={regionsD} fillRule="evenodd" className="regions" data-regions="1" />
           {hoverRef && !sameProfile(hoverRef, selRef) && <path d={profD(hoverRef)} fillRule="evenodd" className="region-hover" data-hover-profile={hoverRef.outer} />}
@@ -1076,15 +1192,19 @@ export function Viewport() {
             const on = sel?.kind === "feature" && sel.id === f.id;
             const cs = cutShape(plan);
             const guide = !(plan.overflow_mm > 0) && !sameBox(cs.outer, plan.outer);
+            // Layers › Quiet-zone guides off: not drawn, but on the marker in focus (its own)
+            const guideShown = overlays.guides || f.id === dimFid;
             return (
               <g key={f.id} className={`marker${on ? " on" : ""}`} data-marker={f.id}>
-                <path d={sl(plan.outer)} className={`outline${plan.overflow_mm > 0 ? " bad" : ""}`} data-marker-outline="1" style={guide ? OUTLINE_GUIDE : OUTLINE}
+                <path d={sl(plan.outer)} className={`outline${plan.overflow_mm > 0 ? " bad" : ""}`} data-marker-outline="1"
+                  style={guide ? (guideShown ? OUTLINE_GUIDE : OUTLINE_GUIDE_OFF) : OUTLINE}
                   data-overflow={plan.overflow_mm} data-guide={guide ? "1" : "0"} />
                 {on && guide && <path d={sl(cs.outer) + cs.holes.map(sl).join("")} fillRule="evenodd" data-cut-sel={f.id} style={CUT_SEL} />}
                 <path d={plan.black.map((p) => sl(p.outer) + p.holes.map(sl).join("")).join("")} fillRule="evenodd" className="black" data-marker-black="1" />
               </g>
             );
           })}
+          {/* WHY an edge that is "off" stays in the DOM, unpainted: its path is the shape's place (what the e2e measures), and a click finds the shape by its geometry, not by this path */}
           {shapes.map((s) => (
             <path key={s.id} d={sl(shapeLoop(s))} data-shape={s.id} data-kind={s.kind}
               className={[
@@ -1092,6 +1212,7 @@ export function Viewport() {
                 selIds.has(s.id) && "on",
                 hover?.kind === "edge" && hover.id === s.id && "hover",
                 featureRects.has(s.id) && "marker-rect",
+                edgeLook(s.id),
               ].filter(Boolean).join(" ")} />
           ))}
         </g>
@@ -1107,7 +1228,7 @@ export function Viewport() {
             {picks.map((r) => refMark(r, "pick-on"))}
           </g>
         )}
-        <SketchDims dims={visibleSketchDims(sketchDims, laid.length > 0 && sel?.kind !== "shape" && tool !== "dim" ? dimOf?.f.profile ?? null : null)} selected={dimSel} editing={sdimEdit ?? placing?.id ?? null} preview={previewDim}
+        <SketchDims dims={shownDims} quiet={quietDims} selected={dimSel} editing={sdimEdit ?? placing?.id ?? null} preview={previewDim}
           onSelect={(id) => useStudio.getState().selectDim(id)} onEdit={(id) => setSdimEdit(id)} />
         {fitBoxOf && (
           <path d={sl(rectCorners(fitBoxOf.rect))} data-fit-rect={fitBoxOf.f.id} className="fit-rect"
@@ -1125,10 +1246,12 @@ export function Viewport() {
             data-testid="select-box" data-select-box={drag.b[0] < drag.a[0] ? "crossing" : "window"}
             style={drag.b[0] < drag.a[0] ? CROSSING_BOX : WINDOW_BOX} />
         )}
-        <g className="ruler">
-          <rect x={0} y={0} width={w} height={RULER} className="ruler-bg" />
-          {ticks}
-        </g>
+        {overlays.rulers && (
+          <g className="ruler" data-testid="rulers">
+            <rect x={0} y={0} width={w} height={RULER} className="ruler-bg" />
+            {ticks}
+          </g>
+        )}
       </svg>
       {editDim && dimEdit && dimFid && (
         <DimEditor key={`${dimFid}:${editDim.field}`} dim={editDim}

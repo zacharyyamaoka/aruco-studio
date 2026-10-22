@@ -1,29 +1,26 @@
-/* Actual size (./scale.ts): the zoom indicator bottom left, its "estimated"
-   words, and the calibration dialog's card and ruler. Kit tokens only, so the
-   skins restyle it with the rest. */
+/* Actual size (./scale.ts) and the zoom pill (Miro's, ./ZoomIndicator.tsx):
+   the bottom-right pill with the zoom and ?, its "estimated" word, and the
+   calibration dialog's card and ruler. Kit tokens only, so the skins restyle
+   it with the rest. */
 
-/* ------------------------------------------------------------ the zoom indicator */
-/* WHY its width capped to the dock's left: the dock is centred (about 190 px
-   each side of the middle); the words wrap to a second line before they reach it */
-.zoom-pill { position: absolute; left: 12px; bottom: 14px; z-index: 10; display: flex; align-items: center; flex-wrap: wrap;
-  min-height: 38px; max-width: max(120px, calc(50% - 214px)); padding: 2px 12px 2px 3px; background: var(--panel); color: var(--text);
+/* ------------------------------------------------------------ the corner pill: the zoom | ? */
+.corner-pill { display: flex; align-items: center; gap: 2px; height: 38px; padding: 0 3px; background: var(--panel); color: var(--text);
   border: 1px solid var(--line); border-radius: 19px; box-shadow: var(--shadow-sm); }
-.zi-btn { height: 32px; padding: 0 9px; border: 0; border-radius: 16px; background: none; color: inherit; font: inherit; font-weight: 600;
-  white-space: nowrap; font-variant-numeric: tabular-nums; cursor: pointer; }
+.zoom-pill { display: inline-flex; align-items: center; }
+/* the percent: Miro's, a hover lights it (Zach: he likes the hover) */
+.zi-btn { display: inline-flex; align-items: center; height: 30px; padding: 0 11px; border: 0; border-radius: 15px; background: none; color: inherit;
+  font: inherit; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; cursor: pointer; }
 .zi-btn:hover, .zi-btn[data-popup-open] { background: var(--hover); }
-.zi-btn:focus-visible, .zi-cal:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-/* "(estimated — calibrate)": a word's space after "Actual size"; wrapped to its own line, under its text */
-.zoom-pill[data-actual="1"][data-calibrated="0"] .zi-btn { padding-right: 2px; }
-.zi-est { color: var(--muted); padding-left: 9px; }
-.zi-cal { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.zi-btn:focus-visible, .cp-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.zi-est { color: var(--muted); font-weight: 400; margin-left: 5px; }
+.cp-sep { flex: none; width: 1px; height: 18px; background: var(--line-soft); }
+/* ? in the pill */
+.cp-btn { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%;
+  background: none; color: var(--text); cursor: pointer; }
+.cp-btn:hover, .cp-btn[data-popup-open] { background: var(--hover); }
 /* in a menu row: Actual size's "estimated" */
 .zm-est { margin-left: 4px; color: var(--muted); font-size: 11px; }
-
-/* a phone: only while at Actual size (its words matter), under the document pill */
-@media (max-width: 640px) {
-  .zoom-pill { top: 82px; bottom: auto; left: 8px; max-width: calc(100% - 16px); }
-  .zoom-pill[data-actual="0"] { display: none; }
-}
+.zm-popup { min-width: 230px; }
 
 /* ------------------------------------------------------------ the calibration dialog */
 .cal-body { display: flex; flex-direction: column; gap: 12px; padding: 4px 16px 8px; }

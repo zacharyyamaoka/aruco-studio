@@ -67,6 +67,10 @@ export const hasSelection = (): boolean => { const { doc, plans, sel, multi } = 
 export const actualSize = (at?: Vec2): void => setZoom(useScale.getState().scale.pxPerMm, at);
 /** 100 %: CSS's millimetre, 96 px per inch (what a browser calls 1 mm). */
 export const zoom100 = (at?: Vec2): void => setZoom(CSS_PX_PER_MM, at);
+/** The zoom pill's steps (Miro's zoom menu), in percent of CSS's millimetre. */
+export const ZOOM_STEPS = [50, 100, 200, 400] as const;
+/** Zoom to `percent` % of CSS's millimetre about a view point (default: the view's centre). */
+export const zoomToPercent = (percent: number, at?: Vec2): void => setZoom((percent / 100) * CSS_PX_PER_MM, at);
 export const openCalibrate = (): void => useScale.getState().setCalibrating(true);
 
 /** Keep Actual size actual: when the scale changes (another monitor, a page

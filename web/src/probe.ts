@@ -11,6 +11,7 @@ import { activeFeatureId, useStudio } from "./store";
 import { view3d, type View3DProbe } from "./view3d/probe3d";
 import { exampleMarksKnown } from "./app/thumbs";
 import { useScale } from "./zoom/scale";
+import { useOverlays } from "./overlays/overlays";
 
 export interface Probe {
   kind: "real" | "mock";
@@ -45,6 +46,8 @@ function snapshot() {
     markerInfo: s.markerInfo, thumbs: exampleMarksKnown(),
     // the actualsize lane (2026-10-21): this screen's scale (px per mm) for Actual size, and whether it is calibrated
     scale: (({ key, pxPerMm, calibrated, basis }) => ({ key, pxPerMm, calibrated, basis }))(useScale.getState().scale),
+    // the calmcanvas lane (2026-10-21): the Layers menu's background and switches
+    overlays: useOverlays.getState().overlays,
   };
 }
 

@@ -12,7 +12,8 @@
 //   history, Move to trash; on a phone also Download for CAD).
 // - Top right: Download for CAD, then Verify | Print (K, S: in the tooltips,
 //   no key badges).
-// - Bottom right: ? (the keys, and how the start went) and GitHub.
+// - Bottom right (Miro's, 2026-10-21): one pill with the zoom and ? (the keys,
+//   and how the start went), then GitHub.
 // WHY one item in one menu (Zach, 2026-10-21: "Please unify these two file
 // menus, they are redundant... Copy how figma does it"; simple-hosted-files
 // SPEC "v2.9 Menus follow Figma's split"): the logo's menu is the app's (File
@@ -42,6 +43,7 @@ import { WaitLine, failedDetail, reload, startingText, useTick } from "../panel/
 import { useStudio } from "../store";
 import { SKINS, useSkin } from "../skins/skins";
 import { exportPdf, exportSvg, openDoc, openPrint, openVerify, saveDoc } from "./commands";
+import { ZoomIndicator } from "../zoom/ZoomIndicator";
 import { ZoomItems } from "../zoom/ZoomItems";
 import { openHome } from "./home";
 
@@ -501,21 +503,29 @@ function HelpBody() {
   );
 }
 
-/** The bottom corner: ? (the keys and the status) and GitHub; on a phone they
- *  are in the ⌄ menu, and `help` opens the same list as a dialog. */
+/** The bottom-right corner, Miro's: one calm pill with the zoom (its percent,
+ *  a click opens the zoom rows: ../zoom/ZoomIndicator.tsx) and ? (the keys and
+ *  the status), then the GitHub button. WHY (Zach, 2026-10-21, from Miro): the
+ *  zoom moved here from the bottom left, "in one calm pill with the existing
+ *  help (?) button". On a phone ? and GitHub are in the ⌄ menu (`help` opens
+ *  the same list as a dialog), and the zoom shows only at Actual size, under
+ *  the document pill (styles.css). */
 export function HelpCorner({ help, setHelp }: { help: boolean; setHelp: (on: boolean) => void }) {
   const narrow = useNarrow();
   return (
     <>
       <div className="corner" data-testid="corner">
-        <Popover.Root open={help && !narrow} onOpenChange={setHelp}>
-          <Popover.Trigger className="corner-btn" data-testid="help" title="Keyboard shortcuts" aria-label="Keyboard shortcuts"><CircleHelp size={18} /></Popover.Trigger>
-          <Popover.Portal>
-            <Popover.Positioner side="top" align="end" sideOffset={8} className="kit-menu-positioner">
-              <Popover.Popup className="kit-menu-popup help-popup" data-kit-popup="help" data-testid="help-popover"><HelpBody /></Popover.Popup>
-            </Popover.Positioner>
-          </Popover.Portal>
-        </Popover.Root>
+        <div className="corner-pill" data-testid="corner-pill">
+          <ZoomIndicator />
+          <Popover.Root open={help && !narrow} onOpenChange={setHelp}>
+            <Popover.Trigger className="cp-btn" data-testid="help" title="Keyboard shortcuts" aria-label="Keyboard shortcuts"><CircleHelp size={17} /></Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Positioner side="top" align="end" sideOffset={10} className="kit-menu-positioner">
+                <Popover.Popup className="kit-menu-popup help-popup" data-kit-popup="help" data-testid="help-popover"><HelpBody /></Popover.Popup>
+              </Popover.Positioner>
+            </Popover.Portal>
+          </Popover.Root>
+        </div>
         <a className="corner-btn" href={GITHUB} target="_blank" rel="noreferrer" title="Source on GitHub" aria-label="GitHub" data-testid="github"><GithubMark /></a>
       </div>
       <Dialog open={help && narrow} onClose={() => setHelp(false)} title="Keyboard shortcuts" testid="help-dialog" width={360}><HelpBody /></Dialog>
