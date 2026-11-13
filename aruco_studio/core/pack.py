@@ -55,7 +55,7 @@ line cuts up (`_variants`): they sometimes fit a bin fewer as well.
 ### The API
 
     pack(boxes, bin_w, bin_h, gap=0.0, stock=None,
-         objective="fewest_sheets") -> Packing
+         objective="fewest_sheets", keep_clear=None) -> Packing
 
 `Box(key, w, h, turn=True, turned=None, cut=None)`: `turned` is the box's
 size turned 90 degrees when that is not (h, w) (a sticker's caption stays
@@ -88,6 +88,7 @@ _TOL = 1e-6                         # cut lines: coordinates within this are the
 ND = 6                              # keys are rounded to 1e-6 (deterministic everywhere)
 
 CHOICES = ("bssf", "baf", "blsf", "tl")
+CARVES = ("rows", "cols")           # how a bin's free room is cut round what it keeps clear
 SPLITS = ("rows", "slas", "llas", "sas", "las", "minas", "maxas", "cols")
 ORDERS = (
     ("height", lambda w, h: (-h, -w)),
@@ -195,20 +196,56 @@ def _split(f, w, h, rule):
 
 def guillotine(boxes: Sequence[Box], bin_w: float, bin_h: float, order: int = 0,
                choice: str = "bssf", split: str = "rows",
-               first_h: Optional[float] = None) -> List[Optional[Place]]:
+               first_h: Optional[float] = None, keep=None,
+               carve: str = "rows") -> List[Optional[Place]]:
     """One guillotine variant (ORDERS[order], a CHOICES rule, a SPLITS rule),
     bins first-fit. Boxes that fit no empty bin get None. Sizes are as given
-    (pack grows them by the gap). `first_h`: the first bin's own height."""
+    (pack grows them by the gap). `first_h`: the first bin's own height.
+    `keep` {bin: [(x0, y0, x1, y1), ...]}: what each bin keeps clear, cut
+    round along `carve` ("rows" / "cols", _carve)."""
     keyf = ORDERS[order][1]
     seq = sorted(range(len(boxes)), key=lambda i: (tuple(round(v, ND) for v in
                                                          keyf(boxes[i].w, boxes[i].h)), i))
-    return _run(boxes, bin_w, bin_h, seq, choice, split, first_h)
+    return _run(boxes, bin_w, bin_h, seq, choice, split, first_h, keep, carve)
 
 
-def _run(boxes, bin_w, bin_h, seq, choice, split, first_h=None):
+def _carve(free, obstacles, axis):
+    """The free rectangles (x, y, w, h) left once every obstacle (x0, y0,
+    x1, y1) is cut out of them, guillotine-style, so the layout still frees
+    by straight cuts: a rectangle an obstacle overlaps becomes the bands
+    above and below it (full width) and the pieces left and right of it in
+    its y-span ("rows"), or the bands left and right (full height) and the
+    pieces above and below in its x-span ("cols")."""
+    for ox0, oy0, ox1, oy1 in obstacles:
+        out = []
+        for f in free:
+            fx, fy, fw, fh = f
+            ix0, iy0 = max(fx, ox0), max(fy, oy0)
+            ix1, iy1 = min(fx + fw, ox1), min(fy + fh, oy1)
+            if ix1 - ix0 <= _EPS or iy1 - iy0 <= _EPS:
+                out.append(f)
+                continue
+            if axis == "rows":
+                parts = [(fx, fy, fw, iy0 - fy), (fx, iy1, fw, fy + fh - iy1),
+                         (fx, iy0, ix0 - fx, iy1 - iy0), (ix1, iy0, fx + fw - ix1, iy1 - iy0)]
+            else:
+                parts = [(fx, fy, ix0 - fx, fh), (ix1, fy, fx + fw - ix1, fh),
+                         (ix0, fy, ix1 - ix0, iy0 - fy), (ix0, iy1, ix1 - ix0, fy + fh - iy1)]
+            out += [p for p in parts if p[2] > _EPS and p[3] > _EPS]
+        free = out
+    return free
+
+
+def _run(boxes, bin_w, bin_h, seq, choice, split, first_h=None, keep=None, carve="rows"):
     """guillotine() in the order `seq` (box indices)."""
     bins: List[list] = []
     out: List[Optional[Place]] = [None] * len(boxes)
+    last = max(keep, default=-1) if keep else -1     # the last bin that keeps anything clear
+
+    def fresh(b):
+        f = [(0.0, 0.0, float(bin_w), float(bin_h if first_h is None or b else first_h))]
+        return _carve(f, keep[b], carve) if keep and b in keep else f
+
     for i in seq:
         sizes = _sizes(boxes[i])
         spot = None
@@ -217,13 +254,18 @@ def _run(boxes, bin_w, bin_h, seq, choice, split, first_h=None):
             if got is not None:
                 spot = (b, got)
                 break
-        if spot is None:
-            h = float(bin_h if first_h is None or bins else first_h)
-            got = _choose([(0.0, 0.0, float(bin_w), h)], sizes, choice)
+        while spot is None:
+            free = fresh(len(bins))
+            got = _choose(free, sizes, choice)
+            if got is None and len(bins) <= last:
+                bins.append(free)               # kept too clear for it: on to the next bin,
+                continue                        # so bins stay the pages they keep clear on
             if got is None:
-                continue
-            bins.append([(0.0, 0.0, float(bin_w), h)])
+                break
+            bins.append(free)
             spot = (len(bins) - 1, got)
+        if spot is None:
+            continue
         b, (_k, fi, w, h, turned) = spot
         f = bins[b].pop(fi)
         bins[b].extend(_split(f, w, h, split))
@@ -357,18 +399,31 @@ def _turned_all(boxes: Sequence[Box], flat: bool, bin_w: float, bin_h: float):
 
 
 def _variants(boxes: Sequence[Box], bin_w: float, bin_h: float,
-              first_h: Optional[float] = None):
+              first_h: Optional[float] = None, keep=None):
     """(how, places) of every variant pack tries: ORDERS x CHOICES x SPLITS,
     then the ones that line cuts up -- every box turned the same way (the
     long side across, or along), and equal boxes packed together, the most
     numerous size first. Measured (2026-10-18, 400 sets with repeated
     sizes): each family wins some; each size on bins of its own never did
-    (every bin adds its edge cuts), so it is not tried."""
+    (every bin adds its edge cuts), so it is not tried. With `keep` (bins
+    that keep boxes clear) each runs once per CARVES way of cutting round
+    them, its `how` saying which; without, exactly as before."""
+    if not keep:
+        yield from _variants_carved(boxes, bin_w, bin_h, first_h, None, None)
+        return
+    for carve in CARVES:
+        for how, got in _variants_carved(boxes, bin_w, bin_h, first_h, keep, carve):
+            yield ("%s, carve %s" % (how, carve), got)
+
+
+def _variants_carved(boxes, bin_w, bin_h, first_h, keep, carve):
+    """_variants for one carve way (keep None: nothing kept clear)."""
+    c = (keep, carve or "rows")
     for oi, (oname, _f) in enumerate(ORDERS):
         for choice in CHOICES:
             for split in SPLITS:
                 yield ("%s, %s, %s" % (oname, choice, split),
-                       guillotine(boxes, bin_w, bin_h, oi, choice, split, first_h))
+                       guillotine(boxes, bin_w, bin_h, oi, choice, split, first_h, *c))
     for flat in (True, False):
         if not any(b.turn for b in boxes):
             break                                   # nothing turns: the variants above
@@ -377,7 +432,7 @@ def _variants(boxes: Sequence[Box], bin_w: float, bin_h: float,
         for oi, (oname, _f) in enumerate(ORDERS):
             for choice in CHOICES:
                 for split in SPLITS:
-                    got = guillotine(turned, bin_w, bin_h, oi, choice, split, first_h)
+                    got = guillotine(turned, bin_w, bin_h, oi, choice, split, first_h, *c)
                     yield ("%s turned %s, %s, %s" % ("flat" if flat else "upright", oname,
                                                      choice, split),
                            [p if p is None else p._replace(turned=flags[k])
@@ -393,7 +448,7 @@ def _variants(boxes: Sequence[Box], bin_w: float, bin_h: float,
     for choice in CHOICES:
         for split in SPLITS:
             yield ("same size, %s, %s" % (choice, split),
-                   _run(boxes, bin_w, bin_h, seq, choice, split, first_h))
+                   _run(boxes, bin_w, bin_h, seq, choice, split, first_h, *c))
 
 
 OBJECTIVES = ("fewest_sheets", "fewest_cuts")
@@ -408,9 +463,29 @@ def _cut_rect(p: Place, cut):
             round(p.y + y1, ND))
 
 
+def _union_area(rects) -> float:
+    """The area rectangles (x0, y0, x1, y1) cover together (overlaps once)."""
+    xs = sorted({v for r in rects for v in (r[0], r[2])})
+    area = 0.0
+    for a, b in zip(xs, xs[1:]):
+        spans = sorted((r[1], r[3]) for r in rects if r[0] <= a and r[2] >= b)
+        top = None
+        for y0, y1 in spans:
+            if top is None or y0 > top[1]:
+                if top is not None:
+                    area += (b - a) * (top[1] - top[0])
+                top = [y0, y1]
+            else:
+                top[1] = max(top[1], y1)
+        if top is not None:
+            area += (b - a) * (top[1] - top[0])
+    return area
+
+
 def pack(boxes: Sequence[Box], bin_w: float, bin_h: float, gap: float = 0.0,
          stock: Optional[Tuple[float, float, float, float]] = None,
-         objective: str = "fewest_sheets", first_h: Optional[float] = None) -> Packing:
+         objective: str = "fewest_sheets", first_h: Optional[float] = None,
+         keep_clear=None) -> Packing:
     """Every box on as few bins as possible, at least `gap` apart, never
     scaled: the best of the guillotine variants (ORDERS x CHOICES x SPLITS,
     see the module's docstring). A box no empty bin holds (either way
@@ -424,7 +499,16 @@ def pack(boxes: Sequence[Box], bin_w: float, bin_h: float, gap: float = 0.0,
 
     `first_h` (scale bar "first page", Zach 2026-10-20 night): the first bin
     is only this high (< bin_h): a page 1 that keeps a band for its scale bar
-    while the others give it to stickers. A box must fit that first bin too."""
+    while the others give it to stickers. A box must fit that first bin too.
+
+    `keep_clear` {bin: [(x0, y0, x1, y1), ...]} (Zach, 2026-11-13: "draw an
+    avoid box and then you recalculate it"): rectangles of a bin, in its
+    frame, no box may land in (spaced: nor within `gap` of; each grows by
+    the gap on its right and bottom as the boxes do). The bin's free room
+    starts cut round them (_carve), each variant once per CARVES way. A box
+    no bin up to the last one that keeps anything clear has room for goes
+    on the next, the bins between left empty: bin numbers stay the ones the
+    rectangles were given for. `fill` leaves their area out."""
     if objective not in OBJECTIVES:
         raise ValueError("objective is one of %s (got %r)" % (", ".join(OBJECTIVES), objective))
     cuts_first = objective == "fewest_cuts"
@@ -451,11 +535,20 @@ def pack(boxes: Sequence[Box], bin_w: float, bin_h: float, gap: float = 0.0,
             continue
         t = None if b.turned is None else (b.turned[0] + gap, b.turned[1] + gap)
         grown.append(Box(i, b.w + gap, b.h + gap, b.turn, t, b.cut))
+    keep, kept = {}, {}                 # bin -> grown + clipped (packing), clipped (fill)
+    for b, rects in sorted((keep_clear or {}).items()):
+        hb = small if b == 0 else bin_h
+        for x0, y0, x1, y1 in rects:
+            for out, d in ((keep, gap), (kept, 0.0)):
+                r = (max(0.0, float(x0)), max(0.0, float(y0)),
+                     min(bin_w + d, float(x1) + d), min(hb + d, float(y1) + d))
+                if r[2] - r[0] > _EPS and r[3] - r[1] > _EPS:
+                    out.setdefault(int(b), []).append(r)
     best = None
     seen: dict = {}                     # a bin's rects -> its cuts (variants often agree)
     k = 0
     for how, got in _variants(grown, bin_w + gap, bin_h + gap,
-                              None if first_h is None else small + gap):
+                              None if first_h is None else small + gap, keep):
         places = [p._replace(w=p.w - gap, h=p.h - gap) for p in got]
         nb = 1 + max((p.bin for p in places), default=-1)
         k += 1
@@ -478,8 +571,9 @@ def pack(boxes: Sequence[Box], bin_w: float, bin_h: float, gap: float = 0.0,
                                      nb == best[0][0] and cuts > best[0][1]):
                 break                   # more cuts already: it cannot win
             spread += b * sum((r[2] - r[0]) * (r[3] - r[1]) for r in mine)
-            compact += ((max(r[2] for r in mine) - min(r[0] for r in mine))
-                        * (max(r[3] for r in mine) - min(r[1] for r in mine)))
+            if mine:                    # a bin kept too clear for any box is empty
+                compact += ((max(r[2] for r in mine) - min(r[0] for r in mine))
+                            * (max(r[3] for r in mine) - min(r[1] for r in mine)))
         else:
             turns = sum(1 for p in places if p.turned)
             first = (cuts, nb) if cuts_first else (nb, cuts)
@@ -495,5 +589,6 @@ def pack(boxes: Sequence[Box], bin_w: float, bin_h: float, gap: float = 0.0,
         places = [p._replace(key=boxes[p.key].key) for p in got]
     area = sum(p.w * p.h for p in places)
     cap = nb * bin_w * bin_h - (bin_h - small) * bin_w if first_h is not None else nb * bin_w * bin_h
+    cap -= sum(_union_area(rs) for b, rs in kept.items() if b < nb)
     fill = area / cap if nb else 0.0
     return Packing(places=places, rejected=rejected, bins=nb, cuts=cuts, fill=fill, how=how)

@@ -1680,6 +1680,83 @@ def _xml(t: str) -> str:
 _PAGE = re.compile(r'<g data-page="(\d+)" transform="translate\(0 [^)]*\)">(.*?)</g>', re.S)
 
 
+_SIDES = ("top", "right", "bottom", "left")
+
+
+def _finite(v) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+
+
+def _sheet_margins(got, margin: float):
+    """sheet's `margins_mm` -> SheetSettings.margins_mm (top, right, bottom,
+    left), or None when every side is the preset's `margin`."""
+    if got is None:
+        return None
+    if not isinstance(got, dict):
+        raise ValueError(f"margins_mm is {{top, right, bottom, left}} in mm (got {got!r})")
+    for k, v in got.items():
+        if k not in _SIDES:
+            raise ValueError(f"margins_mm has no side {k!r}: one of {', '.join(_SIDES)}")
+        if v is not None and not (_finite(v) and v >= 0):
+            raise ValueError(f"margins_mm.{k}: a margin is a number of mm >= 0 (got {v!r})")
+    sides = tuple(margin if got.get(k) is None else float(got[k]) for k in _SIDES)
+    return None if all(v == margin for v in sides) else sides
+
+
+def _sheet_keep_clear(got) -> list:
+    """sheet's `keep_clear` -> [(page, x0, y0, x1, y1)] page mm, checked."""
+    if got is None:
+        return []
+    if not isinstance(got, list):
+        raise ValueError(f"keep_clear is a list of {{page, x_mm, y_mm, w_mm, h_mm}} (got {got!r})")
+    out = []
+    for n, k in enumerate(got, 1):
+        if not isinstance(k, dict):
+            raise ValueError(f"keep_clear box {n} is {{page, x_mm, y_mm, w_mm, h_mm}} (got {k!r})")
+        page = k.get("page")
+        if not (isinstance(page, int) and not isinstance(page, bool) and page >= 0):
+            raise ValueError(f"keep_clear box {n}: page is a page index >= 0 (got {page!r})")
+        for f in ("x_mm", "y_mm", "w_mm", "h_mm"):
+            v = k.get(f)
+            if not _finite(v) or (f in ("w_mm", "h_mm") and v <= 0):
+                raise ValueError(f"keep_clear box {n}: {f} is a number of mm"
+                                 f"{' > 0' if f in ('w_mm', 'h_mm') else ''} (got {v!r})")
+        x, y = float(k["x_mm"]), float(k["y_mm"])
+        out.append((page, x, y, x + float(k["w_mm"]), y + float(k["h_mm"])))
+    return out
+
+
+def _keep_by_page(keep) -> dict:
+    by: dict = {}
+    for page, *box in keep:
+        by.setdefault(page, []).append(tuple(box))
+    return by
+
+
+def _keep_clear_issues(keep, lay) -> list:
+    """An info issue per keep-clear box over the footer (every page) or the
+    scale bar (the pages that draw it): they still print there."""
+    pw, ph = lay.page_mm
+    mt, mr, mb, ml = lay.settings.margins()
+    bands = [("the footer", (ml, ph - mb - _SH.FOOTER_H_MM, pw - mr, ph - mb), None)]
+    if lay.ruler is not None:
+        x0, top = lay.printable_mm[0], lay.ruler["top"]
+        bands.append(("the scale bar", (x0, top, x0 + _SH.RULER_W_MM, top + _SH.RULER_H_MM),
+                      0 if lay.scale_bar == "first" else None))
+    out = []
+    for n, (page, *box) in enumerate(keep, 1):
+        if page >= lay.page_count:
+            continue
+        for words, (a, b, c, d), only in bands:
+            if only is not None and page != only:
+                continue
+            if min(box[2], c) - max(box[0], a) > 0 and min(box[3], d) - max(box[1], b) > 0:
+                out.append({"field": "preset", "level": "info",
+                            "text": f"Keep-clear box {n} on page {page + 1} covers {words}: "
+                                    "it still prints there"})
+    return out
+
+
 def sheet(req: dict, date=None) -> dict:
     """Every item on the first item's preset's page (core.sheet's sticker
     sheet: true size, cut lines, the scale bars), each captioned with its
@@ -1705,7 +1782,20 @@ def sheet(req: dict, date=None) -> dict:
     page, show on every page"): which pages draw the 100 mm / 4 in bar and
     keep its band, "hide" | "first" (default: a printer's scale is the same
     for a whole job, and a page without the bar gives its band to stickers) |
-    "every" (what every page had before). "hide" adds an info issue."""
+    "every" (what every page had before). "hide" adds an info issue.
+
+    `margins_mm` {top?, right?, bottom?, left?} (mm, each finite and >= 0):
+    each side given replaces the preset's margin_mm on that side (absent or
+    null keeps it); the printable area, the footer and the scale bar move
+    with them (SheetSettings.margins_mm). `keep_clear` [{page (0-based), x_mm,
+    y_mm, w_mm, h_mm}]: boxes on one page, in placements' frame (mm from the
+    page's top-left, y down), that no sticker nor its caption lands in
+    (spaced: nor within the gap of); a page whose clear room takes no sticker
+    sends it on, the page left empty (SheetSettings.keep_clear, core.pack).
+    One over the footer or the scale bar adds an info issue: those still
+    print there. Bad values raise ValueError naming the field.
+    WHY (Zach, 2026-11-13: "...reprint on the same page I have already cut"):
+    margins offset where printing starts; keep-clear boxes are per page."""
     def is_box(cut) -> bool:
         # a sticker's cut outline is its own bounding box (no holes)
         pts = (cut or {}).get("outer") or []
@@ -1765,15 +1855,19 @@ def sheet(req: dict, date=None) -> dict:
     mode = req.get("mode") or "spaced"
     gap = req.get("gap_mm")
     gap = _SH.SheetSettings.gap_mm if gap is None else float(gap)
+    margins = _sheet_margins(req.get("margins_mm"), margin)
+    keep = _sheet_keep_clear(req.get("keep_clear"))
     st = _SH.SheetSettings(page=page, landscape=False, custom_page_mm=custom, mode=mode, gap_mm=gap, margin_mm=margin,
                            title="ArUco Studio", cut_marks=bool(req.get("cut_lines", True)),
                            packer="guillotine",
                            objective=req.get("objective") or "fewest_sheets",
-                           scale_bar=scale_bar)
+                           scale_bar=scale_bar, margins_mm=margins,
+                           keep_clear=_keep_by_page(keep) or None)
     lay = _SH.layout_stickers(items, st)
     if scale_bar == "hide":
         warnings.append({"field": "tag", "level": "info",
                          "text": "No scale bar: measure a marker to check the print is at 100 %"})
+    warnings += _keep_clear_issues(keep, lay)
     date = date or datetime.date.today().isoformat()
     whole = _SH.render_sticker_svg(lay, date=date)
     pw, ph = (_f(v) for v in lay.page_mm)
