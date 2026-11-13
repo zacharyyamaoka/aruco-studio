@@ -110,10 +110,15 @@ def test_the_footer_and_the_scale_bar_move_with_the_margins():
 
 
 def test_a_bigger_margin_can_push_stickers_onto_another_page():
-    its = squares(24, side=41.5)
+    # 4 x 5 = 20 tiles of 41.5 mm fill a Letter page under the bar's band
+    # (test_web_scalebar.tiles); a 60 mm top margin takes a row of them away
+    # (FIXED 2026-11-13 after the build: the first version asked 24 on one
+    # page, which today's layout never fitted -- the ruler's error, not the build's)
+    its = squares(20, side=41.5)
     assert run(its, mode="tight")["pages"] == 1
-    got = run(its, mode="tight", margins_mm={"top": 120})
-    assert got["pages"] == 2 and len(boxes(got)) == 24
+    got = run(its, mode="tight", margins_mm={"top": 60})
+    assert got["pages"] == 2 and len(boxes(got)) == 20
+    assert len(boxes(got, 0)) < 20
 
 
 @pytest.mark.parametrize("bad", [{"top": -1}, {"left": "a"}, {"bottom": None, "right": -0.5}])
