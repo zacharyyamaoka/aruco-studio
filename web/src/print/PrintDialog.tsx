@@ -22,10 +22,17 @@
 // and Print and Download (PDF / SVG). Every change lays the sheet out again. Print opens
 // the browser's dialog on a print-only page (the sheet's SVGs at 100 %,
 // @page sized to the paper); Download PDF / SVG save the core's own files.
-import { useEffect, useRef, useState, type HTMLAttributes, type RefObject } from "react";
+// Page: the margins, each side driven by the preset's margin_mm until typed;
+// Keep clear: boxes drawn on a page that no sticker lands in (./clear.ts),
+// shown over the preview only, never on paper or in the files.
+// WHY (Zach, 2026-11-13: "...reprint on the same page I have already cut"):
+// margins offset where printing starts; a box is kept clear on its own page.
+import { useEffect, useRef, useState, type HTMLAttributes, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { createPortal } from "react-dom";
-import { Button, Dialog, FieldRow, Glyph, Menu, MenuItem, Messages, NumberField, Section, SegmentedRow } from "@bam/ui";
-import type { Sheet, SheetMode, SheetRequest } from "../core/contract";
+import { Button, Dialog, FieldRow, Glyph, IconButton, Menu, MenuItem, Messages, NumberField, Section, SegmentedRow, cn } from "@bam/ui";
+import type { KeepClear, Sheet, SheetMode, SheetRequest } from "../core/contract";
+import { DrivenField } from "../ui/DrivenField";
+import { SIDES, clearRequest, snap, useClear, type Side } from "./clear";
 import { core } from "../coreSource";
 import { downloadBase64, downloadText, slug } from "../io/files";
 import { featurePreset, getFeature, presetKey, sheetGroups, withFeatures } from "../model/doc";
@@ -77,6 +84,69 @@ function PageSvg({ svg, root, ...attrs }: { svg: string; root: RefObject<HTMLDiv
   return <div ref={ref} {...attrs} data-drawn={seen ? "1" : "0"} dangerouslySetInnerHTML={seen ? { __html: svg } : undefined} />;
 }
 
+const KEEP_MIN_MM = 2;          // a drawn box smaller than this either way is a slip, not a box
+const SIDE_LABEL: Record<Side, string> = { top: "Top", right: "Right", bottom: "Bottom", left: "Left" };
+const FIELDS = ["x_mm", "y_mm", "w_mm", "h_mm"] as const;
+
+/** Over one page of the preview (never on paper): its keep-clear boxes, the
+ *  printable area while margins are typed or a box is being drawn, and the
+ *  drag that draws a box. In mm, inside the scaled page, so it tracks Actual
+ *  size and Fit; a pointer's mm is read from the page as drawn. */
+function KeepLayer({ preset, page, w, h, drawing, area, selected, onSelect }: {
+  preset: string; page: number; w: number; h: number; drawing: boolean;
+  /** the printable area [x, y, w, h] mm, or null */
+  area: [number, number, number, number] | null;
+  selected: string | null; onSelect: (id: string | null) => void;
+}) {
+  const all = useClear((s) => s.boxes);
+  const boxes = all.filter((b) => b.preset === preset && b.page === page);
+  const ref = useRef<HTMLDivElement>(null);
+  const start = useRef<[number, number] | null>(null);
+  const [draft, setDraft] = useState<[number, number, number, number] | null>(null);
+  const mm = (e: ReactPointerEvent): [number, number] => {
+    const r = ref.current!.getBoundingClientRect();
+    return [Math.max(0, Math.min(w, ((e.clientX - r.left) / r.width) * w)), Math.max(0, Math.min(h, ((e.clientY - r.top) / r.height) * h))];
+  };
+  /** the box between two corners, each snapped to 0.5 mm: [x, y, w, h] */
+  const boxOf = (a: [number, number], b: [number, number]): [number, number, number, number] => {
+    const x0 = snap(Math.min(a[0], b[0])), y0 = snap(Math.min(a[1], b[1]));
+    return [x0, y0, snap(Math.max(a[0], b[0])) - x0, snap(Math.max(a[1], b[1])) - y0];
+  };
+  const at = ([x, y, bw, bh]: readonly number[]) => ({ left: `${x}mm`, top: `${y}mm`, width: `${bw}mm`, height: `${bh}mm` });
+  return (
+    <div ref={ref} className={cn("keep-layer", drawing && "drawing")} data-testid="keep-layer" data-page={page + 1}
+      onPointerDown={drawing ? (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        ref.current?.setPointerCapture?.(e.pointerId);
+        start.current = mm(e);
+        setDraft(boxOf(start.current, start.current));
+      } : undefined}
+      onPointerMove={(e) => { if (start.current) setDraft(boxOf(start.current, mm(e))); }}
+      onPointerUp={(e) => {
+        const a = start.current;
+        start.current = null;
+        setDraft(null);
+        if (!a) return;
+        const [x, y, bw, bh] = boxOf(a, mm(e));
+        if (bw < KEEP_MIN_MM || bh < KEEP_MIN_MM) return;
+        onSelect(useClear.getState().addBox({ preset, page, x_mm: x, y_mm: y, w_mm: bw, h_mm: bh }));
+      }}>
+      {area && <div className="keep-area" data-testid="keep-area" style={at(area)} />}
+      {boxes.map((b) => (
+        <div key={b.id} className={cn("keep-box", b.id === selected && "on")} data-testid="keep-box" data-box={b.id}
+          style={at([b.x_mm, b.y_mm, b.w_mm, b.h_mm])} onPointerDown={(e) => { if (drawing) return; e.stopPropagation(); onSelect(b.id); }}>
+          <span className="keep-label">keep clear</span>
+          <button type="button" className="keep-x" data-testid="keep-x" title="Delete this box" aria-label="Delete this keep-clear box"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); useClear.getState().removeBox(b.id); if (b.id === selected) onSelect(null); }}>×</button>
+        </div>
+      ))}
+      {draft && <div className="keep-box draft" data-testid="keep-draft" style={at(draft)} />}
+    </div>
+  );
+}
+
 function Stat({ value, label, testid, raw }: { value: string; label: string; testid: string; raw: number | undefined }) {
   return <div data-testid={testid} data-value={raw ?? ""}><b>{value}</b><span>{label}</span></div>;
 }
@@ -115,6 +185,12 @@ export function PrintDialog() {
   /** the group the view is being taken to: until it is in view, the scroll leaves the focus alone */
   const aim = useRef<string | null>(null);
   const [room, setRoom] = useState<[number, number]>([820, 600]);
+  /** Keep clear's Draw box is on: a drag on a page draws a box */
+  const [drawing, setDrawing] = useState(false);
+  /** the keep-clear box selected (Delete / Backspace removes it) */
+  const [selBox, setSelBox] = useState<string | null>(null);
+  const margins = useClear((s) => s.margins);
+  const boxes = useClear((s) => s.boxes);
   // the markers selected on the canvas (the dialog is modal: they hold while it is open)
   const picked = open ? selectedMarkerIds(doc, sel, multi) : [];
   const choice: Which = picked.length ? which ?? (printSelection() ? "selected" : "all") : "all";
@@ -129,17 +205,19 @@ export function PrintDialog() {
   const unset = source.features.filter((f) => !featurePreset(doc, f)).length;
   const printed3d = source.features.filter((f) => featurePreset(doc, f)?.method === "print3d").length;
   const settings: Omit<SheetRequest, "items"> = { cut_lines: true, mode: layout, objective, scale_bar: scaleBar, ...(layout === "spaced" ? { gap_mm: gap } : {}) };
-  const req: SheetRequest = { items, ...settings };
+  // the margins typed and this group's keep-clear boxes: only when there are any
+  const reqOf = (g: (typeof groups)[number]): SheetRequest => ({ items: g.items, ...settings, ...clearRequest(margins, boxes, g.preset.id) });
+  const req: SheetRequest = group ? reqOf(group) : { items, ...settings };
   const key = JSON.stringify(req);
   // every group's request: each is laid out, the group in focus's first
-  const reqs: SheetRequest[] = groups.map((g) => ({ items: g.items, ...settings }));
+  const reqs: SheetRequest[] = groups.map(reqOf);
   const keys = reqs.map((r) => JSON.stringify(r));
   const allKey = JSON.stringify(keys);
   const laid = group ? laidAll[group.key] ?? null : null;
 
   // opening: the group of the marker in focus
   useEffect(() => {
-    if (!open) { setGroupKey(null); setWhich(null); aim.current = null; return; }
+    if (!open) { setGroupKey(null); setWhich(null); aim.current = null; setDrawing(false); setSelBox(null); return; }
     const s = useStudio.getState();
     const own = featurePreset(s.doc, getFeature(s.doc, activeFeatureId(s)));
     setGroupKey(own ? presetKey(own) : null);
@@ -172,11 +250,27 @@ export function PrintDialog() {
     return () => { live = false; };
   }, [open, allKey, tries, ready]);
 
+  // Esc leaves Draw box (the dialog stays open); Delete / Backspace removes the selected box
+  useEffect(() => {
+    if (!open) return;
+    const key = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement | null)?.closest?.("input,textarea,select,[contenteditable=true]")) return;
+      if (e.key === "Escape" && drawing) setDrawing(false);
+      else if ((e.key === "Delete" || e.key === "Backspace") && selBox) { useClear.getState().removeBox(selBox); setSelBox(null); }
+      else return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    window.addEventListener("keydown", key, true);
+    return () => window.removeEventListener("keydown", key, true);
+  }, [open, drawing, selBox]);
+
   // Fit: the page and its scale bar inside the stage as it is now
   useEffect(() => {
     const el = stage.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setRoom([el.clientWidth - 32, el.clientHeight - 32]));
+    // WHY not when it measures nothing: the stage leaving at a close reported 0 x 0, and a reopened Fit drew the page at its 10 % floor
+    const ro = new ResizeObserver(() => { if (el.clientWidth > 0 && el.clientHeight > 0) setRoom([el.clientWidth - 32, el.clientHeight - 32]); });
     ro.observe(el);
     return () => ro.disconnect();
   }, [open]);
@@ -231,6 +325,11 @@ export function PrintDialog() {
   const scaleOf = (w: number, h: number) => (mode === "fit" ? Math.max(0.1, Math.min(1, room[0] / (w * MM_PX), room[1] / ((h + BAND_MM) * MM_PX))) : 1);
   const name = slug(doc.name);
   const many = (sheet?.svg.length ?? 0) > 1;
+  /** a group's margins (typed, else its preset's), top right bottom left */
+  const marginOf = (pm: number | undefined) => SIDES.map((s) => margins[s] ?? pm ?? 10) as [number, number, number, number];
+  const showArea = drawing || SIDES.some((s) => margins[s] !== undefined);
+  const presetMargin = group?.preset.margin_mm ?? 10;
+  const mine = group ? boxes.filter((b) => b.preset === group.preset.id) : [];
 
   const doPrint = () => {
     if (!current || !sheet) return;
@@ -265,7 +364,7 @@ export function PrintDialog() {
               : callWait ? <div className="print-error"><WaitLine wait={callWait} testid="print-wait" /></div>
               : error && <div className="print-error">{error}</div>}
             <div className="print-stage sheet-stage" data-testid="print-stage" data-mode={mode} ref={stage}
-              onScroll={onScroll} onWheel={byHand} onPointerDown={byHand} onKeyDown={byHand}>
+              onScroll={onScroll} onWheel={byHand} onPointerDown={() => { byHand(); setSelBox(null); }} onKeyDown={byHand}>
               {!sheet && groups.length <= 1 && !error && !coreWait && !callWait && <div className="muted pad">Laying out the page…</div>}
               {groups.map((g, gi) => {
                 const got = laidAll[g.key];
@@ -273,6 +372,7 @@ export function PrintDialog() {
                 const [gw, gh] = got ? svgSizeMm(got.sheet.svg[0] ?? "", fb) : fb;
                 const k = scaleOf(gw, gh);
                 const n = got?.sheet.svg.length ?? 0;
+                const [mt, mr, mb, ml] = marginOf(g.preset.margin_mm);
                 return (
                   <section key={g.key} className="sheet-section" data-testid="sheet-section" data-group-index={gi} data-sheet-group={g.preset.id}
                     data-busy={got && got.key !== keys[gi] && !error ? "1" : "0"}>
@@ -293,8 +393,12 @@ export function PrintDialog() {
                           <div className="print-scaled" style={{ width: w * MM_PX * k, height: (h + (bar ? BAND_MM : 0)) * MM_PX * k }}>
                             <div style={{ transform: `scale(${k})`, transformOrigin: "0 0", width: `${w}mm` }}>
                               <ScaleBar onPage={bar} />
-                              <PageSvg svg={svg} root={stage} className="print-page" data-testid="print-page" data-page={i + 1} data-scale-bar={bar ? "1" : "0"}
-                                data-page-mm={`${w}x${h}`} style={{ width: `${w}mm`, height: `${h}mm` }} />
+                              <div className="keep-host">
+                                <PageSvg svg={svg} root={stage} className="print-page" data-testid="print-page" data-page={i + 1} data-scale-bar={bar ? "1" : "0"}
+                                  data-page-mm={`${w}x${h}`} style={{ width: `${w}mm`, height: `${h}mm` }} />
+                                <KeepLayer preset={g.preset.id} page={i} w={w} h={h} drawing={drawing} selected={selBox} onSelect={setSelBox}
+                                  area={showArea ? [ml, mt, w - ml - mr, h - mt - mb] : null} />
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -305,13 +409,49 @@ export function PrintDialog() {
               })}
             </div>
           </div>
-          <div className="sheet-side" data-testid="sheet-side" data-request={laid?.key ?? ""}>
+          <div className="sheet-side" data-testid="sheet-side" data-request={laid?.key ?? ""} data-placements={JSON.stringify(laid?.sheet.placements ?? [])}>
             <Section title="Print" testid="sheet-markers">
               <FieldRow path="sheet.markers" label="Markers">
                 <SegmentedRow compact value={choice} onChange={(v) => setWhich(v as Which)} testid="sheet-which"
                   options={[{ value: "all", label: `All (${doc.features.length})` }, { value: "selected", label: `Selected (${picked.length})`, disabled: !picked.length }]} />
               </FieldRow>
               <div className="sheet-note muted">{picked.length ? `${picked.length} selected on the canvas, with their ids` : "select markers on the canvas (right-drag, Shift+click) to print only those"}</div>
+            </Section>
+            <Section title="Page" testid="sheet-margins">
+              {SIDES.map((side) => (
+                <FieldRow key={side} path={`sheet.margins_mm.${side}`} label={SIDE_LABEL[side]}>
+                  <span data-testid={`sheet-margin-${side}`}>
+                    <DrivenField path={`sheet.margins_mm.${side}`} value={margins[side] ?? presetMargin} driven={margins[side] === undefined}
+                      driver={`the preset's margin, ${presetMargin} mm`} unit="mm" min={0} step={0.5}
+                      onSet={(v) => useClear.getState().setMargin(side, v)} onReset={() => useClear.getState().setMargin(side, null)} />
+                  </span>
+                </FieldRow>
+              ))}
+              <div className="sheet-note muted">where printing starts and stops on the paper</div>
+            </Section>
+            <Section title="Keep clear" testid="sheet-keep">
+              <div className="keep-tools">
+                <Button size="sm" variant={drawing ? "primary" : "default"} testid="keep-draw" disabled={!group}
+                  title={drawing ? "Drawing: drag on a page. Esc or click to stop" : "Drag on a page to draw a box to keep clear"}
+                  onClick={() => setDrawing((d) => !d)}>Draw box</Button>
+                {mine.length > 0 && <Button size="sm" variant="ghost" testid="keep-clear-all"
+                  onClick={() => { if (group) useClear.getState().clearBoxes(group.preset.id); setSelBox(null); }}>Clear all</Button>}
+              </div>
+              {mine.length > 0 && <div className="keep-row keep-head muted"><span /><span>x</span><span>y</span><span>w</span><span>h</span><span /></div>}
+              {mine.map((b, i) => (
+                <div key={b.id} className={cn("keep-row", b.id === selBox && "on")} data-testid={`keep-row-${i}`} data-box={b.id}
+                  onPointerDown={() => setSelBox(b.id)}>
+                  <span className="keep-row-page">{`Page ${b.page + 1}`}</span>
+                  {FIELDS.map((f) => (
+                    <NumberField key={f} value={b[f]} step={0.5} min={f === "w_mm" || f === "h_mm" ? KEEP_MIN_MM : undefined}
+                      path={`sheet.keep_clear.${i}.${f}`} title={`${f.replace("_mm", "")}, mm`}
+                      onCommit={(v) => useClear.getState().updateBox(b.id, { [f]: v } as Partial<KeepClear>)} />
+                  ))}
+                  <IconButton icon="close" title="Delete this box" testid={`keep-del-${i}`}
+                    onClick={() => { useClear.getState().removeBox(b.id); if (b.id === selBox) setSelBox(null); }} />
+                </div>
+              ))}
+              <div className="sheet-note muted">draw where the sheet is already cut; stickers are laid out round it</div>
             </Section>
             <Section title="Auto layout" testid="sheet-layout">
               <FieldRow path="sheet.mode" label="Layout">
