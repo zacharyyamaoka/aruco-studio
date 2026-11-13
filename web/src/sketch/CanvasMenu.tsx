@@ -7,6 +7,8 @@
 //   Turn 90°, Export SVG;
 // - a shape, several, a profile: ArUco Extrude (A), Copy, Paste here,
 //   Duplicate, Delete;
+// - 2+ markers selected: ArUco Re-ID… numbers only those (Zach, 2026-11-13:
+//   "batch select a bunch of ids and then set the starting ID");
 // - empty canvas: Paste here;
 // - always: the zoom group (../zoom/ZoomItems.tsx), about the click's point.
 // The kit's menu rows and popup (the logo's menu's look), on a point anchor.
@@ -14,7 +16,7 @@ import { useMemo } from "react";
 import { Menu as M } from "@base-ui/react/menu";
 import { MenuItem, MenuSeparator } from "@bam/ui";
 import type { Vec2 } from "../core/contract";
-import { exportSvg } from "../app/commands";
+import { exportSvg, reIdScope } from "../app/commands";
 import { useStudio } from "../store";
 import { ZoomItems } from "../zoom/ZoomItems";
 
@@ -79,6 +81,13 @@ function Items({ at }: { at: MenuAt }) {
           <MenuItem label="Duplicate" hint="Ctrl+D" testid="cm-duplicate" disabled={!ids.length} onClick={() => st().duplicate()} />
           <MenuItem label="Delete" hint="Del" testid="cm-delete" disabled={!deletes} title={deletes ? undefined : "Select its shapes to delete them"}
             onClick={() => st().deleteSelection()} />
+        </>
+      )}
+      {t.kind !== "canvas" && (reIdScope()?.length ?? 0) > 1 && (
+        <>
+          <MenuSeparator />
+          <MenuItem icon="marker" label={`ArUco Re-ID ${reIdScope()!.length} selected…`} testid="cm-reid"
+            title="Number the selected markers from a start, left to right, top to bottom" onClick={() => st().openModal("reid")} />
         </>
       )}
       {t.kind === "marker" && (

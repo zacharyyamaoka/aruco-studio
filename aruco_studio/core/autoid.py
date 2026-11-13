@@ -56,21 +56,25 @@ reproducible with no ledger. What is guaranteed:
       Python's salted hash()). Modes "next" and "sequential" number in
       document order instead.
 
-Next id -- rule 3, version 2 (mode "next", the request's default since
-2026-10-20 night; DEFAULT_MODE. Zach: "As I copy paste new single markers,
-how are the new IDs calculated? It seems like it would be simplest if they
-simply increment"). Rule 3 above is version 1 (mode "hash", still asked for
-by name); rules 1 and 2 are the same in both:
+Next id -- rule 3, version 3 (mode "next", the request's default; DEFAULT_MODE).
+Zach, 2026-11-13: "when you copy paste markers they should increment to the
+next available IDs in order left to right ... from actually the available
+IDs, deleted markers need to release". Rule 3 above is version 1 (mode
+"hash", still asked for by name); rules 1 and 2 are the same in every mode:
 
-    3'. every other driven item, in REQUEST (document) order, takes the first
-        free block of its count that starts after the HIGHEST id in use in its
-        family -- ledger, typed, held and reserved ids, and the blocks this
-        call already gave out -- so pasting #5 three times gives #6, #7, #8;
-        a typed or reserved id in the way is stepped over. Past the end of its
-        dictionary it wraps to the lowest free block, with an info issue that
-        says so; then held blocks and a full dictionary as rule 3. `start` is
-        sequential's and is ignored. Ids freed by a removed feature are
-        reused only by that wrap.
+    3'. every other driven item, in REQUEST order (the Studio sends new
+        markers in reading order, left to right, top to bottom), takes the
+        LOWEST free block of its count in its family -- ledger, typed, held
+        and reserved ids, and the blocks this call already gave out, are in
+        use; an id is in use only while its feature is in the request, so a
+        removed feature's ids are free again at once. Then held blocks and
+        a full dictionary as rule 3. `start` is sequential's and is ignored.
+        A gap (numbering from 100, say) is Re-ID's: mode "sequential".
+        Decision record: docs/peps/0004-ids-lowest-free-and-reid-from-start.md.
+
+    Version 2 (2026-10-20 night, "simplest if they simply increment") took
+    the first free block after the HIGHEST id in use and reused a freed id
+    only at the dictionary's end; Zach's 2026-11-13 ask replaced it.
 
 Re-ID (IdRequest.mode / start / fresh, Zach, 2026-10-20: "we should be able
 to have lots of the markers on a page and then re-id them"):
@@ -245,7 +249,7 @@ def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None,
     if not isinstance(fresh, bool):
         raise ValueError(f"fresh: true or false, got {fresh!r}")
     sequential, origin = mode == "sequential", start      # `start` is reused below
-    after_highest = mode == "next"
+    lowest = mode == "next"
     its = [item_of(d) for d in (items or [])]
     by_family = reserved_in(reserved)
     every = by_family.get(None, set())
@@ -371,23 +375,17 @@ def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None,
                     hold.setdefault(led[it.key] + k, it.key)
     # 3. the rest, driven: the preferred block, else the next free one (wrapping);
     #    sequential: in request order, from its family's counter;
-    #    next (3'): in request order, after the highest id in use in its family
+    #    next (3'): in request order, the lowest free block in its family
     counter: Dict[str, int] = {}
     wrapped: Set[str] = set()
-
-    def highest(fam: str) -> int:
-        """The highest id in use in the family (-1: none): printed, held or reserved."""
-        return max([*claims.get(fam, {}), *held.get(fam, {}), *res_of(fam)], default=-1)
-    for it in (its if sequential or after_highest else order):
+    for it in (its if sequential or lowest else order):
         if it.key in out:
             continue
-        if after_highest:
-            # WHY after the highest and never into a gap below it: an id a removed
-            # feature freed may still be printed on a part somewhere, so it comes
-            # back only when the dictionary has nothing left above (the wrap)
-            if it.family not in counter:
-                counter[it.family] = highest(it.family) + 1
-            want = counter[it.family]
+        if lowest:
+            # WHY from 0 and never after the highest (Zach, 2026-11-13: "deleted
+            # markers need to release"): a removed feature's ids are free again
+            # and the next new marker takes the lowest one; a gap is Re-ID's
+            want = 0
         elif sequential:
             want = counter.get(it.family, origin)
             if origin > it.capacity - 1 and it.dictionary not in wrapped:
@@ -401,11 +399,6 @@ def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None,
         last = it.capacity - it.count
         starts = list(range(want, last + 1)) + list(range(0, min(want, last + 1)))
         start = next((s for s in starts if not clash(it, s, True)), None)
-        if after_highest and start is not None and start < want:
-            warnings.append(_issue("info", it.key,
-                                   f"past {it.dictionary}'s last id {it.capacity - 1}: it wraps "
-                                   f"to the lowest free {'id' if it.count == 1 else 'block'} "
-                                   f"{_label(start, it.count)}"))
         if start is None:                          # a held block, never a reserved one
             start = next((s for s in starts if not clash(it, s) and not on_reserved(it, s)), None)
             if start is not None:
@@ -428,6 +421,5 @@ def assign(items, ledger: Optional[Dict[str, int]] = None, reserved=None,
             refuse(it, want, True)
             continue
         take(it, start, True)
-        # next: a wrapped block is below the counter, which stays past the highest
-        counter[it.family] = max(counter[it.family], start + it.count) if after_highest else start + it.count
+        counter[it.family] = start + it.count
     return {"items": [out[it.key] for it in its], "ledger": new_ledger, "warnings": warnings}

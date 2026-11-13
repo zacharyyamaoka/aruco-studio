@@ -20,6 +20,7 @@ import { boxOf, rectCorners, toScreen } from "../model/geom";
 import { presetStep, stepOf, stepOptions } from "../presets/fields";
 import { profileLoops } from "../sketch/model";
 import { useSkin } from "../skins/skins";
+import { reIdFrom } from "../app/commands";
 import { useStudio, type Tab } from "../store";
 import type { Box } from "../ui/anchor";
 import { DrivenChoice, DrivenField } from "../ui/DrivenField";
@@ -51,6 +52,8 @@ export function BatchPanel() {
   const setRow = (r: BatchRow, v: unknown) => st.setFieldMany(r.ids, r.path, v);
   const resetRow = (r: BatchRow) => st.resetFieldMany(r.ids, r.path);
   const methods = new Set(features.map((f) => f.preset?.method ?? "inkjet"));
+  /** the selection's lowest printed id: what its First ID shows */
+  const lowestId = Math.min(...features.flatMap((f) => (plans[f.id]?.ids?.length ? plans[f.id].ids : [f.marker.first_id])));
   const methodIcon = methods.size === 1 && methods.has("print3d") ? "print3d" : "inkjet";
   const dicts: Opt[] = (info?.dictionaries.map((d) => ({ value: d.name, label: d.name.replace("DICT_", ""), hint: `${d.capacity} ids` }))
     ?? FALLBACK_DICTS.map((d) => ({ value: d, label: d.replace("DICT_", "") })));
@@ -181,8 +184,21 @@ export function BatchPanel() {
       <Group title="Marker" />
       {readOnly("marker.type", "Type", "row-grid-2x2")}
       {list("marker.dictionary", "Dictionary", dicts, `${DEFAULT} (${DEFAULT_MARKER.dictionary.replace("DICT_", "")})`, "row-book-open")}
-      {readOnly("marker.first_id", "ID", "row-hash",
-        <Button size="sm" onClick={() => st.openModal("reid")} testid="batch-reid" title="Number only the selected markers">Re-ID…</Button>)}
+      {/* WHY a First ID here (Zach, 2026-11-13: "batch select a bunch of ids and then
+          set the starting ID and then it will Re-ID all of them, left to right, top to
+          bottom"): typing 100 numbers the selection 100, 101, ... in reading order, typed
+          ids too, one undo step (commands.ts reIdFrom); Re-ID… has the other options */}
+      {row("marker.first_id") && (
+        <FieldRow path="marker.first_id" label="First ID" icon="row-hash"
+          title="Type an id: the selected markers are numbered from it, left to right, top to bottom">
+          <span className="batch-ctl batch-first-id" data-batch="marker.first_id" data-testid="batch-first-id">
+            <NumberField value={lowestId} int min={0} step={1} path="marker.first_id"
+              title="Number the selection from this id, left to right, top to bottom"
+              onCommit={(v) => { if (v !== lowestId) void reIdFrom(features.map((f) => f.id), v, false); }} />
+          </span>
+          <Button size="sm" onClick={() => st.openModal("reid")} testid="batch-reid" title="Re-ID the selected markers: Sequential or a fresh hash, keep typed ids or not">Re-ID…</Button>
+        </FieldRow>
+      )}
       <Group title="Size" />
       {number("marker.marker_mm", "Marker size", "fills the profile", { icon: "row-ruler", unit: "mm", min: 0.1, step: 0.5 })}
       {readOnly("marker.cols", "Columns × Rows", "row-grid-3x3")}

@@ -15,7 +15,9 @@
 import type { IdItem, IdResult, MarkerPlan, MarkerType } from "../core/contract";
 import { tabRows } from "../panel/issues";
 import { presetStep, stepKey } from "../presets/fields";
-import { DEFAULT_MARKER, idCount, idItems, isSet, presetKey, resetField, setField, type Doc, type Feature } from "./doc";
+import { profileLoops } from "../sketch/model";
+import { DEFAULT_MARKER, applyIds, idCount, idItems, isSet, presetKey, resetField, setField, type Doc, type Feature } from "./doc";
+import { boxOf, readingOrder, type Box } from "./geom";
 
 /** Several selected features' values differ. */
 export const MIXED = "mixed" as const;
@@ -45,7 +47,7 @@ export const BATCHABLE: readonly string[] = [
 export const NOT_BATCHABLE: Readonly<Record<string, string>> = {
   "profile": "Each marker has its own profile",
   "marker.type": "Type changes which rows a marker has: set it on one marker at a time",
-  "marker.first_id": "Ids stay unique: ArUco Re-ID… numbers the selection",
+  "marker.first_id": "Ids stay unique: type a First ID to Re-ID the selection from it, left to right, top to bottom",
   "feature.key": "Keys stay unique: set one marker's key at a time",
   "marker.cols": "A board's columns and rows fit its own profile: set them on one marker at a time",
   "marker.separation_mm": "A grid's separation fits its own profile: set it on one marker at a time",
@@ -185,23 +187,101 @@ export function batchSummary(features: Feature[], plans: Record<string, MarkerPl
 
 // ------------------------------------------------------------ Re-ID of a selection
 
-/** Re-ID's items when only `only` (feature ids) are renumbered: every other
- *  feature is held at the ids it has, as if typed (the core steps over typed
- *  ids: core/autoid.py rule 2), so only the selection moves. */
-export function reIdItems(doc: Doc, only: string[] | null): IdItem[] {
-  const items = idItems(doc);
-  if (!only) return items;
-  return items.map((it, i) => (only.includes(doc.features[i].id) ? it : { ...it, first_id: doc.features[i].marker.first_id }));
+/** Where a feature is on the sketch: its profile's outer loop's box. */
+export function featureBox(doc: Doc, f: Feature): Box | null {
+  const pr = f.profile ? profileLoops(doc.shapes, f.profile) : null;
+  return pr?.loops[0]?.length ? boxOf(pr.loops[0]) : null;
 }
 
-/** A Re-ID answer for a selection, made whole: its ledger is the document's
- *  for the other features and the answer's for the selection (a fresh answer
- *  knows only the features it numbered). */
-export function reIdResult(doc: Doc, only: string[] | null, res: IdResult): IdResult {
-  if (!only) return res;
-  const keys = new Set(doc.features.filter((f) => only.includes(f.id)).map((f) => f.key));
+/** The features in reading order (geom.ts readingOrder: left to right, top to
+ *  bottom), only `only`'s when given. */
+export function readingFeatures(doc: Doc, only: readonly string[] | null = null): Feature[] {
+  const fs = only ? doc.features.filter((f) => only.includes(f.id)) : doc.features;
+  return readingOrder(fs, (f) => featureBox(doc, f));
+}
+
+/** Re-ID's items: every feature, in READING order (the core numbers driven
+ *  items in request order, so Re-ID from 100 gives the top-left marker 100,
+ *  its right-hand neighbour 101, ...). When only `only` (feature ids) are
+ *  renumbered, every other feature is held at the ids it has, as if typed
+ *  (the core steps over typed ids: core/autoid.py rule 2), so only the
+ *  selection moves. `keepTyped` false: a typed id among those renumbered is
+ *  renumbered too (it becomes driven at its new id: reIdDoc).
+ *  WHY (Zach, 2026-11-13): "batch select a bunch of ids and then set the
+ *  starting ID and then it will Re-ID all of them, left to right, top to
+ *  bottom in priority". */
+export function reIdItems(doc: Doc, only: readonly string[] | null, keepTyped = true): IdItem[] {
+  const items = idItems(doc);
+  const byId = new Map(doc.features.map((f, i) => [f.id, items[i]]));
+  return readingFeatures(doc).map((f) => {
+    const it = byId.get(f.id)!;
+    if (only && !only.includes(f.id)) return { ...it, first_id: f.marker.first_id };
+    return keepTyped ? it : { ...it, first_id: null };
+  });
+}
+
+/** A Re-ID answer (for reIdItems(doc, only, keepTyped)) into the document:
+ *  its items back in document order (applyIds reads them by index), each
+ *  renumbered feature's new first id, a renumbered typed one driven now (its
+ *  new id is in the ledger, so it stays), and the ledger the document's for
+ *  the other features and the answer's for the renumbered ones (a fresh
+ *  answer knows only what it numbered). -> the document and the whole answer. */
+export function reIdDoc(doc: Doc, only: readonly string[] | null, res: IdResult, keepTyped = true): { doc: Doc; res: IdResult } {
+  const scope = new Set(doc.features.filter((f) => !only || only.includes(f.id)).map((f) => f.key));
+  const byKey = new Map(res.items.map((a) => [a.key, a]));
+  const items = doc.features.map((f) => byKey.get(f.key) ?? { key: f.key, first_id: f.marker.first_id, ids: [], driven: false });
+  const features = doc.features.map((f) => (
+    !keepTyped && scope.has(f.key) && isSet(f, "marker.first_id") && byKey.get(f.key)?.ids.length ? resetField(f, "marker.first_id") : f));
   const ledger: Record<string, number> = {};
-  for (const [k, v] of Object.entries(doc.id_ledger)) if (!keys.has(k)) ledger[k] = v;
-  for (const [k, v] of Object.entries(res.ledger)) if (keys.has(k)) ledger[k] = v;
-  return { ...res, ledger };
+  if (only) for (const [k, v] of Object.entries(doc.id_ledger)) if (!scope.has(k)) ledger[k] = v;
+  for (const [k, v] of Object.entries(res.ledger)) if (scope.has(k)) ledger[k] = v;
+  const whole: IdResult = { ...res, items, ledger };
+  return { doc: applyIds({ ...doc, features }, whole), res: whole };
+}
+
+/** The ArUco dictionary sizes of one bit size, smallest first (core/dictionary.py). */
+const SIZES = [50, 100, 250, 1000];
+
+/** Re-ID from `start` (Sequential): a marker whose dictionary is too small for
+ *  the ids it would be given moves to the smallest dictionary of its bit size
+ *  that holds them -- DICT_4X4_50 ends at #49, so numbered from 100 its
+ *  markers become DICT_4X4_250. The patterns of the first ids are the same in
+ *  every size (core/numbering.py family), only the range grows. Ids the other
+ *  markers hold at or past `start` push the numbering on, so they count.
+ *  -> the document (the same one when nothing grows) and each change [from, to].
+ *  WHY (Zach, 2026-11-13: "set a starting ID to like 100 and then all of them
+ *  would go 100, 101"): with the default DICT_4X4_50 the core wrapped them to
+ *  0 with a warning, which read as Re-ID doing nothing. */
+export function growForStart(doc: Doc, only: readonly string[] | null, start: number): { doc: Doc; grown: [string, string][] } {
+  const bits = (d: string) => /^DICT_(\d)X\1_(\d+)$/.exec(d);
+  const scope = doc.features.filter((f) => !only || only.includes(f.id));
+  const need = new Map<string, number>();        // bit size -> the last id the numbering reaches
+  for (const f of scope) {
+    const m = bits(f.marker.dictionary);
+    if (m) need.set(m[1], (need.get(m[1]) ?? start - 1) + idCount(f.marker));
+  }
+  for (const f of doc.features) {
+    const m = bits(f.marker.dictionary);
+    if (!m || !need.has(m[1]) || scope.includes(f)) continue;
+    const held = idsOf(f).filter((i) => i >= start).length;
+    need.set(m[1], need.get(m[1])! + held);
+  }
+  const grown: [string, string][] = [];
+  const features = doc.features.map((f) => {
+    const m = bits(f.marker.dictionary);
+    if (!m || !scope.includes(f)) return f;
+    const last = need.get(m[1])!;
+    if (Number(m[2]) > last) return f;
+    const size = SIZES.find((n) => n > last && n >= Number(m[2]));
+    if (!size) return f;                          // past DICT_nXn_1000: the core warns of the wrap
+    const to = `DICT_${m[1]}X${m[1]}_${size}`;
+    if (!grown.some(([a, b]) => a === f.marker.dictionary && b === to)) grown.push([f.marker.dictionary, to]);
+    return setField(f, "marker.dictionary", to);
+  });
+  return grown.length ? { doc: { ...doc, features }, grown } : { doc, grown };
+}
+
+/** "DICT_4X4_50 → DICT_4X4_250 (it ends at #49)" for each growth, in words. */
+export function grownWords(grown: [string, string][]): string {
+  return grown.map(([a, b]) => `${a.replace("DICT_", "")} → ${b.replace("DICT_", "")} (${a.replace("DICT_", "")} ends at #${Number(a.split("_").pop()) - 1})`).join(", ");
 }

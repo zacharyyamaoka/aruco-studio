@@ -15,11 +15,11 @@ import { create } from "zustand";
 import type { CoreInfo, IdResult, Issue, LabelParams, MarkerPlan, Preset, Suggestion } from "./core/contract";
 import { core, coreStatus } from "./coreSource";
 import {
-  addFeature, addShape, applyIds, refusedKeys, deleteShape, emptyDoc, featureOfProfile, featureOfRect, fillPresets, getFeature, keyOwner, newFeature, newId, nextTurn, pickSuggestion,
+  addFeature, addShape, refusedKeys, deleteShape, emptyDoc, featureOfProfile, featureOfRect, fillPresets, getFeature, keyOwner, newFeature, newId, nextTurn, pickSuggestion,
   rectProfile, removeFeature, resetField, setField, setShape, updateFeature, validateDoc, withoutRect, type Doc, type Feature, type Holes,
 } from "./model/doc";
 import { applyBatch, resetBatch } from "./model/batch";
-import { boxOf, fitBox, rectCorners, type Camera } from "./model/geom";
+import { boxOf, fitBox, readingOrder, rectCorners, type Camera } from "./model/geom";
 import { touchRecent } from "./presets/local";
 import { example } from "./model/examples";
 import type { Vec2 } from "./core/contract";
@@ -187,9 +187,10 @@ export interface Studio {
   /** the marker the panel is open on (a batch: every one) is made by `p` (one
    *  undo step), and a new marker starts with it; with no panel open, only the latter */
   setPreset: (p: Preset) => void;
-  /** Edit › ArUco Re-ID…: a core.assign_ids answer for idItems(doc)
-   *  (sequential or fresh hash) into the document's ids and ledger, as one undo step */
-  reId: (res: IdResult) => void;
+  /** ArUco Re-ID (the dialog, the batch panel's First ID): the document with the
+   *  new ids (model/batch.ts reIdDoc) and the core's answer they came from, as
+   *  one undo step */
+  reId: (next: Doc, res: IdResult) => void;
   openModal: (m: Modal) => void;
   say: (note: string | null) => void;
 
@@ -329,8 +330,13 @@ export const useStudio = create<Studio>((set, get) => {
     // new ids and keys: auto id hands each pasted feature new marker ids; every setting is kept
     // WHY a typed first id is driven in the copy (Zach, 2026-10-20 night: "simplest if they
     // simply increment"): kept typed, the copy would print the same id as its original;
-    // driven, it takes the next id after the highest in use (core autoid rule 3')
-    const features = c.features.map((f) => {
+    // driven, it takes the lowest free id (core autoid rule 3', Zach 2026-11-13: "the next
+    // available IDs ... deleted markers need to release")
+    // WHY in reading order (Zach, 2026-11-13: "increment ... in order left to right"): the
+    // core gives new markers ids in document order, so the copies join it left to right,
+    // top to bottom, wherever they sat in the clipboard
+    const at = (id: string) => { const sh = shapes.find((x) => x.id === id); return sh ? sketchBox([sh]) : null; };
+    const features = readingOrder(c.features, (f) => at(map[f.profile!.outer])).map((f) => {
       const id = newId("f");
       const g = { ...structuredClone(f), id, key: id, set: f.set.filter((p) => p !== "marker.first_id"),
         profile: { outer: map[f.profile!.outer], holes: f.profile!.holes.map((h) => map[h]) } };
@@ -583,7 +589,9 @@ export const useStudio = create<Studio>((set, get) => {
       if (many.length > 1 || owned.length > 1) {
         if (get().panel.open) get().ok();
         const { doc, panel, multi } = get();
-        const fresh = many.filter((r) => !featureOfRect(doc, r.id)).map((r) => newFeature(rectProfile(r.id), undefined, doc.default_preset));
+        // in reading order: the core numbers new markers in document order (autoid rule 3')
+        const fresh = readingOrder(many.filter((r) => !featureOfRect(doc, r.id)), (r) => sketchBox([r]))
+          .map((r) => newFeature(rectProfile(r.id), undefined, doc.default_preset));
         const next = fresh.reduce(addFeature, doc);
         // 2 or more: every rectangle has one now
         const ids = selectionFeatureIds(next, multi);
@@ -719,7 +727,7 @@ export const useStudio = create<Studio>((set, get) => {
     },
     // the planner's next auto id call (with this ledger) keeps these ids
     // its warnings and refusals too: a Re-ID that ran out of ids says so (review finding #5)
-    reId: (res) => put({ doc: applyIds(get().doc, res), idIssues: res.warnings, idRefused: refusedKeys(res) }),
+    reId: (next, res) => put({ doc: next, idIssues: res.warnings, idRefused: refusedKeys(res) }),
     openModal: (modal) => set({ modal }),
     say: (note) => set({ note }),
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   boxOf, circleLoop, fitBox, frameOf, handlePoint, inLoop, inRect, loopArea, loopD, loopHitsRect, niceStep, rectCorners, rectFromCorners,
-  resizeRect, snap, toScreen, toWorld, zoomAt,
+  readingOrder, resizeRect, snap, toScreen, toWorld, zoomAt,
 } from "./geom";
 
 describe("geometry", () => {
@@ -65,4 +65,16 @@ describe("geometry", () => {
     expect(frameOf([1, 0, 0, 5, 0, 1, 0, 6, 0, 0, 1, 0, 0, 0, 0, 1])).toEqual({ o: [5, 6], x: [1, 0], y: [0, 1] });
     expect(frameOf([])).toBeNull();
   });
+  it("reading order: rows from the top (y up), left to right in each; unboxed last, in order", () => {
+    const b = (x: number, y: number, s = 10) => ({ x0: x, y0: y, x1: x + s, y1: y + s });
+    const items = [
+      { n: "bottom-right", b: b(30, 0) }, { n: "top-right", b: b(30, 40) }, { n: "none", b: null },
+      { n: "bottom-left", b: b(0, 1) }, { n: "top-left", b: b(0, 42) }, { n: "top-mid-low", b: b(15, 39) },
+    ];
+    expect(readingOrder(items, (i) => i.b).map((i) => i.n)).toEqual(["top-left", "top-mid-low", "top-right", "bottom-left", "bottom-right", "none"]);
+    // a big box sets its row: small ones level with its middle read in it, by x
+    const big = { n: "big", b: b(0, 0, 50) };
+    expect(readingOrder([{ n: "right", b: b(60, 20) }, big, { n: "below", b: b(0, -30) }], (i) => i.b).map((i) => i.n)).toEqual(["big", "right", "below"]);
+  });
 });
+
