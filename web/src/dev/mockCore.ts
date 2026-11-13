@@ -359,7 +359,8 @@ function sheetOf(req: SheetRequest): Sheet {
   if (!first) return { pages: 0, svg: [], pdf_base64: "", warnings: [] };
   const plan = planOf(first);
   const one = svgOf(plan, 3);
-  const x = r2((page[0] - one.w) / 2), y = r2(margin + 10);
+  // margins_mm: the marker starts under the top one (keep_clear is not mocked)
+  const x = r2((page[0] - one.w) / 2), y = r2((req.margins_mm?.top ?? margin) + 10);
   const inner = one.svg.replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "");
   const cut = req.cut_lines ? `<rect x="${x}" y="${y}" width="${one.w}" height="${one.h}" fill="none" stroke="#e0218a" stroke-width="0.2" stroke-dasharray="1 1"/>` : "";
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${page[0]}mm" height="${page[1]}mm" viewBox="0 0 ${page[0]} ${page[1]}">`
