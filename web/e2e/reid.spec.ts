@@ -136,19 +136,24 @@ test.describe(`Re-ID (${CORE} core)`, () => {
     expect(rest).toEqual([[0], ...sequential(rest.slice(1).map((b: number[]) => b.length), 2)]);
   });
 
-  test("e · start 100 on DICT_4X4_50 warns that the numbering wraps to 0", async ({ page }) => {
+  test("e · start 100 on DICT_4X4_50: the dictionary grows to DICT_4X4_250 (4X4_50 ends at #49) and numbering starts at #100", async ({ page }) => {
+    // WHY (Zach, 2026-11-13: "set a starting ID to like 100 and then all of them would go
+    // 100, 101"): it used to wrap to 0 with a warning, which read as Re-ID doing nothing
     await sheet(page);
     await openReId(page);
     const start = page.locator('input[data-path="reid.start"]');
     await start.fill("100");
     await start.press("Enter");
-    const warn = page.locator('[data-issues-for="reid"] [data-level="warn"]');
-    await expect(warn).toHaveAttribute("data-text", "start 100 is past DICT_4X4_50's last id 49: numbering wraps to 0");
-    // still unique, from 0
-    const got = await preview(page);
-    expect(got[0]).toBe("#0");
-    await shot(page, "reid-wrap-warning");
-    await page.getByTestId("reid-cancel").click();
+    await expect(page.getByTestId("reid-grow")).toContainText("4X4_50 → 4X4_250");
+    await expect.poll(async () => (await preview(page))[0]).toBe("#100");
+    await expect(page.locator('[data-issues-for="reid"] [data-level="warn"]')).toHaveCount(0);
+    await shot(page, "reid-grow");
+    await page.getByTestId("reid-apply").click();
+    await idle(page);
+    const s = await state(page);
+    expect(Math.min(...s.doc.features.flatMap((f: any) => s.plans[f.id].ids))).toBe(100);
+    for (const f of s.doc.features) expect(f.marker.dictionary, f.id).not.toBe("DICT_4X4_50");
+    expect(unique(s)).toBe(true);
   });
 
   test("f · Cancel changes nothing", async ({ page }) => {

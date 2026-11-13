@@ -61,7 +61,7 @@ export function ReIdDialog() {
     setKeepTyped(!scope);
   }, [open]);
   // Sequential from a start past a marker's dictionary: it grows to one of its bit size that holds the ids
-  const { doc: base, grown } = open && how === "sequential" ? growForStart(doc, only, start) : { doc, grown: [] as [string, string][] };
+  const { doc: base, grown } = open && how === "sequential" ? growForStart(doc, only, start, keepTyped) : { doc, grown: [] as [string, string][] };
   const items = open ? reIdItems(base, only, keepTyped) : [];
   const req: IdRequest = { items, mode: how, fresh: true, ...(how === "sequential" ? { start } : {}) };
   const key = JSON.stringify(req);

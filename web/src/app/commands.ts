@@ -133,7 +133,7 @@ export function reIdScope(): string[] | null {
 export async function reIdFrom(only: string[] | null, start: number, keepTyped = false): Promise<boolean> {
   const doc = st().doc;
   // a dictionary too small for ids from `start` grows to one of its bit size that holds them
-  const { doc: base, grown } = growForStart(doc, only, start);
+  const { doc: base, grown } = growForStart(doc, only, start, keepTyped);
   try {
     const res = await core.assign_ids({ items: reIdItems(base, only, keepTyped), mode: "sequential", start, fresh: true });
     if (st().doc !== doc) { st().say("Re-ID not applied: the document changed while it was worked out. Try again."); return false; }

@@ -248,13 +248,15 @@ const SIZES = [50, 100, 250, 1000];
  *  markers become DICT_4X4_250. The patterns of the first ids are the same in
  *  every size (core/numbering.py family), only the range grows. Ids the other
  *  markers hold at or past `start` push the numbering on, so they count.
+ *  `keepTyped`: a typed id among them keeps its number, so it only holds one.
  *  -> the document (the same one when nothing grows) and each change [from, to].
  *  WHY (Zach, 2026-11-13: "set a starting ID to like 100 and then all of them
  *  would go 100, 101"): with the default DICT_4X4_50 the core wrapped them to
  *  0 with a warning, which read as Re-ID doing nothing. */
-export function growForStart(doc: Doc, only: readonly string[] | null, start: number): { doc: Doc; grown: [string, string][] } {
+export function growForStart(doc: Doc, only: readonly string[] | null, start: number, keepTyped = false): { doc: Doc; grown: [string, string][] } {
   const bits = (d: string) => /^DICT_(\d)X\1_(\d+)$/.exec(d);
-  const scope = doc.features.filter((f) => !only || only.includes(f.id));
+  // a typed id that is kept is not renumbered: it holds its id, as the others do
+  const scope = doc.features.filter((f) => (!only || only.includes(f.id)) && !(keepTyped && isSet(f, "marker.first_id")));
   const need = new Map<string, number>();        // bit size -> the last id the numbering reaches
   for (const f of scope) {
     const m = bits(f.marker.dictionary);
