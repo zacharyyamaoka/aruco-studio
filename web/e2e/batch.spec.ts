@@ -84,17 +84,20 @@ test.describe(`batch editing (${CORE} core)`, () => {
     expect(s.canUndo).toBe(false);
   });
 
-  test("b · ID and Type are read-only in batch mode, with reasons; Re-ID… numbers only the selection", async ({ page }) => {
+  test("b · Type is read-only in batch mode, with reasons; ID is a First ID (it Re-IDs them); Re-ID… numbers only the selection", async ({ page }) => {
     await sheet(page);
     const before = await state(page);
     await batch(page, NINE);
     await panelTab(page, "marker");
-    for (const [path, why] of [["marker.first_id", /Re-ID/], ["marker.type", /Type changes which rows/], ["feature.key", /unique/], ["profile", /own profile/]] as const) {
+    for (const [path, why] of [["marker.type", /Type changes which rows/], ["feature.key", /unique/], ["profile", /own profile/]] as const) {
       const ro = panel(page).locator(`[data-batch-ro="${path}"]`);
       await expect(ro, path).toHaveText("—");
       await expect(ro, path).toHaveAttribute("title", why);
     }
-    await expect(panel(page).locator('input[data-path="marker.first_id"]')).toHaveCount(0);
+    // WHY a field now (Zach, 2026-11-13: "set the starting ID and then it will Re-ID all of them"):
+    // it shows the selection's lowest id (reid-select.spec.ts types into it)
+    const lowest = Math.min(...NINE.flatMap((id) => before.plans[id].ids));
+    await expect(panel(page).getByTestId("batch-first-id").locator('input[data-path="marker.first_id"]')).toHaveValue(String(lowest));
     await expect(panel(page).locator('[data-path="marker.type"]')).toHaveCount(0);
     // a type mix: the board's own rows are hidden
     await expect(panel(page).locator('[data-row="marker.cols"]')).toHaveCount(0);
@@ -114,11 +117,22 @@ test.describe(`batch editing (${CORE} core)`, () => {
     for (const f of s.doc.features.filter((g: any) => !NINE.includes(g.id))) {
       expect(s.plans[f.id].ids, `${f.id} is not in the selection: unmoved`).toEqual(before.plans[f.id].ids);
     }
-    // the selection's ids: 0, 1, 2 … in document order, stepping over the others'
+    // the selection's ids: 0, 1, 2 … in reading order, stepping over the others'. The
+    // oracle: rows are the profiles whose y-ranges overlap (the sheet's three rows), top
+    // row first, each left to right
     const taken = new Set(before.doc.features.filter((g: any) => !NINE.includes(g.id)).flatMap((g: any) => before.plans[g.id].ids));
     const want: number[] = [];
     for (let id = 0; want.length < NINE.reduce((n, fid) => n + before.plans[fid].ids.length, 0); id++) if (!taken.has(id)) want.push(id);
-    const order = s.doc.features.filter((g: any) => NINE.includes(g.id));
+    const rectOf = (f: any) => s.doc.shapes.find((x: any) => x.id === f.profile.outer);
+    const rows: { y0: number; y1: number }[] = [];
+    for (const r of s.doc.shapes.filter((x: any) => x.id !== "sheet")) {
+      const [y0, y1] = [r.cy - r.h / 2, r.cy + r.h / 2];
+      const row = rows.find((q) => y0 < q.y1 && y1 > q.y0);
+      if (row) { row.y0 = Math.min(row.y0, y0); row.y1 = Math.max(row.y1, y1); } else rows.push({ y0, y1 });
+    }
+    const rowOf = (f: any) => { const r = rectOf(f); return rows.findIndex((q) => r.cy > q.y0 && r.cy < q.y1); };
+    const order = s.doc.features.filter((g: any) => NINE.includes(g.id))
+      .sort((a: any, b: any) => (rows[rowOf(b)].y1 - rows[rowOf(a)].y1) || (rectOf(a).cx - rectOf(b).cx));
     expect(order.flatMap((f: any) => s.plans[f.id].ids)).toEqual(want);
   });
 

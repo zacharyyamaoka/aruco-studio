@@ -5,6 +5,7 @@ import { getFeature, parseDoc, planRequest, serialise, sheetItems, withFeatures,
 import { idLines, idsReady, settledOutput } from "./output";
 import { activeFeatureId, selectedMarkerIds, useStudio } from "../store";
 import { leaveFile } from "../hosted/hosted";
+import { growForStart, grownWords, reIdDoc, reIdItems } from "../model/batch";
 
 const st = () => useStudio.getState();
 
@@ -110,4 +111,40 @@ export function openVerify(): void {
 export function openPrint(): void {
   if (!st().doc.features.length) { st().say("Nothing to print yet: make an ArUco Extrude (A) first."); return; }
   st().openModal("print");
+}
+
+/** The markers ArUco Re-ID numbers: the batch panel's (2+), else the canvas
+ *  selection's when it names 2+ (as Print reads it: printSelection), else
+ *  null (every marker).
+ *  WHY the canvas selection too (Zach, 2026-11-13: "batch select a bunch of
+ *  ids and then set the starting ID"): a right-drag box then Edit › ArUco
+ *  Re-ID… renumbered the whole document. */
+export function reIdScope(): string[] | null {
+  const { panel } = st();
+  if (panel.open && panel.featureIds.length > 1) return panel.featureIds;
+  return printSelection();
+}
+
+/** Number `only` (feature ids; null: every marker) from `start`, left to right,
+ *  top to bottom (model/batch.ts reIdItems), one undo step: the batch panel's
+ *  First ID. `keepTyped` false renumbers typed ids too (they become driven).
+ *  WHY (Zach, 2026-11-13): "set the starting ID to like 100 and then all of
+ *  them would go 100, 101, etc." */
+export async function reIdFrom(only: string[] | null, start: number, keepTyped = false): Promise<boolean> {
+  const doc = st().doc;
+  // a dictionary too small for ids from `start` grows to one of its bit size that holds them
+  const { doc: base, grown } = growForStart(doc, only, start, keepTyped);
+  try {
+    const res = await core.assign_ids({ items: reIdItems(base, only, keepTyped), mode: "sequential", start, fresh: true });
+    if (st().doc !== doc) { st().say("Re-ID not applied: the document changed while it was worked out. Try again."); return false; }
+    const out = reIdDoc(base, only, res, keepTyped);
+    st().reId(out.doc, out.res);
+    const n = only ? only.length : doc.features.length;
+    st().say(`Re-ID: ${n} marker${n === 1 ? "" : "s"} numbered from #${start}, left to right, top to bottom`
+      + (grown.length ? `; dictionary ${grownWords(grown)}.` : "."));
+    return true;
+  } catch (e) {
+    st().say(`Re-ID failed: ${(e as Error).message}`);
+    return false;
+  }
 }

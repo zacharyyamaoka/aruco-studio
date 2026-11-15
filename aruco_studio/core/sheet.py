@@ -189,6 +189,22 @@ class SheetSettings:
                                    # "guillotine" (core.pack: auto layout, stickers may turn)
     objective: str = "fewest_sheets"  # 2026-10-18, packer "guillotine": core.pack's ranking,
                                       # "fewest_sheets" (pages, then cuts) | "fewest_cuts"
+    # 2026-11-13, layout_stickers (Zach: "custom spacing margins, top bottom left
+    # right when I go to print"): (top, right, bottom, left) mm; None = margin_mm
+    # on every side (margins())
+    margins_mm: Optional[Tuple[float, float, float, float]] = None
+    # 2026-11-13, packer "guillotine" (Zach: "draw boxes on the pages that you need
+    # to keep clear ... reprint on the same page I have already cut"): {page
+    # (0-based): [(x0, y0, x1, y1), ...]} in page mm (top-left, y down) no sticker
+    # lands in (core.pack keep_clear)
+    keep_clear: Optional[Dict[int, List[Tuple[float, float, float, float]]]] = None
+
+    def margins(self) -> Tuple[float, float, float, float]:
+        """(top, right, bottom, left) mm: margins_mm, or margin_mm all round."""
+        if self.margins_mm is None:
+            m = float(self.margin_mm)
+            return (m, m, m, m)
+        return tuple(float(v) for v in self.margins_mm)
 
 
 class RejectedItem(NamedTuple):
@@ -1223,16 +1239,16 @@ def _caption_gap(item: PrintItem) -> float:
 def _area(settings: SheetSettings):
     """(page w, h, x0, y0, area w, area h, ruler, warnings): layout_sheet's.
     The area is page 1's; with scale_bar "first" the others are taller by the
-    ruler's band (_rest_h)."""
+    ruler's band (_rest_h). Each side's margin: settings.margins()."""
     page_w, page_h = page_size_mm(settings)
-    m = float(settings.margin_mm)
+    mt, mr, mb, ml = settings.margins()
     gap = float(settings.gap_mm)
-    if m < 0 or gap < 0:
+    if min(mt, mr, mb, ml) < 0 or gap < 0:
         raise ValueError("margin_mm and gap_mm must be >= 0")
     warnings: List[str] = []
-    x0, y0 = m, m
-    area_w = page_w - 2 * m
-    footer_top = page_h - m - FOOTER_H_MM
+    x0, y0 = ml, mt
+    area_w = page_w - (ml + mr)
+    footer_top = page_h - mb - FOOTER_H_MM
     ruler = None
     area_bottom = footer_top - BAND_GAP_MM
     if settings.ruler and settings.scale_bar != "hide":
@@ -1463,10 +1479,12 @@ def _guillotine_pages(prepared, settings, gap, x0, y0, area_w, area_h, page_w, p
                                cut=(cut[0], cut[-1])))
     # scale_bar "first": pages 2+ are rest_h tall, page 1 (area_h) keeps its band
     tall = area_h if rest_h is None else rest_h
+    keep = {pg: [(a - x0, b - y0, c - x0, d - y0) for a, b, c, d in rects]
+            for pg, rects in (getattr(settings, "keep_clear", None) or {}).items()}
     got = _pack.pack(boxes, area_w, tall, gap=gap,
                      stock=(-x0, -y0, page_w - x0, page_h - y0),
                      objective=getattr(settings, "objective", "fewest_sheets"),
-                     first_h=area_h if tall > area_h else None)
+                     first_h=area_h if tall > area_h else None, keep_clear=keep or None)
     pages: List[List[StickerPlace]] = [[] for _ in range(got.bins)]
     for pl in got.places:
         p = prepared[pl.key]
@@ -1504,6 +1522,9 @@ def sticker_summary(layout: StickerLayout) -> dict:
         extra["cut_lines"] = False
     if getattr(s, "packer", "shelf") != "shelf":
         extra["packer"] = s.packer
+    if getattr(s, "margins_mm", None) is not None:
+        extra["margins_mm"] = dict(zip(("top", "right", "bottom", "left"),
+                                       (_r4(v) for v in s.margins())))
     if layout.scale_bar != "every":
         extra["scale_bar"] = layout.scale_bar
         extra["rest_h_mm"] = _r4(layout.rest_h_mm)    # pages 2+ (the ruler is on page 1 only)
@@ -1658,6 +1679,7 @@ def _shelf_words(layout: StickerLayout, sh: dict) -> str:
 def sticker_page_ops(layout: StickerLayout, page_index: int, date: str) -> _Ops:
     s = layout.settings
     page_w, page_h = layout.page_mm
+    mt, mr, mb, ml = s.margins()
     total = max(1, layout.page_count)
     pg = _Ops(page_h)
     items = layout.pages[page_index] if page_index < len(layout.pages) else []
@@ -1668,20 +1690,19 @@ def sticker_page_ops(layout: StickerLayout, page_index: int, date: str) -> _Ops:
             if sh["page"] != page_index:
                 continue
             words = _fit_text(_shelf_words(layout, sh), SHELF_FONT_PT, max(sh["h"] - 1.0, 3.0))
-            x = max(1.5, float(s.margin_mm) - 2.0)
+            x = max(1.5, ml - 2.0)
             pg.text_up(x, sh["y"] + sh["h"] - 0.5, words, SHELF_FONT_PT, grey=0.3)
     if layout.ruler is not None and (layout.scale_bar != "first" or page_index == 0):
         _draw_ruler(pg, layout.ruler)
-    m = float(s.margin_mm)
-    base = page_h - m - 1.0
+    base = page_h - mb - 1.0
     title = s.title or "ArUco sticker sheet"
-    pg.text(m, base, "%s · %s · %s" % (title, s.mode, date), FOOTER_FONT_PT)
-    pg.text(page_w - m, base, "page %d/%d" % (page_index + 1, total), FOOTER_FONT_PT, "right")
+    pg.text(ml, base, "%s · %s · %s" % (title, s.mode, date), FOOTER_FONT_PT)
+    pg.text(page_w - mr, base, "page %d/%d" % (page_index + 1, total), FOOTER_FONT_PT, "right")
     if layout.rejected:
         pg.text(page_w / 2.0, base, "%d sticker(s) NOT printed -- see sheet.json"
                 % len(layout.rejected), FOOTER_FONT_PT, "center")
     if not layout.pages:
-        pg.text(m, m + 5, "No stickers placed.", 9)
+        pg.text(ml, mt + 5, "No stickers placed.", 9)
     return pg
 
 

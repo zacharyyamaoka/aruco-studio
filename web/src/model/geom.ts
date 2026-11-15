@@ -217,3 +217,30 @@ export function frameOf(m: number[]): { o: Vec2; x: Vec2; y: Vec2 } | null {
   if (!m || m.length !== 16) return null;
   return { o: [m[3], m[7]], x: [m[0], m[4]], y: [m[1], m[5]] };
 }
+
+/** Reading order (Zach, 2026-11-13: "left to right, top to bottom in
+ *  priority"): rows from the top of the sketch down (its y is up), each row
+ *  left to right. A box is in a row when its middle is level with the row's
+ *  first, topmost box, so a marker a little lower than its neighbours still
+ *  reads in their row. Items with no box keep their order, after the rest.
+ *  New markers take ids in this order (core/autoid.py rule 3'), and Re-ID
+ *  numbers in it. */
+export function readingOrder<T>(items: readonly T[], box: (t: T) => Box | null): T[] {
+  const boxed: { t: T; i: number; b: Box }[] = [];
+  const rest: T[] = [];
+  items.forEach((t, i) => {
+    const b = box(t);
+    if (b && [b.x0, b.y0, b.x1, b.y1].every(Number.isFinite)) boxed.push({ t, i, b });
+    else rest.push(t);
+  });
+  boxed.sort((p, q) => q.b.y1 - p.b.y1 || p.b.x0 - q.b.x0 || p.i - q.i);
+  const rows: { top: Box; members: typeof boxed }[] = [];
+  for (const e of boxed) {
+    const mid = (e.b.y0 + e.b.y1) / 2;
+    const row = rows[rows.length - 1];
+    if (row && mid >= row.top.y0 && mid <= row.top.y1) row.members.push(e);
+    else rows.push({ top: e.b, members: [e] });
+  }
+  const midX = (b: Box) => (b.x0 + b.x1) / 2;
+  return [...rows.flatMap((r) => r.members.sort((p, q) => midX(p.b) - midX(q.b) || p.i - q.i).map((e) => e.t)), ...rest];
+}

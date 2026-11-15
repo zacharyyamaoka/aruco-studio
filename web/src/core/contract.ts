@@ -293,7 +293,20 @@ export interface SheetRequest {
    *  the same for a whole job, and a bar on every page costs sticker area. A
    *  page without the bar gives that space to stickers. */
   scale_bar?: "hide" | "first" | "every";
+  /** where printing starts and stops on the paper, mm (Zach, 2026-11-13:
+   *  "custom spacing margins, top bottom left right, when I go to print"):
+   *  each side given replaces the preset's margin_mm on that side; the
+   *  printable area, the footer and the scale bar move with them */
+  margins_mm?: { top?: number; right?: number; bottom?: number; left?: number };
+  /** boxes no sticker (nor its caption) lands in, each on one page (Zach,
+   *  2026-11-13: "reprint on the same page I have already cut"); a page whose
+   *  clear room takes no sticker sends it to the next, left empty */
+  keep_clear?: KeepClear[];
 }
+
+/** A box kept clear on one page: page 0-based, mm from the page's top-left,
+ *  y down (placements' frame). */
+export interface KeepClear { page: number; x_mm: number; y_mm: number; w_mm: number; h_mm: number }
 
 /** True-scale pages for the preset's paper. svg pages use mm units. */
 export interface Sheet {
