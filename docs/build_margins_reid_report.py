@@ -105,7 +105,7 @@ def build(media: Path, evidence: dict) -> str:
                    for a, b, c in evidence.get("runs", []))
     body = f"""
 <h1>Print margins, keep-clear boxes, and IDs that behave</h1>
-<p class="muted">ArUco Studio · lane <code>lane/os-margins-reid</code> @ <code>{sha}</code> · 2026-11-13</p>
+<p class="muted">ArUco Studio · <code>main</code> @ <code>{sha}</code> · live on arucostudio.com · 2026-11-13</p>
 <div class="verdict"><b>Both asks work in the real app.</b> New markers take the lowest free IDs (a deleted marker's IDs
 come back at once) in reading order; select markers, type a <b>First ID</b> and they renumber 100, 101, … left to right,
 top to bottom. Print has Top / Right / Bottom / Left margins and per-page <b>keep-clear boxes</b> you drag on the preview;
@@ -115,7 +115,8 @@ the sheet is laid out again round them.</div>
 <div class="grid2">
 <figure><video src="{vid('hero-ids.mp4')}" autoplay muted loop playsinline controls></video>
 <figcaption>IDs: six rectangles drawn out of order, A on all → #0–5 in reading order; the marker printing #1 deleted, a copy
-pasted → it takes #1; all selected, First ID 100 → #100–106 (DICT_4X4_50 grows to 4X4_250, said in the note).
+pasted → it takes #1; all selected (the bare rectangle too, so A gives it a marker: seven), First ID 100 → #100–106
+(DICT_4X4_50 grows to 4X4_250, said in the note).
 <a href="hero-ids.gif">GIF</a></figcaption></figure>
 <figure><video src="{vid('hero-print.mp4')}" autoplay muted loop playsinline controls></video>
 <figcaption>Print: Top typed 60 mm → printing starts lower; Draw box on page 1 → the stickers are laid out round it.
@@ -126,7 +127,7 @@ pasted → it takes #1; all selected, First ID 100 → #100–106 (DICT_4X4_50 g
 <div class="grid3">
 <figure><img src="{img('ids-1-reading-order.png')}" alt=""><figcaption>A on six rectangles drawn out of order: #0–5 read left to right, top to bottom.</figcaption></figure>
 <figure><img src="{img('ids-2-released.png')}" alt=""><figcaption>#1 deleted (its rectangle stays, grey); the pasted copy on the right takes #1, not #6.</figcaption></figure>
-<figure><img src="{img('ids-3-first-id-100.png')}" alt=""><figcaption>Batch panel → <b>First ID</b> 100: #100–106 in reading order, one undo step.</figcaption></figure>
+<figure><img src="{img('ids-3-first-id-100.png')}" alt=""><figcaption>Batch panel → <b>First ID</b> 100: all seven (the bare rectangle got a marker from A) go #100–106 in reading order, one undo step.</figcaption></figure>
 </div>
 <ul>
 <li><b>Deleted markers release their IDs.</b> Auto id now gives a new marker the <i>lowest</i> free block in its dictionary family
@@ -177,7 +178,9 @@ asked for release, so that protection is gone: reprint with care if a deleted ma
 <li><b>A typed marker keeps its old ID held</b> (unchanged rule): type 30 on a marker that printed #0 and a paste gets #1, not #0. Clearing the typed value brings #0 back.</li>
 <li><b>Re-ID grows the dictionary instead of wrapping</b> (4X4_50 → 4X4_250). Undo: Ctrl+Z, or set the dictionary back by hand.</li>
 <li><b>Margins apply to every preset group; keep-clear boxes belong to one preset's pages.</b></li>
-<li><b>Landed on <code>main</code> and deployed to arucostudio.com.</b> Undo: <code>git revert -m 1</code> the merge and <code>wrangler rollback</code> (in the handoff).</li>
+<li><b>Landed on <code>main</code> @ <code>{evidence.get("merge", sha)}</code>, pushed, and deployed to arucostudio.com</b> (live build stamp reads
+<code>{evidence.get("live_git", "?")}</code>, Cloudflare version <code>{evidence.get("live_version", "?")}</code>). Undo: <code>git revert -m 1 {evidence.get("merge", sha)}</code>
+and <code>npx wrangler rollback {evidence.get("rollback_version", "?")}</code> from <code>web/</code>.</li>
 </ul>
 
 <h2>Not done</h2>
